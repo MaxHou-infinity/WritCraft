@@ -60,13 +60,13 @@ check('切换文件前先保存当前文件', () => {
   const readIndex = workspace.indexOf('bridge.readFile(path)', workspace.indexOf('async function openFile'));
   assert.ok(saveIndex > 0 && readIndex > saveIndex);
 });
-check('切换项目先结算 Onboarding 审阅与指标，再释放图片预览', () => {
+check('切换项目先结算 Onboarding 审阅与指标，再要求图片终态', () => {
   for (const name of ['createProject', 'openProject']) {
     const start = workspace.indexOf(`async function ${name}`);
     const end = workspace.indexOf('\n  async function ', start + 1);
     const body = workspace.slice(start, end > start ? end : undefined);
     const changesIndex = body.indexOf('await window.__changesView.discardPending()');
-    const imageIndex = body.indexOf('await window.__imageGenerationView?.discardPending?.()');
+    const imageIndex = body.indexOf('await window.__imageGenerationView.discardPending()');
     const projectCall = body.indexOf(name === 'createProject' ? 'await bridge.create(name)' : 'await bridge.open()');
     assert.ok(changesIndex >= 0 && imageIndex > changesIndex && projectCall > imageIndex,
       `${name} must settle Changes metrics and image preview before switching Main project`);

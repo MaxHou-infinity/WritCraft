@@ -275,12 +275,42 @@ test('exclusive writer refuses an existing target without changing its bytes', (
   }
 });
 
+test('writer rejects a parent symlink swap before writing and removes its outside empty file', () => {
+  const root = fs.mkdtempSync(path.join(os.tmpdir(), 'writcraft-diagnostic-'));
+  const parent = path.join(root, 'selected');
+  const displaced = path.join(root, 'selected-original');
+  const outside = path.join(root, 'outside');
+  const target = path.join(parent, 'diagnostic.json');
+  const outsideTarget = path.join(outside, 'diagnostic.json');
+  const originalOpen = fs.openSync;
+  fs.mkdirSync(parent);
+  fs.mkdirSync(outside);
+  try {
+    fs.openSync = (filePath, flags, mode) => {
+      fs.renameSync(parent, displaced);
+      fs.symlinkSync(outside, parent);
+      return originalOpen(filePath, flags, mode);
+    };
+    assert.throws(
+      () => service.writeDiagnosticFileExclusive(target, serialized()),
+      error => ['INVALID_DIAGNOSTIC_TARGET', 'DIAGNOSTIC_WRITE_FAILED'].includes(error.code)
+    );
+    assert.strictEqual(fs.existsSync(outsideTarget), false);
+    assert.deepStrictEqual(fs.readdirSync(outside), []);
+    assert.deepStrictEqual(fs.readdirSync(displaced), []);
+  } finally {
+    fs.openSync = originalOpen;
+    fs.rmSync(root, { recursive: true, force: true });
+  }
+});
+
 test('writer removes a partial target after an injected write failure', () => {
   const root = fs.mkdtempSync(path.join(os.tmpdir(), 'writcraft-diagnostic-'));
   const target = path.join(root, 'diagnostic.json');
   const originalWrite = fs.writeFileSync;
   try {
-    fs.writeFileSync = () => {
+    fs.writeFileSync = (descriptor) => {
+      fs.writeSync(descriptor, Buffer.from('partial diagnostic bytes', 'utf8'));
       const error = new Error('injected');
       error.code = 'EIO';
       throw error;
@@ -323,4 +353,4 @@ test('writer failure never deletes a concurrent replacement at the selected path
   }
 });
 
-console.log(`\n${passed}/12 diagnostic export service checks passed.\n`);
+console.log(`\n${passed}/13 diagnostic export service checks passed.\n`);

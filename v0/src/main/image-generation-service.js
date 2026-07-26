@@ -12,6 +12,16 @@ const MAX_RESPONSE_CHARS = Math.ceil(MAX_IMAGE_BYTES * 4 / 3) + 64 * 1024;
 const REQUEST_TIMEOUT_MS = 90_000;
 const ASPECT_RATIOS = Object.freeze(['1:1', '16:9', '4:3', '3:2', '2:3', '3:4', '9:16', '21:9']);
 const ASPECT_RATIO_SET = new Set(ASPECT_RATIOS);
+const ASPECT_RATIO_DIMENSIONS = Object.freeze({
+  '1:1': Object.freeze({ width: 1024, height: 1024 }),
+  '16:9': Object.freeze({ width: 1280, height: 720 }),
+  '4:3': Object.freeze({ width: 1152, height: 864 }),
+  '3:2': Object.freeze({ width: 1248, height: 832 }),
+  '2:3': Object.freeze({ width: 832, height: 1248 }),
+  '3:4': Object.freeze({ width: 864, height: 1152 }),
+  '9:16': Object.freeze({ width: 720, height: 1280 }),
+  '21:9': Object.freeze({ width: 1344, height: 576 }),
+});
 const GENERATED_DIR = Object.freeze(['assets', 'generated']);
 
 class ImageGenerationError extends Error {
@@ -89,7 +99,7 @@ function detectImageType(buffer) {
   fail('UNSUPPORTED_IMAGE_TYPE', '生成结果不是可验证的 JPEG 或 PNG');
 }
 
-function validateDecodedImage(buffer, mimeType, decodeImage) {
+function validateDecodedImage(buffer, mimeType, aspectRatio, decodeImage) {
   if (typeof decodeImage !== 'function') fail('IMAGE_DECODER_UNAVAILABLE', '当前运行时无法完整解码图片');
   let size;
   try { size = decodeImage(buffer, mimeType); }
@@ -98,6 +108,17 @@ function validateDecodedImage(buffer, mimeType, decodeImage) {
       size.width < 1 || size.height < 1 || size.width > 4096 || size.height > 4096) {
     fail('INVALID_IMAGE_DATA', '生成结果无法完整解码');
   }
+  const expected = ASPECT_RATIO_DIMENSIONS[aspectRatio];
+  if (!expected || size.width * expected.height !== size.height * expected.width) {
+    fail('IMAGE_ASPECT_MISMATCH', '生成图片比例与请求不一致，已阻止保存');
+  }
+  return Object.freeze({
+    width: size.width,
+    height: size.height,
+    requestedAspectRatio: aspectRatio,
+    decodedRatio: Number((size.width / size.height).toFixed(4)),
+    officialPresetMatch: size.width === expected.width && size.height === expected.height,
+  });
 }
 
 function abortable(promise, signal) {
@@ -172,7 +193,13 @@ function safeGeneratedDirectory(root) {
       fail('UNSAFE_IMAGE_DESTINATION', '图片保存目录已越出项目');
     }
   }
-  return cursor;
+  const stat = fs.lstatSync(cursor);
+  return Object.freeze({
+    path: cursor,
+    canonical: fs.realpathSync(cursor),
+    dev: stat.dev,
+    ino: stat.ino,
+  });
 }
 
 function syncDirectory(directory) {
@@ -182,23 +209,78 @@ function syncDirectory(directory) {
   } catch (_) {}
 }
 
+function sameIdentity(stat, identity) {
+  return stat.dev === identity.dev && stat.ino === identity.ino;
+}
+
+function verifyGeneratedPath(directory, filePath, identity, expectedLinks = 1) {
+  let directoryStat;
+  let fileStat;
+  let canonicalDirectory;
+  let canonicalFile;
+  try {
+    directoryStat = fs.lstatSync(directory.path);
+    fileStat = fs.lstatSync(filePath);
+    canonicalDirectory = fs.realpathSync(directory.path);
+    canonicalFile = fs.realpathSync(filePath);
+  } catch (_) {
+    fail('UNSAFE_IMAGE_DESTINATION', '图片保存位置在写入前发生变化');
+  }
+  if (directoryStat.isSymbolicLink() || !directoryStat.isDirectory() ||
+      directoryStat.dev !== directory.dev || directoryStat.ino !== directory.ino ||
+      canonicalDirectory !== directory.canonical ||
+      fileStat.isSymbolicLink() || !fileStat.isFile() ||
+      fileStat.nlink !== expectedLinks ||
+      !sameIdentity(fileStat, identity) ||
+      path.dirname(canonicalFile) !== directory.canonical) {
+    fail('UNSAFE_IMAGE_DESTINATION', '图片保存位置在写入前发生变化');
+  }
+}
+
+function unlinkMatching(filePath, identity) {
+  if (!identity) return;
+  try {
+    const current = fs.lstatSync(filePath);
+    if (!current.isSymbolicLink() && current.isFile() &&
+        sameIdentity(current, identity)) {
+      fs.unlinkSync(filePath);
+    }
+  } catch (_) {}
+}
+
 function atomicWriteExclusive(directory, fileName, content) {
-  const target = path.join(directory, fileName);
+  const target = path.join(directory.path, fileName);
   if (fs.existsSync(target)) fail('IMAGE_EXISTS', '相同图片已经保存，不会覆盖现有文件');
-  const temporary = path.join(directory, `.image.${process.pid}.${crypto.randomBytes(8).toString('hex')}.tmp`);
+  const temporary = path.join(directory.path, `.image.${process.pid}.${crypto.randomBytes(8).toString('hex')}.tmp`);
   let descriptor;
+  let temporaryIdentity = null;
+  let targetIdentity = null;
   try {
     descriptor = fs.openSync(temporary, 'wx', 0o600);
+    const temporaryStat = fs.fstatSync(descriptor);
+    if (!temporaryStat.isFile()) fail('UNSAFE_IMAGE_DESTINATION', '图片临时文件无效');
+    temporaryIdentity = { dev: temporaryStat.dev, ino: temporaryStat.ino };
+    verifyGeneratedPath(directory, temporary, temporaryIdentity);
+    const beforeWrite = fs.fstatSync(descriptor);
+    if (!beforeWrite.isFile() || beforeWrite.nlink !== 1 ||
+        !sameIdentity(beforeWrite, temporaryIdentity)) {
+      fail('UNSAFE_IMAGE_DESTINATION', '图片临时文件在写入前发生变化');
+    }
     fs.writeFileSync(descriptor, content);
     fs.fsyncSync(descriptor);
     fs.closeSync(descriptor);
     descriptor = undefined;
+    verifyGeneratedPath(directory, temporary, temporaryIdentity);
     fs.linkSync(temporary, target);
-    try { fs.unlinkSync(temporary); } catch (_) {}
-    syncDirectory(directory);
+    targetIdentity = temporaryIdentity;
+    verifyGeneratedPath(directory, temporary, temporaryIdentity, 2);
+    verifyGeneratedPath(directory, target, targetIdentity, 2);
+    unlinkMatching(temporary, temporaryIdentity);
+    syncDirectory(directory.path);
   } catch (error) {
     if (descriptor !== undefined) try { fs.closeSync(descriptor); } catch (_) {}
-    try { fs.unlinkSync(temporary); } catch (_) {}
+    unlinkMatching(target, targetIdentity);
+    unlinkMatching(temporary, temporaryIdentity);
     if (error && error.code === 'EEXIST') fail('IMAGE_EXISTS', '相同图片已经保存，不会覆盖现有文件');
     throw error;
   }
@@ -315,7 +397,7 @@ async function generateAndSaveImage(options = {}) {
   }
   const bytes = strictBase64(images[0]);
   const type = detectImageType(bytes);
-  validateDecodedImage(bytes, type.mimeType, options.decodeImage);
+  const metadata = validateDecodedImage(bytes, type.mimeType, aspectRatio, options.decodeImage);
   const digest = crypto.createHash('sha256').update(bytes).digest('hex');
   const fileName = `image-${digest}${type.extension}`;
   const filePath = `assets/generated/${fileName}`;
@@ -332,6 +414,7 @@ async function generateAndSaveImage(options = {}) {
       filePath,
       mimeType: type.mimeType,
       previewDataUrl: `data:${type.mimeType};base64,${images[0]}`,
+      ...metadata,
     },
     markdown: `![AI 生成图片](${filePath})`,
   };
@@ -344,6 +427,7 @@ module.exports = {
   MAX_IMAGE_BYTES,
   MAX_RESPONSE_CHARS,
   ASPECT_RATIOS,
+  ASPECT_RATIO_DIMENSIONS,
   ImageGenerationError,
   imageHttpFailure,
   imageProviderFailure,

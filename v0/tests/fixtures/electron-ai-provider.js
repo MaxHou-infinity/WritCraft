@@ -61,7 +61,7 @@ const GRAPH_ISSUE_BEFORE_ONE = '正式签约早于社区调查。';
 const GRAPH_ISSUE_AFTER_ONE = '正式签约晚于社区调查。';
 const GRAPH_ISSUE_BEFORE_TWO = '之后每次引用效率数字，都必须同时说明时间范围和统计口径。';
 const GRAPH_ISSUE_AFTER_TWO = '之后每次引用效率数字，都必须同时说明时间范围、统计口径与对应证据。';
-const PNG_BASE64 = 'iVBORw0KGgoAAAANSUhEUgAAAAEAAAABCAQAAAC1HAwCAAAAC0lEQVR42mNk+A8AAQUBAScY42YAAAAASUVORK5CYII=';
+const PNG_BASE64 = 'iVBORw0KGgoAAAANSUhEUgAAABAAAAAJCAYAAAA7KqwyAAAAFklEQVR4nGPQ9wz/TwlmGDVg1AAgBgBNoQPwF6IA3wAAAABJRU5ErkJggg==';
 
 function jsonResponse(payload) {
   const body = JSON.stringify(payload);

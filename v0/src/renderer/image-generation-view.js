@@ -1,5 +1,7 @@
-// WritCraft V0 · image-01 preview and explicit manuscript insertion.
+// WritCraft V0 · image-01 preview, author review and explicit settlement.
 (function () {
+  'use strict';
+
   const bridge = window.writCraft?.project;
   const toggle = document.getElementById('image-toggle');
   const compose = document.getElementById('image-compose');
@@ -7,28 +9,59 @@
   const aspect = document.getElementById('image-aspect');
   const generate = document.getElementById('image-generate');
   const resultHost = document.getElementById('image-result');
-  let pending = null;
-  let pendingMetric = null;
+  const reviewSummary = document.getElementById('image-review-summary');
   let pendingOwner = null;
   let loading = false;
   let reviewBusy = false;
   let reviewSettlement = null;
   let requestSequence = 0;
+  let aggregateSequence = 0;
+
+  async function refreshReviewSummary() {
+    const projectInstanceId = window.__workspace?.state?.project?.instanceId;
+    if (!reviewSummary || !projectInstanceId || !bridge?.getImageReviewAggregate) return;
+    const sequence = ++aggregateSequence;
+    let result;
+    try {
+      result = await bridge.getImageReviewAggregate(projectInstanceId);
+    } catch (_) {
+      return;
+    }
+    if (sequence !== aggregateSequence ||
+        projectInstanceId !== window.__workspace?.state?.project?.instanceId ||
+        !result?.ok || !result.aggregate) return;
+    const aggregate = result.aggregate;
+    const total = Number.isSafeInteger(aggregate.sampleSize) ? aggregate.sampleSize : 0;
+    if (!total) {
+      reviewSummary.textContent = '本项目尚无图片评审记录';
+      return;
+    }
+    const average = Number.isFinite(aggregate.averageQualityRating)
+      ? `均分 ${aggregate.averageQualityRating.toFixed(1)}`
+      : '暂无评分';
+    const decisions = aggregate.decisions || {};
+    reviewSummary.textContent =
+      `本项目 ${total} 次评审 · ${average} · 插入 ${decisions.inserted || 0} / ` +
+      `保留 ${decisions.kept || 0} / 废纸篓 ${decisions.deleted || 0}`;
+  }
 
   function sync() {
-    if (generate) generate.disabled = loading || reviewBusy || !prompt?.value.trim() || !window.__workspace?.state?.project;
+    if (generate) {
+      generate.disabled = loading || reviewBusy || Boolean(pendingOwner) ||
+        !prompt?.value.trim() || !window.__workspace?.state?.project;
+    }
   }
 
   function clearResult() {
-    pending = null;
-    pendingMetric = null;
     pendingOwner = null;
     requestSequence += 1;
     resultHost?.replaceChildren();
     if (resultHost) resultHost.hidden = true;
+    sync();
   }
 
-  async function recordImageMetric(outcome, metric = pendingMetric) {
+  async function recordImageMetric(outcome, owner) {
+    const metric = owner?.metric;
     if (!metric?.operationId || !metric.originProjectInstanceId) return false;
     return Boolean(await window.WritCraftAiMetrics?.record?.(metric.originProjectInstanceId, {
       operationId: metric.operationId,
@@ -36,24 +69,11 @@
       outcome,
       style: 'none',
       scope: 'file',
-      durationMs: Math.max(0, Date.now() - (['accepted', 'discarded'].includes(outcome) ? metric.readyAt : metric.startedAt)),
+      durationMs: Math.max(0, Date.now() -
+        (['accepted', 'discarded'].includes(outcome) ? metric.readyAt : metric.startedAt)),
       beforeChars: 0,
       afterChars: 0,
     }));
-  }
-
-  async function discardPending() {
-    const settlement = reviewSettlement;
-    if (reviewBusy && settlement) await settlement;
-    const owner = pendingOwner;
-    if (!owner || !owner.image || !owner.metric) return false;
-    if (pendingOwner !== owner) return false;
-    const metric = owner.metric;
-    pendingOwner = null;
-    pending = null;
-    pendingMetric = null;
-    await recordImageMetric('discarded', metric);
-    return true;
   }
 
   function renderState(text, error = false) {
@@ -66,104 +86,237 @@
   }
 
   function safePreviewDataUrl(value) {
-    return typeof value === 'string' && /^data:image\/(?:png|jpeg);base64,[A-Za-z0-9+/=]+$/.test(value) ? value : '';
+    return typeof value === 'string' &&
+      /^data:image\/(?:png|jpeg);base64,[A-Za-z0-9+/=]+$/.test(value)
+      ? value
+      : '';
   }
 
-  function renderResult(result, metric) {
-    const owner = Object.freeze({
-      image: result.image,
-      metric,
-      altText: prompt.value.trim(),
-    });
-    pendingOwner = owner;
-    pending = owner.image;
-    pendingMetric = owner.metric;
-    resultHost.hidden = false;
-    resultHost.replaceChildren();
-    const previewUrl = safePreviewDataUrl(result.image?.previewDataUrl);
-    if (previewUrl) {
-      const image = document.createElement('img');
-      image.className = 'image-preview';
-      image.alt = prompt.value.trim().slice(0, 160) || '生成配图预览';
-      image.src = previewUrl;
-      resultHost.appendChild(image);
+  function reviewPayload(owner, decision, controls) {
+    const qualityRating = Number(controls.rating.value);
+    if (!Number.isSafeInteger(qualityRating) || qualityRating < 1 || qualityRating > 5) {
+      controls.hint.textContent = '请先给这张图片打 1–5 分。';
+      controls.rating.focus();
+      return null;
     }
-    const note = document.createElement('p');
-    note.className = 'image-result-note';
-    note.textContent = `已保存到项目 ${result.image?.filePath || 'assets/generated'}。尚未插入正文。`;
+    const payload = {
+      token: owner.review.token,
+      decision,
+      qualityRating,
+    };
+    const costText = controls.cost.value.trim();
+    if (costText) {
+      if (!/^\d+(?:\.\d{1,2})?$/.test(costText)) {
+        controls.hint.textContent = '费用应为不小于 0 的金额，最多保留两位小数。';
+        controls.cost.focus();
+        return null;
+      }
+      const cost = Number(costText);
+      const costMinorUnits = Math.round(cost * 100);
+      if (!Number.isFinite(cost) || cost < 0 ||
+          !Number.isSafeInteger(costMinorUnits) || costMinorUnits > 100_000_000) {
+        controls.hint.textContent = '费用应为不小于 0 的金额，最多保留两位小数。';
+        controls.cost.focus();
+        return null;
+      }
+      payload.costMinorUnits = costMinorUnits;
+      payload.currency = controls.currency.value;
+    }
+    controls.hint.textContent = '只记录评分、决定与可选费用；不记录图片描述或正文。';
+    return payload;
+  }
+
+  async function settleOwner(owner, decision, controls, insertionProof = null) {
+    if (pendingOwner !== owner || reviewBusy || !bridge?.settleImageReview) return false;
+    const payload = reviewPayload(owner, decision, controls);
+    if (!payload) return false;
+    reviewBusy = true;
+    controls.buttons.forEach(button => { button.disabled = true; });
+    sync();
+    const settle = (async () => {
+      let result;
+      try {
+        result = await bridge.settleImageReview(
+          owner.metric.originProjectInstanceId,
+          payload,
+          insertionProof
+        );
+      } catch (error) {
+        result = { ok: false, message: error.message };
+      }
+      if (pendingOwner !== owner) return false;
+      if (!result?.ok) {
+        controls.hint.textContent = result?.message ||
+          '图片决定尚未安全结算，请保持当前项目并重试。';
+        return false;
+      }
+      await refreshReviewSummary();
+      await recordImageMetric(decision === 'inserted' ? 'accepted' : 'discarded', owner);
+      if (pendingOwner !== owner) return true;
+      pendingOwner = null;
+      if (decision === 'inserted') {
+        renderState('已插入正文，并记录本次图片判断。');
+      } else if (decision === 'kept') {
+        renderState('已保留为项目素材，正文没有修改。');
+      } else {
+        renderState(
+          '已移出素材区，正文没有修改。可从项目文件夹 .writcraft/image-trash 手动恢复。'
+        );
+      }
+      return true;
+    })();
+    reviewSettlement = settle;
+    try {
+      return await settle;
+    } finally {
+      if (reviewSettlement === settle) reviewSettlement = null;
+      reviewBusy = false;
+      if (pendingOwner === owner) {
+        controls.buttons.forEach(button => { button.disabled = false; });
+      }
+      sync();
+    }
+  }
+
+  function reviewControls(owner) {
+    const review = document.createElement('div');
+    review.className = 'image-review';
+
+    const label = document.createElement('label');
+    label.className = 'image-review-label';
+    label.textContent = '你的判断';
+    const rating = document.createElement('select');
+    rating.className = 'image-rating';
+    rating.setAttribute('aria-label', '图片质量评分');
+    for (const [value, text] of [
+      ['', '质量评分…'],
+      ['1', '1 · 不可用'],
+      ['2', '2 · 较差'],
+      ['3', '3 · 可用'],
+      ['4', '4 · 良好'],
+      ['5', '5 · 出色'],
+    ]) {
+      const option = document.createElement('option');
+      option.value = value;
+      option.textContent = text;
+      rating.appendChild(option);
+    }
+
+    const cost = document.createElement('input');
+    cost.className = 'image-cost';
+    cost.type = 'number';
+    cost.min = '0';
+    cost.step = '0.01';
+    cost.inputMode = 'decimal';
+    cost.placeholder = '本次费用（可选）';
+    cost.setAttribute('aria-label', '人工核对的本次图片费用');
+    const currency = document.createElement('select');
+    currency.className = 'image-currency';
+    currency.setAttribute('aria-label', '费用币种');
+    for (const value of ['CNY', 'USD']) {
+      const option = document.createElement('option');
+      option.value = value;
+      option.textContent = value;
+      currency.appendChild(option);
+    }
+
+    const fields = document.createElement('div');
+    fields.className = 'image-review-fields';
+    fields.append(rating, cost, currency);
+    const hint = document.createElement('p');
+    hint.className = 'image-review-hint';
+    hint.textContent = '只记录评分、决定与可选费用；不记录图片描述或正文。';
+    review.append(label, fields, hint);
+
     const actions = document.createElement('div');
     actions.className = 'image-result-actions';
-    const regenerate = document.createElement('button');
-    regenerate.type = 'button';
-    regenerate.textContent = '重新生成';
-    regenerate.disabled = reviewBusy;
-    regenerate.addEventListener('click', async () => {
-      if (reviewBusy || pendingOwner !== owner) return;
-      await run();
-    });
-    const abandon = document.createElement('button');
-    abandon.type = 'button';
-    abandon.textContent = '放弃插入';
-    abandon.disabled = reviewBusy;
-    abandon.addEventListener('click', async () => {
-      if (reviewBusy || pendingOwner !== owner) return;
-      await discardPending();
-      renderState('已放弃插入。生成资产仍保留在项目中，正文没有修改。');
-    });
+    const remove = document.createElement('button');
+    remove.type = 'button';
+    remove.textContent = '移入废纸篓';
+    const keep = document.createElement('button');
+    keep.type = 'button';
+    keep.textContent = '保留素材';
     const insert = document.createElement('button');
     insert.type = 'button';
     insert.className = 'is-primary';
     insert.textContent = '插入当前正文';
-    insert.disabled = reviewBusy;
+    const controls = {
+      rating,
+      cost,
+      currency,
+      hint,
+      buttons: [remove, keep, insert],
+    };
+    remove.addEventListener('click', () => settleOwner(owner, 'deleted', controls));
+    keep.addEventListener('click', () => settleOwner(owner, 'kept', controls));
     insert.addEventListener('click', async () => {
-      if (reviewBusy || pendingOwner !== owner) return;
-      reviewBusy = true;
-      regenerate.disabled = true;
-      abandon.disabled = true;
-      insert.disabled = true;
-      sync();
-      const settle = (async () => {
-        const inserted = await window.__workspace?.insertGeneratedImage?.(owner.image, owner.altText);
+      if (pendingOwner !== owner || reviewBusy) return;
+      if (!reviewPayload(owner, 'inserted', controls)) return;
+      if (!owner.insertionProof) {
+        const inserted = await window.__workspace?.insertGeneratedImage?.(
+          owner.image,
+          owner.altText
+        );
         if (!inserted?.ok) {
-          if (pendingOwner === owner) {
-            renderState(inserted?.message || '配图引用插入失败，已生成资产保持不变。', true);
-          }
-          return false;
+          controls.hint.textContent = inserted?.message ||
+            '配图引用插入失败，生成资产保持不变。';
+          return;
         }
-        const currentProjectInstanceId = window.__workspace?.state?.project?.instanceId;
-        if (pendingOwner !== owner || currentProjectInstanceId !== owner.metric.originProjectInstanceId) return false;
-        await recordImageMetric('accepted', owner.metric);
-        if (pendingOwner !== owner) return true;
-        pendingOwner = null;
-        pending = null;
-        pendingMetric = null;
-        renderState('已在当前光标位置插入 Markdown 配图引用。');
-        return true;
-      })();
-      reviewSettlement = settle;
-      try {
-        await settle;
-      } finally {
-        if (reviewSettlement === settle) reviewSettlement = null;
-        reviewBusy = false;
-        if (pendingOwner === owner && resultHost.contains?.(actions)) {
-          regenerate.disabled = false;
-          abandon.disabled = false;
-          insert.disabled = false;
-        }
-        sync();
+        owner.insertionProof = Object.freeze({
+          targetPath: inserted.targetPath,
+          revision: inserted.revision,
+        });
       }
+      await settleOwner(owner, 'inserted', controls, owner.insertionProof);
     });
-    actions.append(regenerate, abandon, insert);
-    resultHost.append(note, actions);
+    actions.append(remove, keep, insert);
+    return { review, actions };
+  }
+
+  function renderResult(result, metric) {
+    const owner = {
+      image: result.image,
+      review: result.review,
+      metric,
+      altText: prompt.value.trim(),
+      insertionProof: null,
+    };
+    pendingOwner = owner;
+    resultHost.hidden = false;
+    resultHost.replaceChildren();
+    const previewUrl = safePreviewDataUrl(owner.image?.previewDataUrl);
+    if (previewUrl) {
+      const image = document.createElement('img');
+      image.className = 'image-preview';
+      image.alt = owner.altText.slice(0, 160) || '生成配图预览';
+      image.src = previewUrl;
+      resultHost.appendChild(image);
+    }
+    const proof = document.createElement('div');
+    proof.className = 'image-proof';
+    const dimensions = Number.isSafeInteger(owner.image?.width) &&
+      Number.isSafeInteger(owner.image?.height)
+      ? `${owner.image.width}×${owner.image.height}`
+      : '尺寸待核验';
+    proof.textContent = `${dimensions} · ${owner.image?.requestedAspectRatio || '比例待核验'} · 已解码`;
+    const note = document.createElement('p');
+    note.className = 'image-result-note';
+    note.textContent = '图片已进入项目素材区，尚未插入正文。请选择评分和最终动作。';
+    resultHost.append(proof, note);
+    const controls = reviewControls(owner);
+    resultHost.append(controls.review, controls.actions);
+    sync();
+  }
+
+  async function discardPending() {
+    if (reviewBusy && reviewSettlement) await reviewSettlement;
+    return !pendingOwner;
   }
 
   async function run() {
-    if (loading || reviewBusy || !bridge?.generateImage) return;
+    if (loading || reviewBusy || pendingOwner || !bridge?.generateImage) return;
     const value = prompt?.value.trim() || '';
     if (!value || !window.__workspace?.state?.project) return;
-    await discardPending();
-    if (reviewBusy || !window.__workspace?.state?.project) return;
     const requestId = ++requestSequence;
     const projectInstanceId = window.__workspace.state.project.instanceId;
     const metric = {
@@ -172,22 +325,36 @@
       startedAt: Date.now(),
       readyAt: null,
     };
+    if (!metric.operationId) {
+      renderState('无法创建本次图片审阅，请重新打开项目后再试。', true);
+      return;
+    }
     loading = true;
     sync();
     renderState('正在生成配图…完成前不会改写正文。');
     let result;
-    try { result = await bridge.generateImage(projectInstanceId, value, aspect?.value || '16:9'); }
-    catch (error) { result = { ok: false, message: error.message }; }
-    if (requestId !== requestSequence || projectInstanceId !== window.__workspace?.state?.project?.instanceId) return;
+    try {
+      result = await bridge.generateImage(
+        projectInstanceId,
+        metric.operationId,
+        value,
+        aspect?.value || '16:9'
+      );
+    } catch (error) {
+      result = { ok: false, message: error.message };
+    }
+    if (requestId !== requestSequence ||
+        projectInstanceId !== window.__workspace?.state?.project?.instanceId) return;
     loading = false;
     sync();
-    if (!result?.ok || !result.image) {
-      await recordImageMetric('failed', metric);
-      renderState(result?.message || result?.error || '配图生成失败，项目正文没有被修改。', true);
+    if (!result?.ok || !result.image || !result.review?.token) {
+      await recordImageMetric('failed', { metric });
+      renderState(result?.message ||
+        '配图生成或审阅签发失败，正文没有被修改。', true);
       return;
     }
     metric.readyAt = Date.now();
-    await recordImageMetric('generated', metric);
+    await recordImageMetric('generated', { metric });
     renderResult(result, metric);
   }
 
@@ -196,18 +363,17 @@
     compose.hidden = !open;
     toggle.setAttribute('aria-expanded', String(open));
     if (open) prompt.focus();
+    if (open) void refreshReviewSummary();
     sync();
   });
   prompt?.addEventListener('input', sync);
   generate?.addEventListener('click', run);
   document.addEventListener('writcraft:project-entered', () => {
-    const reset = async () => {
-      if (reviewBusy && reviewSettlement) await reviewSettlement;
-      loading = false;
-      clearResult();
-      sync();
-    };
-    void reset();
+    aggregateSequence += 1;
+    loading = false;
+    if (!pendingOwner) clearResult();
+    void refreshReviewSummary();
+    sync();
   });
   window.__imageGenerationView = Object.freeze({ discardPending });
 })();

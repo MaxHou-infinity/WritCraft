@@ -94,11 +94,28 @@ function imageButton(root, label) {
   return null;
 }
 
+function imageClass(root, className) {
+  if (String(root.className || '').split(/\s+/).includes(className)) return root;
+  for (const child of root.children || []) {
+    const found = imageClass(child, className);
+    if (found) return found;
+  }
+  return null;
+}
+
 function nodeText(root) {
   return [root.textContent, ...(root.children || []).map(nodeText)].filter(Boolean).join(' ');
 }
 
-function loadImageHarness(generateImage, insertGeneratedImage = async () => ({ ok: true })) {
+function loadImageHarness({
+  generateImage,
+  insertGeneratedImage = async () => ({
+    ok: true,
+    targetPath: 'chapters/01.md',
+    revision: 'a'.repeat(64),
+  }),
+  settleImageReview = async () => ({ ok: true }),
+}) {
   const ids = ['image-toggle', 'image-compose', 'image-prompt', 'image-aspect', 'image-generate', 'image-result'];
   const nodes = Object.fromEntries(ids.map(id => [id, new ImageNode(id === 'image-prompt' ? 'textarea' : id === 'image-aspect' ? 'select' : id === 'image-generate' ? 'button' : 'div', id)]));
   nodes['image-compose'].hidden = false;
@@ -116,6 +133,7 @@ function loadImageHarness(generateImage, insertGeneratedImage = async () => ({ o
     dispatchEvent() { return true; },
   };
   const metricCalls = [];
+  const settleCalls = [];
   let insertCalls = 0;
   let generateCalls = 0;
   const workspace = {
@@ -126,6 +144,10 @@ function loadImageHarness(generateImage, insertGeneratedImage = async () => ({ o
     __workspace: workspace,
     writCraft: { project: {
       generateImage: async (...args) => { generateCalls += 1; return generateImage(...args); },
+      settleImageReview: async (...args) => {
+        settleCalls.push(args);
+        return settleImageReview(...args);
+      },
       recordAiMetric: async (instanceId, metric) => { metricCalls.push({ instanceId, metric }); return { ok: true }; },
     } },
   };
@@ -137,7 +159,7 @@ function loadImageHarness(generateImage, insertGeneratedImage = async () => ({ o
   vm.runInNewContext(clientSource, context, { filename: 'ai-metrics-client.js' });
   vm.runInNewContext(imageSource, context, { filename: 'image-generation-view.js' });
   return {
-    nodes, window, workspace, metricCalls,
+    nodes, window, workspace, metricCalls, settleCalls,
     getInsertCalls: () => insertCalls,
     getGenerateCalls: () => generateCalls,
   };
@@ -261,74 +283,123 @@ console.log('════════ WritCraft V0 · AI metrics renderer verify
     assert.deepStrictEqual(calls, [], 'B 项目不得收到 A 的延迟事件');
   });
 
-  await check('图片动态记录生成、显式插入与重新生成丢弃，并保持 A→B 隔离', async () => {
-    const image = { filePath: 'assets/generated/test.png', previewDataUrl: 'data:image/png;base64,AA==' };
-    const accepted = loadImageHarness(async () => ({ ok: true, image }));
-    await accepted.nodes['image-generate'].dispatch('click');
-    await imageButton(accepted.nodes['image-result'], '插入当前正文').dispatch('click');
-    assert.deepStrictEqual(accepted.metricCalls.map(item => item.metric.outcome), ['generated', 'accepted']);
-    assert.equal(accepted.getInsertCalls(), 1);
-    assert(accepted.metricCalls.every(item => item.metric.action === 'image' && item.metric.scope === 'file'));
+  await check('图片审阅必须评分，并覆盖 inserted、kept 与 deleted 三种结算', async () => {
+    const generated = {
+      ok: true,
+      image: {
+        filePath: 'assets/generated/test.png',
+        previewDataUrl: 'data:image/png;base64,AA==',
+        width: 1600,
+        height: 900,
+        requestedAspectRatio: '16:9',
+      },
+      review: { token: `irv_${'b'.repeat(48)}` },
+    };
 
-    const regenerated = loadImageHarness(async () => ({ ok: true, image }));
-    await regenerated.nodes['image-generate'].dispatch('click');
-    await regenerated.nodes['image-generate'].dispatch('click');
-    assert.deepStrictEqual(regenerated.metricCalls.map(item => item.metric.outcome), ['generated', 'discarded', 'generated']);
+    const kept = loadImageHarness({ generateImage: async () => generated });
+    await kept.nodes['image-generate'].dispatch('click');
+    assert(nodeText(kept.nodes['image-result']).includes('1600×900 · 16:9 · 已解码'));
+    await imageButton(kept.nodes['image-result'], '保留素材').dispatch('click');
+    assert.equal(kept.settleCalls.length, 0, 'missing rating must not settle review');
+    assert(nodeText(kept.nodes['image-result']).includes('请先给这张图片打 1–5 分'));
+    imageClass(kept.nodes['image-result'], 'image-rating').value = '4';
+    await imageButton(kept.nodes['image-result'], '保留素材').dispatch('click');
+    assert.deepStrictEqual(kept.metricCalls.map(item => item.metric.outcome), ['generated', 'discarded']);
+    assert.equal(kept.settleCalls[0][1].decision, 'kept');
+    assert.equal(kept.settleCalls[0][1].qualityRating, 4);
+    assert.equal(kept.settleCalls[0][2], null);
 
-    const abandoned = loadImageHarness(async () => ({ ok: true, image }));
-    await abandoned.nodes['image-generate'].dispatch('click');
-    await imageButton(abandoned.nodes['image-result'], '放弃插入').dispatch('click');
-    assert.deepStrictEqual(abandoned.metricCalls.map(item => item.metric.outcome), ['generated', 'discarded']);
-    assert(nodeText(abandoned.nodes['image-result']).includes('生成资产仍保留在项目中'));
-    assert(nodeText(abandoned.nodes['image-result']).includes('正文没有修改'));
-    assert.equal(abandoned.getInsertCalls(), 0, 'abandon must not insert or mutate manuscript');
+    const deleted = loadImageHarness({ generateImage: async () => generated });
+    await deleted.nodes['image-generate'].dispatch('click');
+    imageClass(deleted.nodes['image-result'], 'image-rating').value = '2';
+    imageClass(deleted.nodes['image-result'], 'image-cost').value = '1.25';
+    imageClass(deleted.nodes['image-result'], 'image-currency').value = 'CNY';
+    await imageButton(deleted.nodes['image-result'], '移入废纸篓').dispatch('click');
+    assert.equal(deleted.settleCalls[0][1].decision, 'deleted');
+    assert.equal(deleted.settleCalls[0][1].costMinorUnits, 125);
+    assert.equal(deleted.settleCalls[0][1].currency, 'CNY');
+    assert.deepStrictEqual(deleted.metricCalls.map(item => item.metric.outcome), ['generated', 'discarded']);
 
-    const failed = loadImageHarness(async () => ({ ok: false, error: 'LLM_FAILED' }));
-    await failed.nodes['image-generate'].dispatch('click');
-    assert.deepStrictEqual(failed.metricCalls.map(item => item.metric.outcome), ['failed']);
+    const inserted = loadImageHarness({ generateImage: async () => generated });
+    await inserted.nodes['image-generate'].dispatch('click');
+    imageClass(inserted.nodes['image-result'], 'image-rating').value = '5';
+    await imageButton(inserted.nodes['image-result'], '插入当前正文').dispatch('click');
+    assert.equal(inserted.getInsertCalls(), 1);
+    assert.equal(inserted.settleCalls[0][1].decision, 'inserted');
+    assert.equal(inserted.settleCalls[0][2].targetPath, 'chapters/01.md');
+    assert.equal(inserted.settleCalls[0][2].revision, 'a'.repeat(64));
+    assert.deepStrictEqual(inserted.metricCalls.map(item => item.metric.outcome), ['generated', 'accepted']);
+    assert(inserted.metricCalls.every(item => item.metric.action === 'image' && item.metric.scope === 'file'));
+  });
 
-    let resolveInsert;
-    const contested = loadImageHarness(
-      async () => ({ ok: true, image }),
-      () => new Promise(resolve => { resolveInsert = resolve; }),
-    );
-    await contested.nodes['image-generate'].dispatch('click');
-    const contestedInsert = imageButton(contested.nodes['image-result'], '插入当前正文');
-    const contestedAbandon = imageButton(contested.nodes['image-result'], '放弃插入');
-    const contestedRegenerate = imageButton(contested.nodes['image-result'], '重新生成');
-    const insertion = contestedInsert.dispatch('click');
-    await Promise.resolve();
-    assert(contestedInsert.disabled && contestedAbandon.disabled && contestedRegenerate.disabled,
-      'all controls for the exact preview owner must lock during insertion');
-    await contestedAbandon.dispatch('click');
-    await contestedRegenerate.dispatch('click');
-    assert.equal(contested.getGenerateCalls(), 1, 'regenerate during insert must be rejected');
-    assert(nodeText(contested.nodes['image-result']).includes('尚未插入正文'), 'old owner preview must remain while insert settles');
-    let switchSettled = false;
-    const projectSwitch = (async () => {
-      await contested.window.__imageGenerationView.discardPending();
-      contested.workspace.state.project = { instanceId: 'instance-2' };
-      switchSettled = true;
-    })();
-    await Promise.resolve();
-    assert.equal(switchSettled, false, 'project switch must wait for the insertion owner');
-    resolveInsert({ ok: true });
-    await Promise.all([insertion, projectSwitch]);
-    assert.equal(contested.getInsertCalls(), 1, 'exact image may be inserted only once');
-    assert.deepStrictEqual(contested.metricCalls.map(item => item.metric.outcome), ['generated', 'accepted']);
-    assert.equal(contested.metricCalls[1].metric.operationId, contested.metricCalls[0].metric.operationId,
-      'accepted must terminate the original preview metric');
-    assert(!contested.metricCalls.some(item => item.metric.outcome === 'discarded'), 'waiting switch must not invent discard');
-    assert(nodeText(contested.nodes['image-result']).includes('已在当前光标位置插入'));
+  await check('图片 pending 阻止切项目，插入结算失败重试不会二次插入', async () => {
+    const generated = {
+      ok: true,
+      image: {
+        filePath: 'assets/generated/test.png',
+        previewDataUrl: 'data:image/png;base64,AA==',
+        width: 1024,
+        height: 1024,
+        requestedAspectRatio: '1:1',
+      },
+      review: { token: `irv_${'c'.repeat(48)}` },
+    };
+    let settleAttempts = 0;
+    const harness = loadImageHarness({
+      generateImage: async () => generated,
+      settleImageReview: async () => {
+        settleAttempts += 1;
+        return settleAttempts === 1
+          ? { ok: false, message: '插入证据尚未提交' }
+          : { ok: true };
+      },
+    });
+    await harness.nodes['image-generate'].dispatch('click');
+    assert.equal(await harness.window.__imageGenerationView.discardPending(), false);
+    if (await harness.window.__imageGenerationView.discardPending()) {
+      harness.workspace.state.project = { instanceId: 'instance-2' };
+    }
+    assert.equal(harness.workspace.state.project.instanceId, 'instance-1',
+      'unsettled review must block project switch');
+    assert.equal(harness.nodes['image-generate'].disabled, true);
 
+    imageClass(harness.nodes['image-result'], 'image-rating').value = '5';
+    const insert = imageButton(harness.nodes['image-result'], '插入当前正文');
+    await insert.dispatch('click');
+    assert.equal(harness.getInsertCalls(), 1);
+    assert.equal(harness.settleCalls.length, 1);
+    assert(nodeText(harness.nodes['image-result']).includes('插入证据尚未提交'));
+    assert.equal(await harness.window.__imageGenerationView.discardPending(), false);
+    await insert.dispatch('click');
+    assert.equal(harness.getInsertCalls(), 1, 'settlement retry must reuse insertion proof');
+    assert.equal(harness.settleCalls.length, 2);
+    assert.deepStrictEqual(harness.metricCalls.map(item => item.metric.outcome), ['generated', 'accepted']);
+    assert.equal(await harness.window.__imageGenerationView.discardPending(), true);
+  });
+
+  await check('图片生成的 A→B 迟到结果不渲染也不污染 B 指标', async () => {
     let resolveGeneration;
-    const switched = loadImageHarness(() => new Promise(resolve => { resolveGeneration = resolve; }));
+    const switched = loadImageHarness({
+      generateImage: () => new Promise(resolve => { resolveGeneration = resolve; }),
+    });
     const running = switched.nodes['image-generate'].dispatch('click');
     await Promise.resolve();
     switched.workspace.state.project = { instanceId: 'instance-2' };
-    resolveGeneration({ ok: true, image });
+    resolveGeneration({
+      ok: true,
+      image: {
+        filePath: 'assets/generated/late.png',
+        previewDataUrl: 'data:image/png;base64,AA==',
+        width: 1600,
+        height: 900,
+        requestedAspectRatio: '16:9',
+      },
+      review: { token: `irv_${'d'.repeat(48)}` },
+    });
     await running;
     assert.deepStrictEqual(switched.metricCalls, [], 'A 的迟到图片结果不得写入 B 指标');
+    assert.equal(imageClass(switched.nodes['image-result'], 'image-review'), null);
+    assert.equal(switched.settleCalls.length, 0);
   });
 
   await check('aggregate 只消费 Main 返回的聚合对象', async () => {

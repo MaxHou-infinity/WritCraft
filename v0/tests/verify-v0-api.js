@@ -44,7 +44,7 @@ const SAFE_STAGE_ERRORS = new Set([
   'IMAGE_QUOTA_EXCEEDED', 'IMAGE_INVALID_REQUEST',
   'IMAGE_KEY_UNSUPPORTED',
   'IMAGE_TIMEOUT', 'IMAGE_REQUEST_FAILED', 'INVALID_IMAGE_RESPONSE',
-  'UNSUPPORTED_IMAGE_TYPE', 'INVALID_IMAGE_DATA',
+  'UNSUPPORTED_IMAGE_TYPE', 'INVALID_IMAGE_DATA', 'IMAGE_ASPECT_MISMATCH',
   'MODEL_OUTPUT_INCOMPLETE', 'MODEL_OUTPUT_TOO_LARGE', 'MODEL_OUTPUT_TRUNCATED',
   'INVALID_PROJECT_SERVICE', 'INVALID_LLM', 'INVALID_PROJECT_TREE',
   'INVALID_ONBOARDING_REQUEST', 'ONBOARDING_REQUEST_TOO_LARGE',
@@ -386,12 +386,19 @@ async function runAcceptance(options = {}) {
             return decodedSize;
           },
         });
+        if (result.image.width !== decodedSize?.width ||
+            result.image.height !== decodedSize?.height ||
+            result.image.requestedAspectRatio !== '16:9' ||
+            result.image.officialPresetMatch !== true) {
+          throw { code: 'IMAGE_ASPECT_MISMATCH' };
+        }
         const target = path.join(rootPath, ...result.image.filePath.split('/'));
         return {
           mimeType: result.image.mimeType,
           bytes: fs.statSync(target).size,
           requestedAspectRatio: '16:9',
           ...decodedImageMetadata(decodedSize),
+          officialPresetMatch: result.image.officialPresetMatch,
           manuscriptInserted: false,
         };
       });

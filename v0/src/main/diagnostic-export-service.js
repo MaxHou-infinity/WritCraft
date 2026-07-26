@@ -383,13 +383,46 @@ function writeDiagnosticFileExclusive(filePath, serialized) {
   if (parentStat.isSymbolicLink() || !parentStat.isDirectory()) {
     fail('INVALID_DIAGNOSTIC_TARGET', '诊断导出目录不安全');
   }
+  let canonicalParent;
+  try { canonicalParent = fs.realpathSync(parent); }
+  catch (_) { fail('INVALID_DIAGNOSTIC_TARGET', '诊断导出目录不可访问'); }
+  const parentIdentity = { dev: parentStat.dev, ino: parentStat.ino };
   let fd;
   let createdIdentity = null;
   try {
     fd = fs.openSync(target, 'wx', 0o600);
     const createdStat = fs.fstatSync(fd);
+    if (!createdStat.isFile() || createdStat.nlink !== 1) {
+      fail('INVALID_DIAGNOSTIC_TARGET', '诊断导出目标无效');
+    }
     createdIdentity = { dev: createdStat.dev, ino: createdStat.ino };
+
+    // The native save dialog returns a path, but the leaf directory can be
+    // renamed and replaced with a symlink before open(). Re-check both the
+    // selected directory and the newly created inode before writing any JSON.
+    const currentParent = fs.lstatSync(parent);
+    const currentTarget = fs.lstatSync(target);
+    const currentCanonicalParent = fs.realpathSync(parent);
+    const currentCanonicalTarget = fs.realpathSync(target);
+    if (currentParent.isSymbolicLink() || !currentParent.isDirectory() ||
+        currentParent.dev !== parentIdentity.dev ||
+        currentParent.ino !== parentIdentity.ino ||
+        currentCanonicalParent !== canonicalParent ||
+        currentTarget.isSymbolicLink() ||
+        currentTarget.nlink !== 1 ||
+        currentTarget.dev !== createdIdentity.dev ||
+        currentTarget.ino !== createdIdentity.ino ||
+        path.dirname(currentCanonicalTarget) !== canonicalParent) {
+      fail('INVALID_DIAGNOSTIC_TARGET', '诊断导出位置在写入前发生变化');
+    }
+
     fs.fchmodSync(fd, 0o600);
+    const beforeWrite = fs.fstatSync(fd);
+    if (!beforeWrite.isFile() || beforeWrite.nlink !== 1 ||
+        beforeWrite.dev !== createdIdentity.dev ||
+        beforeWrite.ino !== createdIdentity.ino) {
+      fail('INVALID_DIAGNOSTIC_TARGET', '诊断导出目标在写入前发生变化');
+    }
     fs.writeFileSync(fd, serialized, 'utf8');
     fs.fsyncSync(fd);
     fs.closeSync(fd);

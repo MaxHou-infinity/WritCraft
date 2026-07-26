@@ -1,6 +1,6 @@
 # WritCraft V0 · Real Author Acceptance v1
 
-> Status: **frozen; evidence instrumentation and offline acceptance contract signed, pending real paid-API and author execution**. Current implementation evidence (2026-07-26): full Node and Electron-enabled verification exit 0, standard forced-Electron **31/31**, persistent-watcher real Main/IPC **3/3**, Diagnostic Export v1 and Changes/History durable recovery signed, Onboarding dynamic 22/22, and no open P0/P1/P2 in these signed engineering chains. Fixture, source-string, and stub-provider results cannot satisfy the real journey.
+> Status: **frozen; Image Review v1 instrumentation and offline journey signed, pending real paid-API and author execution**. Current evidence (2026-07-26): `npm test` and Electron-enabled `npm run verify` exit 0, forced Electron **31/31**, persistent watcher **3/3**, Image Generation 15/15, Review Service 16/16, Handler 9/9, Renderer 8/8, independent review P0=0/P1=0/P2=1. The disclosed P2 is the missing in-app restore/empty-trash UI; fixture results cannot satisfy the real journey.
 
 Research accuracy instrumentation is governed by `RESEARCH-ACCURACY-V1-CONTRACT.md`; it records the author’s match judgment, never a platform truth score.
 
@@ -26,7 +26,7 @@ The image run additionally requires a complete `sk-api-` credential and may cons
 1. **Project definition:** submit the project card with the real provider. A malformed or incomplete structured response preserves all answers and offers a manual retry. A successful proposal leaves disk unchanged until the author reviews and accepts the `edit.md` ChangeSet. Acceptance must change the authoritative revision, create History, reload `edit.md`, and require a separate confirmation before creating suggested files.
 2. **File and paragraph work:** complete one Inline Rewrite reject, one accept, Safe Undo, one chapter proposal, and one Plan task handoff. Preview and rejection are zero-write; accepted changes survive restart.
 3. **Research:** inspect Claim / Source / Boundary, explicitly rate evidence as matching or not matching, then accept or reject a Research→Changes proposal. Exact-quote validation proves location only, not factual truth.
-4. **Image:** generate `image-01`, verify decoded dimensions/aspect ratio and local asset persistence, then explicitly insert or discard it. Generation alone must not modify Markdown. Record only latency, safe failure class, author quality rating, adoption decision, and a manually checked provider-cost value.
+4. **Image:** generate `image-01`, verify decoded dimensions/aspect ratio and local asset persistence, give a 1–5 quality rating, then explicitly insert, keep, or move the exact asset to recoverable project trash. Generation alone must not modify Markdown. Generic metrics record latency/safe outcome; the separate review record contains only operation, rating, terminal decision, optional manually checked cost/currency, and time.
 5. **Graph and recovery:** inspect people, variables, relations, and time; open both sides of a conflict; make one author correction; send one issue to Changes; restart and verify corrections, History, tabs, current file, and accepted manuscript changes.
 
 ## 4. Sign-off criteria

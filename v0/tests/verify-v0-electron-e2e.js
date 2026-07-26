@@ -3122,7 +3122,7 @@ async function run() {
       assert(persisted.events.every(event => !Object.keys(event).some(key => /prompt|content|path|key/i.test(key))));
     });
 
-    await stage('keeps manuscript bytes unchanged through image preview and inserts only after explicit confirmation', async () => {
+    await stage('keeps manuscript unchanged through image preview, then rates and explicitly inserts', async () => {
       assert.strictEqual(await first.client.evaluate(`window.__workspace.state.currentPath`), createdPath);
       const beforeRenderer = await first.client.evaluate(`window.__editor.getContent()`);
       const beforeDisk = projectService.readFile(project.rootPath, createdPath);
@@ -3138,15 +3138,19 @@ async function run() {
       const preview = await waitForValue(first.client, `(() => {
         const image = document.querySelector('#image-result .image-preview');
         const note = document.querySelector('#image-result .image-result-note');
-        if (!image?.complete || image.naturalWidth !== 1 || !note?.textContent.includes('尚未插入正文')) return null;
+        if (!image?.complete || image.naturalWidth !== 16 || image.naturalHeight !== 9 ||
+            !note?.textContent.includes('尚未插入正文')) return null;
         return { source: image.src, note: note.textContent, text: window.__editor.getContent() };
       })()`, 'decoded image preview');
       assert(preview.source.startsWith('data:image/png;base64,'));
       assert.strictEqual(preview.text, beforeRenderer);
       assert.strictEqual(projectService.readFile(project.rootPath, createdPath), beforeDisk);
 
-      await first.client.evaluate(`document.querySelector('#image-result .image-result-actions .is-primary').click()`);
-      await waitForValue(first.client, `document.querySelector('#image-result .image-state')?.textContent.includes('已在当前光标位置插入')`, 'explicit image insertion');
+      await first.client.evaluate(`(() => {
+        document.querySelector('#image-result .image-rating').value = '4';
+        document.querySelector('#image-result .image-result-actions .is-primary').click();
+      })()`);
+      await waitForValue(first.client, `document.querySelector('#image-result .image-state')?.textContent.includes('已插入正文')`, 'rated explicit image insertion');
       const afterRenderer = await first.client.evaluate(`window.__editor.getContent()`);
       const afterDisk = projectService.readFile(project.rootPath, createdPath);
       assert(afterRenderer.includes('![WritCraft E2E 配图验收：旧港档案室](../assets/generated/image-'));
@@ -3176,13 +3180,28 @@ async function run() {
         editor.dispatchEvent(new InputEvent('input', { bubbles: true, inputType: 'insertText', data: 'Watcher own-echo probe.' }));
         const persisted = await window.__workspace.persistCurrent(true);
         if (!persisted) return { ok: false, error: 'E2E_SAVE_FAILED' };
-        return window.writCraft.project.generateImage(
+        const operationId = window.WritCraftAiMetrics.createOperationId();
+        const generated = await window.writCraft.project.generateImage(
           window.__workspace.state.project.instanceId,
+          operationId,
           ${JSON.stringify(electronAiFixture.IMAGE_PROMPT)},
-          '4:3'
+          '16:9'
         );
+        if (!generated?.ok) return generated;
+        const settled = await window.writCraft.project.settleImageReview(
+          window.__workspace.state.project.instanceId,
+          {
+            token: generated.review.token,
+            decision: 'kept',
+            qualityRating: 4,
+          },
+          null
+        );
+        return { ...generated, settled };
       })()`);
       assert.strictEqual(result.ok, true, JSON.stringify(result));
+      assert.strictEqual(result.settled?.ok, true, JSON.stringify(result));
+      assert.strictEqual(result.settled?.decision, 'kept');
       assert(result.image?.previewDataUrl?.startsWith('data:image/png;base64,'));
       assert(result.image?.filePath?.startsWith('assets/generated/image-'));
     });

@@ -52,6 +52,8 @@ const researchJudgmentTransaction = require('./research-judgment-transaction');
 const researchApplyTransactionService = require('./research-apply-transaction');
 const refreshedResidualMetadata = researchApplyTransactionService.refreshedResidualMetadata;
 const imageGenerationService = require('./image-generation-service');
+const imageReviewServiceModule = require('./image-review-service');
+const imageReviewHandlerModule = require('./image-review-handler');
 const inlineRewriteContextService = require('./inline-rewrite-context-service');
 const inlineRewriteService = require('./inline-rewrite-service');
 const inlineRewriteCapabilityStoreService = require('./inline-rewrite-capability-store');
@@ -89,6 +91,16 @@ let currentProjectWatcher = null;
 const projectWatcherHealth = projectWatcherHealthService.createProjectWatcherHealth();
 const diagnosticRecorder = diagnosticExportService.createDiagnosticRecorder();
 const diagnosticPreviewStore = diagnosticExportService.createDiagnosticPreviewStore();
+const imageReviewService = imageReviewServiceModule.createImageReviewService();
+const activeImageGenerations = new Set();
+const imageReviewHandler = imageReviewHandlerModule.createImageReviewHandler({
+  assertTrustedSender,
+  getCurrentProject: () => currentProject,
+  getMutationGeneration: () => projectMutationGeneration,
+  getNavigationEpoch: () => rendererNavigationEpoch,
+  projectService,
+  reviewService: imageReviewService,
+});
 let projectMutationGeneration = 0;
 let rendererNavigationEpoch = 0;
 let pendingChangeSets = null;
@@ -277,6 +289,7 @@ function projectFailure(error) {
     error instanceof researchService.ResearchError ||
     error instanceof researchHandoffService.ResearchHandoffError ||
     error instanceof imageGenerationService.ImageGenerationError ||
+    error instanceof imageReviewServiceModule.ImageReviewError ||
     error instanceof inlineRewriteContextService.InlineRewriteContextError ||
     error instanceof inlineRewriteMutationGuardService.InlineRewriteMutationGuardError ||
     error instanceof inlineRewriteMutationGuardService.ChangesHistoryMutationGuardError ||
@@ -2795,7 +2808,9 @@ ipcMain.handle('writcraft:project:discard-research-card', async (event, projectI
   }
 });
 
-ipcMain.handle('writcraft:project:generate-image', async (event, projectInstanceId, prompt, aspectRatio) => {
+ipcMain.handle('writcraft:project:generate-image', async (event, projectInstanceId, operationId, prompt, aspectRatio) => {
+  let generationLease = null;
+  let generationLeaseAcquired = false;
   try {
     assertTrustedSender(event);
     const project = requireMutableProject();
@@ -2809,6 +2824,23 @@ ipcMain.handle('writcraft:project:generate-image', async (event, projectInstance
         'Coding Plan Key 可用于文本服务；生成 image-01 配图需要完整 API Key（sk-api-）'
       );
     }
+    if (typeof operationId !== 'string' ||
+        !imageReviewServiceModule.OPERATION_ID_RE.test(operationId)) {
+      throw new imageReviewServiceModule.ImageReviewError(
+        'IMAGE_REVIEW_ISSUE_INVALID',
+        '图片生成操作身份无效'
+      );
+    }
+    generationLease = `${project.instanceId}\0${project.rootPath}`;
+    if (activeImageGenerations.has(generationLease)) {
+      throw new imageReviewServiceModule.ImageReviewError(
+        'IMAGE_REVIEW_PENDING',
+        '当前项目已有图片正在生成或等待审阅'
+      );
+    }
+    imageReviewHandler.assertCanIssue(event, project, operationId);
+    activeImageGenerations.add(generationLease);
+    generationLeaseAcquired = true;
     const mutationGeneration = projectMutationGeneration;
     const result = await runAiRequest(projectInstanceId, signal => imageGenerationService.generateAndSaveImage({
         rootPath: project.rootPath,
@@ -2834,7 +2866,46 @@ ipcMain.handle('writcraft:project:generate-image', async (event, projectInstance
         },
       }));
     invalidateProjectDerivedState();
+    const review = imageReviewHandler.issue(event, currentProject, operationId, result.image);
+    return { ...result, review };
+  } catch (error) {
+    return projectFailure(error);
+  } finally {
+    if (generationLeaseAcquired) activeImageGenerations.delete(generationLease);
+  }
+});
+
+ipcMain.handle('writcraft:project:settle-image-review', async (
+  event,
+  projectInstanceId,
+  review,
+  insertionProof
+) => {
+  try {
+    const result = imageReviewHandler.settle(
+      event,
+      projectInstanceId,
+      review,
+      insertionProof
+    );
+    if (result.ok && result.decision === 'deleted' && !result.responseRecovered) {
+      invalidateProjectDerivedState();
+    }
     return result;
+  } catch (error) {
+    return projectFailure(error);
+  }
+});
+
+ipcMain.handle('writcraft:project:get-image-review-aggregate', async (
+  event,
+  projectInstanceId
+) => {
+  try {
+    return {
+      ok: true,
+      aggregate: imageReviewHandler.aggregate(event, projectInstanceId),
+    };
   } catch (error) {
     return projectFailure(error);
   }

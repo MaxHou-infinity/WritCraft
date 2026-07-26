@@ -111,7 +111,12 @@ contextBridge.exposeInMainWorld('writCraft', {
     ackResearchReview: (projectInstanceId, cardId, changeSetId) => ipcRenderer.invoke('writcraft:project:ack-research-review', projectInstanceId, cardId, changeSetId),
     cancelResearchHandoff: (projectInstanceId, cardId) => ipcRenderer.invoke('writcraft:project:cancel-research-handoff', projectInstanceId, cardId),
     discardResearchCard: (projectInstanceId, cardId) => ipcRenderer.invoke('writcraft:project:discard-research-card', projectInstanceId, cardId),
-    generateImage: (projectInstanceId, prompt, aspectRatio) => ipcRenderer.invoke('writcraft:project:generate-image', projectInstanceId, prompt, aspectRatio),
+    generateImage: (projectInstanceId, operationId, prompt, aspectRatio) =>
+      ipcRenderer.invoke('writcraft:project:generate-image', projectInstanceId, operationId, prompt, aspectRatio),
+    settleImageReview: (projectInstanceId, review, insertionProof) =>
+      ipcRenderer.invoke('writcraft:project:settle-image-review', projectInstanceId, review, insertionProof),
+    getImageReviewAggregate: (projectInstanceId) =>
+      ipcRenderer.invoke('writcraft:project:get-image-review-aggregate', projectInstanceId),
     recordAiMetric: (projectInstanceId, metric) => ipcRenderer.invoke('writcraft:project:record-ai-metric', projectInstanceId, metric),
     getAiMetricsAggregate: (projectInstanceId) => ipcRenderer.invoke('writcraft:project:get-ai-metrics-aggregate', projectInstanceId),
     onExternalChange: (handler) => {

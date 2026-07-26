@@ -57,13 +57,15 @@ function successResponse(bytes) {
 }
 
 async function generate(root, bytes, overrides = {}) {
+  const selectedRatio = overrides.aspectRatio || '16:9';
+  const expected = service.ASPECT_RATIO_DIMENSIONS[selectedRatio] || { width: 1, height: 1 };
   return service.generateAndSaveImage({
     rootPath: root,
     prompt: '雨后的港口档案室，纪实摄影',
-    aspectRatio: '16:9',
+    aspectRatio: selectedRatio,
     apiKey: 'sk-api-test-only-key',
     fetchImpl: async () => successResponse(bytes),
-    decodeImage: () => ({ width: 1, height: 1 }),
+    decodeImage: () => ({ ...expected }),
     ...overrides,
   });
 }
@@ -101,6 +103,11 @@ async function run() {
           filePath: `assets/generated/image-${digest}.png`,
           mimeType: 'image/png',
           previewDataUrl: `data:image/png;base64,${bytes.toString('base64')}`,
+          width: 1280,
+          height: 720,
+          requestedAspectRatio: '16:9',
+          decodedRatio: 1.7778,
+          officialPresetMatch: true,
         },
         markdown: `![AI 生成图片](assets/generated/image-${digest}.png)`,
       });
@@ -115,7 +122,10 @@ async function run() {
     try {
       const result = await generate(root, jpegBytes(), { aspectRatio: '1:1' });
       assert.deepStrictEqual(Object.keys(result), ['ok', 'image', 'markdown']);
-      assert.deepStrictEqual(Object.keys(result.image), ['filePath', 'mimeType', 'previewDataUrl']);
+      assert.deepStrictEqual(Object.keys(result.image), [
+        'filePath', 'mimeType', 'previewDataUrl', 'width', 'height',
+        'requestedAspectRatio', 'decodedRatio', 'officialPresetMatch',
+      ]);
       assert.strictEqual(result.image.mimeType, 'image/jpeg');
       assert.match(result.image.filePath, /^assets\/generated\/image-[a-f0-9]{64}\.jpg$/);
       assert(result.image.previewDataUrl.startsWith('data:image/jpeg;base64,'));
@@ -183,6 +193,17 @@ async function run() {
     try {
       await expectCode('INVALID_IMAGE_DATA', () => generate(root, pngBytes(), { decodeImage: () => null }));
       await expectCode('INVALID_IMAGE_DATA', () => generate(root, jpegBytes(), { decodeImage: () => { throw new Error('decode failed'); } }));
+      assert.strictEqual(fs.existsSync(path.join(root, 'assets')), false);
+    } finally { fs.rmSync(root, { recursive: true, force: true }); }
+  });
+
+  await test('rejects a decoded image whose dimensions do not match the requested aspect ratio', async () => {
+    const root = projectRoot();
+    try {
+      await expectCode('IMAGE_ASPECT_MISMATCH', () => generate(root, pngBytes(), {
+        aspectRatio: '16:9',
+        decodeImage: () => ({ width: 1024, height: 1024 }),
+      }));
       assert.strictEqual(fs.existsSync(path.join(root, 'assets')), false);
     } finally { fs.rmSync(root, { recursive: true, force: true }); }
   });
@@ -257,6 +278,38 @@ async function run() {
       await expectCode('UNSAFE_IMAGE_DESTINATION', () => generate(root, pngBytes()));
       assert.deepStrictEqual(fs.readdirSync(outside), []);
     } finally {
+      fs.rmSync(root, { recursive: true, force: true });
+      fs.rmSync(outside, { recursive: true, force: true });
+    }
+  });
+
+  await test('rejects a generated-directory symlink swap before writing image bytes', async () => {
+    const root = projectRoot();
+    const outside = fs.mkdtempSync(path.join(os.tmpdir(), 'writcraft-image-outside-'));
+    const canonicalRoot = fs.realpathSync(root);
+    const generated = path.join(canonicalRoot, 'assets', 'generated');
+    const displaced = path.join(canonicalRoot, 'assets', 'generated-original');
+    const originalOpen = fs.openSync;
+    let swapped = false;
+    try {
+      fs.openSync = (filePath, flags, mode) => {
+        if (!swapped && typeof filePath === 'string' &&
+            path.dirname(filePath) === generated &&
+            path.basename(filePath).startsWith('.image.')) {
+          swapped = true;
+          fs.renameSync(generated, displaced);
+          fs.symlinkSync(outside, generated);
+        }
+        return originalOpen(filePath, flags, mode);
+      };
+      await expectCode('UNSAFE_IMAGE_DESTINATION', () => generate(root, pngBytes()));
+      assert.strictEqual(swapped, true);
+      assert.deepStrictEqual(fs.readdirSync(outside), []);
+      assert.deepStrictEqual(fs.readdirSync(displaced), []);
+      assert(!fs.readdirSync(outside).some(name => /^image-.*\.png$/.test(name)));
+      assert(!fs.readdirSync(displaced).some(name => /^image-.*\.png$/.test(name)));
+    } finally {
+      fs.openSync = originalOpen;
       fs.rmSync(root, { recursive: true, force: true });
       fs.rmSync(outside, { recursive: true, force: true });
     }
@@ -341,13 +394,17 @@ async function run() {
     assert.match(main, /generateAndSaveImage\(\{[\s\S]{0,500}\n\s*apiKey,/);
     assert(main.includes("'IMAGE_KEY_UNSUPPORTED'"));
     assert.match(main, /beforeCommit\(\)[\s\S]{0,350}projectMutationGeneration !== mutationGeneration/);
-    assert.match(preload, /generateImage: \(projectInstanceId, prompt, aspectRatio\) => ipcRenderer\.invoke\('writcraft:project:generate-image', projectInstanceId, prompt, aspectRatio\)/);
+    assert.match(preload, /generateImage: \(projectInstanceId, operationId, prompt, aspectRatio\) =>\s+ipcRenderer\.invoke\('writcraft:project:generate-image', projectInstanceId, operationId, prompt, aspectRatio\)/);
+    assert.match(preload, /settleImageReview: \(projectInstanceId, review, insertionProof\) =>\s+ipcRenderer\.invoke\('writcraft:project:settle-image-review', projectInstanceId, review, insertionProof\)/);
     assert(main.includes('nativeImage.createFromBuffer(bytes)'));
     assert(main.includes('currentProject.instanceId !== projectInstanceId'));
     const handlerStart = main.indexOf("ipcMain.handle('writcraft:project:generate-image'");
     const handlerEnd = main.indexOf('\nipcMain.handle(', handlerStart + 20);
     const handler = main.slice(handlerStart, handlerEnd);
     assert(handler.indexOf('projectInstanceId !== project.instanceId') < handler.indexOf('generateAndSaveImage({'));
+    assert(handler.indexOf('imageReviewHandler.assertCanIssue') < handler.indexOf('generateAndSaveImage({'));
+    assert(handler.includes('activeImageGenerations.has(generationLease)'));
+    assert(handler.includes('generationLeaseAcquired'));
     const bridgeLine = preload.split('\n').find(line => line.includes('generateImage:'));
     assert(!/root|key|path|output/i.test(bridgeLine.replace(/generateImage|generate-image/g, '')));
   });

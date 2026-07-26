@@ -508,7 +508,14 @@
     const inserted = window.__editor?.insertMarkdown?.(markdown) || { ok: false, message: '编辑器未连接' };
     if (!inserted.ok) return inserted;
     const saved = await persistCurrent(true);
-    return saved ? { ok: true, markdown } : { ok: false, message: '配图引用已进入恢复稿，但尚未写入磁盘' };
+    return saved
+      ? {
+        ok: true,
+        markdown,
+        targetPath: state.currentPath,
+        revision: state.revision,
+      }
+      : { ok: false, message: '配图引用已进入恢复稿，但尚未写入磁盘' };
   }
 
   function closeFileMenus(except = null) {
@@ -2088,7 +2095,10 @@
     if (window.__changesView?.discardPending && !(await window.__changesView.discardPending())) {
       return showError('当前 Onboarding 审阅未能安全结算，已停止切换项目');
     }
-    await window.__imageGenerationView?.discardPending?.();
+    if (window.__imageGenerationView?.discardPending &&
+        !(await window.__imageGenerationView.discardPending())) {
+      return showError('请先对当前生成图片选择插入、保留或移入废纸篓，再切换项目');
+    }
     setSaveState('正在创建项目…', 'saving');
     try {
       await handleProjectResult(await bridge.create(name));
@@ -2103,7 +2113,10 @@
     if (window.__changesView?.discardPending && !(await window.__changesView.discardPending())) {
       return showError('当前 Onboarding 审阅未能安全结算，已停止切换项目');
     }
-    await window.__imageGenerationView?.discardPending?.();
+    if (window.__imageGenerationView?.discardPending &&
+        !(await window.__imageGenerationView.discardPending())) {
+      return showError('请先对当前生成图片选择插入、保留或移入废纸篓，再切换项目');
+    }
     setSaveState('正在打开项目…', 'saving');
     try {
       await handleProjectResult(await bridge.open());

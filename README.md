@@ -1,7 +1,7 @@
 # 笔触 · WritCraft（写作 IDE）
 
-> 状态：**V0 候选原型，2026-07-26 Diagnostic Export v1 与 Changes/History durable recovery 已签收** · 发起方：Max
-> 当前开发真相与唯一续作入口：[`v0/DEVELOPMENT-STATUS.md`](v0/DEVELOPMENT-STATUS.md)。诊断信息现在必须先在设置中完整预览和脱敏，再由 Main 选择本机保存位置；下一入口仍是真实 API/作者与发布验收。现有 App/ZIP 禁止分发。
+> 状态：**V0 候选原型，2026-07-26 Image Review v1 自动化闭环已接入** · 发起方：Max
+> 当前开发真相与唯一续作入口：[`v0/DEVELOPMENT-STATUS.md`](v0/DEVELOPMENT-STATUS.md)。配图现在必须评分并明确插入、保留或移入可恢复废纸篓；自动化链复审 P0/P1=0，下一入口是真实 `sk-api-`/作者与发布验收。现有 App/ZIP 禁止分发。
 > 下一阶段验收边界：[`docs/AUTHOR-ACCEPTANCE-V1-CONTRACT.md`](docs/AUTHOR-ACCEPTANCE-V1-CONTRACT.md) 已冻结；真实调用、作者内容与发布证据必须遵守其中的隐私和付费门禁。
 
 ## 2026-07-26 当前复核快照
@@ -15,12 +15,12 @@
 - Chat 已实现 project/file/selection 三种明确作用域、selection 必选、精确选区邻段、受限项目检索、正文 H1 Source locator 和 request/phase-owned Inspector/Chips；重开、折叠选区与外部文件变化都会主动取消失效请求，Main 权威 `PROJECT_CHANGED` 不再显示为普通调用失败。
 - Chapter 已实现严格计划→逐块生成→Main 本地组装→整文件审阅，并把 project/target/instruction/context/pending 绑定到完整异步生命周期；no-op/provenance/result/capability 分类与确认式回收已动态固化，最终独立复审 P0/P1/P2=0。
 - Onboarding v2 已签字：service **22/22**、capability **15/15**、all-or-nothing batch **22/22**；生产 Handler **11/11**、Main/preload **14/14**；Renderer state/UI/dynamic **8/8、11/11、22/22**。Main single-flight 保证同项目并发只调用一次模型；Renderer epoch 与生命周期清理同时关闭 await→mint、mint→IPC delivery 两侧孤儿 authority 窗口。最终独立复审 P0/P1/P2=0。
-- Author Evidence Metrics v1 已签字：Onboarding 指标绑定 exact operation；待审阅文件失效、手动/并发丢弃、指标失败重试、项目切换与提交后 confirmation 清理均有动态门禁。图片支持显式放弃插入且保留资产；小样本提示、A→B 双重 gate 与八字段隐私 allowlist 保持不变。
+- Author Evidence Metrics v1 保持签字；image 生成耗时/结果仍走八字段隐私事件，评分、三类终态和可选费用走独立私有 Image Review 证据。
 - Research 已形成 Main-owned 的 Claim / Source / Boundary → 专用 Changes → History/undo 闭环；Renderer 只传 card ID 与目标范围，A–D 只是用户提供的来源元数据声明，不是 WritCraft 的事实背书。
 - Research apply 已收敛为 Main 实际复用的生产事务；动态 11/11 以真实磁盘和 History 证明提交后的 stale、TTL、residual、tree 与状态迁移故障不会误报普通失败、泄漏 capability 或诱导重复确认。最终独立二审 P0/P1/P2=0。
 - Research Accuracy 已签字：加入显式“主张匹配/不匹配”作者判断和私有聚合；判断提交前重验 exact authority，watcher 持续不可用会锁住项目 AI/写入，证据提交后变化会保留历史样本但锁定旧卡片。
-- `image-01` 已实现安全本地落盘、预览和用户显式插入；不会生成后静默修改正文。真实质量、费用、限流与故障体验仍待完整 `sk-api-` 验收。
-- Diagnostic Export v1 已接入设置页：作者先看到可能导出的完整 JSON，正文、Prompt、模型回答、Key、项目/文件名与路径均被排除；Renderer 只能回传一次性 token，Main 负责原生保存和不可覆盖写入。Service **12/12**、Handler **10/10**、Renderer **7/7**、Network boundary **15/15**，真实 Electron 已覆盖可见预览和隐私 sentinel。
+- `image-01` 已实现安全落盘、解码尺寸/比例证明、必填 1–5 分、可选费用、插入/保留/可恢复废纸篓和项目聚合；未结算时不能重复生成或切换项目。Generation **15/15**、Review Service **16/16**、Handler **9/9**、Renderer **8/8**、动态 Metrics **20/20**，独立复审 **P0=0/P1=0/P2=1**；P2 为尚无应用内恢复/清空废纸篓入口，真实质量与费用仍待完整 `sk-api-`。
+- Diagnostic Export v1 已接入设置页：作者先看到可能导出的完整 JSON，正文、Prompt、模型回答、Key、项目/文件名与路径均被排除；Renderer 只能回传一次性 token，Main 负责原生保存和不可覆盖写入。Service **13/13**、Handler **10/10**、Renderer **7/7**、Network boundary **15/15**，真实 Electron 已覆盖可见预览和隐私 sentinel。
 - Inline 当前源码隔离 App 已完成人工预览零写入、拒绝、重载、接受、History 与 Safe Undo；Plan 生成已强制 `end_turn`、单文本块、strict JSON、错误脱敏与目标/Prompt 资源上限，独立复审 P0=0/P1=0。
 - 当前最终源码 `npm test` **exit 0**、Electron-enabled `npm run verify` **exit 0**（真实 DOM sanitizer **13/13**）、标准强制 Electron **31/31**、Persistent Watcher Main/IPC **3/3**；Changes/History 为 Recovery **24/24**、Handler **10/10**、Renderer 协议 **16/16**、Workspace **7/7**，Graph 既有专项仍全绿。
 - Main 网络边界已固定文本/图片官方主机，加入 renderer HTTP(S)/WS(S) 双层断网、上下文 IPC 上限、owner abort、mutation generation、内部 revision/父目录回声隔离、零 POST retry、拒绝重定向、诊断 token-only 导出和错误脱敏；当前 network boundary **15/15**。

@@ -31,21 +31,31 @@ test('只提供官方支持的有界比例与 1500 字符 Prompt', () => {
   for (const ratio of ['16:9', '4:3', '1:1', '3:4', '9:16']) assert(html.includes(`value="${ratio}"`));
 });
 
-test('renderer 只通过窄桥接传 origin/projectInstanceId 与 prompt/aspect，不传 Key、root 或输出路径', () => {
-  assert.match(view, /bridge\.generateImage\(projectInstanceId, value, aspect\?\.value \|\| '16:9'\)/);
+test('renderer 只通过窄桥接传 origin、operationId 与 prompt/aspect，不传 Key、root 或输出路径', () => {
+  assert.match(view, /bridge\.generateImage\(\s*projectInstanceId,\s*metric\.operationId,\s*value,\s*aspect\?\.value \|\| '16:9'\s*\)/);
   assert.doesNotMatch(view, /bridge\.generateImage\([^\n]*(?:apiKey|rootPath|outputPath|filePath)/);
 });
 
-test('生成结果先预览，且只接受内嵌 PNG/JPEG data URL', () => {
+test('生成结果先预览并展示尺寸证明，且只接受内嵌 PNG/JPEG data URL', () => {
   assert.match(view, /safePreviewDataUrl/);
   assert.match(view, /\^data:image\\\/\(\?:png\|jpeg\);base64/);
-  assert.match(view, /尚未插入正文/);
+  assert.match(view, /请选择评分和最终动作/);
+  assert.match(view, /owner\.image\?\.width/);
+  assert.match(view, /owner\.image\?\.height/);
+  assert.match(view, /requestedAspectRatio/);
   assert(!view.includes('innerHTML'));
 });
 
-test('只有用户点击“插入当前正文”才调用工作区写入门', () => {
+test('评分后必须显式选择插入、保留或移入废纸篓', () => {
   assert.match(view, /插入当前正文/);
-  assert.match(view, /insertGeneratedImage\?\.\(owner\.image, owner\.altText\)/);
+  assert.match(view, /保留素材/);
+  assert.match(view, /移入废纸篓/);
+  assert.match(view, /\.writcraft\/image-trash 手动恢复/);
+  assert.match(view, /qualityRating/);
+  assert.match(view, /settleImageReview/);
+  assert.match(view, /getImageReviewAggregate/);
+  assert.match(view, /本项目 \$\{total\} 次评审/);
+  assert.match(view, /insertGeneratedImage\?\.\(\s*owner\.image,\s*owner\.altText\s*\)/);
   assert.match(view, /pendingOwner !== owner/);
   assert.match(view, /reviewBusy/);
   assert.doesNotMatch(view, /(?:writeFile|atomicWrite|applyChanges)\s*\(/);
@@ -73,7 +83,8 @@ test('项目切换时通过 instanceId 和 sequence 丢弃旧图像结果', () =
   assert.match(view, /writcraft:project-entered/);
   assert.match(view, /clearResult\(\)/);
   assert.match(view, /window\.__imageGenerationView = Object\.freeze\(\{ discardPending \}\)/);
-  assert((workspace.match(/await window\.__imageGenerationView\?\.discardPending\?\.\(\)/g) || []).length >= 2);
+  assert((workspace.match(/window\.__imageGenerationView\.discardPending\(\)/g) || []).length >= 2);
+  assert.match(workspace, /请先对当前生成图片选择插入、保留或移入废纸篓/);
 });
 
 if (!process.exitCode) console.log(`\n✅ image-01 renderer ${passed}/8 全过`);

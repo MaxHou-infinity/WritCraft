@@ -6,9 +6,9 @@
 > 产品依据：`docs/WRITCRAFT-PRD-V3.md`  
 > 范围：把现有单文档 Electron 原型升级为安全、可恢复的本地多文件项目工作区。
 
-> **工程交接（2026-07-26，Diagnostic Export v1 已签收）**：诊断 allowlist、精确预览、短期 token、Main 原生保存、不可覆盖私有写入和稳定码日志均已完成；Service 12/12、Handler 10/10、Renderer 7/7、Network 15/15。Changes/History durable recovery 保持签字；完整 Node/verify exit 0，强制真实 Electron 31/31。现有 App/ZIP 禁止分发。
+> **工程交接（2026-07-26，Image Review v1 自动化闭环）**：图片生成后由 Main 签发资产绑定 token，Renderer 必填评分并显式选择插入、保留或可恢复废纸篓；Generation 15/15、Review Service 16/16、Handler 9/9、Renderer 8/8，完整 `npm test`、Electron-enabled `npm run verify` 与强制真实 Electron 31/31 通过。Diagnostic 与 Changes/History 保持签字；现有 App/ZIP 禁止分发。
 > **下一阶段合同**：`docs/AUTHOR-ACCEPTANCE-V1-CONTRACT.md` 已冻结，明确付费网络门禁、允许记录的隐私安全证据、真实长文旅程与发布前签字顺序。
-> **当前实现停点**：0.0L 已关闭；下一步按作者验收合同执行真实项目卡、真实长文、Research、image-01 与发布前证据，不得重写已签收的诊断或 Changes/History 协议。
+> **当前实现停点**：0.0M 自动化实现与独立复审已完成（P0=0/P1=0/P2=1）；下一步按作者验收合同执行真实 `sk-api-`、真实长文和发布前证据，不得退回旧图片协议。
 
 ## 1. 阶段目标
 
@@ -361,6 +361,7 @@ Main 为当前窗口保存不可伪造的 project session，不允许 renderer �
 - **Plan 生成**：`docs/PLAN-STRICT-V1-CONTRACT.md` 已实现；request/project/target revision ownership、strict JSON、stopReason、单文本块、失败终态、资源上限及 identifier-only Plan→Changes provenance 均已冻结并验证。
 - **Graph 扩展验收**：`docs/GRAPH-ACCEPTANCE-V1-CONTRACT.md` 已签字；筛选/双证据/stale/作者纠错、failure live、键盘/AX、布局及大图性能已覆盖。后续韧性批又关闭 deferred async ownership、缓存/分析器完整语义权威、有界不可变 Renderer 快照与 Unicode quote 边界，独立二审 P0/P1/P2=0；当前总链真实 Electron 31/31。
 - **Diagnostic Export**：`docs/DIAGNOSTIC-EXPORT-V1-CONTRACT.md` 已实现；Main 构造递归 allowlist JSON，Renderer 只显示精确预览并回传 token，原生保存拒绝覆盖并在失败时只清理由本次创建且 inode 相同的文件；取消、项目/导航漂移、TTL 跨 fsync 与并发替换均有动态门禁。
+- **Image Review**：`docs/IMAGE-REVIEW-V1-CONTRACT.md` 已实现自动化主链；Main 绑定窗口/项目/代际/资产，Renderer 只回传 token、评分、终态和可选费用，插入证明由 Main 重读 Markdown 核验，删除移动到项目私有可恢复废纸篓。
 
 违反本节门禁产生的“测试全绿”不得写入发布判断，也不得作为继续堆叠新功能的依据。
 
