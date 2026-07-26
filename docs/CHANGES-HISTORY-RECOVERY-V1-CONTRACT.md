@@ -1,6 +1,6 @@
 # Changes / History Recovery v1 Contract
 
-> Status: **frozen for implementation on 2026-07-26**  
+> Status: **implemented and signed on 2026-07-26; final review P0=0/P1=0/P2=0**
 > Scope: ordinary Changes apply, reject-only review audit, History undo, process/Renderer response loss, and post-commit bookkeeping failure. Research and Inline retain their signed higher-level protocols but must obey the same project mutation guard.
 
 ## 1. Product truth

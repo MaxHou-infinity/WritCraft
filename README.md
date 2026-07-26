@@ -1,10 +1,10 @@
 # 笔触 · WritCraft（写作 IDE）
 
-> 状态：**V0 候选原型，2026-07-26 Changes/History durable recovery 已全链签收** · 发起方：Max  
-> 当前开发真相与唯一续作入口：[`v0/DEVELOPMENT-STATUS.md`](v0/DEVELOPMENT-STATUS.md)。Changes/History 已接入 Main/IPC/preload、Renderer 启动对账、人工恢复与真实 Electron 旅程；下一入口是真实 API/作者与发布验收。现有 App/ZIP 禁止分发。
+> 状态：**V0 候选原型，2026-07-26 Diagnostic Export v1 与 Changes/History durable recovery 已签收** · 发起方：Max
+> 当前开发真相与唯一续作入口：[`v0/DEVELOPMENT-STATUS.md`](v0/DEVELOPMENT-STATUS.md)。诊断信息现在必须先在设置中完整预览和脱敏，再由 Main 选择本机保存位置；下一入口仍是真实 API/作者与发布验收。现有 App/ZIP 禁止分发。
 > 下一阶段验收边界：[`docs/AUTHOR-ACCEPTANCE-V1-CONTRACT.md`](docs/AUTHOR-ACCEPTANCE-V1-CONTRACT.md) 已冻结；真实调用、作者内容与发布证据必须遵守其中的隐私和付费门禁。
 
-## 2026-07-23 当前复核快照
+## 2026-07-26 当前复核快照
 
 > Research Accuracy v1 签收时完成事务顺序、watcher degraded 门禁与 Renderer recorded-but-locked 语义；该历史批次的完整 Node/verify 与强制 Electron 26/26 已通过。当前最终 Graph 韧性源码的完整边界以本节下方和状态台账为准。
 
@@ -20,9 +20,10 @@
 - Research apply 已收敛为 Main 实际复用的生产事务；动态 11/11 以真实磁盘和 History 证明提交后的 stale、TTL、residual、tree 与状态迁移故障不会误报普通失败、泄漏 capability 或诱导重复确认。最终独立二审 P0/P1/P2=0。
 - Research Accuracy 已签字：加入显式“主张匹配/不匹配”作者判断和私有聚合；判断提交前重验 exact authority，watcher 持续不可用会锁住项目 AI/写入，证据提交后变化会保留历史样本但锁定旧卡片。
 - `image-01` 已实现安全本地落盘、预览和用户显式插入；不会生成后静默修改正文。真实质量、费用、限流与故障体验仍待完整 `sk-api-` 验收。
+- Diagnostic Export v1 已接入设置页：作者先看到可能导出的完整 JSON，正文、Prompt、模型回答、Key、项目/文件名与路径均被排除；Renderer 只能回传一次性 token，Main 负责原生保存和不可覆盖写入。Service **12/12**、Handler **10/10**、Renderer **7/7**、Network boundary **15/15**，真实 Electron 已覆盖可见预览和隐私 sentinel。
 - Inline 当前源码隔离 App 已完成人工预览零写入、拒绝、重载、接受、History 与 Safe Undo；Plan 生成已强制 `end_turn`、单文本块、strict JSON、错误脱敏与目标/Prompt 资源上限，独立复审 P0=0/P1=0。
-- 当前最终源码 `npm test` **exit 0**、Electron-enabled `npm run verify` **exit 0**（真实 DOM sanitizer **13/13**）、标准强制 Electron **30/30**、Persistent Watcher Main/IPC **3/3**；Changes/History 为 Recovery **24/24**、Handler **10/10**、Renderer 协议 **16/16**、Workspace **7/7**，Graph 既有专项仍全绿。
-- Main 网络边界已固定文本/图片官方主机，加入 renderer HTTP(S)/WS(S) 双层断网、上下文 IPC 上限、owner abort、mutation generation、内部 revision/父目录回声隔离、零 POST retry、拒绝重定向和错误脱敏；当前 network boundary **13/13**。
+- 当前最终源码 `npm test` **exit 0**、Electron-enabled `npm run verify` **exit 0**（真实 DOM sanitizer **13/13**）、标准强制 Electron **31/31**、Persistent Watcher Main/IPC **3/3**；Changes/History 为 Recovery **24/24**、Handler **10/10**、Renderer 协议 **16/16**、Workspace **7/7**，Graph 既有专项仍全绿。
+- Main 网络边界已固定文本/图片官方主机，加入 renderer HTTP(S)/WS(S) 双层断网、上下文 IPC 上限、owner abort、mutation generation、内部 revision/父目录回声隔离、零 POST retry、拒绝重定向、诊断 token-only 导出和错误脱敏；当前 network boundary **15/15**。
 - Graph 扩展已动态覆盖 300 文件/1279 节点、cold-to-interactive、stale/三类作者纠错、failure live、键盘/AX、布局、性能、重启与 A→B；缓存完整语义权威、Renderer 不可变快照、同/跨项目异步所有权及 Unicode quote 边界已关闭，最终独立复审 P0=0/P1=0/P2=0。
 - 2026-07-26 已建立本地 Git `main` 基线；后续改动必须通过提交保留可审计差异。该基线不追溯此前历史，阶段事实仍以 `v0/DEVELOPMENT-STATUS.md` 和当次可复现测试证据为准。
 

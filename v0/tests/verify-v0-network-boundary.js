@@ -11,6 +11,7 @@ const main = read('src/main/main.js');
 const changesHistoryHandler = read('src/main/changes-history-handler.js');
 const projectPlanHandler = read('src/main/project-plan-handler.js');
 const projectOnboardingHandler = read('src/main/project-onboarding-handler.js');
+const diagnosticExportHandler = read('src/main/diagnostic-export-handler.js');
 const preload = read('src/main/preload.js');
 const html = read('src/renderer/index.html');
 const image = read('src/main/image-generation-service.js');
@@ -111,6 +112,24 @@ test('BrowserWindow session denies browser permissions and HTTP(S)/WebSocket bef
 test('first-run key detection and API check require the trusted renderer sender', () => {
   assert.match(handler('writcraft:detect-key-type'), /assertTrustedSender\(event\)/);
   assert.match(handler('writcraft:check-api'), /assertTrustedSender\(event\)/);
+});
+
+test('diagnostic preview/export keeps content, paths and serialization authority in Main', () => {
+  const diagnosticBridge = preload.slice(
+    preload.indexOf('diagnostics: Object.freeze({'),
+    preload.indexOf('\n  // 项目态', preload.indexOf('diagnostics: Object.freeze({'))
+  );
+  assert.match(preload, /diagnostics: Object\.freeze\(\{/);
+  assert.match(preload, /preview: \(\) => ipcRenderer\.invoke\('writcraft:diagnostics:preview'\)/);
+  assert.match(preload, /export: \(token\) => ipcRenderer\.invoke\('writcraft:diagnostics:export', \{\s*schema: 'writcraft\.diagnostic-export\/v1',\s*token,\s*\}\)/);
+  assert.doesNotMatch(diagnosticBridge, /(?:filePath|serialized|content|rootPath)/);
+  assert.match(handler('writcraft:diagnostics:preview'), /diagnosticExportHandler\.preview\(event\)/);
+  assert.match(handler('writcraft:diagnostics:export'), /diagnosticExportHandler\.exportPreview\(event, request\)/);
+  assert.match(diagnosticExportHandler, /async function preview\(event\) \{\s*assertTrustedSender\(event\)/);
+  assert.match(diagnosticExportHandler, /async function exportPreview\(event, rawRequest\) \{\s*assertTrustedSender\(event\);\s*const request = exactRequest\(rawRequest\)/);
+  assert.match(diagnosticExportHandler, /const selected = await showSaveDialog\(/);
+  assert(diagnosticExportHandler.indexOf('const currentBinding = captureBinding(event)') <
+    diagnosticExportHandler.indexOf('writeFile(selected.filePath, currentRecord.serialized)'));
 });
 
 test('rewrite/chat carry their origin project instance through the narrow preload bridge', () => {
@@ -247,6 +266,14 @@ test('unknown project errors are logged only through a bounded stable code', () 
   assert.match(main, /\^\[A-Z\]\[A-Z0-9_\]\{0,63\}\$/);
   assert.match(main, /console\.error\('\[project\]', diagnosticCode\)/);
   assert.doesNotMatch(main, /console\.error\('\[project\]', error && error\.message/);
+});
+
+test('renderer console and load failures log stable codes without raw browser content', () => {
+  assert.match(main, /webContents\.on\('console-message', \(_event, level\) =>/);
+  assert.match(main, /console\.log\('\[renderer\]', code\)/);
+  assert.doesNotMatch(main, /webContents\.on\('console-message', \(_event, level, message/);
+  assert.match(main, /webContents\.on\('did-fail-load', \(\) =>/);
+  assert.match(main, /console\.error\('\[renderer\]', 'RENDERER_LOAD_FAILED'\)/);
 });
 
 test('image generation fixes the official host and rejects redirects without retrying', () => {

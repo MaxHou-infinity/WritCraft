@@ -1,6 +1,6 @@
 # WritCraft V0 · Real Author Acceptance v1
 
-> Status: **frozen; evidence instrumentation and offline acceptance contract signed, pending real paid-API and author execution**. Current implementation evidence (2026-07-26): full Node and Electron-enabled verification exit 0, standard forced-Electron **30/30**, persistent-watcher real Main/IPC **3/3**, Changes/History durable recovery fully signed, Onboarding dynamic 22/22, and no open P0/P1/P2 in these signed engineering chains. Fixture, source-string, and stub-provider results cannot satisfy the real journey.
+> Status: **frozen; evidence instrumentation and offline acceptance contract signed, pending real paid-API and author execution**. Current implementation evidence (2026-07-26): full Node and Electron-enabled verification exit 0, standard forced-Electron **31/31**, persistent-watcher real Main/IPC **3/3**, Diagnostic Export v1 and Changes/History durable recovery signed, Onboarding dynamic 22/22, and no open P0/P1/P2 in these signed engineering chains. Fixture, source-string, and stub-provider results cannot satisfy the real journey.
 
 Research accuracy instrumentation is governed by `RESEARCH-ACCURACY-V1-CONTRACT.md`; it records the author’s match judgment, never a platform truth score.
 

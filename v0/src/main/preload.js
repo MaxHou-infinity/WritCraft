@@ -21,6 +21,17 @@ contextBridge.exposeInMainWorld('writCraft', {
     check: () => ipcRenderer.invoke('writcraft:check-api'),
   }),
 
+  // Privacy-safe diagnostics. Renderer can request the exact Main-owned
+  // preview and later return only its short-lived token; it never supplies
+  // diagnostic content or a filesystem path.
+  diagnostics: Object.freeze({
+    preview: () => ipcRenderer.invoke('writcraft:diagnostics:preview'),
+    export: (token) => ipcRenderer.invoke('writcraft:diagnostics:export', {
+      schema: 'writcraft.diagnostic-export/v1',
+      token,
+    }),
+  }),
+
   // 项目态 ⌘K：Renderer 只提供 revision + locator proof，Main 重建正文。
   rewrite: (projectInstanceId, request) => ipcRenderer.invoke('writcraft:rewrite', projectInstanceId, request),
   ackRewrite: (projectInstanceId, payload) => ipcRenderer.invoke('writcraft:rewrite:ack', projectInstanceId, payload),

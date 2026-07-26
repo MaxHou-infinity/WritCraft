@@ -960,6 +960,93 @@ async function run() {
       await delay(500);
     });
 
+    await stage('previews exact privacy-safe diagnostics from visible Settings without opening save', async () => {
+      const beforePath = await first.client.evaluate(`window.__workspace.state.currentPath`);
+      const beforeContent = await first.client.evaluate(`window.__editor.getContent()`);
+      await first.client.evaluate(`(() => {
+        document.getElementById('activity-settings').click();
+        document.getElementById('diagnostic-preview-open').click();
+      })()`);
+      const preview = await waitForValue(first.client, `(() => {
+        const settings = document.getElementById('api-key-dialog');
+        const dialog = document.getElementById('diagnostic-dialog');
+        const serialized = document.getElementById('diagnostic-serialized');
+        const exportButton = document.getElementById('diagnostic-export');
+        if (settings.hidden || dialog.hidden || serialized.dataset.empty !== 'false' ||
+            exportButton.disabled) return null;
+        try {
+          return {
+            settingsVisible: getComputedStyle(settings).display !== 'none',
+            dialogVisible: getComputedStyle(dialog).display !== 'none',
+            serialized: serialized.textContent,
+            bundle: JSON.parse(serialized.textContent),
+          };
+        } catch (_) {
+          return null;
+        }
+      })()`, 'the visible Main-owned diagnostic preview');
+      assert.strictEqual(preview.settingsVisible, true);
+      assert.strictEqual(preview.dialogVisible, true);
+      assert.deepStrictEqual(Object.keys(preview.bundle), [
+        'schema', 'generatedAt', 'app', 'runtime', 'project', 'diagnostics',
+      ]);
+      assert.strictEqual(preview.bundle.schema, 'writcraft.diagnostic-bundle/v1');
+      assert.strictEqual(Number.isNaN(Date.parse(preview.bundle.generatedAt)), false);
+      assert.deepStrictEqual(Object.keys(preview.bundle.app), ['version', 'packaged']);
+      assert.deepStrictEqual(Object.keys(preview.bundle.runtime), [
+        'platform', 'arch', 'electron', 'node',
+      ]);
+      assert.deepStrictEqual(Object.keys(preview.bundle.project), [
+        'open', 'fileCount', 'markdownFileCount', 'promptStatus',
+        'promptDiagnosticCodes', 'watcherStatus', 'metrics',
+      ]);
+      assert.deepStrictEqual(Object.keys(preview.bundle.project.metrics), [
+        'sampleSize', 'smallSample', 'inlineDecisions', 'planAttempts',
+        'researchJudgments', 'imageAttempts', 'onboardingAttempts',
+      ]);
+      assert.strictEqual(preview.bundle.project.open, true);
+      assert(preview.bundle.project.fileCount >= 10);
+      assert(preview.bundle.project.markdownFileCount >= 10);
+      assert(preview.bundle.project.markdownFileCount <= preview.bundle.project.fileCount);
+      assert(Array.isArray(preview.bundle.diagnostics));
+      assert(preview.bundle.diagnostics.every(event =>
+        JSON.stringify(Object.keys(event)) === JSON.stringify(['area', 'code', 'time'])));
+
+      const forbidden = [
+        project.descriptor.name,
+        marker,
+        createdPath,
+        path.basename(createdPath),
+        project.rootPath,
+        path.basename(project.rootPath),
+        'edit.md',
+        '01-arrival.md',
+      ];
+      for (const sentinel of forbidden) {
+        assert(!preview.serialized.includes(sentinel),
+          `diagnostic preview must exclude private sentinel: ${sentinel}`);
+      }
+
+      const closed = await first.client.evaluate(`(() => {
+        document.getElementById('diagnostic-close').click();
+        const settingsStillOpen = !document.getElementById('api-key-dialog').hidden;
+        document.getElementById('api-key-close').click();
+        return {
+          settingsStillOpen,
+          settingsHidden: document.getElementById('api-key-dialog').hidden,
+          diagnosticHidden: document.getElementById('diagnostic-dialog').hidden,
+          currentPath: window.__workspace.state.currentPath,
+          content: window.__editor.getContent(),
+        };
+      })()`);
+      assert.strictEqual(closed.settingsStillOpen, true);
+      assert.strictEqual(closed.settingsHidden, true);
+      assert.strictEqual(closed.diagnosticHidden, true);
+      assert.strictEqual(closed.currentPath, beforePath);
+      assert.strictEqual(closed.content, beforeContent);
+      assert(closed.content.includes(marker));
+    });
+
     await stage('plans every chapter block in Main, reviews one complete file, applies it once, and undoes it', async () => {
       const beforeDisk = projectService.readFile(project.rootPath, createdPath);
       await first.client.evaluate(`(() => {

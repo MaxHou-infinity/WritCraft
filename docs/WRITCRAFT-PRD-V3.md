@@ -6,7 +6,7 @@
 > 适用范围：V0 起的桌面写作 IDE  
 > 优先级：若本文件与旧版 PRD、路线图或原型行为冲突，以本文件为准；工程实现以 `docs/PHASE-A-IMPLEMENTATION.md` 为准。
 
-> **实现状态注记（2026-07-26 Changes/History 收口）**：本文仍是产品权威规格，**完整 PRD 尚未实现**。Inline Rewrite v1、Plan Strict v1、Graph Extended Acceptance v1、Author Evidence Metrics v1、Research Accuracy v1、Changes/History durable recovery 与真实 API 离线验收合同已签字；当前完整 test/verify exit 0，强制 Electron **30/30**。当前仍缺真实付费 API/作者、完整图片质量与费用、干净打包与公开发布；历史 App/ZIP 不能代表当前源码且禁止分发。当前事实与顺序只看 `v0/DEVELOPMENT-STATUS.md`。
+> **实现状态注记（2026-07-26 Diagnostic Export v1 收口）**：本文仍是产品权威规格，**完整 PRD 尚未实现**。Inline Rewrite v1、Plan Strict v1、Graph Extended Acceptance v1、Author Evidence Metrics v1、Research Accuracy v1、Changes/History durable recovery、Diagnostic Preview/Export v1 与真实 API 离线验收合同已签字；当前完整 test/verify exit 0，强制 Electron **31/31**。当前仍缺真实付费 API/作者、完整图片质量与费用、干净打包与公开发布；历史 App/ZIP 不能代表当前源码且禁止分发。当前事实与顺序只看 `v0/DEVELOPMENT-STATUS.md`。
 
 > **完成定义**：任何“V0 完成”声明必须同时满足 §10.1–§10.4、全量自动回归、真实 Electron E2E 和独立复审。局部 suite 通过、本地 ad-hoc App 或历史 ZIP 均不能单独构成完成证据。
 
@@ -354,6 +354,7 @@ Issue 类型首批支持：
 - API Key 不写入项目目录、正文、日志或 ChangeSet。
 - 正式 API 配置必须存入稳定的应用级 userData；升级或开发 profile 迁移不得覆盖更新配置，也不得让 E2E 读取或改写真实用户 Key。设置面板打开时不自动联网，连接检测必须由保存动作或用户显式触发。
 - 日志默认不记录正文全文；诊断导出前必须让用户预览和脱敏。
+- 诊断预览必须显示将要写出的完整字节，并明确排除正文、来源文字、Prompt、模型回答、Key、项目/文件名和路径；Renderer 只能返回短期 token，输出路径与不可覆盖写入由 Main 和原生保存窗口掌握。
 - Renderer 是离线文档表面：CSP 禁止连接，Electron session 继续拦截 HTTP(S) 与 WS(S)，并默认拒绝浏览器和设备权限；Renderer 不持有 Key 或网络原语。
 - 作者证据指标保持项目私有和内容无关：只允许 workflow、结果、耗时、字符计数与时间，不记录正文、Prompt、答案、模型原文、错误消息、Key 或路径；旧指标文件必须兼容，小样本不得包装成结论。
 - Main 的 V0 远端 allowlist 仅为文本 `api.minimaxi.com/anthropic/v1/{models,messages}` 与图片 `api.minimax.io/v1/image_generation`，不得接受 Renderer 提交 URL、主机、Key 或输出路径。
@@ -396,7 +397,7 @@ Issue 类型首批支持：
 
 ### 10.3 Phase C：一致性星图
 
-本节的动态旅程、零写入边界、可访问性、最小窗口和大型图谱性能门禁由 `docs/GRAPH-ACCEPTANCE-V1-CONTRACT.md` 细化。产品契约于 2026-07-22 签字，2026-07-23 性能批源码完整 test/verify 与强制 Electron 连续两轮 26/26 通过，可见帧性能复审 P0/P1/P2=0。后续 Graph 韧性批又关闭完整语义权威、不可变快照、异步所有权与 Unicode quote 边界；当前最终源码完整 test/verify 通过、总链强制 Electron **30/30**，既有独立复审 P0/P1/P2=0。不得用 Node/源码字符串绿灯替代真实 Electron 验收。
+本节的动态旅程、零写入边界、可访问性、最小窗口和大型图谱性能门禁由 `docs/GRAPH-ACCEPTANCE-V1-CONTRACT.md` 细化。产品契约于 2026-07-22 签字，2026-07-23 性能批源码完整 test/verify 与强制 Electron 连续两轮 26/26 通过，可见帧性能复审 P0/P1/P2=0。后续 Graph 韧性批又关闭完整语义权威、不可变快照、异步所有权与 Unicode quote 边界；当前最终源码完整 test/verify 通过、总链强制 Electron **31/31**，既有独立复审 P0/P1/P2=0。不得用 Node/源码字符串绿灯替代真实 Electron 验收。
 
 1. 能从至少三个项目文件增量生成统一节点、关系、证据和问题。
 2. 默认显示当前文件子图，可切换全项目并按类型、文件和问题筛选。

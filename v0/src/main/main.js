@@ -58,6 +58,8 @@ const inlineRewriteCapabilityStoreService = require('./inline-rewrite-capability
 const inlineRewriteApplyServiceModule = require('./inline-rewrite-apply-service');
 const inlineRewriteMutationGuardService = require('./inline-rewrite-mutation-guard');
 const chatContextRequestService = require('./chat-context-request-service');
+const diagnosticExportService = require('./diagnostic-export-service');
+const diagnosticExportHandlerService = require('./diagnostic-export-handler');
 
 // Establish one identity-independent profile before Main reads userData. The
 // deterministic GUI E2E keeps its explicitly supplied disposable profile;
@@ -85,6 +87,8 @@ let mainWindow = null;
 let currentProject = null;
 let currentProjectWatcher = null;
 const projectWatcherHealth = projectWatcherHealthService.createProjectWatcherHealth();
+const diagnosticRecorder = diagnosticExportService.createDiagnosticRecorder();
+const diagnosticPreviewStore = diagnosticExportService.createDiagnosticPreviewStore();
 let projectMutationGeneration = 0;
 let rendererNavigationEpoch = 0;
 let pendingChangeSets = null;
@@ -249,6 +253,7 @@ function projectFailure(error) {
   const diagnosticCode = error && typeof error.code === 'string' && /^[A-Z][A-Z0-9_]{0,63}$/.test(error.code)
     ? error.code
     : 'PROJECT_OPERATION_FAILED';
+  diagnosticRecorder.record('project', diagnosticCode);
   console.error('[project]', diagnosticCode);
   const isSafeProjectError = error instanceof projectService.ProjectServiceError ||
     error instanceof issueStateService.IssueStateError ||
@@ -277,7 +282,8 @@ function projectFailure(error) {
     error instanceof inlineRewriteMutationGuardService.ChangesHistoryMutationGuardError ||
     error instanceof changesHistoryHandlerService.ChangesHistoryHandlerError ||
     error instanceof changesHistoryReconciliationService.ChangesHistoryRecoveryError ||
-    error instanceof referenceImportService.ReferenceImportError;
+    error instanceof referenceImportService.ReferenceImportError ||
+    error instanceof diagnosticExportService.DiagnosticExportError;
   return {
     ok: false,
     error: isSafeProjectError && error.code ? error.code : 'PROJECT_OPERATION_FAILED',
@@ -660,7 +666,8 @@ function setCurrentProject(project) {
     } catch (error) {
       // A watcher failure keeps read-only access available, but the degraded
       // gate blocks AI and every mutable path until the project is reopened.
-      console.error('[project:watcher]', error && error.message ? error.message : error);
+      diagnosticRecorder.record('project', 'PROJECT_WATCHER_START_FAILED');
+      console.error('[project:watcher]', 'PROJECT_WATCHER_START_FAILED');
     }
   } else if (recoverSameProjectWatcher) {
     // instanceId is a stable canonical-root hash. Reopening the same root is
@@ -669,7 +676,8 @@ function setCurrentProject(project) {
     try {
       restartProjectWatcher(project);
     } catch (error) {
-      console.error('[project:watcher:reopen]', error && error.message ? error.message : error);
+      diagnosticRecorder.record('project', 'PROJECT_WATCHER_RESTART_FAILED');
+      console.error('[project:watcher:reopen]', 'PROJECT_WATCHER_RESTART_FAILED');
     }
   }
 }
@@ -872,7 +880,8 @@ function rememberRecentProject(project) {
   } catch (error) {
     // A failure to remember UI convenience state must not make a successfully
     // opened writing project appear to have failed.
-    console.error('[project:recent]', error && error.message ? error.message : error);
+    diagnosticRecorder.record('project', 'RECENT_PROJECT_SAVE_FAILED');
+    console.error('[project:recent]', 'RECENT_PROJECT_SAVE_FAILED');
   }
 }
 
@@ -976,16 +985,123 @@ function createWindow() {
     mainWindow.webContents.openDevTools({ mode: 'detach' });
   }
 
-  // 监听 renderer 控制台日志 → 转发到 stdout 主人能看到
-  mainWindow.webContents.on('console-message', (event, level, message, line, sourceId) => {
-    const lvl = ['log','warn','error','info'][level] || 'log';
-    console.log(`[renderer:${lvl}]`, message, sourceId ? `(${sourceId}:${line})` : '');
+  // Renderer messages may contain manuscript text, prompts, source URLs or
+  // paths. Keep only a stable level code in process logs and diagnostics.
+  mainWindow.webContents.on('console-message', (_event, level) => {
+    const lvl = ['LOG', 'WARN', 'ERROR', 'INFO'][level] || 'LOG';
+    const code = `RENDERER_CONSOLE_${lvl}`;
+    diagnosticRecorder.record('renderer', code);
+    console.log('[renderer]', code);
   });
 
-  // 监听 renderer 加载失败
-  mainWindow.webContents.on('did-fail-load', (_e, code, desc, url) => {
-    console.error(`[renderer] did-fail-load: ${code} ${desc} ${url}`);
+  // The raw Chromium description and URL are deliberately not logged.
+  mainWindow.webContents.on('did-fail-load', () => {
+    diagnosticRecorder.record('window', 'RENDERER_LOAD_FAILED');
+    console.error('[renderer]', 'RENDERER_LOAD_FAILED');
   });
+}
+
+function summarizeDiagnosticTree(nodes) {
+  const stack = Array.isArray(nodes) ? [...nodes] : [];
+  let fileCount = 0;
+  let markdownFileCount = 0;
+  let visited = 0;
+  while (stack.length && visited < 10000) {
+    const node = stack.pop();
+    visited += 1;
+    if (!node || typeof node !== 'object') continue;
+    if (node.type === 'directory' && Array.isArray(node.children)) {
+      stack.push(...node.children);
+    } else if (node.type === 'file') {
+      fileCount += 1;
+      if (typeof node.path === 'string' && /\.(?:md|markdown)$/i.test(node.path)) {
+        markdownFileCount += 1;
+      }
+    }
+  }
+  return { fileCount, markdownFileCount };
+}
+
+function diagnosticMetricsSummary(aggregate) {
+  const evidence = aggregate?.authorEvidence || {};
+  const count = value => Number.isSafeInteger(value) && value >= 0 ? value : 0;
+  return {
+    sampleSize: count(aggregate?.sampleSize),
+    smallSample: aggregate?.smallSample !== false,
+    inlineDecisions: count(evidence.inline?.decisionSampleSize),
+    planAttempts: count(evidence.planRun?.attempts),
+    researchJudgments: count(evidence.researchAccuracy?.sampleSize),
+    imageAttempts: count(evidence.image?.attempts),
+    onboardingAttempts: count(evidence.onboarding?.attempts),
+  };
+}
+
+function createDiagnosticBundleInput() {
+  const project = {
+    open: Boolean(currentProject),
+    fileCount: 0,
+    markdownFileCount: 0,
+    promptStatus: currentProject ? 'unavailable' : 'not_open',
+    promptDiagnosticCodes: [],
+    watcherStatus: currentProject
+      ? projectWatcherHealth.isDegraded(currentProject)
+        ? 'degraded'
+        : currentProjectWatcher
+          ? 'healthy'
+          : 'unavailable'
+      : 'not_open',
+    metrics: diagnosticMetricsSummary(null),
+  };
+  if (currentProject) {
+    try {
+      Object.assign(project, summarizeDiagnosticTree(projectService.listTree(currentProject.rootPath)));
+    } catch (_) {
+      diagnosticRecorder.record('diagnostic', 'DIAGNOSTIC_TREE_UNAVAILABLE');
+    }
+    try {
+      const edit = projectService.readFileWithRevision(currentProject.rootPath, projectService.EDIT_FILE);
+      project.promptStatus = edit.frontMatter?.status || 'unavailable';
+      project.promptDiagnosticCodes = Array.isArray(edit.frontMatter?.diagnostics)
+        ? edit.frontMatter.diagnostics.map(item => item?.code).filter(code =>
+          typeof code === 'string' && /^[A-Z][A-Z0-9_]{0,63}$/.test(code)).slice(0, 20)
+        : [];
+    } catch (_) {
+      project.promptStatus = 'missing';
+      diagnosticRecorder.record('diagnostic', 'DIAGNOSTIC_PROMPT_UNAVAILABLE');
+    }
+    try {
+      const metrics = aiMetricsService.aggregateMetrics(
+        aiMetricsService.loadMetrics(currentProject.rootPath)
+      );
+      project.metrics = diagnosticMetricsSummary(metrics);
+    } catch (_) {
+      diagnosticRecorder.record('diagnostic', 'DIAGNOSTIC_METRICS_UNAVAILABLE');
+    }
+  }
+  return {
+    generatedAt: new Date(),
+    app: {
+      version: app.getVersion(),
+      packaged: app.isPackaged,
+    },
+    runtime: {
+      platform: process.platform,
+      arch: process.arch,
+      electron: process.versions.electron || 'unknown',
+      node: process.versions.node || 'unknown',
+    },
+    project,
+    diagnostics: diagnosticRecorder.list(),
+  };
+}
+
+function captureDiagnosticBinding(event) {
+  return {
+    webContentsId: event?.sender?.id,
+    projectInstanceId: currentProject?.instanceId || null,
+    mutationGeneration: projectMutationGeneration,
+    navigationEpoch: rendererNavigationEpoch,
+  };
 }
 
 // Key 只来自应用 userData 配置或启动环境。Main 不读取项目/仓库根
@@ -1007,6 +1123,20 @@ function resolveActiveApiKey() {
   }
 }
 
+const diagnosticExportHandler = diagnosticExportHandlerService.createDiagnosticExportHandler({
+  assertTrustedSender,
+  captureBinding: captureDiagnosticBinding,
+  createBundleInput: createDiagnosticBundleInput,
+  previewStore: diagnosticPreviewStore,
+  showSaveDialog: ({ defaultName }) => dialog.showSaveDialog(mainWindow, {
+    title: '导出 WritCraft 诊断信息',
+    defaultPath: path.join(app.getPath('documents'), defaultName),
+    buttonLabel: '导出诊断',
+    filters: [{ name: 'JSON', extensions: ['json'] }],
+    properties: ['createDirectory', 'showOverwriteConfirmation'],
+  }),
+});
+
 // IPC 桥接（V0 Day 1 占位）
 ipcMain.handle('writcraft:detect-key-type', (event, key) => {
   assertTrustedSender(event);
@@ -1017,6 +1147,22 @@ ipcMain.handle('writcraft:detect-key-type', (event, key) => {
   if (key.startsWith('sk-api-') || key.startsWith('SK-api-')) return 'FULL';
   if (key.startsWith('sk-'))                                  return 'UNKNOWN';
   return 'INVALID';
+});
+
+ipcMain.handle('writcraft:diagnostics:preview', async event => {
+  try {
+    return await diagnosticExportHandler.preview(event);
+  } catch (error) {
+    return projectFailure(error);
+  }
+});
+
+ipcMain.handle('writcraft:diagnostics:export', async (event, request) => {
+  try {
+    return await diagnosticExportHandler.exportPreview(event, request);
+  } catch (error) {
+    return projectFailure(error);
+  }
 });
 
 // IPC: Key 配置（P1-4）——renderer 只能 set / clear / status，绝不读取明文

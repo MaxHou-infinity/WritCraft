@@ -1,6 +1,6 @@
 # Inline Rewrite v1 Contract
 
-> Status: product chain signed. The 21/21 forced-Electron result below is this contract's historical focused evidence; it is not the current project-wide total. The current final source passed full `npm test`, Electron-enabled `npm run verify`, and controlled forced Electron **30/30**; authoritative current status is `v0/DEVELOPMENT-STATUS.md`.
+> Status: product chain signed. The 21/21 forced-Electron result below is this contract's historical focused evidence; it is not the current project-wide total. The current final source passed full `npm test`, Electron-enabled `npm run verify`, and controlled forced Electron **31/31**; authoritative current status is `v0/DEVELOPMENT-STATUS.md`.
 > Request schema: `writcraft.inline-rewrite/v1`
 > Result schema: `writcraft.inline-rewrite-result/v1`
 

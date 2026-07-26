@@ -294,6 +294,31 @@
     .api-key-connection-status { margin: 0; color: #40382d; font-weight: 600; }
     .api-key-connection-detail { margin: 4px 0 0; color: #7c705f; font-size: 11px; line-height: 1.45; }
     .api-key-note { margin: 8px 0 0; font-size: 11px; color: #8b7e66; }
+    .settings-divider { height: 1px; margin: 16px 0 14px; background: #e2dbcf; }
+    .settings-privacy { display: grid; grid-template-columns: minmax(0, 1fr) auto; gap: 12px; align-items: center; }
+    .settings-privacy strong { display: block; color: #40382d; font-size: 12px; }
+    .settings-privacy p { margin: 4px 0 0; color: #7c705f; font-size: 11px; line-height: 1.5; }
+    .settings-privacy button { border: 1px solid #cfc5b5; border-radius: 4px; background: #fffdf8; color: #5a4a36; padding: 7px 10px; cursor: pointer; font-size: 11px; white-space: nowrap; }
+    .settings-privacy button:focus-visible,
+    .diagnostic-actions button:focus-visible,
+    .diagnostic-close:focus-visible { outline: 2px solid var(--theme, #d4a574); outline-offset: 2px; }
+    .diagnostic-dialog { position: fixed; inset: 0; z-index: 340; display: grid; place-items: center; padding: 24px; background: rgba(26, 24, 21, .58); }
+    .diagnostic-dialog[hidden] { display: none; }
+    .diagnostic-card { width: min(760px, calc(100vw - 48px)); max-height: min(760px, calc(100vh - 48px)); display: grid; grid-template-rows: auto auto minmax(180px, 1fr) auto; overflow: hidden; background: #f8f5ee; border: 1px solid #bba98f; border-radius: 9px; box-shadow: 0 24px 70px rgba(20, 17, 12, .32); }
+    .diagnostic-head { display: flex; justify-content: space-between; align-items: flex-start; gap: 16px; padding: 18px 20px 13px; border-bottom: 1px solid #ded5c6; }
+    .diagnostic-eyebrow { color: #8d7658; font: 600 9px/1.2 "SF Mono", Menlo, monospace; letter-spacing: .12em; text-transform: uppercase; }
+    .diagnostic-head h2 { margin: 4px 0 0; color: #332c23; font: 500 20px/1.3 "Songti SC", serif; }
+    .diagnostic-close { border: 0; background: transparent; color: #766956; font-size: 19px; line-height: 1; cursor: pointer; }
+    .diagnostic-notice { margin: 0; padding: 11px 20px; color: #665a49; background: #fffaf0; border-bottom: 1px solid #e6dccd; font-size: 11px; line-height: 1.6; }
+    .diagnostic-preview { min-height: 0; margin: 0; padding: 16px 20px; overflow: auto; white-space: pre-wrap; overflow-wrap: anywhere; color: #27302d; background: #eef0eb; font: 10.5px/1.55 "SF Mono", Menlo, monospace; tab-size: 2; }
+    .diagnostic-preview[data-empty="true"] { color: #817665; }
+    .diagnostic-footer { display: grid; grid-template-columns: minmax(0, 1fr) auto; gap: 14px; align-items: center; padding: 13px 20px 16px; border-top: 1px solid #d8d0c2; }
+    .diagnostic-feedback { margin: 0; min-height: 16px; color: #5c6b5b; font-size: 11px; line-height: 1.45; }
+    .diagnostic-feedback.is-error { color: #a13f36; }
+    .diagnostic-actions { display: flex; gap: 8px; }
+    .diagnostic-actions button { border: 1px solid #c8bcaa; border-radius: 4px; padding: 7px 11px; background: #fff; color: #514637; cursor: pointer; font-size: 11px; }
+    .diagnostic-actions .diagnostic-export { border-color: #735c3c; background: #735c3c; color: #fff; }
+    .diagnostic-actions button:disabled { opacity: .48; cursor: default; }
     #tip-tap-status { overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
     .status-metrics { display: flex; gap: 12px; white-space: nowrap; }
     .conflict-actions { display: inline-flex; gap: 5px; }
@@ -714,7 +739,7 @@
       <button class="activity-button" id="activity-changes" title="跨文件 Changes">⇄</button>
       <button class="activity-button" data-view="sources" title="来源与证据">⌁</button>
       <div class="activity-spacer"></div>
-      <button class="activity-button" id="activity-settings" title="AI Key 设置">⚙</button>
+      <button class="activity-button" id="activity-settings" title="设置">⚙</button>
       <button class="activity-button" id="activity-ai" title="AI 写作助手">✦</button>
     </nav>
 
@@ -916,10 +941,10 @@
     </form>
   </dialog>
 
-  <!-- AI Key 设置对话框（P1-4）：renderer 只能 set/clear/status，永不回显明文 -->
+  <!-- 设置对话框：AI Key 永不回显明文；诊断必须先预览再导出。 -->
   <div id="api-key-dialog" class="api-key-dialog" hidden>
-    <div class="api-key-card" role="dialog" aria-label="AI Key 设置" aria-modal="true">
-      <div class="api-key-head"><strong>⚙ AI Key 设置</strong><button id="api-key-close" title="关闭">×</button></div>
+    <div class="api-key-card" role="dialog" aria-label="设置" aria-modal="true">
+      <div class="api-key-head"><strong>⚙ 设置</strong><button id="api-key-close" title="关闭">×</button></div>
       <p id="api-key-status-line" class="api-key-status">正在读取状态…</p>
       <input id="api-key-input" type="password" autocomplete="off" spellcheck="false" placeholder="粘贴 sk-api- 或 sk-cp- 开头的 MiniMax Key">
       <div class="api-key-actions">
@@ -934,7 +959,33 @@
       </div>
       <p class="api-key-note">Key 只保存在本机应用数据目录（0600 权限），绝不写入项目文件夹、日志或界面。</p>
       <p class="api-key-note">Coding Plan Key 用于文本服务；生成 image-01 配图需要完整 API Key（sk-api-）。</p>
+      <div class="settings-divider" aria-hidden="true"></div>
+      <section class="settings-privacy" aria-labelledby="diagnostic-settings-title">
+        <div>
+          <strong id="diagnostic-settings-title">诊断与隐私</strong>
+          <p>先查看经过白名单筛选的诊断 JSON，再决定是否保存到本机。</p>
+        </div>
+        <button id="diagnostic-preview-open" type="button">预览诊断信息</button>
+      </section>
     </div>
+  </div>
+
+  <div id="diagnostic-dialog" class="diagnostic-dialog" hidden>
+    <section class="diagnostic-card" role="dialog" aria-modal="true" aria-labelledby="diagnostic-title" aria-describedby="diagnostic-exclusion">
+      <header class="diagnostic-head">
+        <div><div class="diagnostic-eyebrow">Diagnostic preview</div><h2 id="diagnostic-title">诊断与隐私</h2></div>
+        <button id="diagnostic-close" class="diagnostic-close" type="button" aria-label="关闭诊断预览">×</button>
+      </header>
+      <p id="diagnostic-exclusion" class="diagnostic-notice">这份诊断不包含正文、来源文字、Prompt、模型回答、API Key、项目名、文件名或任何路径。下方内容就是可能导出的完整内容。</p>
+      <pre id="diagnostic-serialized" class="diagnostic-preview" data-empty="true" tabindex="0">正在生成只读预览…</pre>
+      <footer class="diagnostic-footer">
+        <p id="diagnostic-feedback" class="diagnostic-feedback" role="status" aria-live="polite" aria-atomic="true"></p>
+        <div class="diagnostic-actions">
+          <button id="diagnostic-refresh" type="button">刷新预览</button>
+          <button id="diagnostic-export" class="diagnostic-export" type="button" disabled>导出这份诊断</button>
+        </div>
+      </footer>
+    </section>
   </div>
 
   <script src="diff.min.js"></script>
@@ -976,6 +1027,7 @@
   <script src="changes-review-state.js"></script>
   <script src="changes-view.js"></script>
   <script src="api-key-settings.js"></script>
+  <script src="diagnostic-export-view.js"></script>
   <script src="assistant-workspace.js"></script>
   <script src="image-generation-view.js"></script>
 </body>

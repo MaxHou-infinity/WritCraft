@@ -6,9 +6,9 @@
 > 产品依据：`docs/WRITCRAFT-PRD-V3.md`  
 > 范围：把现有单文档 Electron 原型升级为安全、可恢复的本地多文件项目工作区。
 
-> **工程交接（2026-07-26，Changes/History 全链已签收）**：durable marker、History expected-state CAS、apply/review/undo transaction、Main/IPC/preload、复合写入锁、Renderer 启动对账、两项人工恢复与 fsync durability lock 均已完成。Recovery 24/24、Handler 10/10、Renderer 协议 16/16、Workspace 7/7；完整 Node/verify exit 0，强制真实 Electron 30/30，最终独立复核 P0/P1/P2=0。现有 App/ZIP 禁止分发。
+> **工程交接（2026-07-26，Diagnostic Export v1 已签收）**：诊断 allowlist、精确预览、短期 token、Main 原生保存、不可覆盖私有写入和稳定码日志均已完成；Service 12/12、Handler 10/10、Renderer 7/7、Network 15/15。Changes/History durable recovery 保持签字；完整 Node/verify exit 0，强制真实 Electron 31/31。现有 App/ZIP 禁止分发。
 > **下一阶段合同**：`docs/AUTHOR-ACCEPTANCE-V1-CONTRACT.md` 已冻结，明确付费网络门禁、允许记录的隐私安全证据、真实长文旅程与发布前签字顺序。
-> **当前实现停点**：0.0J 已关闭；下一步按作者验收合同执行真实项目卡、真实长文、Research、image-01 与发布前证据，不得重写已签收的 Changes/History 协议。
+> **当前实现停点**：0.0L 已关闭；下一步按作者验收合同执行真实项目卡、真实长文、Research、image-01 与发布前证据，不得重写已签收的诊断或 Changes/History 协议。
 
 ## 1. 阶段目标
 
@@ -359,7 +359,8 @@ Main 为当前窗口保存不可伪造的 project session，不允许 renderer �
 - **Research→Changes**：`writcraft.research-handoff/v1` 已完成契约、实现、强制 Electron reject/A→B 与当前源码 App 人工旅程；来源保持只读并进入 ChangeSet provenance。生产 apply transaction 以真实磁盘/History 关闭 committed-warning 动态故障注入，最终独立二审 P0=0/P1=0/P2=0。
 - **Inline Rewrite**：已冻结并实现 selection/block anchor、target revision、`end_turn`、输出边界、保留路径禁写、Main capability/ACK、接受时依赖复核、durable reconciliation 和 Change History；原位红绿 Diff、阻断恢复与当前源码人工旅程均已签字。
 - **Plan 生成**：`docs/PLAN-STRICT-V1-CONTRACT.md` 已实现；request/project/target revision ownership、strict JSON、stopReason、单文本块、失败终态、资源上限及 identifier-only Plan→Changes provenance 均已冻结并验证。
-- **Graph 扩展验收**：`docs/GRAPH-ACCEPTANCE-V1-CONTRACT.md` 已签字；筛选/双证据/stale/作者纠错、failure live、键盘/AX、布局及大图性能已覆盖。后续韧性批又关闭 deferred async ownership、缓存/分析器完整语义权威、有界不可变 Renderer 快照与 Unicode quote 边界，独立二审 P0/P1/P2=0；当前总链真实 Electron 30/30。
+- **Graph 扩展验收**：`docs/GRAPH-ACCEPTANCE-V1-CONTRACT.md` 已签字；筛选/双证据/stale/作者纠错、failure live、键盘/AX、布局及大图性能已覆盖。后续韧性批又关闭 deferred async ownership、缓存/分析器完整语义权威、有界不可变 Renderer 快照与 Unicode quote 边界，独立二审 P0/P1/P2=0；当前总链真实 Electron 31/31。
+- **Diagnostic Export**：`docs/DIAGNOSTIC-EXPORT-V1-CONTRACT.md` 已实现；Main 构造递归 allowlist JSON，Renderer 只显示精确预览并回传 token，原生保存拒绝覆盖并在失败时只清理由本次创建且 inode 相同的文件；取消、项目/导航漂移、TTL 跨 fsync 与并发替换均有动态门禁。
 
 违反本节门禁产生的“测试全绿”不得写入发布判断，也不得作为继续堆叠新功能的依据。
 
@@ -379,7 +380,7 @@ Main 为当前窗口保存不可伪造的 project session，不允许 renderer �
 - [x] renderer sandbox、context isolation 和窄 preload API 保持开启。
 - [x] Phase A 地基、当前 Chat/Chapter 源码的单元/IPC 集成和强制真实 Electron 验收通过；失败证据不被静态 verify 掩盖。
 
-> 证据边界：当前最终源码 `npm test`、Electron-enabled `npm run verify` 均 exit 0，强制 Electron 30/30；Changes/History 与 Graph 定向证据均通过。真实 API、完整 `sk-api-` 图片、真实作者内测与发布复审仍未关闭。精确缺口见 `v0/DEVELOPMENT-STATUS.md`。
+> 证据边界：当前最终源码 `npm test`、Electron-enabled `npm run verify` 均 exit 0，强制 Electron 31/31；Diagnostic Export、Changes/History 与 Graph 定向证据均通过。真实 API、完整 `sk-api-` 图片、真实作者内测与发布复审仍未关闭。精确缺口见 `v0/DEVELOPMENT-STATUS.md`。
 
 Phase A 只有在全部清单有可复现证据时才算完成；“页面看起来像工作区”或“测试只检查元素存在”都不构成验收。
 
