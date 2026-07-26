@@ -1,11 +1,11 @@
 # 笔触 · WritCraft — 产品需求与价值说明
 
-> 文档版本：v2.5 | 2026-07-22（第十二次收口后校准）
+> 文档版本：v2.6 | 2026-07-26（Image Review v1 日终校准）
 > 发起方：Max Hou
 > 输入依据：T1–T9 全流程调研，含 T7 综合分析（25KB）/ T8 魔鬼质询（17KB）/ T9 战略路线（16KB）
 > 状态：产品背景与商业假设已定；**V0 仍在开发，未完成、未发布**
 
-> 实施说明：本文件描述产品价值、原始研究与商业假设；功能验收以 `docs/WRITCRAFT-PRD-V3.md` 为准，当前事实与 TODO 只以 `v0/DEVELOPMENT-STATUS.md` 为准。现有工程已具备三级项目工作区、`edit.md`、Inline Diff、ChangeSet、完整 Context、来源/脚注、项目向导、增强图谱及右侧四书签；Inline、Plan Strict、Graph、Metrics、Research Accuracy、Changes/History 与真实 API 离线合同已签字，当前总链为完整 Node/verify 通过、受控强制 Electron **30/30**。真实付费 MiniMax API、完整图片质量/费用、真实作者指标与公开发布仍未完成；历史 stub GUI 的 9/9 仅是旧专项证据。
+> 实施说明：本文件描述产品价值、原始研究与商业假设；功能验收以 `docs/WRITCRAFT-PRD-V3.md` 为准，当前事实与 TODO 只以 `v0/DEVELOPMENT-STATUS.md` 为准。现有工程已具备三级项目工作区、`edit.md`、Inline Diff、ChangeSet、完整 Context、来源/脚注、项目向导、增强图谱及右侧四书签；Inline、Plan Strict、Graph、Metrics、Research Accuracy、Changes/History、Diagnostic Export 与 Image Review 自动化链已签字，当前总链为完整 Node/verify 通过、受控强制 Electron **31/31**、Persistent Watcher **3/3**。Image Review 仍有一个非阻断 P2：缺少应用内图片废纸篓恢复/清空；明天先关闭该本地缺口，再进入真实付费 MiniMax API、完整图片质量/费用、真实作者指标与公开发布。历史 stub GUI 的 9/9 仅是旧专项证据。
 
 ---
 

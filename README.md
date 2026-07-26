@@ -1,14 +1,14 @@
 # 笔触 · WritCraft（写作 IDE）
 
 > 状态：**V0 候选原型，2026-07-26 Image Review v1 自动化闭环已接入** · 发起方：Max
-> 当前开发真相与唯一续作入口：[`v0/DEVELOPMENT-STATUS.md`](v0/DEVELOPMENT-STATUS.md)。配图现在必须评分并明确插入、保留或移入可恢复废纸篓；自动化链复审 P0/P1=0，下一入口是真实 `sk-api-`/作者与发布验收。现有 App/ZIP 禁止分发。
+> 当前开发真相与唯一续作入口：[`v0/DEVELOPMENT-STATUS.md`](v0/DEVELOPMENT-STATUS.md)。配图现在必须评分并明确插入、保留或移入可恢复废纸篓；自动化链复审 P0/P1=0，明天先补应用内废纸篓恢复/清空，再进入真实 `sk-api-`/作者与发布验收。现有 App/ZIP 禁止分发。
 > 下一阶段验收边界：[`docs/AUTHOR-ACCEPTANCE-V1-CONTRACT.md`](docs/AUTHOR-ACCEPTANCE-V1-CONTRACT.md) 已冻结；真实调用、作者内容与发布证据必须遵守其中的隐私和付费门禁。
 
 ## 2026-07-26 当前复核快照
 
 > Research Accuracy v1 签收时完成事务顺序、watcher degraded 门禁与 Renderer recorded-but-locked 语义；该历史批次的完整 Node/verify 与强制 Electron 26/26 已通过。当前最终 Graph 韧性源码的完整边界以本节下方和状态台账为准。
 
-> Graph 性能复验没有用单次重试绿灯覆盖失败：索引、布局、baseline 所有权、元素重挂、scene detach 与 dispatch-only 计时缺口均已进入根因修复和回归。最终门禁等待两帧并读取实际 CSS 可见状态与 SVG 布局；同一源码无中间修改连续两次全链均为 **26/26**。
+> Graph 性能复验没有用单次重试绿灯覆盖失败：索引、布局、baseline 所有权、元素重挂、scene detach 与 dispatch-only 计时缺口均已进入根因修复和回归。该历史性能专项门禁等待两帧并读取实际 CSS 可见状态与 SVG 布局；同一源码无中间修改连续两次全链均为 **26/26**。当前项目总链以本节 31/31 和状态台账为准。
 
 - 项目 / 文件 / 段落三级工作区、`edit.md`、Inline Diff、localized ChangeSet/撤销、权威 Context、来源/脚注、recovery、Cursor 式标签和一致性图谱均已接入；当前源码已完成 Onboarding v2 自动化产品链，现有 App/ZIP 仍是旧链路且未重建。
 - 普通 Changes、Plan→Changes 与 Graph 的本轮结构性修复已完成独立复审；模型不再回传整篇 after，而由 Main 验证局部锚点、依赖和 stopReason 后构造修改。

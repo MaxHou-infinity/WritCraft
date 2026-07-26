@@ -4,9 +4,9 @@
 > Wiki 同步：`~/Library/Mobile Documents/iCloud~md~obsidian/.../wiki/projects/writ-craft/`
 > 完整复盘见 Nowledge Mem `writcraft-v0-pdca-2026-07-14`
 
-> **开发阶段续作交接（2026-07-18）**：调研结论不变；工程已完成三级工作区、`edit.md`、ChangeSet、完整有界 Context、项目向导、增强图谱、来源/脚注、Cursor 标签、右侧四书签和 300 文件压力基线。metrics、Research、image-01 已通过真实 Electron 9/9 stub GUI 闭环；Main 固定主机、Renderer 双层断网、主动 abort、内部 Watcher revision 回声隔离、错误脱敏与真实 Chromium DOM sanitizer 13/13 也已完成专项验证。仍待真实 MiniMax API、真实作者指标与发布复审。唯一执行入口仍是 `v0/DEVELOPMENT-STATUS.md`，不得沿用历史测试数字或“已可发布”判断。
+> **开发阶段续作交接（2026-07-18，历史专项证据）**：调研结论不变；工程已完成三级工作区、`edit.md`、ChangeSet、完整有界 Context、项目向导、增强图谱、来源/脚注、Cursor 标签、右侧四书签和 300 文件压力基线。metrics、Research、image-01 当时通过真实 Electron 9/9 stub GUI 闭环；Main 固定主机、Renderer 双层断网、主动 abort、内部 Watcher revision 回声隔离、错误脱敏与真实 Chromium DOM sanitizer 13/13 也完成专项验证。当前总链以紧随其后的 0.0M 校准和 `v0/DEVELOPMENT-STATUS.md` 为准；仍待真实 MiniMax API、真实作者指标与发布复审，不得沿用历史测试数字或“已可发布”判断。
 
-> **当前收口校准（2026-07-26）**：第三次收口的 Renderer 缺口及后续 Changes/History 不确定写入缺口均已关闭，不能再作为下一轮任务。Inline、Plan Strict、Graph、Author Evidence Metrics、Research Accuracy 与 Changes/History 均已签字；当前源码完整 `npm test`、Electron-enabled `npm run verify` 与受控强制 Electron **30/30** 均通过。下一步是 `docs/AUTHOR-ACCEPTANCE-V1-CONTRACT.md` 规定的真实付费 API、真实作者和发布验收；现有 App/ZIP 继续禁止分发。旧收口数字只保留为历史复盘，不可覆盖 `v0/DEVELOPMENT-STATUS.md`。
+> **当前收口校准（2026-07-26，0.0M）**：第三次收口、Changes/History 不确定写入和 Image Review 的阻断项均已关闭，不能再作为下一轮任务。图片现已具备尺寸证明、1–5 分、可选费用、插入/保留/可恢复废纸篓与项目聚合；最终复审 P0=0/P1=0/P2=1。当前源码完整 `npm test`、Electron-enabled `npm run verify`、受控强制 Electron **31/31** 与 Persistent Watcher **3/3** 均通过。明天先完成仍可本地自主推进的应用内图片废纸篓恢复/清空，再进入 `docs/AUTHOR-ACCEPTANCE-V1-CONTRACT.md` 规定的真实 `sk-api-`、真实作者和发布验收；现有 App/ZIP 继续禁止分发。旧数字只保留为历史复盘，不可覆盖 `v0/DEVELOPMENT-STATUS.md`。
 
 ---
 

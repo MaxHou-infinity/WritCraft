@@ -8,7 +8,7 @@
 
 > **工程交接（2026-07-26，Image Review v1 自动化闭环）**：图片生成后由 Main 签发资产绑定 token，Renderer 必填评分并显式选择插入、保留或可恢复废纸篓；Generation 15/15、Review Service 16/16、Handler 9/9、Renderer 8/8，完整 `npm test`、Electron-enabled `npm run verify` 与强制真实 Electron 31/31 通过。Diagnostic 与 Changes/History 保持签字；现有 App/ZIP 禁止分发。
 > **下一阶段合同**：`docs/AUTHOR-ACCEPTANCE-V1-CONTRACT.md` 已冻结，明确付费网络门禁、允许记录的隐私安全证据、真实长文旅程与发布前签字顺序。
-> **当前实现停点**：0.0M 自动化实现与独立复审已完成（P0=0/P1=0/P2=1）；下一步按作者验收合同执行真实 `sk-api-`、真实长文和发布前证据，不得退回旧图片协议。
+> **当前实现停点**：0.0M 自动化实现与独立复审已完成（P0=0/P1=0/P2=1）；下一步先关闭可本地推进的应用内废纸篓恢复/清空 P2，再按作者验收合同执行真实 `sk-api-`、真实长文和发布前证据，不得退回旧图片协议。
 
 ## 1. 阶段目标
 
@@ -381,7 +381,7 @@ Main 为当前窗口保存不可伪造的 project session，不允许 renderer �
 - [x] renderer sandbox、context isolation 和窄 preload API 保持开启。
 - [x] Phase A 地基、当前 Chat/Chapter 源码的单元/IPC 集成和强制真实 Electron 验收通过；失败证据不被静态 verify 掩盖。
 
-> 证据边界：当前最终源码 `npm test`、Electron-enabled `npm run verify` 均 exit 0，强制 Electron 31/31；Diagnostic Export、Changes/History 与 Graph 定向证据均通过。真实 API、完整 `sk-api-` 图片、真实作者内测与发布复审仍未关闭。精确缺口见 `v0/DEVELOPMENT-STATUS.md`。
+> 证据边界：当前最终源码 `npm test`、Electron-enabled `npm run verify` 均 exit 0，强制 Electron 31/31、Persistent Watcher 3/3；Diagnostic Export、Image Review、Changes/History 与 Graph 定向证据均通过。Image Review 独立复审 P0=0/P1=0/P2=1，唯一 P2 是缺少应用内恢复/清空废纸篓入口。真实 API、完整 `sk-api-` 图片、真实作者内测与发布复审仍未关闭。精确缺口见 `v0/DEVELOPMENT-STATUS.md`。
 
 Phase A 只有在全部清单有可复现证据时才算完成；“页面看起来像工作区”或“测试只检查元素存在”都不构成验收。
 
