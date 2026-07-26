@@ -1,0 +1,51 @@
+# macOS and editor metadata
+.DS_Store
+**/.DS_Store
+Thumbs.db
+desktop.ini
+*.swp
+*.swo
+*.bak
+*~
+
+# Local environment and secrets
+.env
+.env.*
+!.env.example
+**/.env
+**/.env.*
+!**/.env.example
+*.pem
+*.p12
+*.key
+
+# JavaScript dependencies and generated output
+node_modules/
+**/node_modules/
+release/
+**/release/
+dist/
+**/dist/
+build/
+**/build/
+out/
+**/out/
+coverage/
+**/coverage/
+.cache/
+**/.cache/
+.tmp/
+**/.tmp/
+tmp/
+**/tmp/
+
+# Logs and temporary files
+*.log
+npm-debug.log*
+yarn-debug.log*
+pnpm-debug.log*
+*.tmp
+
+# Local agent runtime state
+.omc/
+.codex/

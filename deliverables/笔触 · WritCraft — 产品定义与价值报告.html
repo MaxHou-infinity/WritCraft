@@ -1,0 +1,1216 @@
+<!DOCTYPE html>
+<html lang="zh-CN">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>笔触 · WritCraft — 产品定义与价值报告</title>
+<script src="https://cdn.jsdelivr.net/npm/mermaid@10/dist/mermaid.min.js"></script>
+<style>
+  :root {
+    --bg: #faf9f7;
+    --surface: #ffffff;
+    --ink: #1a1a1a;
+    --ink-2: #555;
+    --ink-3: #999;
+    --accent: #c0392b;
+    --accent-bg: #fdf2f2;
+    --border: #e8e4df;
+    --rule: #d4cfc8;
+    --card-shadow: 0 1px 3px rgba(0,0,0,0.06), 0 1px 2px rgba(0,0,0,0.04);
+    --card-hover: 0 4px 12px rgba(0,0,0,0.08);
+    --font-display: "Source Serif 4", "Source Serif Pro", "Noto Serif SC", Georgia, serif;
+    --font-body: "Noto Sans SC", "PingFang SC", "Microsoft YaHei", sans-serif;
+    --font-mono: "JetBrains Mono", "Fira Code", monospace;
+    --radius: 4px;
+    --radius-lg: 8px;
+  }
+  * { box-sizing: border-box; margin: 0; padding: 0; }
+  body {
+    background: var(--bg);
+    color: var(--ink);
+    font-family: var(--font-body);
+    font-size: 15px;
+    line-height: 1.7;
+    -webkit-font-smoothing: antialiased;
+  }
+  .report-header {
+    background: var(--ink);
+    color: #fff;
+    padding: 64px 48px;
+    position: relative;
+    overflow: hidden;
+  }
+  .report-header::before {
+    content: "";
+    position: absolute;
+    top: 0; right: 0; bottom: 0;
+    width: 40%;
+    background: repeating-linear-gradient(
+      -45deg,
+      transparent,
+      transparent 20px,
+      rgba(255,255,255,0.02) 20px,
+      rgba(255,255,255,0.02) 21px
+    );
+  }
+  .report-header .eyebrow {
+    font-family: var(--font-mono);
+    font-size: 11px;
+    letter-spacing: 0.15em;
+    text-transform: uppercase;
+    color: rgba(255,255,255,0.45);
+    margin-bottom: 16px;
+  }
+  .report-header h1 {
+    font-family: var(--font-display);
+    font-size: 42px;
+    font-weight: 700;
+    line-height: 1.2;
+    margin-bottom: 12px;
+    letter-spacing: -0.02em;
+  }
+  .report-header .subtitle {
+    font-family: var(--font-display);
+    font-size: 18px;
+    color: rgba(255,255,255,0.6);
+    font-style: italic;
+    margin-bottom: 32px;
+  }
+  .report-header .meta-row {
+    display: flex;
+    gap: 32px;
+    flex-wrap: wrap;
+  }
+  .report-header .meta-item {
+    font-size: 12px;
+    color: rgba(255,255,255,0.4);
+    font-family: var(--font-mono);
+  }
+  .report-header .meta-item strong {
+    color: rgba(255,255,255,0.7);
+    font-weight: 500;
+  }
+  .report-body {
+    max-width: 1100px;
+    margin: 0 auto;
+    padding: 0 32px 80px;
+  }
+  .section {
+    padding: 56px 0;
+    border-bottom: 1px solid var(--rule);
+  }
+  .section:last-child { border-bottom: none; }
+  h2 {
+    font-family: var(--font-display);
+    font-size: 26px;
+    font-weight: 700;
+    color: var(--ink);
+    margin-bottom: 8px;
+    letter-spacing: -0.02em;
+  }
+  h2 .num {
+    font-family: var(--font-mono);
+    font-size: 13px;
+    color: var(--accent);
+    margin-right: 12px;
+    font-weight: 400;
+    vertical-align: middle;
+  }
+  .section-desc {
+    font-size: 14px;
+    color: var(--ink-3);
+    margin-bottom: 32px;
+    font-style: italic;
+  }
+  .card-grid {
+    display: grid;
+    grid-template-columns: repeat(auto-fill, minmax(280px, 1fr));
+    gap: 16px;
+    margin-bottom: 32px;
+  }
+  .card {
+    background: var(--surface);
+    border: 1px solid var(--border);
+    border-radius: var(--radius-lg);
+    padding: 20px 24px;
+    box-shadow: var(--card-shadow);
+    transition: box-shadow 0.2s;
+  }
+  .card:hover { box-shadow: var(--card-hover); }
+  .card .card-label {
+    font-family: var(--font-mono);
+    font-size: 10px;
+    letter-spacing: 0.12em;
+    text-transform: uppercase;
+    color: var(--accent);
+    margin-bottom: 8px;
+  }
+  .card .card-title {
+    font-family: var(--font-display);
+    font-size: 17px;
+    font-weight: 600;
+    margin-bottom: 8px;
+    color: var(--ink);
+  }
+  .card .card-body {
+    font-size: 13.5px;
+    color: var(--ink-2);
+    line-height: 1.65;
+  }
+  .card .card-body p + p { margin-top: 8px; }
+  .table-wrap {
+    overflow-x: auto;
+    margin-bottom: 32px;
+    border-radius: var(--radius-lg);
+    border: 1px solid var(--border);
+    box-shadow: var(--card-shadow);
+  }
+  table {
+    width: 100%;
+    border-collapse: collapse;
+    background: var(--surface);
+    font-size: 13.5px;
+  }
+  thead { background: var(--ink); color: #fff; }
+  th {
+    font-family: var(--font-mono);
+    font-size: 11px;
+    letter-spacing: 0.08em;
+    text-transform: uppercase;
+    padding: 12px 16px;
+    text-align: left;
+    font-weight: 500;
+  }
+  td {
+    padding: 12px 16px;
+    border-bottom: 1px solid var(--border);
+    vertical-align: top;
+    color: var(--ink-2);
+    line-height: 1.6;
+  }
+  tr:last-child td { border-bottom: none; }
+  tbody tr:hover td { background: #faf9f7; }
+  .badge {
+    display: inline-block;
+    padding: 2px 8px;
+    border-radius: 3px;
+    font-family: var(--font-mono);
+    font-size: 10px;
+    font-weight: 600;
+    letter-spacing: 0.05em;
+  }
+  .badge-red { background: #fde8e8; color: #c0392b; }
+  .badge-green { background: #e8f5e9; color: #27ae60; }
+  .badge-gray { background: #f0f0f0; color: #666; }
+  .badge-ink { background: var(--ink); color: #fff; }
+  .pull-quote {
+    background: var(--accent-bg);
+    border-left: 3px solid var(--accent);
+    padding: 20px 28px;
+    margin: 24px 0;
+    border-radius: 0 var(--radius-lg) var(--radius-lg) 0;
+  }
+  .pull-quote p {
+    font-family: var(--font-display);
+    font-size: 18px;
+    line-height: 1.6;
+    color: var(--ink);
+    font-style: italic;
+  }
+  .mermaid-wrap {
+    background: var(--surface);
+    border: 1px solid var(--border);
+    border-radius: var(--radius-lg);
+    padding: 32px 24px;
+    margin: 24px 0;
+    box-shadow: var(--card-shadow);
+    text-align: center;
+  }
+  .mermaid-wrap .mermaid-label {
+    font-family: var(--font-mono);
+    font-size: 11px;
+    letter-spacing: 0.1em;
+    text-transform: uppercase;
+    color: var(--ink-3);
+    margin-bottom: 16px;
+  }
+  .sop-flow {
+    display: flex;
+    gap: 0;
+    margin: 24px 0;
+    overflow-x: auto;
+  }
+  .sop-step {
+    flex: 1;
+    min-width: 100px;
+    position: relative;
+    padding: 16px 12px 16px 0;
+  }
+  .sop-step::after {
+    content: "→";
+    position: absolute;
+    right: -2px;
+    top: 50%;
+    transform: translateY(-50%);
+    color: var(--ink-3);
+    font-size: 18px;
+    font-family: var(--font-mono);
+  }
+  .sop-step:last-child::after { display: none; }
+  .sop-num {
+    font-family: var(--font-mono);
+    font-size: 10px;
+    color: var(--accent);
+    font-weight: 700;
+    letter-spacing: 0.1em;
+    display: block;
+    margin-bottom: 6px;
+  }
+  .sop-name {
+    font-size: 13px;
+    font-weight: 600;
+    color: var(--ink);
+    margin-bottom: 4px;
+    font-family: var(--font-display);
+  }
+  .sop-desc {
+    font-size: 11.5px;
+    color: var(--ink-3);
+    line-height: 1.5;
+  }
+  .stat-row {
+    display: grid;
+    grid-template-columns: repeat(4, 1fr);
+    gap: 16px;
+    margin: 24px 0;
+  }
+  .stat-box {
+    background: var(--ink);
+    color: #fff;
+    border-radius: var(--radius-lg);
+    padding: 20px;
+    text-align: center;
+  }
+  .stat-box .stat-num {
+    font-family: var(--font-display);
+    font-size: 36px;
+    font-weight: 700;
+    line-height: 1;
+    margin-bottom: 6px;
+  }
+  .stat-box .stat-label {
+    font-size: 11px;
+    color: rgba(255,255,255,0.5);
+    font-family: var(--font-mono);
+    letter-spacing: 0.08em;
+    text-transform: uppercase;
+  }
+  .gate-grid {
+    display: grid;
+    grid-template-columns: repeat(3, 1fr);
+    gap: 16px;
+    margin: 24px 0;
+  }
+  .gate-box {
+    background: var(--surface);
+    border: 1px solid var(--border);
+    border-radius: var(--radius-lg);
+    padding: 20px;
+    box-shadow: var(--card-shadow);
+  }
+  .gate-box .gate-label {
+    font-family: var(--font-mono);
+    font-size: 11px;
+    font-weight: 700;
+    letter-spacing: 0.1em;
+    padding: 3px 8px;
+    border-radius: 3px;
+    display: inline-block;
+    margin-bottom: 10px;
+  }
+  .gate-box.go .gate-label { background: #e8f5e9; color: #27ae60; }
+  .gate-box.pivot .gate-label { background: #fff8e1; color: #f39c12; }
+  .gate-box.no .gate-label { background: #fde8e8; color: #c0392b; }
+  .gate-title {
+    font-family: var(--font-display);
+    font-size: 15px;
+    font-weight: 600;
+    margin-bottom: 8px;
+  }
+  .gate-body {
+    font-size: 12.5px;
+    color: var(--ink-2);
+    line-height: 1.6;
+  }
+  .checklist {
+    background: var(--surface);
+    border: 1px solid var(--border);
+    border-radius: var(--radius-lg);
+    padding: 24px;
+    box-shadow: var(--card-shadow);
+    margin: 24px 0;
+  }
+  .checklist h3 {
+    font-family: var(--font-display);
+    font-size: 16px;
+    font-weight: 600;
+    margin-bottom: 16px;
+    color: var(--ink);
+  }
+  .check-grid {
+    display: grid;
+    grid-template-columns: repeat(auto-fill, minmax(220px, 1fr));
+    gap: 8px;
+  }
+  .check-item {
+    display: flex;
+    align-items: flex-start;
+    gap: 8px;
+    font-size: 13px;
+    color: var(--ink-2);
+    padding: 6px 0;
+  }
+  .check-item .ck {
+    color: #27ae60;
+    font-weight: 700;
+    flex-shrink: 0;
+    font-size: 15px;
+    line-height: 1.4;
+  }
+  .report-footer {
+    background: var(--ink);
+    color: rgba(255,255,255,0.4);
+    text-align: center;
+    padding: 32px;
+    font-size: 12px;
+    font-family: var(--font-mono);
+    letter-spacing: 0.05em;
+  }
+  .two-col {
+    display: grid;
+    grid-template-columns: 1fr 1fr;
+    gap: 24px;
+    margin: 24px 0;
+  }
+  .workflow-bar {
+    display: flex;
+    gap: 4px;
+    margin: 16px 0;
+    background: var(--border);
+    border-radius: var(--radius);
+    padding: 4px;
+  }
+  .workflow-bar .wb-segment {
+    flex: 1;
+    padding: 10px 14px;
+    border-radius: 3px;
+    font-size: 12px;
+    font-family: var(--font-mono);
+    color: var(--ink-2);
+    text-align: center;
+  }
+  .workflow-bar .wb-segment.active {
+    background: var(--ink);
+    color: #fff;
+    font-weight: 600;
+  }
+  .arch-layers {
+    margin: 24px 0;
+    display: flex;
+    flex-direction: column;
+    gap: 8px;
+  }
+  .arch-layer {
+    display: flex;
+    align-items: center;
+    gap: 12px;
+  }
+  .arch-layer-label {
+    width: 100px;
+    font-family: var(--font-mono);
+    font-size: 11px;
+    color: var(--ink-3);
+    text-align: right;
+    flex-shrink: 0;
+    letter-spacing: 0.05em;
+  }
+  .arch-layer-bar {
+    flex: 1;
+    background: var(--surface);
+    border: 1px solid var(--border);
+    border-radius: var(--radius);
+    padding: 10px 16px;
+    box-shadow: var(--card-shadow);
+    font-size: 13px;
+    color: var(--ink);
+  }
+  .arch-layer-bar.accent {
+    background: var(--ink);
+    color: #fff;
+    border-color: var(--ink);
+  }
+  .arch-layer-bar.accent span {
+    color: rgba(255,255,255,0.55);
+    font-size: 11px;
+  }
+  .red-rule-box {
+    background: #fdf2f2;
+    border: 1px solid #f5c6c6;
+    border-radius: var(--radius-lg);
+    padding: 20px 24px;
+    margin: 24px 0;
+  }
+  .red-rule-box h4 {
+    font-family: var(--font-mono);
+    font-size: 11px;
+    text-transform: uppercase;
+    letter-spacing: 0.1em;
+    color: #c0392b;
+    margin-bottom: 12px;
+  }
+  .red-rule-box table { background: transparent; }
+  .red-rule-box td {
+    border-color: #f5c6c6;
+    font-size: 13px;
+  }
+  @media (max-width: 768px) {
+    .report-header { padding: 40px 24px; }
+    .report-header h1 { font-size: 28px; }
+    .report-body { padding: 0 20px 60px; }
+    .stat-row { grid-template-columns: repeat(2, 1fr); }
+    .gate-grid { grid-template-columns: 1fr; }
+    .two-col { grid-template-columns: 1fr; }
+  }
+</style>
+</head>
+<body>
+
+<header class="report-header">
+  <div class="eyebrow">huashu-design · 产品定义报告 · v2.1</div>
+  <h1>笔触 · WritCraft<br>产品定义与价值报告</h1>
+  <div class="subtitle">中国第一款 Cursor 范式 AI 写作 IDE</div>
+  <div class="meta-row">
+    <div class="meta-item"><strong>发起方</strong> Max（独立 HR 顾问 + AI Agent 探索者）</div>
+    <div class="meta-item"><strong>日期</strong> 2026-07-14</div>
+    <div class="meta-item"><strong>状态</strong> V0 规划定稿</div>
+    <div class="meta-item"><strong>输入</strong> T1–T9 全流程调研</div>
+  </div>
+</header>
+
+<div class="report-body">
+
+<section class="section" id="s1">
+  <h2><span class="num">01</span>一句话定义</h2>
+  <p class="section-desc">WritCraft 是什么，为什么它值得存在</p>
+  <div class="pull-quote">
+    <p>笔触 · WritCraft 是中国第一款 Cursor 范式 AI 写作 IDE——把结构化大纲 / 逐句悬浮 Diff / Plan Mode / 研究内联 / 多模态生成 / 结论溯源，全部塞进一个界面，让专业长文作者在自己的地盘上把 AI 当副驾驶，而不是被工具切换打断心流。</p>
+  </div>
+  <div class="stat-row">
+    <div class="stat-box">
+      <div class="stat-num">1M</div>
+      <div class="stat-label">M3 上下文</div>
+    </div>
+    <div class="stat-box">
+      <div class="stat-num">&lt;200</div>
+      <div class="stat-label">ms M2.7 延迟</div>
+    </div>
+    <div class="stat-box">
+      <div class="stat-num">6</div>
+      <div class="stat-label">大核功能 V0 全覆盖</div>
+    </div>
+    <div class="stat-box">
+      <div class="stat-num">0</div>
+      <div class="stat-label">自动应用 AI 输出</div>
+    </div>
+  </div>
+</section>
+
+<section class="section" id="s2">
+  <h2><span class="num">02</span>现状痛点</h2>
+  <p class="section-desc">写作者在现有工具链里遭遇了什么</p>
+  <div class="card-grid">
+    <div class="card">
+      <div class="card-label">Pain Point 01</div>
+      <div class="card-title">工具碎片化</div>
+      <div class="card-body"><p>写 1 小时，切换 4–5 个工具：写作（Notion/Scrivener）→ 对话 AI（ChatGPT）→ 浏览器研究 → 图片生成 → 笔记软件。每次切换丢失 3–5 分钟上下文。</p></div>
+    </div>
+    <div class="card">
+      <div class="card-label">Pain Point 02</div>
+      <div class="card-title">文档规模瓶颈</div>
+      <div class="card-body"><p>Notion 写几千字后开始卡；Scrivener 零 AI；ChatGPT 写完一段上下文就断。写到 10 万字量级，现有任何工具都无法承载。</p></div>
+    </div>
+    <div class="card">
+      <div class="card-label">Pain Point 03</div>
+      <div class="card-title">AI 建议如黑盒</div>
+      <div class="card-body"><p>不知道 AI 改了什么、为什么这么改、结论从哪来。用 AI 三星期，写完还是心虚——「这句话是我写的还是 AI 润色的？」</p></div>
+    </div>
+    <div class="card">
+      <div class="card-label">Pain Point 04</div>
+      <div class="card-title">长文修改无从下手</div>
+      <div class="card-body"><p>初稿差在哪里不清楚。AI 改完不敢用——「改得对吗？边界在哪里？」没有溯源，长文写作等同于盲飞。</p></div>
+    </div>
+  </div>
+
+  <div class="mermaid-wrap">
+    <div class="mermaid-label">现状工具链：碎片化导致的心流断裂</div>
+    <div class="mermaid">
+flowchart LR
+  A["📝 写作<br>Notion/Scrivener"] --> B["🤖 对话AI<br>ChatGPT"]
+  B --> C["🌐 浏览器研究<br>搜索引擎"]
+  C --> D["🎨 图像生成<br>Midjourney"]
+  D --> E["📒 笔记<br>Obsidian"]
+  E --> A
+  style A fill:#fdf2f2,stroke:#c0392b
+  style B fill:#fdf2f2,stroke:#c0392b
+  style C fill:#fdf2f2,stroke:#c0392b
+  style D fill:#fdf2f2,stroke:#c0392b
+  style E fill:#fdf2f2,stroke:#c0392b
+    </div>
+  </div>
+
+  <div class="table-wrap">
+    <table>
+      <thead>
+        <tr><th>用户类型</th><th>代表人物</th><th>核心痛点</th></tr>
+      </thead>
+      <tbody>
+        <tr><td>短篇小说作者</td><td>Stephen King / Murakami 派</td><td>3000-30000 字；场景卡 / 草稿 / 分层修订；写作哲学影响功能边界（按 T8 N2）。短篇小说对心流依赖最强</td></tr>
+        <tr><td>方法论书籍作者</td><td>Ray Dalio / Cialdini / 管理学作家</td><td>50–80 万字结构化管理；原则树 + 案例对照；出版前 6–12 周分层冷却修订</td></tr>
+        <tr><td>学术综述作者</td><td>医学/法律/经管综述写手</td><td>PRISMA 流程严格；300+ 篇文献管理；同行评审格式要求</td></tr>
+        <tr><td>长篇小说作者</td><td>Stephen King / 纳博科夫派</td><td>10 万字以上非线性管理；伏笔追踪；卡片法 vs 大纲法两派并存</td></tr>
+        <tr><td>咨询报告作者</td><td>乙方顾问/战略分析师</td><td>模板化输出；图表自动生成；客户风格对齐</td></tr>
+      </tbody>
+    </table>
+  </div>
+</section>
+
+<section class="section" id="s3">
+  <h2><span class="num">03</span>Cursor / Trae 可移植范式</h2>
+  <p class="section-desc">为什么这套交互逻辑可以跨平台复制</p>
+
+  <div class="mermaid-wrap">
+    <div class="mermaid-label">Plan Mode 流程：5 模板 × 用户全控</div>
+    <div class="mermaid">
+flowchart TD
+  Start["开始写作"] --> Plan["选择 Plan Mode 模板？"]
+  Plan --"跳过"--> Write["直接开始写作"]
+  Plan --"开场"--> A1["钩子 3 选 1 + 理由"]
+  Plan --"主旨"--> A2["核心主张 + 3 点逻辑"]
+  Plan --"大纲"--> A3["Part→Chapter→Section→Paragraph 多级树"]
+  Plan --"立意"--> A4["立意评估 + 强化建议"]
+  Plan --"收尾"--> A5["收尾呼应 + 金句建议"]
+  A1 --> Write; A2 --> Write; A3 --> Write; A4 --> Write; A5 --> Write
+  Write --> CmdK{"⌘K 触发"}
+  CmdK --> Diff["悬浮 Diff 展示"]
+  Diff --> Accept{"Tab / Esc"}
+  Accept --> Next["下一句 / 撤销"]
+  style Write fill:#e8f5e9,stroke:#27ae60
+  style Plan fill:#fff8e1,stroke:#f39c12
+    </div>
+  </div>
+
+  <div class="two-col">
+    <div>
+      <h3 style="font-family:var(--font-display);font-size:16px;margin-bottom:12px;">⌘K 改写三层反馈</h3>
+      <div class="card" style="margin-bottom:12px;">
+        <div class="card-label">第一层</div>
+        <div class="card-title">悬浮 Diff 展示</div>
+        <div class="card-body">原文：删除线 → 修改：黄色高亮 → 不替代原文，用户确认后才应用</div>
+      </div>
+      <div class="card" style="margin-bottom:12px;">
+        <div class="card-label">第二层</div>
+        <div class="card-title">结论溯源标注</div>
+        <div class="card-body">每条修改右下角标「结论 / 来源 / 边界」——鼠标悬停显示来源卡片</div>
+      </div>
+      <div class="card">
+        <div class="card-label">第三层</div>
+        <div class="card-title">接受 / 拒绝</div>
+        <div class="card-body">Tab 接受 · Esc 拒绝 · Ctrl+Enter 重生成 · ⌘K+↑↓ 切换 3 个候选</div>
+      </div>
+    </div>
+    <div>
+      <h3 style="font-family:var(--font-display);font-size:16px;margin-bottom:12px;">核心交互原则</h3>
+      <div style="background:var(--surface);border:1px solid var(--border);border-radius:var(--radius-lg);padding:16px;">
+        <div class="check-grid" style="grid-template-columns:1fr;">
+          <div class="check-item"><span class="ck">✓</span>AI 修改默认「建议」，绝不自动应用</div>
+          <div class="check-item"><span class="ck">✓</span>接受 / 拒绝 / 撤销全部可操作，撤销栈无限层</div>
+          <div class="check-item"><span class="ck">✓</span>每条 AI 输出标「结论 / 来源 / 边界」</div>
+          <div class="check-item"><span class="ck">✓</span>不替代写作者做价值判断——AI 不写「我认为 X」</div>
+          <div class="check-item"><span class="ck">✓</span>不替用户做归属判断——不冒认身份</div>
+        </div>
+      </div>
+    </div>
+  </div>
+</section>
+
+<section class="section" id="s4">
+  <h2><span class="num">04</span>4 文体 SOP × 7 阶梯</h2>
+  <p class="section-desc">不同写作场景的完整工作流</p>
+
+  <div class="workflow-bar">
+    <div class="wb-segment active">短篇小说</div>
+    <div class="wb-segment">方法论书籍</div>
+    <div class="wb-segment">学术综述</div>
+    <div class="wb-segment">长篇小说</div>
+    <div class="wb-segment">咨询报告</div>
+  </div>
+
+  <div style="margin-bottom:32px;">
+    <h3 style="font-family:var(--font-display);font-size:16px;margin-bottom:16px;">方法论书籍 7 阶段写作流程</h3>
+    <div class="sop-flow">
+      <div class="sop-step"><span class="sop-num">Step 01</span><div class="sop-name">原则树规划</div><div class="sop-desc">建立全书原则树，每条原则对应 3+ 案例</div></div>
+      <div class="sop-step"><span class="sop-num">Step 02</span><div class="sop-name">Plan Mode 立意</div><div class="sop-desc">选「主旨」模板 → 本章核心主张 + 逻辑支撑</div></div>
+      <div class="sop-step"><span class="sop-num">Step 03</span><div class="sop-name">章节大纲树</div><div class="sop-desc">Part→Chapter→Section→Paragraph 多级树</div></div>
+      <div class="sop-step"><span class="sop-num">Step 04</span><div class="sop-name">逐句写作</div><div class="sop-desc">M2.7 ghost text 补全候选，⌘K 改写</div></div>
+      <div class="sop-step"><span class="sop-num">Step 05</span><div class="sop-name">⌘R 深度研究</div><div class="sop-desc">调 MiniMax Doc API → 自动生成脚注</div></div>
+      <div class="sop-step"><span class="sop-num">Step 06</span><div class="sop-name">章节插图</div><div class="sop-desc">⌘I 选中数字 → image-01 生成 SVG 风格图</div></div>
+      <div class="sop-step"><span class="sop-num">Step 07</span><div class="sop-name">分层冷却修订</div><div class="sop-desc">6–12 周后修订；⌘L 全局查询一致性</div></div>
+    </div>
+  </div>
+
+  <div class="table-wrap">
+    <table>
+      <thead>
+        <tr><th>文体</th><th>Plan Mode 选择</th><th>⌘K 重点</th><th>⌘R 用途</th><th>插图</th></tr>
+      </thead>
+      <tbody>
+        <tr><td>方法论书籍</td><td>主旨 + 大纲</td><td>语言精确 / 语气一致</td><td>案例溯源 / 数据标注</td><td>柱状图 / 流程图</td></tr>
+        <tr><td>学术综述</td><td>大纲 + 收尾</td><td>学术语气 / 引文改写</td><td>文献检索 / 格式生成</td><td>森林图 / PRISMA</td></tr>
+        <tr><td>长篇小说</td><td>跳过（可选）</td><td>文风延续 / 对话张力</td><td>伏笔追踪 / 人物关系</td><td>场景卡 / 分镜</td></tr>
+        <tr><td>咨询报告</td><td>开场 + 大纲</td><td>客户风格对齐</td><td>行业数据 / 竞品对比</td><td>矩阵图 / 雷达图</td></tr>
+      </tbody>
+    </table>
+  </div>
+</section>
+
+<section class="section" id="s5">
+  <h2><span class="num">05</span>作家工作流关键洞察</h2>
+  <p class="section-desc">四类作者在真实写作中的决策节点</p>
+  <div class="card-grid">
+    <div class="card">
+      <div class="card-label">Insight 01</div>
+      <div class="card-title">King / Murakami 派：抵触大纲</div>
+      <div class="card-body"><p>顶级作家（King、Murakami）坚决反对 AI 介入规划——「在不知道故事走向时才开始写」。</p><p style="margin-top:8px;"><strong>设计决策：</strong>Plan Mode 是可选锚点，不是强制入口。V0 主路径允许直接写作。</p></div>
+    </div>
+    <div class="card">
+      <div class="card-label">Insight 02</div>
+      <div class="card-title">逐句修改是心流关键</div>
+      <div class="card-body"><p>写作时切换到「对话框」是最大的心流杀手。<200ms 的悬浮建议让修改发生在句子内部，而不是切换到另一个界面。</p><p style="margin-top:8px;"><strong>设计决策：</strong>M2.7-highspeed <200ms 是硬指标，不可妥协。</p></div>
+    </div>
+    <div class="card">
+      <div class="card-label">Insight 03</div>
+      <div class="card-title">溯源是信任的根基</div>
+      <div class="card-body"><p>专业作者不怕 AI 给建议，怕的是「不知道对不对」——没有溯源的 AI 建议等于不签字的专家意见，没人敢用。</p><p style="margin-top:8px;"><strong>设计决策：</strong>每条 AI 输出必须标「结论 / 来源 / 边界」，不裸输出。</p></div>
+    </div>
+    <div class="card">
+      <div class="card-label">Insight 04</div>
+      <div class="card-title">长文写作是结构问题</div>
+      <div class="card-body"><p>写 10 万字书籍，最难的不是单句质量，而是全书结构一致性。跨章节引用和全局查询是刚需。</p><p style="margin-top:8px;"><strong>设计决策：</strong>⌘L 全局对话 + @chapter 引用覆盖整本书上下文。</p></div>
+    </div>
+  </div>
+</section>
+
+<section class="section" id="s6">
+  <h2><span class="num">06</span>竞品差异化</h2>
+  <p class="section-desc">V0 在四维能力矩阵上的独特位置</p>
+
+  <div class="table-wrap">
+    <table>
+      <thead>
+        <tr><th>能力</th><th>WritCraft V0</th><th>Notion AI</th><th>Lex</th><th>Scrivener</th><th>Ulysses</th><th>iA Writer</th></tr>
+      </thead>
+      <tbody>
+        <tr><td>Tab 内联补全（<200ms）</td><td><span class="badge badge-green">✅ M2.7</span></td><td><span class="badge badge-gray">✗ 替换式</span></td><td><span class="badge badge-gray">✗ 无</span></td><td><span class="badge badge-gray">✗ 无</span></td><td><span class="badge badge-gray">✗ 无</span></td><td><span class="badge badge-gray">✗ 无</span></td></tr>
+        <tr><td>⌘K 悬浮修改（删除线+高亮）</td><td><span class="badge badge-green">✅ V0</span></td><td><span class="badge badge-gray">✗ 块级重写</span></td><td><span class="badge badge-green">✅ 内联</span></td><td><span class="badge badge-gray">✗ 无</span></td><td><span class="badge badge-gray">✗ 无</span></td><td><span class="badge badge-gray">✗ 无</span></td></tr>
+        <tr><td>⌘L 全局对话（@chapter）</td><td><span class="badge badge-green">✅ 1M</span></td><td><span class="badge badge-gray">✓ Q&amp;A</span></td><td><span class="badge badge-gray">✓ 弱</span></td><td><span class="badge badge-gray">✗ 无</span></td><td><span class="badge badge-gray">✗ 无</span></td><td><span class="badge badge-gray">✗ 无</span></td></tr>
+        <tr><td>结论溯源（结论/来源/边界）</td><td><span class="badge badge-green">✅ V0 独有</span></td><td><span class="badge badge-gray">✗ 无</span></td><td><span class="badge badge-gray">✗ 无</span></td><td><span class="badge badge-gray">✗ 无</span></td><td><span class="badge badge-gray">✗ 无</span></td><td><span class="badge badge-gray">✗ 无</span></td></tr>
+        <tr><td>研究内联（自动脚注）</td><td><span class="badge badge-green">✅ V0</span></td><td><span class="badge badge-gray">✗ 需跳出</span></td><td><span class="badge badge-gray">✗ 需跳出</span></td><td><span class="badge badge-gray">✗ 需跳出</span></td><td><span class="badge badge-gray">✗ 无</span></td><td><span class="badge badge-gray">✗ 无</span></td></tr>
+        <tr><td>多模态生成（图像）</td><td><span class="badge badge-green">✅ image-01</span></td><td><span class="badge badge-gray">✓ 弱</span></td><td><span class="badge badge-gray">✗ 无</span></td><td><span class="badge badge-gray">✗ 无</span></td><td><span class="badge badge-gray">✗ 无</span></td><td><span class="badge badge-gray">✗ 无</span></td></tr>
+        <tr><td>Human-in-the-loop（F1）</td><td><span class="badge badge-green">✅ 强制</span></td><td><span class="badge badge-gray">⚠ 部分</span></td><td><span class="badge badge-gray">✓</span></td><td><span class="badge badge-gray">✗</span></td><td><span class="badge badge-gray">✗</span></td><td><span class="badge badge-gray">✗</span></td></tr>
+      </tbody>
+    </table>
+  </div>
+
+  <div class="card-grid" style="margin-top:16px;">
+    <div class="card" style="border-color:var(--accent);background:var(--accent-bg);">
+      <div class="card-label">V0 独有</div>
+      <div class="card-title">结论溯源（结论 / 来源 / 边界）</div>
+      <div class="card-body">所有竞品均无此功能。专业作者对 AI 建议的最大恐惧是「不知道对不对」——溯源解决了信任问题。</div>
+    </div>
+    <div class="card" style="border-color:var(--accent);background:var(--accent-bg);">
+      <div class="card-label">V0 独有</div>
+      <div class="card-title">研究内联（自动脚注）</div>
+      <div class="card-body">所有竞品均需跳出到浏览器。APA7 / MLA9 / Chicago17 自动生成，不用手动查格式。</div>
+    </div>
+  </div>
+</section>
+
+<section class="section" id="s7">
+  <h2><span class="num">07</span>MiniMax 全栈分工</h2>
+  <p class="section-desc">为什么只用 MiniMax 是战略选择，不是技术妥协</p>
+
+  <div class="arch-layers">
+    <div class="arch-layer">
+      <div class="arch-layer-label">模型层</div>
+      <div class="arch-layer-bar accent"><strong>M2.7-highspeed</strong> <span>— ⌘K 实时改写，<200ms，句子级 ghost text</span></div>
+    </div>
+    <div class="arch-layer">
+      <div class="arch-layer-label">模型层</div>
+      <div class="arch-layer-bar accent"><strong>M3</strong> <span>— ⌘L 全局对话 + Plan Mode + 长文生成，1M tokens</span></div>
+    </div>
+    <div class="arch-layer">
+      <div class="arch-layer-label">模型层</div>
+      <div class="arch-layer-bar accent"><strong>image-01</strong> <span>— 章节插图，$0.0035/张，手动触发</span></div>
+    </div>
+    <div class="arch-layer">
+      <div class="arch-layer-label">工具层</div>
+      <div class="arch-layer-bar"><strong>doc-01</strong> — PDF 解析，V1+ 才做，V0 聚焦核心写作</div>
+    </div>
+    <div class="arch-layer">
+      <div class="arch-layer-label">工具层</div>
+      <div class="arch-layer-bar"><strong>Speech-2.8</strong> — 语音合成，V2 才做，V0 不碰</div>
+    </div>
+  </div>
+
+  <div class="red-rule-box" style="margin-top:24px;">
+    <h4>V0 功能红线（4 条否定清单）</h4>
+    <table>
+      <tbody>
+        <tr><td style="width:40px;"><span class="badge badge-red">✗</span></td><td><strong>不做价值判断</strong> — AI 不替用户决定「观点 X 比观点 Y 更好」</td></tr>
+        <tr><td><span class="badge badge-red">✗</span></td><td><strong>不对接出版商 V2</strong> — V0 不接任何出版社内容工作流</td></tr>
+        <tr><td><span class="badge badge-red">✗</span></td><td><strong>不自动生成整本书</strong> — 不做「一键生成全书」功能</td></tr>
+        <tr><td><span class="badge badge-red">✗</span></td><td><strong>不模仿作家风格</strong> — 不训练/不输出「像 XXX 一样的文风」</td></tr>
+      </tbody>
+    </table>
+  </div>
+</section>
+
+<!-- 新插入：7-A MiniMax 鉴权方式 -->
+<section class="section" id="s7a">
+  <h2><span class="num">07-A</span>MiniMax 鉴权与接入方式</h2>
+  <p class="section-desc">4 种鉴权方式满足个人 / 企业 / 多用户 / 企业 SSO 4 类场景</p>
+
+  <h3>4 种鉴权方式对比</h3>
+  <table>
+    <tr><th>方式</th><th>形式</th><th>适用</th><th>安全性</th><th>V0 优先级</th></tr>
+    <tr><td><strong>① API Key</strong></td><td>sk-api-* / sk-cp-*</td><td>个人 / 小团队</td><td>⭐⭐</td><td>✅ Week 1</td></tr>
+    <tr><td><strong>② OAuth 2.0 Bearer</strong></td><td>Authorization: Bearer</td><td>企业 / 多用户</td><td>⭐⭐⭐⭐</td><td>✅ Week 2-3</td></tr>
+    <tr><td><strong>③ 临时 Token JWT</strong></td><td>服务端代理 5min</td><td>公共部署</td><td>⭐⭐⭐⭐</td><td>V1</td></tr>
+    <tr><td><strong>④ 企业 SSO (OIDC)</strong></td><td>飞书 / 钉钉 / 企业微信</td><td>大型企业</td><td>⭐⭐⭐⭐⭐</td><td>V1</td></tr>
+  </table>
+
+  <h3>鉴权方式选择流程</h3>
+  <div class="mermaid">
+flowchart TD
+  A[启动 WritCraft] --> B{环境变量有 API Key?}
+  B -->|Yes| C[模式 1: API Key]
+  B -->|No| D{有 OAuth Client?}
+  D -->|Yes| E[模式 2: OAuth 2.0]
+  D -->|No| F{多用户服务器?}
+  F -->|Yes| G[模式 3: JWT 代理]
+  F -->|No| H{企业有 IdP?}
+  H -->|Yes| I[模式 4: OIDC SSO]
+  H -->|No| J[询问用户输入 API Key]
+  </div>
+
+  <h3>Key 格式踩坑（Nowledge Mem 沉淀）</h3>
+  <div class="warning">
+    <strong>警告</strong>：<code>sk-cp-*</code> Key <strong>必须配 <code>speech-2.8-hd</code></strong>（实测踩坑），不支持 M2.7 / M3 / image-01。<br>
+    <strong>推荐</strong>：<code>sk-api-*</code> 支持完整 5 模态，作为 V0 主推 Key 类型。
+  </div>
+
+  <h3>安全设计（5 条红线）</h3>
+  <ul>
+    <li>❌ 永远不在前端明文存储 API Key</li>
+    <li>❌ 不在 localStorage 存明文 Token</li>
+    <li>✅ Mac 用 Keychain / Windows 用 Credential Manager</li>
+    <li>✅ Token 加密存储 + 30 天自动轮换</li>
+    <li>✅ 所有调用走 server-side 代理（避免 CORS + Key 泄露）</li>
+  </ul>
+</section>
+
+<!-- 新插入：7-B 心流体验规范 -->
+<section class="section" id="s7b">
+  <h2><span class="num">07-B</span>心流体验规范（视觉 + 交互）</h2>
+  <p class="section-desc">让用户忘记自己在用什么工具，像写 Word 一样自然，但有 AI 在后台</p>
+
+  <h3>心流的 4 个敌人 + 4 个解药</h3>
+  <table>
+    <tr><th>敌人</th><th>解药</th></tr>
+    <tr><td>① 加载等待（>200ms 焦虑）</td><td>永远 < 100ms 给出反馈（占位符 / skeleton）</td></tr>
+    <tr><td>② UI 切换（弹窗打断）</td><td>全部 inline（diff / AI 建议都在原位置）</td></tr>
+    <tr><td>③ 颜色刺眼（高对比度）</td><td>单一主题色（赭黄 #d4a574） + 大量留白</td></tr>
+    <tr><td>④ 强迫决策（弹窗强制同意）</td><td>永远有「稍后」/「Esc 跳过」</td></tr>
+  </table>
+
+  <h3>视觉设计规范（huashu-design 风格）</h3>
+  <div class="card-grid card-grid-2">
+    <div class="card">
+      <h3>色板</h3>
+      <ul>
+        <li>主色：<span class="tag" style="background:#d4a574;color:#fff;">#d4a574</span> 赭黄（唯一高饱和色）</li>
+        <li>背景：<span class="tag" style="background:#fafaf7;color:#1a1a1a;">#fafaf7</span> 象牙白</li>
+        <li>文字：<span class="tag" style="background:#1a1a1a;color:#fff;">#1a1a1a</span> 深咖</li>
+        <li>高亮：<span class="tag" style="background:#4a7a3a;color:#fff;">#4a7a3a</span> 墨绿（接受）</li>
+        <li>警告：<span class="tag" style="background:#a83232;color:#fff;">#a83232</span> 暗红（拒绝）</li>
+      </ul>
+    </div>
+    <div class="card">
+      <h3>字体</h3>
+      <ul>
+        <li>标题：<strong>Songti SC / STSong</strong>（衬线 + 书感）</li>
+        <li>正文：<strong>PingFang SC / Microsoft YaHei</strong>（无衬线 + 长时间阅读）</li>
+        <li>代码：<strong>SF Mono / Menlo</strong>（等宽 + AI 输出）</li>
+        <li>段距：1.6-1.8（不用 Word 1.0）</li>
+        <li>强调：<u>只有下划线</u>（不用粗体+斜体+大写）</li>
+      </ul>
+    </div>
+  </div>
+
+  <h3>键鼠交互（4 大类）</h3>
+  <table>
+    <tr><th>类别</th><th>快捷键 / 行为</th><th>心流设计要点</th></tr>
+    <tr><td rowspan="7"><strong>键鼠</strong></td><td>⌘K：悬浮编辑</td><td>默认"建议"，不强制接受</td></tr>
+    <tr><td>⌘L：右侧抽屉</td><td>不抢焦点</td></tr>
+    <tr><td>⌘R：底部抽屉</td><td>脚注插入位置</td></tr>
+    <tr><td>⌘I：内联图片</td><td>不离原位</td></tr>
+    <tr><td>Tab：接受</td><td>不打断视线</td></tr>
+    <tr><td>Esc：拒绝</td><td>一键回滚</td></tr>
+    <tr><td>⌘.：暂停所有 AI</td><td>紧急按钮</td></tr>
+    <tr><td rowspan="2"><strong>AI 输出</strong></td><td>永远 diff 形式</td><td>绿（接受 #4a7a3a） / 红（拒绝 #a83232）</td></tr>
+    <tr><td>3 档信心展示</td><td>高（实色）/ 中（半透明）/ 低（虚线 + ⚠）</td></tr>
+    <tr><td rowspan="2"><strong>错误处理</strong></td><td>❌ 弹窗（破坏心流）</td><td>✅ 内联红字 + 3s 后变浅</td></tr>
+    <tr><td>❌ 红屏（崩溃）</td><td>✅ 一键撤销栈无限</td></tr>
+    <tr><td rowspan="3"><strong>加载反馈</strong></td><td>写 → 0ms</td><td>永远即时</td></tr>
+    <tr><td>⌘K → 100ms skeleton</td><td>"AI 思考中"</td></tr>
+    <tr><td>⌘L → 500ms 流式</td><td>打字机效果</td></tr>
+  </table>
+
+  <div class="warning" style="margin-top: 24px;">
+    <strong>5 个"反心流"动作的红线</strong>：❌ 绝不弹窗（除非主动触发）/ ❌ 绝不强制 AI 修改 / ❌ 绝不自动滚动 / ❌ 绝不打断打字 / ❌ 绝不丢字（操作失败必保留草稿）
+  </div>
+
+  <h3>心流度量（V0 内测必收）</h3>
+  <table>
+    <tr><th>指标</th><th>目标</th><th>测量方式</th></tr>
+    <tr><td>平均键鼠响应延迟</td><td>< 100ms</td><td>浏览器 DevTools Performance</td></tr>
+    <tr><td>AI 输出展示延迟</td><td>< 500ms 首字</td><td>服务端打点</td></tr>
+    <tr><td>内测用户每日连续写作时长</td><td>≥ 60 分钟</td><td>自动埋点</td></tr>
+    <tr><td>Esc 拒绝率（⌘K Esc 率）</td><td>< 30%</td><td>行为埋点</td></tr>
+    <tr><td>⌘. 暂停率</td><td>< 5%</td><td>行为埋点</td></tr>
+    <tr><td>草稿丢失事件</td><td>0</td><td>异常日志</td></tr>
+  </table>
+
+  <h3>V0 Week 1 心流验证 checklist（7 项必查）</h3>
+  <ul>
+    <li>☐ 本机启动应用 ≤ 1 秒（不闪屏 / 不弹窗）</li>
+    <li>☐ 输入文字 → 0ms 反馈（无延迟感）</li>
+    <li>☐ ⌘K 触发 → 100ms 内 skeleton + 500ms 内流式输出</li>
+    <li>☐ AI 输出默认是 diff，不替换（Esc 一键拒绝）</li>
+    <li>☐ 任何错误保留草稿（关闭浏览器重启应用不丢字）</li>
+    <li>☐ 暗色模式自动跟随系统</li>
+    <li>☐ 3 名内测用户中至少 1 人连续写 ≥ 30 分钟（V0 退出条件之一）</li>
+  </ul>
+</section>
+
+<section class="section" id="s8">
+  <h2><span class="num">08</span>编辑器架构选型</h2>
+  <p class="section-desc">为什么 TipTap + MiniMax 是 V0 的最优技术路径</p>
+
+  <div class="mermaid-wrap">
+    <div class="mermaid-label">编辑器架构：TipTap 为核心，MiniMax API 为大脑</div>
+    <div class="mermaid">
+flowchart LR
+  subgraph Editor["编辑器层 (TipTap)"]
+    A["StarterKit<br>Heading/List"] 
+    B["⌘K Extension<br>悬浮 Diff"]
+    C["Plan Mode<br>Extension"]
+    D["Chapter Tree<br>章节大纲"]
+  end
+  subgraph AI["AI 层 (MiniMax)"]
+    E["M2.7 API<br><200ms"]
+    F["M3 API<br>1M context"]
+    G["image-01 API<br>$0.0035"]
+  end
+  subgraph Storage["存储层"]
+    H["LocalStorage<br>会话恢复"]
+    I["文件树<br>Project/Chapter"]
+  end
+  A --> B
+  B --> E
+  C --> F
+  D --> F
+  E --> H
+  F --> H
+  style Editor fill:#e8f5e9,stroke:#27ae60
+  style AI fill:#fff8e1,stroke:#f39c12
+    </div>
+  </div>
+
+  <div class="two-col" style="margin-top:24px;">
+    <div>
+      <h3 style="font-family:var(--font-display);font-size:15px;margin-bottom:12px;">架构决策</h3>
+      <div class="card" style="margin-bottom:12px;">
+        <div class="card-label">技术选型</div>
+        <div class="card-title">TipTap（ProseMirror base）</div>
+        <div class="card-body">富文本编辑 + 扩展机制成熟；AI Toolkit + OpenAI-compatible API 直连（绕过 T8 D2 警告）</div>
+      </div>
+      <div class="card">
+        <div class="card-label">中文支持</div>
+        <div class="card-title">需适配（Week 1 验证）</div>
+        <div class="card-body">首行缩进 2 字符 + 中文标点「」『』正确渲染；需专项验证（T8 N4）</div>
+      </div>
+    </div>
+    <div>
+      <h3 style="font-family:var(--font-display);font-size:15px;margin-bottom:12px;">技术风险与对策</h3>
+      <div class="table-wrap" style="margin:0;">
+        <table>
+          <tbody>
+            <tr><td><strong>TipTap AI Toolkit 不支持 MiniMax</strong></td><td><span class="badge badge-green">已解决</span> OpenAI-compatible API 直连绕过</td></tr>
+            <tr><td><strong>M2.7 延迟 >500ms</strong></td><td><span class="badge badge-gray">Pivot</span> 降级为「异步确认模式」</td></tr>
+            <tr><td><strong>Notion 卡顿（万字+）</strong></td><td><span class="badge badge-gray">已验证</span> TipTap 虚拟渲染无此问题</td></tr>
+            <tr><td><strong>Trae 竞争威胁</strong></td><td><span class="badge badge-gray">观察</span> V0 先跑通再担心，字节进入写作 IDE 是猜测</td></tr>
+          </tbody>
+        </table>
+      </div>
+    </div>
+  </div>
+</section>
+
+<section class="section" id="s9">
+  <h2><span class="num">09</span>产品原则</h2>
+  <p class="section-desc">F1–F10 合规硬规则，V0 设计的不可撼动底线</p>
+  <div class="checklist">
+    <div class="check-grid">
+      <div class="check-item"><span class="ck">✓</span><strong>F1</strong> AI 修改默认「建议」，绝不自动应用</div>
+      <div class="check-item"><span class="ck">✓</span><strong>F2</strong> 接受 / 拒绝 / 撤销全部可操作，撤销栈无限层</div>
+      <div class="check-item"><span class="ck">✓</span><strong>F3</strong> 每条 AI 输出标「结论 / 来源 / 边界」</div>
+      <div class="check-item"><span class="ck">✓</span><strong>F4</strong> 不替写作者做价值判断——AI 不写「我认为 X」</div>
+      <div class="check-item"><span class="ck">✓</span><strong>F5</strong> 不替用户做归属判断——不写「X 公司的 Y 报告」</div>
+      <div class="check-item"><span class="ck">✓</span><strong>F6</strong> prompt 禁止一个模板批量发给所有用户</div>
+      <div class="check-item"><span class="ck">✓</span><strong>F7</strong> 候选人 / 引用合并可解释——多字段匹配 + 用户确认</div>
+      <div class="check-item"><span class="ck">✓</span><strong>F8</strong> 字段级来源标注 + 时间戳——删除日志不可删除</div>
+      <div class="check-item"><span class="ck">✓</span><strong>F9</strong> 所有 AI 操作写审计日志——类型/时间/触发者/输入/输出</div>
+      <div class="check-item"><span class="ck">✓</span><strong>F10</strong> 原始文件 90 天过期——可配置延长</div>
+    </div>
+  </div>
+  <div class="two-col">
+    <div class="card">
+      <div class="card-label">Human-in-the-loop</div>
+      <div class="card-title">这是设计的核心，不是功能</div>
+      <div class="card-body">所有 AI 输出都是「建议」——不是 Copilot 的「接受大部分建议」，而是每一次操作都在用户控制之下。接受率是指标，不是目标。</div>
+    </div>
+    <div class="card">
+      <div class="card-label">数据模型</div>
+      <div class="card-title">Project → Chapter → Section → Sentence → Citation → Source</div>
+      <div class="card-body">写作数据模型的每一层都可溯源。Sentence 级是 AI 修改的最小单位，也是溯源的最小单位。</div>
+    </div>
+  </div>
+</section>
+
+<section class="section" id="s10">
+  <h2><span class="num">10</span>一个月 V0 路线图</h2>
+  <p class="section-desc">Week 1–4 每天的具体任务和验收闸门</p>
+
+  <div class="gate-grid">
+    <div class="gate-box go">
+      <div class="gate-label">Week 1 · Day 1–7</div>
+      <div class="gate-title">基础设施 Sprint</div>
+      <div class="gate-body">
+        Vite + React + TipTap 脚手架<br>
+        Day 3：MiniMax API 客户端<br>
+        Day 4：⌘K 悬浮 UI 原型<br>
+        <strong style="color:var(--ink);margin-top:8px;display:block;">闸门 G0/G1/G2</strong>
+        G0：M2.7 ping &lt;200ms<br>
+        G1：⌘K 端到端 &lt;2s<br>
+        G2：中文排版可接受
+      </div>
+    </div>
+    <div class="gate-box go">
+      <div class="gate-label">Week 2 · Day 8–14</div>
+      <div class="gate-title">⌘K 完整版 + ⌘L</div>
+      <div class="gate-body">
+        5 快捷键：Tab/Esc/⌘Y/⌃Enter/⌘Z<br>
+        ⌘L 全局对话 + @chapter 引用<br>
+        5 类来源模板标准化<br>
+        <strong style="color:var(--ink);margin-top:8px;display:block;">目标：接受率 ≥60%</strong>
+        端到端：2000 字章节
+      </div>
+    </div>
+    <div class="gate-box go">
+      <div class="gate-label">Week 3 · Day 15–21</div>
+      <div class="gate-title">⌘R 研究 + 脚注 + 插图</div>
+      <div class="gate-body">
+        MiniMax Doc API 集成<br>
+        APA7 / MLA9 / Chicago17<br>
+        image-01 章节插图<br>
+        结论溯源 UI<br>
+        <strong style="color:var(--ink);margin-top:8px;display:block;">目标：30 条脚注 + 插图</strong>
+      </div>
+    </div>
+  </div>
+
+  <div class="mermaid-wrap">
+    <div class="mermaid-label">V0 四周执行计划：闸门驱动的迭代节奏</div>
+    <div class="mermaid">
+gantt
+  title 笔触 · WritCraft V0 执行计划
+  dateFormat  YYYY-MM-DD
+  section Week 1
+  脚手架 + TipTap      :w1a, 2026-07-14, 3d
+  MiniMax API 集成      :w1b, 2026-07-17, 2d
+  ⌘K 原型验证          :w1c, 2026-07-19, 2d
+  Week 1 闸门复盘      :w1d, 2026-07-20, 1d
+  section Week 2
+  ⌘K 完整快捷键        :w2a, 2026-07-21, 2d
+  ⌘L 全局对话          :w2b, 2026-07-23, 2d
+  M3 长文生成          :w2c, 2026-07-25, 2d
+  Week 2 复盘          :w2d, 2026-07-27, 1d
+  section Week 3
+  ⌘R 研究内联         :w3a, 2026-07-28, 2d
+  自动脚注             :w3b, 2026-07-30, 2d
+  插图 + 溯源 UI       :w3c, 2026-08-01, 2d
+  Week 3 复盘          :w3d, 2026-08-03, 1d
+  section Week 4
+  10 人内测             :w4a, 2026-08-04, 3d
+  价值报告生成          :w4b, 2026-08-07, 1d
+  V0 Go/No-Go 决策      :w4c, 2026-08-08, 1d
+    </div>
+  </div>
+
+  <div class="table-wrap">
+    <table>
+      <thead>
+        <tr><th>成功指标</th><th>目标</th><th>测量方式</th><th>Continue 标准</th></tr>
+      </thead>
+      <tbody>
+        <tr><td>⌘K 修改接受率</td><td><span class="badge badge-ink">≥ 60%</span></td><td>埋点：接受/拒绝/忽略分类统计</td><td>≥60% → V1 / &lt;40% → Pivot</td></tr>
+        <tr><td>Plan Mode 完成率</td><td><span class="badge badge-ink">≥ 50%</span></td><td>大纲创建 → 章节填写完成比例</td><td>≥50% → V1 / &lt;30% → Pivot</td></tr>
+        <tr><td>引用/脚注准确率</td><td><span class="badge badge-ink">≥ 80%</span></td><td>5 人内测抽样统计正确格式比例</td><td>≥80% → V1 / &lt;60% → Pivot</td></tr>
+        <tr><td>章节插图采纳率</td><td><span class="badge badge-ink">≥ 40%</span></td><td>埋点：AI 生成 → 用户采纳数</td><td>≥40% → V1 / &lt;20% → Pivot</td></tr>
+      </tbody>
+    </table>
+  </div>
+</section>
+
+<section class="section" id="s11">
+  <h2><span class="num">11</span>风险与退出条件</h2>
+  <p class="section-desc">V0 的 Continue / Pivot / Abandon 决策矩阵</p>
+
+  <div class="gate-grid">
+    <div class="gate-box go">
+      <div class="gate-label">Continue</div>
+      <div class="gate-title">全部满足才继续</div>
+      <div class="gate-body">
+        ✅ 10 人内测 ≥7 人每天用 ≥30 分钟<br>
+        ✅ ⌘K 修改接受率 ≥60%<br>
+        ✅ Plan Mode 完成率 ≥50%
+      </div>
+    </div>
+    <div class="gate-box pivot">
+      <div class="gate-label">Pivot</div>
+      <div class="gate-title">满足任一则转向</div>
+      <div class="gate-body">
+        ⚠️ TipTap + MiniMax 集成遇技术瓶颈 → Lex 重写<br>
+        ⚠️ M2.7 延迟 >500ms → 异步确认模式<br>
+        ⚠️ Plan Mode 接受率 &lt;30% → 降级为可选入口
+      </div>
+    </div>
+    <div class="gate-box no">
+      <div class="gate-label">Abandon</div>
+      <div class="gate-title">满足任一则终止</div>
+      <div class="gate-body">
+        ❌ 2 周后仍无 5 名内测写作者<br>
+        ❌ 内测作者平均使用时长 &lt;10 分钟/天<br>
+        ❌ MiniMax API 异常 >1 天无备选<br>
+        ❌ TipTap 技术难点 >3 天无解
+      </div>
+    </div>
+  </div>
+
+  <div class="table-wrap" style="margin-top:24px;">
+    <table>
+      <thead>
+        <tr><th>立即暂停触发器</th><th>触发条件</th><th>暂停原因</th></tr>
+      </thead>
+      <tbody>
+        <tr><td>MiniMax API 异常</td><td>&gt;1 天不可用</td><td>V0 核心依赖断裂</td></tr>
+        <tr><td>TipTap 技术难点</td><td>&gt;3 天未解决</td><td>V0 技术路径不通</td></tr>
+        <tr><td>内测作者负面反馈</td><td>&gt;3 条明确负面</td><td>产品方向存疑</td></tr>
+        <tr><td>Max 可用时间断崖</td><td>单周可用时间 &lt;5h</td><td>V0 无法按计划交付</td></tr>
+      </tbody>
+    </table>
+  </div>
+</section>
+
+<section class="section" id="s12">
+  <h2><span class="num">12</span>证据附录</h2>
+  <p class="section-desc">本报告依据的全流程调研文档</p>
+
+  <div class="card-grid">
+    <div class="card">
+      <div class="card-label">T1–T9 调研输入</div>
+      <div class="card-title">T1 调研分析</div>
+      <div class="card-body">editor/raw/ T1–T9 编号文档 · 25KB 综合分析 · 17KB 魔鬼质询 · 16KB 战略路线</div>
+    </div>
+    <div class="card">
+      <div class="card-label">PRD 定稿</div>
+      <div class="card-title">产品需求与价值说明</div>
+      <div class="card-body">19,131 字 · 覆盖 12 项核心章节 · V0 范围 + 4 条红线 + F1–F10</div>
+    </div>
+    <div class="card">
+      <div class="card-label">V0 路线图</div>
+      <div class="card-title">一个月执行计划</div>
+      <div class="card-body">6,990 字 · Week 1–4 每天任务 + G0/G1/G2 闸门 + Continue/Pivot/Abandon</div>
+    </div>
+    <div class="card">
+      <div class="card-label">四维度能力矩阵</div>
+      <div class="card-title">竞品横向对比</div>
+      <div class="card-body">3,792 字 · 8 平台 × 30 项能力 · A/B/C 证据等级 · T1–T6 引用</div>
+    </div>
+  </div>
+
+  <div class="checklist">
+    <h3>12 项 Checklist 自检</h3>
+    <div class="check-grid">
+      <div class="check-item"><span class="ck">✓</span>一句话定义（PRD §1.1）</div>
+      <div class="check-item"><span class="ck">✓</span>现状痛点 × 4 类用户（PRD §1.2）</div>
+      <div class="check-item"><span class="ck">✓</span>Cursor/Trae 可移植范式（PRD §3/§6）</div>
+      <div class="check-item"><span class="ck">✓</span>4 文体 SOP × 7 阶梯（PRD §4/§5）</div>
+      <div class="check-item"><span class="ck">✓</span>作家工作流关键洞察（PRD §5）</div>
+      <div class="check-item"><span class="ck">✓</span>竞品差异化矩阵（CSV）</div>
+      <div class="check-item"><span class="ck">✓</span>MiniMax 全栈分工（PRD §7）</div>
+      <div class="check-item"><span class="ck">✓</span>编辑器架构选型（CSV T6）</div>
+      <div class="check-item"><span class="ck">✓</span>产品原则 F1–F10（PRD §8）</div>
+      <div class="check-item"><span class="ck">✓</span>一个月 V0 路线图（路线图.md）</div>
+      <div class="check-item"><span class="ck">✓</span>风险与退出条件（PRD §12）</div>
+      <div class="check-item"><span class="ck">✓</span>证据附录（所有源文档）</div>
+    </div>
+  </div>
+</section>
+
+</div>
+
+<footer class="report-footer">
+  <p>笔触 · WritCraft — 产品定义与价值报告 · v2.1 · 2026-07-14<br>
+  发起方：Max Hou · 输入：T1–T9 全流程调研 + v2.1 新增 MiniMax 鉴权 + 心流规范</p>
+</footer>
+
+<script>
+  mermaid.initialize({
+    startOnLoad: true,
+    theme: 'base',
+    themeVariables: {
+      fontFamily: 'Noto Sans SC, PingFang SC, sans-serif',
+      fontSize: '14px',
+      primaryColor: '#fdf2f2',
+      primaryTextColor: '#1a1a1a',
+      primaryBorderColor: '#e8e4df',
+      lineColor: '#c0392b',
+      secondaryColor: '#fff8e1',
+      tertiaryColor: '#faf9f7',
+    }
+  });
+</script>
+</body>
+</html>
