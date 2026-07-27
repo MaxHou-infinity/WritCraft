@@ -8,7 +8,7 @@
 
 > **工程交接（2026-07-27，真实作者验收前置）**：Image Trash 保持签字；Author CLI 已将 Python helper 替换为随 App 打包的 universal Mach-O。单一快照、cwd/inode 祖先绑定、私有 stage readiness、parent-fd 相对排他发布、三态 committed truth、精确清理、硬上限、空 `PATH`、embedded-NUL 和 helper 故障均有动态回归；Author **42/42**、离线 API **15/15**、package **6/6**、本地 release **7/7**、完整 test/verify 与最终强制 Electron **32/32** 通过。Onboarding 旧超时已定位为 E2E watcher 静默判断缺口，静默/fatal/CDP 加固前后聚焦真实 Electron 累计 8 次通过。ad-hoc App/ZIP 仍禁止分发。
 > **下一阶段合同**：`docs/AUTHOR-ACCEPTANCE-V1-CONTRACT.md` 已冻结，明确付费网络门禁、允许记录的隐私安全证据、真实长文旅程与发布前签字顺序。
-> **当前实现停点**：0.0Q Main-owned Watcher flush 已完成 Main/IPC/preload/Renderer exact barrier、首次 strict 全项目失效、internal-mutation/navigation 绑定和外部刷新失败 AI 门禁；Watcher **23/23**、跨层 **11/11**、完整 test/verify 与同源真实 Electron 连续两次 **32/32**，独立复审 **P0=0/P1=0/P2=1**。保留 P2 是 strict hash 的 `lstat→path read` 本地并发替换窗口，下一步以 no-follow fd + fstat 关闭。真实产品门禁仍要求作者显式选择满足五章节、2,000 汉字和来源要求的项目并提供完整 `sk-api-`；不得扫描无关私人文稿、自动创建真实副本或用 fixture 替代作者证据。
+> **当前实现停点**：0.0R strict watcher fd hash 已签收；0.0Q Main-owned exact barrier 保持签字。默认哈希已从 path stream 改为 `O_NOFOLLOW | O_NONBLOCK` fd、BigInt pre/post identity 与精确限长读取，关闭最终文件组件在 `lstat` 后被替换造成的预算/barrier 绕过。Watcher **28/28**、跨层 **11/11**、完整 test/verify 与同源真实 Electron 连续两次 **32/32**，独立复审 **P0=0/P1=0/P2=1**。保留 P2 是纯 Node 无法对祖先目录逐段 `openat` 的架构边界；下一本地任务转向 native reserve 空 stage/build 因果 P2。真实产品门禁仍要求作者显式选择满足五章节、2,000 汉字和来源要求的项目并提供完整 `sk-api-`；不得扫描无关私人文稿、自动创建真实副本或用 fixture 替代作者证据。
 
 ## 1. 阶段目标
 
@@ -217,6 +217,7 @@ Main 为当前窗口保存不可伪造的 project session，不允许 renderer �
 - 树节点使用相对路径作为身份，显示名仅用于 UI。
 - 外部新增、修改、重命名或删除通过 Main watcher 转成结构化事件；watcher 事件只是失效信号，renderer 应重新读取权威快照。
 - 在 watcher 驱动的状态之后生成新 AI capability 时，Renderer 的队列排空或时间稳定窗都不能充当权威证明。必须由 Main 等待在途 poll、强制新快照并清空 pending 后签发绑定当前项目实例与 mutation generation 的一次性 flush barrier；任何扫描不完整、项目切换或 watcher degraded 均 fail-closed。
+- strict flush 的 Markdown hash 必须以扫描时私有 BigInt identity 绑定 no-follow fd，在 fd 上按已验证 size 分块读取，并于读取前后复核 `dev/ino/size/mode/nlink/mtimeNs/ctimeNs` 与最终路径。最终组件替换、symlink、增长或原地改写均使覆盖不完整；公开 snapshot 仍保持既有 Number `size/mtimeMs` 兼容语义。`O_NOFOLLOW` 不证明祖先目录链，若将恶意祖先替换纳入威胁模型，须另用 native `openat` 逐段遍历。
 
 ### 7.3 标签页状态
 
@@ -382,7 +383,7 @@ Main 为当前窗口保存不可伪造的 project session，不允许 renderer �
 - [x] renderer sandbox、context isolation 和窄 preload API 保持开启。
 - [x] Phase A 地基、当前 Chat/Chapter 源码的单元/IPC 集成和强制真实 Electron 验收通过；失败证据不被静态 verify 掩盖。
 
-> 证据边界：当前最终源码 `npm test` 与 Electron-enabled `npm run verify` exit 0，0.0Q Watcher 23/23、跨层 11/11、同源强制 Electron 连续两次 32/32、Persistent Watcher 3/3；Diagnostic Export、Image Review、Image Trash、Changes/History 与 Graph 定向证据均通过。0.0Q 独立复审 P0=0/P1=0/P2=1；真实 API、完整 `sk-api-` 图片、真实作者内测与发布复审仍未关闭。精确缺口见 `v0/DEVELOPMENT-STATUS.md`。
+> 证据边界：当前最终源码 `npm test` 与 Electron-enabled `npm run verify` exit 0，0.0R Watcher 28/28、跨层 11/11、同源强制 Electron 连续两次 32/32、Persistent Watcher 3/3；Diagnostic Export、Image Review、Image Trash、Changes/History 与 Graph 定向证据均通过。0.0R 独立复审 P0=0/P1=0/P2=1，保留项仅为祖先目录纯 Node 解析边界；真实 API、完整 `sk-api-` 图片、真实作者内测与发布复审仍未关闭。精确缺口见 `v0/DEVELOPMENT-STATUS.md`。
 
 Phase A 只有在全部清单有可复现证据时才算完成；“页面看起来像工作区”或“测试只检查元素存在”都不构成验收。
 

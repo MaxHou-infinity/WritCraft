@@ -18,6 +18,7 @@ const DEFAULT_HASH_BYTES_PER_ROUND = 10 * 1024 * 1024;
 const DEFAULT_FLUSH_HASH_FILES = 5000;
 const DEFAULT_FLUSH_HASH_BYTES = 64 * 1024 * 1024;
 const DEFAULT_MAX_ENTRIES = 5000;
+const HASH_READ_CHUNK_BYTES = 64 * 1024;
 const IGNORED_TOP_LEVEL = new Set(['node_modules']);
 
 function normalizeWatchPath(filename) {
@@ -71,14 +72,81 @@ function snapshotEntries(snapshot) {
   return snapshot && snapshot.entries instanceof Map ? snapshot.entries : snapshot;
 }
 
-async function defaultHashFile(absolute) {
-  return new Promise((resolve, reject) => {
+function watcherHashError(code, message) {
+  const error = new Error(message);
+  error.code = code;
+  return error;
+}
+
+function sameFileIdentity(actual, expected) {
+  return actual.isFile() &&
+    actual.dev === expected.dev &&
+    actual.ino === expected.ino &&
+    actual.size === expected.size &&
+    actual.mode === expected.mode &&
+    actual.nlink === expected.nlink &&
+    actual.mtimeNs === expected.mtimeNs &&
+    actual.ctimeNs === expected.ctimeNs;
+}
+
+// Hash an already-scanned regular file without resolving its pathname again
+// during reads. The pre/post identity checks turn replacement, growth, and
+// in-place mutation into an unreadable candidate instead of bypassing budgets.
+async function hashFileByIdentity(absolute, expected, options = {}) {
+  if (!expected || typeof expected.size !== 'bigint' || typeof expected.dev !== 'bigint' ||
+      typeof expected.ino !== 'bigint' || typeof expected.mtimeNs !== 'bigint' ||
+      typeof expected.ctimeNs !== 'bigint') {
+    throw watcherHashError('PROJECT_WATCHER_HASH_CHANGED', 'Missing authoritative file identity');
+  }
+  if (!Number.isInteger(fs.constants.O_NOFOLLOW)) {
+    throw watcherHashError('PROJECT_WATCHER_HASH_UNSUPPORTED', 'O_NOFOLLOW is unavailable');
+  }
+  const expectedBytes = Number(expected.size);
+  const maxBytes = positiveInteger(options.maxBytes, expectedBytes || 1);
+  if (!Number.isSafeInteger(expectedBytes) || expectedBytes < 0 || expectedBytes > maxBytes) {
+    throw watcherHashError('PROJECT_WATCHER_HASH_BUDGET', 'File exceeds watcher hash budget');
+  }
+
+  const openFile = typeof options.openFile === 'function'
+    ? options.openFile
+    : (target, flags) => fs.promises.open(target, flags);
+  const nonBlock = Number.isInteger(fs.constants.O_NONBLOCK) ? fs.constants.O_NONBLOCK : 0;
+  const flags = fs.constants.O_RDONLY | fs.constants.O_NOFOLLOW | nonBlock;
+  let handle = null;
+  try {
+    handle = await openFile(absolute, flags);
+    const opened = await handle.stat({ bigint: true });
+    if (!sameFileIdentity(opened, expected) || Number(opened.size) > maxBytes) {
+      throw watcherHashError('PROJECT_WATCHER_HASH_CHANGED', 'File identity changed before hashing');
+    }
+
     const digest = crypto.createHash('sha256');
-    const stream = fs.createReadStream(absolute);
-    stream.on('data', chunk => digest.update(chunk));
-    stream.once('error', reject);
-    stream.once('end', () => resolve(digest.digest('hex').slice(0, 16)));
-  });
+    const buffer = Buffer.allocUnsafe(Math.max(1, Math.min(HASH_READ_CHUNK_BYTES, expectedBytes)));
+    let offset = 0;
+    while (offset < expectedBytes) {
+      const requested = Math.min(buffer.length, expectedBytes - offset);
+      const { bytesRead } = await handle.read(buffer, 0, requested, offset);
+      if (!Number.isInteger(bytesRead) || bytesRead <= 0 || bytesRead > requested) {
+        throw watcherHashError('PROJECT_WATCHER_HASH_CHANGED', 'File changed during hashing');
+      }
+      digest.update(buffer.subarray(0, bytesRead));
+      offset += bytesRead;
+    }
+
+    const afterRead = await handle.stat({ bigint: true });
+    let afterPath;
+    try {
+      afterPath = await fs.promises.lstat(absolute, { bigint: true });
+    } catch (_) {
+      throw watcherHashError('PROJECT_WATCHER_HASH_CHANGED', 'File path changed during hashing');
+    }
+    if (!sameFileIdentity(afterRead, expected) || !sameFileIdentity(afterPath, expected)) {
+      throw watcherHashError('PROJECT_WATCHER_HASH_CHANGED', 'File identity changed during hashing');
+    }
+    return digest.digest('hex').slice(0, 16);
+  } finally {
+    if (handle) await handle.close();
+  }
 }
 
 function positiveInteger(value, fallback) {
@@ -98,8 +166,9 @@ async function projectSnapshot(rootPath, options = {}) {
   const maxHashBytes = completeHash
     ? positiveInteger(options.flushMaxHashBytes, DEFAULT_FLUSH_HASH_BYTES)
     : positiveInteger(options.maxHashBytes, DEFAULT_HASH_BYTES_PER_ROUND);
-  const hashFile = typeof options.hashFile === 'function' ? options.hashFile : defaultHashFile;
+  const hashFile = typeof options.hashFile === 'function' ? options.hashFile : null;
   const entries = new Map();
+  const identities = new Map();
   const queue = [{ absolute: rootPath, prefix: '' }];
   let scanErrors = 0;
 
@@ -117,25 +186,41 @@ async function projectSnapshot(rootPath, options = {}) {
       const relative = prefix ? `${prefix}/${child.name}` : child.name;
       const target = path.join(absolute, child.name);
       let stat;
-      try { stat = await fs.promises.lstat(target); }
+      try { stat = await fs.promises.lstat(target, { bigint: true }); }
       catch (_) {
         scanErrors += 1;
         continue;
       }
       const type = stat.isDirectory() ? 'directory' : stat.isFile() ? 'file' : 'other';
       const old = previous.get(relative);
-      const mtimeMs = Math.trunc(stat.mtimeMs);
+      const size = stat.size <= BigInt(Number.MAX_SAFE_INTEGER) ? Number(stat.size) : Number.MAX_SAFE_INTEGER;
+      // Preserve the historical Number Stats rounding contract used by public
+      // snapshots while retaining exact nanoseconds in the private identity.
+      const mtimeMs = Math.trunc(
+        Number(stat.mtimeMs) + (Number(stat.mtimeNs % 1000000n) / 1000000)
+      );
       // Metadata changes are already a complete invalidation signal. Do not
       // carry the old hash across them, otherwise a later rotating hash pass
       // would emit the same logical modification a second time.
       const oldHash = old && typeof old === 'object' && old.type === 'file' &&
-        old.size === stat.size && old.mtimeMs === mtimeMs ? old.contentHash : undefined;
+        old.size === size && old.mtimeMs === mtimeMs ? old.contentHash : undefined;
       entries.set(relative, {
         type,
-        size: stat.size,
+        size,
         mtimeMs,
         ...(type === 'file' && typeof oldHash === 'string' ? { contentHash: oldHash } : {}),
       });
+      if (type === 'file') {
+        identities.set(relative, {
+          dev: stat.dev,
+          ino: stat.ino,
+          size: stat.size,
+          mode: stat.mode,
+          nlink: stat.nlink,
+          mtimeNs: stat.mtimeNs,
+          ctimeNs: stat.ctimeNs,
+        });
+      }
       if (type === 'directory' && !stat.isSymbolicLink()) queue.push({ absolute: target, prefix: relative });
       if (entries.size >= maxEntries) break;
     }
@@ -143,7 +228,7 @@ async function projectSnapshot(rootPath, options = {}) {
 
   const allMarkdown = [...entries.entries()]
     .filter(([relative, entry]) => entry.type === 'file' && /\.(?:md|markdown)$/i.test(relative))
-    .map(([relative, entry]) => ({ relative, entry }))
+    .map(([relative, entry]) => ({ relative, entry, identity: identities.get(relative) }))
     .sort((left, right) => left.relative.localeCompare(right.relative, 'zh-CN'));
   const markdown = allMarkdown.filter(candidate => candidate.entry.size <= MAX_MARKDOWN_BYTES);
   const edit = markdown.find(candidate => candidate.relative === 'edit.md');
@@ -158,7 +243,13 @@ async function projectSnapshot(rootPath, options = {}) {
   async function hashCandidate(candidate) {
     if (!candidate || hashedFiles >= maxHashFiles || hashedBytes + candidate.entry.size > maxHashBytes) return false;
     try {
-      candidate.entry.contentHash = await hashFile(path.join(rootPath, ...candidate.relative.split('/')));
+      const absolute = path.join(rootPath, ...candidate.relative.split('/'));
+      candidate.entry.contentHash = typeof options.hashFile === 'function'
+        ? await hashFile(absolute)
+        : await hashFileByIdentity(absolute, candidate.identity, {
+          maxBytes: candidate.entry.size,
+          openFile: options.openFile,
+        });
     } catch (_) {
       candidate.entry.contentHash = 'unreadable';
       hashErrors.push(candidate.relative);
@@ -243,6 +334,7 @@ function createProjectWatcher(rootPath, onChange, options = {}) {
     flushMaxHashFiles: options.flushMaxHashFiles,
     flushMaxHashBytes: options.flushMaxHashBytes,
     hashFile: options.hashFile,
+    openFile: options.openFile,
   };
   let closed = false;
   let timer = null;
@@ -470,6 +562,7 @@ module.exports = {
   MAX_MARKDOWN_BYTES,
   DEFAULT_HASH_FILES_PER_ROUND,
   DEFAULT_HASH_BYTES_PER_ROUND,
+  hashFileByIdentity,
   normalizeWatchPath,
   coalesceChanges,
   projectSnapshot,

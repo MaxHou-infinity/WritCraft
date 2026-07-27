@@ -10,7 +10,7 @@ const watcher = require('../src/main/project-watcher');
 const watcherInvalidationPolicy = require('../src/main/watcher-invalidation-policy');
 
 let pass = 0;
-const EXPECTED_CHECKS = 23;
+const EXPECTED_CHECKS = 28;
 async function check(label, fn) {
   try {
     await fn();
@@ -425,6 +425,158 @@ async function run() {
       const snapshot = await promise;
       assert.strictEqual(hashCalls, 1);
       assert.strictEqual(snapshot.entries.get('edit.md').contentHash, 'async-hash');
+    } finally {
+      fs.rmSync(root, { recursive: true, force: true });
+    }
+  });
+
+  await check('生产哈希拒绝 lstat 后被符号链接或普通文件替换的路径', async () => {
+    const root = tempProject();
+    const target = path.join(root, 'edit.md');
+    const outside = path.join(root, 'outside.txt');
+    try {
+      fs.writeFileSync(target, 'trusted');
+      fs.writeFileSync(outside, 'outside-content-is-larger');
+      const expected = fs.lstatSync(target, { bigint: true });
+
+      fs.unlinkSync(target);
+      fs.symlinkSync(outside, target);
+      await assert.rejects(
+        () => watcher.hashFileByIdentity(target, expected),
+        error => ['ELOOP', 'PROJECT_WATCHER_HASH_CHANGED'].includes(error?.code)
+      );
+
+      fs.unlinkSync(target);
+      fs.writeFileSync(target, 'replacement-is-larger');
+      await assert.rejects(
+        () => watcher.hashFileByIdentity(target, expected),
+        error => error?.code === 'PROJECT_WATCHER_HASH_CHANGED'
+      );
+    } finally {
+      fs.rmSync(root, { recursive: true, force: true });
+    }
+  });
+
+  await check('生产哈希在 fd 打开后再次核验路径身份并拒绝替换', async () => {
+    const root = tempProject();
+    const target = path.join(root, 'edit.md');
+    const replacement = path.join(root, 'replacement.md');
+    try {
+      fs.writeFileSync(target, 'trusted');
+      fs.writeFileSync(replacement, 'hostile');
+      const expected = fs.lstatSync(target, { bigint: true });
+      await assert.rejects(
+        () => watcher.hashFileByIdentity(target, expected, {
+          openFile: async (absolute, flags) => {
+            const handle = await fs.promises.open(absolute, flags);
+            fs.renameSync(replacement, target);
+            return handle;
+          },
+        }),
+        error => error?.code === 'PROJECT_WATCHER_HASH_CHANGED'
+      );
+      assert.strictEqual(fs.readFileSync(target, 'utf8'), 'hostile');
+    } finally {
+      fs.rmSync(root, { recursive: true, force: true });
+    }
+  });
+
+  await check('快照默认哈希使用 no-follow fd 边界且保持精确预算', async () => {
+    const root = tempProject();
+    const file = path.join(root, 'edit.md');
+    try {
+      fs.writeFileSync(file, 'prompt');
+      let observedFlags = null;
+      const snapshot = await watcher.projectSnapshot(root, {
+        openFile: async (absolute, flags) => {
+          observedFlags = flags;
+          return fs.promises.open(absolute, flags);
+        },
+      });
+      assert.strictEqual((observedFlags & fs.constants.O_NOFOLLOW), fs.constants.O_NOFOLLOW);
+      assert.strictEqual(snapshot.stats.hashedBytes, Buffer.byteLength('prompt'));
+      assert.match(snapshot.entries.get('edit.md').contentHash, /^[a-f0-9]{16}$/);
+    } finally {
+      fs.rmSync(root, { recursive: true, force: true });
+    }
+  });
+
+  await check('strict flush 遇到 scan 后 symlink 替换时失败且不发布成功失效', async () => {
+    const root = tempProject();
+    const target = path.join(root, 'edit.md');
+    const outside = path.join(root, 'outside.txt');
+    const native = new EventEmitter();
+    native.close = () => {};
+    const payloads = [];
+    let replaced = false;
+    fs.writeFileSync(target, 'trusted');
+    fs.writeFileSync(outside, 'outside-content');
+    const instance = watcher.createProjectWatcher(root, payload => payloads.push(payload), {
+      watchFn: () => native,
+      pollIntervalMs: 0,
+      openFile: async (absolute, flags) => {
+        if (!replaced && path.basename(absolute) === 'edit.md') {
+          replaced = true;
+          fs.unlinkSync(target);
+          fs.symlinkSync(outside, target);
+        }
+        return fs.promises.open(absolute, flags);
+      },
+    });
+    try {
+      await assert.rejects(
+        () => instance.flush(),
+        error => error?.code === 'PROJECT_WATCHER_FLUSH_INCOMPLETE'
+      );
+      assert.strictEqual(replaced, true);
+      assert.deepStrictEqual(payloads, []);
+    } finally {
+      instance.close();
+      fs.rmSync(root, { recursive: true, force: true });
+    }
+  });
+
+  await check('生产哈希在成功和身份失败路径都关闭 fd', async () => {
+    const root = tempProject();
+    const target = path.join(root, 'edit.md');
+    try {
+      fs.writeFileSync(target, 'trusted');
+      const expected = fs.lstatSync(target, { bigint: true });
+      let successCloses = 0;
+      await watcher.hashFileByIdentity(target, expected, {
+        openFile: async (absolute, flags) => {
+          const handle = await fs.promises.open(absolute, flags);
+          return {
+            stat: options => handle.stat(options),
+            read: (...args) => handle.read(...args),
+            close: async () => {
+              successCloses += 1;
+              return handle.close();
+            },
+          };
+        },
+      });
+      assert.strictEqual(successCloses, 1);
+
+      fs.writeFileSync(target, 'replacement-is-larger');
+      let failureCloses = 0;
+      await assert.rejects(
+        () => watcher.hashFileByIdentity(target, expected, {
+          openFile: async (absolute, flags) => {
+            const handle = await fs.promises.open(absolute, flags);
+            return {
+              stat: options => handle.stat(options),
+              read: (...args) => handle.read(...args),
+              close: async () => {
+                failureCloses += 1;
+                return handle.close();
+              },
+            };
+          },
+        }),
+        error => error?.code === 'PROJECT_WATCHER_HASH_CHANGED'
+      );
+      assert.strictEqual(failureCloses, 1);
     } finally {
       fs.rmSync(root, { recursive: true, force: true });
     }

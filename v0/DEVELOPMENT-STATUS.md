@@ -1,10 +1,10 @@
 # 笔触 · WritCraft · V0 开发状态与续作入口
 
-> 最后更新：2026-07-27（Asia/Shanghai，0.0Q Main-owned Watcher flush 签收）
-> 当前状态：**V0 候选原型。Image Trash、0.0P 等既有本地产品链保持签字；0.0Q 已删除 1.5 秒 watcher 时间推断并完成跨层 exact barrier，独立复审 P0=0/P1=0/P2=1。真实付费图片、真实作者旅程和正式发布验收仍缺。**
+> 最后更新：2026-07-27（Asia/Shanghai，0.0R strict watcher fd hash 签收）
+> 当前状态：**V0 候选原型。Image Trash、0.0P 与 0.0Q 等既有本地产品链保持签字；0.0R 已关闭 strict watcher hash 在 `lstat` 后跟随最终文件组件替换并突破字节预算的 P2。独立复审 P0=0/P1=0/P2=1，保留项仅是纯 Node 无法 descriptor-relative 证明祖先目录链。真实付费图片、真实作者旅程和正式发布验收仍缺。**
 > 发布判断：**仍禁止分发；当前配置为 Coding Plan，合同禁止调用 `image-01`；最近项目不满足 5 章/2000 字/来源门槛。本轮已从当前源码重建本地 ad-hoc App/ZIP 并通过 7/7 完整性检查，但尚未完成真实作者、付费 API、干净账户启动、Developer ID 签名、公证与 Gatekeeper 复审。**
-> 在制任务：**当前没有未接线的跨层功能。0.0Q 已完整收口；下一项本地可执行任务是把 strict watcher hash 的 `lstat→path read` 改为 no-follow fd + fstat/inode/size 复核并加对抗测试。随后再处理 native reserve 空 stage/build 因果 P2，或在作者明确提供合格项目与完整 `sk-api-` 后进入外部门禁。**
-> 当前源码证据：**Author Preflight 42/42、Real API Offline Contract 15/15；Diagnostic Service 13/13、Handler 10/10、Renderer 7/7；Image Generation 15/15、Image Review Service 16/16、Review Handler 9/9、Trash Service 21/21、Trash Handler 7/7、Trash Integration 4/4、Image Renderer 8/8、Trash Renderer 7/7、Metrics Renderer 20/20、Network Boundary 15/15；Recovery 24/24、Change History 14/14、ChangeSet Review 15/15、Composite Guard 5/5、Changes Renderer 协议 16/16、Workspace 恢复 7/7、Changes integration 6/6、Persistent Watcher Main/IPC 3/3；0.0Q Watcher 23/23、跨层 11/11、Workspace 19/19、Chat 11/11、Inline 14/14、Large 6/6；最终 `npm test` 与沙箱外 Electron-enabled `npm run verify` 均 exit 0，聚焦真实 Electron 2/2，当前源码完整真实 Electron 连续两次 32/32。**
+> 在制任务：**当前没有未接线的跨层功能。0.0R 已完整收口；下一项本地可执行任务是处理 native reserve 的失败空 stage 与 build 因果 P2。若作者明确提供合格项目与完整 `sk-api-`，则优先按冻结合同进入真实作者/付费门禁。不得把祖先目录纯 Node 残余误记为已消除；威胁模型若要求关闭它，须另立 native `openat` 逐段遍历合同。**
+> 当前源码证据：**Author Preflight 42/42、Real API Offline Contract 15/15；Diagnostic Service 13/13、Handler 10/10、Renderer 7/7；Image Generation 15/15、Image Review Service 16/16、Review Handler 9/9、Trash Service 21/21、Trash Handler 7/7、Trash Integration 4/4、Image Renderer 8/8、Trash Renderer 7/7、Metrics Renderer 20/20、Network Boundary 15/15；Recovery 24/24、Change History 14/14、ChangeSet Review 15/15、Composite Guard 5/5、Changes Renderer 协议 16/16、Workspace 恢复 7/7、Changes integration 6/6、Persistent Watcher Main/IPC 3/3；0.0R Watcher 28/28、跨层 11/11、Large 6/6；最终 `npm test` 与沙箱外 Electron-enabled `npm run verify` 均 exit 0，真实 DOM sanitizer 13/13，当前源码完整真实 Electron 连续两次 32/32。**
 > 最近历史基线（本批前）：**强制真实 Electron E2E 31/31 是 0.0M Image Review 阶段证据，已被上方当前源码 32/32 覆盖。**
 > Graph 历史签字基线：**性能修复前的既有源码曾完整 `npm test`、Electron-enabled `npm run verify`、强制真实 Electron 26/26 exit 0；Graph Filter 15/15、Workbench 14/14、dynamic 5/5、Large 5/5、Watcher 15/15、Network 11/11、Intelligence 17/17，第二轮复审 P0=0/P1=0/P2=2。该数字只保留为历史过程，已被上方当前最终源码证据覆盖。**  
 > Graph 动态边界：**300 文件/1279 节点 cold-to-interactive、cache/incremental、筛选/内存/布局、AX/键鼠、三类纠错、stale/Issue→Changes、failure live、重启与项目隔离均进入真实 Electron；正文/History/ledger 的零写入门禁通过。**  
@@ -27,6 +27,16 @@ Chat/Chapter、Onboarding v2、Research→Changes、Inline Rewrite 与 Plan Stri
 5. 每批合入后重跑定向测试；阶段完成时再运行完整 `npm test`、`npm run verify` 与 `WRITCRAFT_E2E_FORCE=1 npm run e2e:electron`，保存当次证据。
 6. 真实 API 只使用用户显式配置的 Key；记录延迟、限流、超时、故障和费用，不记录 Key、Prompt、模型原文或正文。本轮 ad-hoc 包只用于验证；完成真实作者闭环后仍须重建并做干净账户、Developer ID、公证和 Gatekeeper 复审。
 
+### 0.0R 2026-07-27 strict watcher fd hash（已签收）
+
+- **目标与结果**：关闭 0.0Q 唯一 P2 的精确范围：扫描 `lstat` 后，最终文件组件被普通文件或 symlink 替换时，旧 `createReadStream(path)` 会重新解析路径、读取更大目标并继续按旧 size 记账。默认生产哈希现只通过 fd 读取，不再 path-based stream。
+- **权威身份与预算**：扫描使用 BigInt stat 私存 `dev/ino/size/mode/nlink/mtimeNs/ctimeNs`；打开使用 `O_RDONLY | O_NOFOLLOW | O_NONBLOCK`。打开后、读完后均 `fstat`，返回前再次 `lstat(path)`；任何身份、大小或纳秒时间漂移都进入 `hashErrors`。读取按已验证 size 以 64 KiB 分块，绝不读取候选预算外字节，成功和失败均在 `finally` 关闭 fd。
+- **兼容与失败语义**：BigInt 身份不进入公开 snapshot；公开 `size` 与旧 `Math.trunc(normalStats.mtimeMs)` 保持 Number 语义。ordinary polling 的瞬态失败继续返回本轮无权威 hash、等待后续轮转；strict flush 因覆盖不完整返回 `PROJECT_WATCHER_FLUSH_INCOMPLETE`，不发布成功失效或 barrier。
+- **红灯与纠错**：新增红测先证明旧实现缺少安全 helper/identity；完整套件随后暴露一次 `mtimeMs` 精度兼容红灯。根因是把内部纳秒安全升级错误地直接改变了公开毫秒舍入，而非产品 watcher 逻辑失败。最终实现把“私有精确权威”和“公开兼容字段”分离，并以 50 轮时间边界及最终 10 轮新套件复跑证明稳定。
+- **验证**：Watcher **28/28**（含真实 strict flush scan→open symlink fault、零成功 payload、成功/失败 fd close）、跨层 **11/11**、Large **6/6**；完整 `npm test`、沙箱外 Electron-enabled `npm run verify` exit 0；真实 DOM sanitizer **13/13**；同一源码真实 Electron 连续两次 **32/32**；Persistent Watcher Main/IPC **3/3**。
+- **独立复审**：最终 **P0=0/P1=0/P2=1，允许签字与提交**。保留 P2 是 `O_NOFOLLOW` 只保护最终组件，纯 Node 无法对祖先目录进行 fd-relative `openat` 逐段遍历；不得把本批写成“全路径 TOCTOU 已消除”。若以后提升到恶意并发祖先替换威胁模型，须用 native helper 单独关闭。
+- **下一步**：本地顺序转向 native reserve 的失败空 stage/build 因果 P2；外部门禁仍是作者显式提供合格真实项目、完整 `sk-api-`、干净账户、Developer ID、公证与 Gatekeeper。现有 App/ZIP 未因本批重建，仍禁止分发。
+
 ### 0.0Q 2026-07-27 Main-owned Watcher flush（已签收）
 
 - **目标**：删除 Renderer 以 1.5 秒时间稳定推断 watcher 已静默的做法。任何在 own-save 或受控外部写后铸造 AI/Onboarding authority 的路径，都先取得 Main 对当前项目 watcher 的显式 flush 证明。
@@ -37,7 +47,7 @@ Chat/Chapter、Onboarding v2、Research→Changes、Inline Rewrite 与 Plan Stri
 - **完成结果**：Main handler、IPC、preload listener-before-invoke exact handshake、Renderer barrier 后外部刷新 drain、Chat/Inline 可见失败态和真实 Electron 均已接通；1.5 秒 helper 与旧 `externalQueue` 测试等待已经删除。首次 strict flush 主动发布一次全项目失效，扫描期间 internal-mutation epoch、navigation epoch、项目/watcher 漂移和 Renderer 刷新失败全部 fail-closed。
 - **对抗修复**：第一轮独立复审在全量绿灯后发现 3 个 P1：内部写可在扫描期间完整发生并结束、初始 poll 可先吸收外部写、Renderer 会吞掉外部刷新异常。三项均先加红灯再修复。自审另发现普通轮转 hash 预算被误用于“完整”flush，已改为独立 5000 文件/64 MiB 全 Markdown hash，超限失败。
 - **真实 Electron 过程证据**：一轮旧测试断言曾把运行时 project instance 与不存在的 fixture 字段比较，产品 barrier 已成功但测试红；修正后聚焦 2/2。最终收口前还保留两次不同阶段的等待超时；加入终态快照并把 Graph 的旧 `externalQueue` 等待替换为 Main barrier 后，当前同一源码连续两次完整 **32/32**。
-- **最终签字**：Watcher **23/23**、跨层 **11/11**、Workspace **19/19**、Chat **11/11**、Inline **14/14**、Large **6/6**；完整 `npm test`、Electron-enabled `npm run verify` exit 0，Persistent Watcher **3/3**。独立二审 **P0=0/P1=0/P2=1，可以签字**。唯一 P2 是 strict hash 的 `lstat→path createReadStream` 仍有本地并发 symlink/replacement TOCTOU；下一步用 no-follow fd + fstat/inode/size 与有界 fd read 关闭。
+- **最终签字**：Watcher **23/23**、跨层 **11/11**、Workspace **19/19**、Chat **11/11**、Inline **14/14**、Large **6/6**；完整 `npm test`、Electron-enabled `npm run verify` exit 0，Persistent Watcher **3/3**。独立二审 **P0=0/P1=0/P2=1，可以签字**。该批唯一 P2 是 strict hash 的 `lstat→path createReadStream` 本地并发替换窗口；它已由上方 0.0R 的 no-follow fd、pre/post identity 与有界读取关闭到最终组件范围。
 
 ### 0.0P 2026-07-27 原生 helper 与 Onboarding E2E 稳定性收口
 
@@ -48,8 +58,8 @@ Chat/Chapter、Onboarding v2、Research→Changes、Inline Rewrite 与 Plan Stri
 - **稳定性证据**：Onboarding 聚焦真实 Electron连续 **6 次 2/2**，E2E fatal 加固后再过 **2 次 2/2**，随后完整真实 Electron **32/32**；timeout 分支保留可读 Renderer 状态快照。Harness 从 spawn 起统一清理，进程 exit 与 CDP failure 均进入全局 fatal latch，每阶段及绿线前复核，并强制固定 2/32 计数。
 - **当前回归**：Author **42/42** + API Offline **15/15** = **57/57、0 网络**；`npm test`、Electron-enabled `npm run verify` 均 exit 0；package **6/6**、release **7/7**、最终强制 Electron **32/32**。
 - **复审纠错**：第一轮增量复审在全部绿灯后仍找出 4 个 P1：helper 未独立签名、App/helper minOS 断层、最后 CDP 命令后 Electron exit 可假绿、CDP 初始化失败可能泄漏 child；第二轮又动态证明纯 CDP close 未进入 fatal latch，并发现 ZIP 的 412 个 `._*` AppleDouble 会让标准 unzip 后签名失效。上述缺口均先复现再修复，说明外层 `--deep`、同工具打包/解包、自增 passed 计数和单一 client abort 都不能替代终态证明。
-- **最终独立复审**：**P0=0/P1=0/P2=3，允许技术签字**。P2 为：Watcher 1.5 秒稳定窗不是 Main 显式 flush barrier；native reserve 的 `mkdirat→openat` 极窄 external-process/失败空 stage 残余；build-info 的 C source/binary hash 是并列证据，直接绕过标准 `npm run package:mac` 时不是强因果证明。标准 npm 打包路径会先强制重建。
-- **下一步**：0.0P 已在提交 `1944950` 完成文档/Nowledge/Git 收口。当前先把 Watcher 时间静默证据升级为 Main 显式 flush barrier；随后由作者显式选择合格项目和完整 `sk-api-` 执行真实旅程。不得把本地 ad-hoc 包当公开发布候选。
+- **最终独立复审（历史）**：**P0=0/P1=0/P2=3，允许技术签字**。当时 P2 为：Watcher 1.5 秒稳定窗不是 Main 显式 flush barrier；native reserve 的 `mkdirat→openat` 极窄 external-process/失败空 stage 残余；build-info 的 C source/binary hash 是并列证据，直接绕过标准 `npm run package:mac` 时不是强因果证明。Watcher 两项已分别由 0.0Q exact barrier 与 0.0R fd hash 覆盖；native reserve/build 两项仍按本文顶部进入下一本地任务。
+- **历史下一步（已执行并被取代）**：0.0P 已在提交 `1944950` 完成文档/Nowledge/Git 收口；当时要求先升级 Watcher 时间静默证据，再进入真实旅程。当前只按本文顶部 0.0R 停点续作；不得把本地 ad-hoc 包当公开发布候选。
 
 ### 0.0O 2026-07-27 真实作者验收预检与隔离副本底座
 

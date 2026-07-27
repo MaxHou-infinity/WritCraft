@@ -34,11 +34,15 @@ Tests use Node's built-in `assert` and executable scripts rather than a test fra
 
 Fault injection must cross the claimed boundary. A “partial write” test must write bytes before throwing; a “rename committed, fsync failed” test must prove the retry performs another directory fsync. Readable files are not automatically durable. Verify cleanup against the exact inode so failures never delete a concurrent replacement.
 
+Security precision belongs in a private authority record, not by silently changing a public compatibility field. For example, watcher identity may use BigInt `dev`/`ino` and nanosecond times while the public snapshot must retain its established numeric `mtimeMs` rounding. When changing stat representations, add a parity test against the old public contract and repeat the race test enough times to cross timestamp-boundary variance.
+
 ## Documentation Discipline
 
 Before resuming work, read `v0/DEVELOPMENT-STATUS.md`, the relevant contract in `docs/`, and `v0/package.json`; source and current test evidence override historical snapshots. In the same change set as every completed feature, review, or verification result, update the status ledger and any affected contract/README/roadmap. Mark old figures as **historical focused evidence** with scope and date—never present them as the current total. Do not begin a follow-up fix from an old TODO until the status ledger confirms it remains open.
 
 At each durable closeout, compare current `main`, test evidence, `README.md`, PRD, Phase A, feature contracts, PDCA, and the status ledger. Search for the superseded milestone and test totals, run `git diff --check`, then update and re-query the same Nowledge authority memory. Separate the next locally executable task from external gates such as paid API keys or real-author evidence.
+
+When a shell search pattern contains Markdown backticks, `$()`, or other substitution syntax, use a single-quoted fixed string or pass the pattern as a literal argument. Never place such documentation text inside a double-quoted shell command; an audit must not execute the content it is searching for.
 
 ## Delegation & Efficiency Guardrails
 
@@ -53,6 +57,8 @@ Watcher-driven flows must not infer authority from elapsed time. A drained Rende
 A forced tree walk is not automatically a complete authority scan. If ordinary polling rotates a small hash budget, an explicit flush must use an independent bounded full-Markdown hash budget or fail closed; otherwise a same-size, restored-mtime edit outside the rotation can be missed. Propagate flush failure as an explicit user-visible blocked state—never as an unhandled Renderer rejection.
 
 Real Electron harnesses must not let their own infrastructure self-certify. Register a child immediately after spawn; clean it up across discovery, CDP connect/enable/reload/readiness failures; latch both unexpected process exit and CDP failure; check that latch before/after every stage and before the final green line; compare against a fixed expected stage count.
+
+Classify a real-Electron process signal before editing product code. A sandbox-denied GUI launch can exit with `code === null` and `SIGABRT`; rerun the identical probe in the approved unsandboxed GUI context and record both outcomes. Only a failure that reproduces there is product or harness evidence.
 
 When an integration assertion fails after the product boundary already succeeded, verify that the test compares against runtime authority rather than fixture metadata. Preserve the red run, classify the faulty assertion, and rerun only after the test has been corrected; do not patch product code to satisfy an undefined or incidental fixture field.
 
