@@ -1,11 +1,11 @@
 # 笔触 · WritCraft — 产品需求与价值说明
 
-> 文档版本：v3.1 | 2026-07-27（0.0Q Main-owned Watcher flush 签收）
+> 文档版本：v3.2 | 2026-07-27（0.0R strict watcher fd hash 签收）
 > 发起方：Max Hou
 > 输入依据：T1–T9 全流程调研，含 T7 综合分析（25KB）/ T8 魔鬼质询（17KB）/ T9 战略路线（16KB）
 > 状态：产品背景与商业假设已定；**V0 仍在开发，未完成、未发布**
 
-> 实施说明：本文件描述产品价值、原始研究与商业假设；功能验收以 `docs/WRITCRAFT-PRD-V3.md` 为准，当前事实与 TODO 只以 `v0/DEVELOPMENT-STATUS.md` 为准。既有三级工作区、`edit.md`、Inline Diff、ChangeSet、来源/脚注、图谱、Diagnostic、Image Review/Trash 与 0.0P 原生 helper 保持签字。0.0Q exact watcher barrier 已签收，Watcher **23/23**、跨层 **11/11**、同源完整 Electron 连续两次 **32/32**，独立复审 **P0=0/P1=0/P2=1**。下一本地加固为 strict hash no-follow fd；作者合格项目、完整 `sk-api-`、真实质量/费用/价值指标和发布门禁仍未完成。
+> 实施说明：本文件描述产品价值、原始研究与商业假设；功能验收以 `docs/WRITCRAFT-PRD-V3.md` 为准，当前事实与 TODO 只以 `v0/DEVELOPMENT-STATUS.md` 为准。既有三级工作区、`edit.md`、Inline Diff、ChangeSet、来源/脚注、图谱、Diagnostic、Image Review/Trash 与 0.0P 原生 helper 保持签字。0.0Q exact watcher barrier 与 0.0R strict watcher no-follow fd 均已签收；Watcher **28/28**、跨层 **11/11**、同源完整 Electron 连续两次 **32/32**，独立复审 **P0=0/P1=0/P2=1**。下一本地任务是 native reserve 失败空 stage 与 build 因果 P2；作者合格项目、完整 `sk-api-`、真实质量/费用/价值指标和发布门禁仍未完成。0.0P App/ZIP 未随 0.0R 重建，禁止分发。
 
 ---
 

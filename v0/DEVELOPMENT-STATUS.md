@@ -2,7 +2,7 @@
 
 > 最后更新：2026-07-27（Asia/Shanghai，0.0R strict watcher fd hash 签收）
 > 当前状态：**V0 候选原型。Image Trash、0.0P 与 0.0Q 等既有本地产品链保持签字；0.0R 已关闭 strict watcher hash 在 `lstat` 后跟随最终文件组件替换并突破字节预算的 P2。独立复审 P0=0/P1=0/P2=1，保留项仅是纯 Node 无法 descriptor-relative 证明祖先目录链。真实付费图片、真实作者旅程和正式发布验收仍缺。**
-> 发布判断：**仍禁止分发；当前配置为 Coding Plan，合同禁止调用 `image-01`；最近项目不满足 5 章/2000 字/来源门槛。本轮已从当前源码重建本地 ad-hoc App/ZIP 并通过 7/7 完整性检查，但尚未完成真实作者、付费 API、干净账户启动、Developer ID 签名、公证与 Gatekeeper 复审。**
+> 发布判断：**仍禁止分发；当前配置为 Coding Plan，合同禁止调用 `image-01`；最近项目不满足 5 章/2000 字/来源门槛。0.0P 曾按当时源码重建本地 ad-hoc App/ZIP 并通过 7/7 完整性检查，但 0.0R 修改后未再次重建，因此现有产物落后于当前源码；真实作者、付费 API、干净账户启动、Developer ID 签名、公证与 Gatekeeper 复审也尚未完成。**
 > 在制任务：**当前没有未接线的跨层功能。0.0R 已完整收口；下一项本地可执行任务是处理 native reserve 的失败空 stage 与 build 因果 P2。若作者明确提供合格项目与完整 `sk-api-`，则优先按冻结合同进入真实作者/付费门禁。不得把祖先目录纯 Node 残余误记为已消除；威胁模型若要求关闭它，须另立 native `openat` 逐段遍历合同。**
 > 当前源码证据：**Author Preflight 42/42、Real API Offline Contract 15/15；Diagnostic Service 13/13、Handler 10/10、Renderer 7/7；Image Generation 15/15、Image Review Service 16/16、Review Handler 9/9、Trash Service 21/21、Trash Handler 7/7、Trash Integration 4/4、Image Renderer 8/8、Trash Renderer 7/7、Metrics Renderer 20/20、Network Boundary 15/15；Recovery 24/24、Change History 14/14、ChangeSet Review 15/15、Composite Guard 5/5、Changes Renderer 协议 16/16、Workspace 恢复 7/7、Changes integration 6/6、Persistent Watcher Main/IPC 3/3；0.0R Watcher 28/28、跨层 11/11、Large 6/6；最终 `npm test` 与沙箱外 Electron-enabled `npm run verify` 均 exit 0，真实 DOM sanitizer 13/13，当前源码完整真实 Electron 连续两次 32/32。**
 > 最近历史基线（本批前）：**强制真实 Electron E2E 31/31 是 0.0M Image Review 阶段证据，已被上方当前源码 32/32 覆盖。**
@@ -22,7 +22,7 @@ Chat/Chapter、Onboarding v2、Research→Changes、Inline Rewrite 与 Plan Stri
 
 1. 读本文、`package.json`、当前源码文件与 `git log -1 --stat`；本地 Git 历史从 2026-07-26 V0 基线开始，不得据此臆测更早的开发过程。
 2. **Diagnostic Export v1、Research Accuracy v1、committed-warning、Graph 三项韧性缺口、Changes/History durable recovery、Image Review v1 与 Image Trash 本地链均已完整签收，不再重开这些协议。**
-3. 下一产品入口是作者显式选择合格真实项目和完整 `sk-api-`；原生 helper 已消除 `/usr/bin/python3` 依赖。不得扫描无关私人文稿、不得退回旧图片协议。
+3. 下一本地工程入口是 native reserve 失败空 stage 与 build 因果 P2；若作者显式提供合格真实项目和完整 `sk-api-`，则优先按冻结合同进入真实作者门禁。原生 helper 已消除 `/usr/bin/python3` 依赖；不得扫描无关私人文稿、不得退回旧图片协议。
 4. 不重写已经签字的 Onboarding v2 service、capability store、batch、Main/preload 与 Renderer 契约；Main 动态 admission、single-flight 和 Renderer 生命周期 authority 清理均已关闭。
 5. 每批合入后重跑定向测试；阶段完成时再运行完整 `npm test`、`npm run verify` 与 `WRITCRAFT_E2E_FORCE=1 npm run e2e:electron`，保存当次证据。
 6. 真实 API 只使用用户显式配置的 Key；记录延迟、限流、超时、故障和费用，不记录 Key、Prompt、模型原文或正文。本轮 ad-hoc 包只用于验证；完成真实作者闭环后仍须重建并做干净账户、Developer ID、公证和 Gatekeeper 复审。
@@ -70,7 +70,7 @@ Chat/Chapter、Onboarding v2、Research→Changes、Inline Rewrite 与 Plan Stri
 - **验证**：Author Preflight **39/39**；`npm run verify:author-acceptance` 合计 **54/54、0 网络**；最终精确候选完整 `npm test` exit 0；沙箱内 verify 只因 Electron 被终止，沙箱外同命令 exit 0；受控强制真实 Electron **32/32**。
 - **Electron 波动如实保留**：日终最终重跑第一次在 Onboarding fresh one-time confirmation 等待处超时（1/32 后红灯），未改源码立即同命令复跑为 **32/32**。这证明当前存在非确定性时序 P2；绿灯不覆盖首个红灯。下次进入发布前须在该等待点补状态诊断，并完成连续稳定复跑或定位 watcher/confirmation ownership 时序。
 - **六轮复审与候选修复**：首轮 **P0=0/P1=6/P2=2**；后续复审继续发现目标换壳、绝对路径 helper 误发布、stage 身份采用和双 helper 证据丢失误报未提交。所有 P0/P1 均已动态关闭，最终独立技术复审 **P0=0/P1=0/P2=3，可以代码签字**。P2 为 native `mkdirat→openat/fstat` 极窄外部替换残余、干净 macOS `/usr/bin/python3` 依赖，以及 reserve 回执丢失可能遗留空 0700 随机 stage。
-- **后续覆盖**：本节的 Python 依赖与 Onboarding flake 已由 0.0P 根因关闭；其余历史过程保留用于追溯。当前下一步只看本文顶部与 0.0P。
+- **后续覆盖**：本节的 Python 依赖与 Onboarding flake 已由 0.0P 根因关闭；其余历史过程保留用于追溯。当前下一步只看本文顶部与 0.0R。
 - **当日复盘**：正确动作包括离线 API 合同 0 网络、凭据只报类型、只检查 App 最近项目的公开计数、不扫描其他私人目录，以及在 Coding Plan/不合格项目处停下。主要失误是先实现顺序式 happy path，再补安全测试；没有在编码前冻结“源快照—祖先身份—目标所有权—提交真相”矩阵，导致 11/11 和全链绿灯仍漏掉 6 个 P1。今天不提交该 WIP，避免把不可签字状态写进 `main`。
 
 ### 0.0N 2026-07-27 应用内 Image Trash 恢复/清空闭环
@@ -82,7 +82,7 @@ Chat/Chapter、Onboarding v2、Research→Changes、Inline Rewrite 与 Plan Stri
 - **当前证据**：Trash Service **21/21**、Handler **7/7**、Main/preload Integration **4/4**、Renderer **7/7**；完整图片专项 **107/107**、沙箱外 `npm run verify` exit 0、真实 Electron **32/32**。真实 Electron 可见覆盖删除→列表→恢复→重启→保留新到条目→两次确认式清空，且正文/评审证据不变、Renderer 0 HTTP(S)。
 - **独立复审与错误沉淀**：第一轮在 15/15 后发现 path-based unlink、committed TTL 和 restore 原地改写 3 项 P1；第二轮在 19/19 后继续发现 empty 缺 digest 快照与 pre-link replacement 遗留 foreign target 2 项 P1。五项均已关闭并增至 21/21。最终独立只读 sign-off 为 **P0=0/P1=0/P2=1，可以签字**；P2 仅是非协作外部进程预持 open FD 并在最后 digest 后改写同一 inode 的 POSIX 通用极窄残余，不会按旧路径误删替换文件。
 - **稳定性复盘**：竞态用例曾固定假设 `first` 一定先处理，但 `createdAt`/birthtime 排序并不保证该顺序，导致次日复跑偶发失败。测试现对“实际首个被处理条目”注入竞态，仍严格断言 foreign 内容保留、未处理 peer 不被删除；service 连续 20 轮 **20/20**，不是放宽产品断言。
-- **下一步严格顺序**：进入真实 `sk-api-`/作者证据；不得再次扩展 Image Trash，也不得用 fixture 质量替代真实作者判断。
+- **该批当时的下一步（历史，已被 0.0O–0.0R 重排）**：原计划进入真实 `sk-api-`/作者证据；当前续作顺序只看本文顶部。不得再次扩展 Image Trash，也不得用 fixture 质量替代真实作者判断。
 - **当日复盘**：今天完成了从“图片只能移入废纸篓”到“用户可看见、恢复、确认清空且不误删并发替换”的产品闭环，并把五项复审发现的竞态缺口全部关闭。一次次日复跑失败并非产品回归，而是测试错误假设 fixture 创建顺序等于生产排序；修正为注入实际首个处理项后连续 20 次通过。另一次流程错误是把 10 秒工具轮询超时误当成 5–10 分钟复审交付窗口，过早中断 reviewer；后续规则是先给新 reviewer 一个真实证据窗口，再按约定 checkpoint 判断是否接管。这两条已写入 `AGENTS.md`。
 
 ### 0.0M 2026-07-26 Image Review v1 自动化闭环（历史已签字基线）
@@ -92,7 +92,7 @@ Chat/Chapter、Onboarding v2、Research→Changes、Inline Rewrite 与 Plan Stri
 - **Main 权威与隐私**：短期 token 绑定可信窗口、项目、mutation/navigation、operation 与资产身份；Renderer 不持有 root、digest、绝对路径、Key 或图片字节。`.writcraft/image-reviews.json` 只记录 operation、评分、终态、可选费用和时间。
 - **可靠性**：生成目录、诊断导出父目录及图片证据临时文件均补 inode/canonical/nlink 复核与精确清理；插入或废纸篓移动已提交但证据写入失败时保留可恢复真相，精确重试不重复插入或移动。
 - **作者证据可见**：配图面板显示项目累计样本、平均评分以及插入/保留/废纸篓计数；生成耗时与失败仍由既有八字段隐私指标负责，不把 Prompt、正文或远端错误写入评审证据。
-- **当前自动化**：Generation **15/15**、Review Service **16/16**、Handler **9/9**、Renderer **8/8**、Metrics Renderer **20/20**、Network **15/15**；`npm test` 与 Electron-enabled `npm run verify` exit 0，强制真实 Electron **31/31**，Persistent Watcher **3/3**。真实 Electron 已覆盖评分后插入、Main/IPC 保留、重启与零 Renderer 网络。
+- **该历史批自动化**：Generation **15/15**、Review Service **16/16**、Handler **9/9**、Renderer **8/8**、Metrics Renderer **20/20**、Network **15/15**；当时 `npm test` 与 Electron-enabled `npm run verify` exit 0，强制真实 Electron **31/31**，Persistent Watcher **3/3**。该数字只证明 Image Review 专项，已被本文顶部当前源码 32/32 覆盖。真实 Electron 已覆盖评分后插入、Main/IPC 保留、重启与零 Renderer 网络。
 - **独立复审**：首轮发现 3 项 P1 与 3 项 P2；已关闭生成后签发失败孤儿、committed inserted 恢复受旧 revision 阻断、evidence rename 后 fsync 未补做，以及 handler map、诊断部分文件清理问题。最终 **P0=0、P1=0、P2=1**。
 - **当时未完成边界（已被 0.0N 部分覆盖）**：真实 `sk-api-` 图片质量/费用/限流/超时、真实作者判断和发布包均未签字；本批当时唯一 Image Review P2 是缺少应用内废纸篓恢复/清空，现已由 0.0N 实现。Graph 另有顶部列明的两项历史保留 P2，不得混为同一复审范围。App/ZIP 继续禁止分发。
 - **今日交付**：建立本地 Git `main` 基线；完成并独立签收 Diagnostic Export v1；把 Image Review 从“生成后插入/放弃”升级为评分、费用、三类终态、可恢复废纸篓和项目聚合，并在复审修复后签收自动化链。
@@ -273,7 +273,7 @@ Onboarding v2 独立底座的权威文件为：
 - **Research→Changes v1 产品链与异常边界均已签字**：`../docs/RESEARCH-CHANGES-V1-CONTRACT.md` 已落地；committed-warning 生产事务动态覆盖真实磁盘/History、residual、TTL、stale、回滚与 undo，最终独立二审 P0=0/P1=0/P2=0。强制 Electron 已覆盖 reject-only、late-open A→B 及 Research→Changes→History/undo。
 - **Inline Rewrite 产品链已经签字**：当前源码隔离 App 已完成预览零写入、拒绝、重载、接受后磁盘/History 同步与 Safe Undo；本次本地确定性 provider 不等于真实 API/作者验收。
 - **Plan Strict v1 已签字**：`../docs/PLAN-STRICT-V1-CONTRACT.md` 已实现；模型必须 `end_turn`、单一文本块与无外围 strict JSON，重复/危险键、资源超限和路径错误均 fail closed；独立复审 P0=0/P1=0。
-- **下一阶段入口**：先完成 Image Review v1 独立复审，再补真实 `sk-api-`/作者证据、干净打包与发布复审。
+- **该历史批当时的下一阶段入口（已完成并被取代）**：先完成 Image Review v1 独立复审，再补真实 `sk-api-`/作者证据、干净打包与发布复审；当前入口只看本文顶部。
 - **证据纪律**：本地 Git 历史从 2026-07-26 V0 基线开始；恢复时必须同时核对本文、`git log` / `git diff`、磁盘当前文件和当次可复现测试结果。任何新的通过数字都要写明命令、覆盖范围和是否使用真实 Electron/真实 API。
 - **顺序理由**：三级 AI 协作与 Graph 主链均已签字；真实 API/作者价值和发布门禁现在是最早仍开放的产品验收。
 
@@ -503,8 +503,8 @@ Graph Extended Acceptance v1 已签字。首轮复审曾以 P1=3 回退 watcher�
 - [x] 0.0O 第六轮独立技术复审为 **P0=0/P1=0/P2=3，可以代码签字**；0.0P 已移除其中的 Python 运行时 P2，当前组合 **57/57、0 网络**、完整 test/verify 与强制 Electron **32/32**。
 - [x] 将 `/usr/bin/python3 -I` 替换为随 App 打包的 universal 原生 helper；本地重建 App/ZIP 并通过 package **6/6**、release **7/7**。仍待真实旅程后的 Developer ID/公证/Gatekeeper。
 - [x] 将 Onboarding/Graph 外部变化等待从 generation 静默窗口升级为 Main-owned exact watcher barrier；0.0Q 最终 Watcher 23/23、跨层 11/11、聚焦 2/2、同源完整 Electron 连续两次 32/32。
-- [ ] 将 strict watcher hash 改为 no-follow fd，打开后复核 inode/size 并有界读取，关闭 `lstat→path read` 本地并发替换 P2。
-- [ ] 为 reserve 回执丢失后的空 0700 stage 增加诊断或安全回收；继续保留 `mkdirat→openat/fstat` 极窄 external-process P2。
+- [x] 将 strict watcher hash 改为 no-follow fd，打开后复核 inode/size 并有界读取，关闭 `lstat→path read` 最终文件组件并发替换 P2；0.0R Watcher 28/28、跨层 11/11、同源完整 Electron 连续两次 32/32，最终组件范围已签收。
+- [ ] 为 native reserve 失败或回执丢失后遗留的空 0700 stage 增加诊断或安全回收，并把 build-info 与标准 `npm run package:mac` 生命周期建立可验证的强因果绑定；继续明确保留 `mkdirat→openat/fstat` 极窄 external-process P2，不得以 0.0P package 6/6、release 7/7 代替该项修复或 0.0R 产物重建。
 - [x] Author Evidence Metrics v1 已签字：service **13/13**、integration **6/6**、Renderer **18/18**、Onboarding dynamic **22/22**、Workspace **19/19**、image **8/8**、Research **13/13**、Plan **16/16**、Graph handoff **6/6**；该 Metrics 批完整 `npm test`、Electron-enabled `npm run verify` 均 exit 0，强制 Electron **26/26**，独立复审 **P0=0/P1=0/P2=0**。成功 Onboarding 指标延迟到 exact capability 终态后落盘；并发释放、失败重试、项目切换与 post-commit confirmation token 清理均已关闭；当前总链见顶部 32/32。
 - [x] 使用可控、开发态双门禁且未知请求 fail-closed 的 stub 完成 Research GUI：选择来源 → Claim/Source/Boundary → 制造 stale → 阻止 Changes → 重跑 → 人工确认交接。
 - [x] 使用同一 stub 完成 Image Review GUI：完整 PNG 解码与比例证明 → 预览零正文写入 → 必填评分 → 显式插入/保留/废纸篓；动态三态、失败重试与真实 Electron 插入/保留均通过。

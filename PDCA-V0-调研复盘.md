@@ -20,6 +20,8 @@
 
 > **2026-07-27 0.0Q 收口复盘**：Main-owned exact barrier 已替代时间静默推断，并在独立复审发现 3 个 P1 后补齐 internal-mutation epoch、首次 strict 全项目失效和 Renderer 外部同步失败门禁。做对的是保留红灯、先写对抗测试、让独立 reviewer 二审，最后以同源连续两次 32/32 收口。做错或险些做错的有三点：把“强制遍历”误当“完整 hash”（实际仍复用了轮转预算）；测试把运行时实例与不存在的 fixture 字段比较，错把测试断言红当产品红；E2E 在 Graph 外部写后仍读取已删除的 `externalQueue`，造成 3.5 秒假性能红。今后任何权威 barrier 必须证明覆盖范围而非只证明动作发生；集成红灯先核对运行时 authority 与测试 fixture；删除生产同步原语时同步搜索并删除所有测试侧旧等待。当前保留 P2 是 strict hash 的 `lstat→path read` TOCTOU，明日优先用 no-follow fd + fstat 关闭。
 
+> **2026-07-27 0.0R 收口复盘（当前）**：strict watcher hash 已从 path stream 改为 `O_NOFOLLOW | O_NONBLOCK` fd，在扫描时私存 BigInt identity，读前后 `fstat`、返回前 `lstat`，并按已验证 size 有界读取；最终文件组件被 symlink、普通文件替换、增长或同 inode 改写时均 fail-closed，不再签发成功 barrier。做对的是先用 scan→open 对抗测试稳定复现，再分离私有纳秒权威与公开 `mtimeMs` 兼容语义，并补成功/失败 fd close；Watcher **28/28**、跨层 **11/11**、同源完整 Electron 连续两次 **32/32**。险些做错的是把内部精度升级直接暴露到公开 snapshot，造成旧舍入语义回归；今后安全精度升级必须与公开兼容字段分层。保留 P2 仅为纯 Node 无法逐段 `openat` 保护祖先目录，不能宣称全路径 TOCTOU 已消除。下一本地任务是 native reserve 失败空 stage 与 build 因果 P2；0.0P App/ZIP 未随 0.0R 重建，禁止分发。
+
 ---
 
 ## P (Plan)

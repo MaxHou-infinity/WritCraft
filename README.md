@@ -11,7 +11,7 @@
 
 > Graph 性能复验没有用单次重试绿灯覆盖失败：索引、布局、baseline 所有权、元素重挂、scene detach 与 dispatch-only 计时缺口均已进入根因修复和回归。该历史性能专项门禁等待两帧并读取实际 CSS 可见状态与 SVG 布局；同一源码无中间修改连续两次全链均为 **26/26**。当前项目总链以本节 32/32 和状态台账为准。
 
-- 项目 / 文件 / 段落三级工作区、`edit.md`、Inline Diff、localized ChangeSet/撤销、权威 Context、来源/脚注、recovery、Cursor 式标签和一致性图谱均已接入；当前源码已完成 Onboarding v2 自动化产品链。本轮本地 App/ZIP 已按当前源码重建并通过完整性检查，但仍是 ad-hoc、未公证的验证产物。
+- 项目 / 文件 / 段落三级工作区、`edit.md`、Inline Diff、localized ChangeSet/撤销、权威 Context、来源/脚注、recovery、Cursor 式标签和一致性图谱均已接入；当前源码已完成 Onboarding v2 自动化产品链。0.0P 曾按当时源码重建本地 App/ZIP 并通过完整性检查；0.0R 修改后未再次重建，因此现有 ad-hoc、未公证产物落后于当前源码并禁止分发。
 - 普通 Changes、Plan→Changes 与 Graph 的本轮结构性修复已完成独立复审；模型不再回传整篇 after，而由 Main 验证局部锚点、依赖和 stopReason 后构造修改。
 - Chat 已实现 project/file/selection 三种明确作用域、selection 必选、精确选区邻段、受限项目检索、正文 H1 Source locator 和 request/phase-owned Inspector/Chips；重开、折叠选区与外部文件变化都会主动取消失效请求，Main 权威 `PROJECT_CHANGED` 不再显示为普通调用失败。
 - Chapter 已实现严格计划→逐块生成→Main 本地组装→整文件审阅，并把 project/target/instruction/context/pending 绑定到完整异步生命周期；no-op/provenance/result/capability 分类与确认式回收已动态固化，最终独立复审 P0/P1/P2=0。
@@ -24,7 +24,7 @@
 - `image-01` 已实现安全落盘、解码尺寸/比例证明、必填 1–5 分、可选费用、插入/保留/可恢复废纸篓和项目聚合；废纸篓现可见数量/容量、逐项恢复和确认式精确快照清空，并明确长期保留、绝不后台删除。Trash Service **21/21**、Handler **7/7**、Integration **4/4**、Renderer **7/7**；path replacement、same-inode rewrite 与 committed TTL 五项 P1 已关闭，最终独立复审 **P0=0/P1=0/P2=1**。P2 仅为非协作外部 open-FD writer 的极窄通用残余；真实质量与费用仍待完整 `sk-api-`。
 - Diagnostic Export v1 已接入设置页：作者先看到可能导出的完整 JSON，正文、Prompt、模型回答、Key、项目/文件名与路径均被排除；Renderer 只能回传一次性 token，Main 负责原生保存和不可覆盖写入。Service **13/13**、Handler **10/10**、Renderer **7/7**、Network boundary **15/15**，真实 Electron 已覆盖可见预览和隐私 sentinel。
 - Inline 当前源码隔离 App 已完成人工预览零写入、拒绝、重载、接受、History 与 Safe Undo；Plan 生成已强制 `end_turn`、单文本块、strict JSON、错误脱敏与目标/Prompt 资源上限，独立复审 P0=0/P1=0。
-- 当前精确候选 `npm test` 与沙箱外 Electron-enabled `npm run verify` 均 **exit 0**（真实 DOM sanitizer **13/13**）、最终同源强制 Electron 连续两次 **32/32**。0.0Q 已用 Main barrier 关闭旧 Onboarding 静默窗口；0.0R 再以 no-follow fd、纳秒身份和受限读取关闭最终文件替换的 hash 预算绕过，Watcher **28/28**。作者验收前置 **42/42**、真实 API 离线合同 **15/15**，组合 **57/57、0 网络**；package **6/6**、本地重建产物 release **7/7**。真实作者项目、完整 `sk-api-`、付费图片、干净账户、Developer ID、公证与 Gatekeeper 仍是后续外部门禁；ad-hoc App/ZIP 禁止分发。
+- 当前精确候选 `npm test` 与沙箱外 Electron-enabled `npm run verify` 均 **exit 0**（真实 DOM sanitizer **13/13**）、最终同源强制 Electron 连续两次 **32/32**。0.0Q 已用 Main barrier 关闭旧 Onboarding 静默窗口；0.0R 再以 no-follow fd、纳秒身份和受限读取关闭最终文件替换的 hash 预算绕过，Watcher **28/28**。作者验收前置 **42/42**、真实 API 离线合同 **15/15**，组合 **57/57、0 网络**；0.0P 历史产物证据为 package **6/6**、release **7/7**，不代表 0.0R 已重建。真实作者项目、完整 `sk-api-`、付费图片、干净账户、Developer ID、公证与 Gatekeeper 仍是后续外部门禁；ad-hoc App/ZIP 禁止分发。
 - Main 网络边界已固定文本/图片官方主机，加入 renderer HTTP(S)/WS(S) 双层断网、上下文 IPC 上限、owner abort、mutation generation、内部 revision/父目录回声隔离、零 POST retry、拒绝重定向、诊断 token-only 导出和错误脱敏；当前 network boundary **15/15**。
 - Graph 扩展已动态覆盖 300 文件/1279 节点、cold-to-interactive、stale/三类作者纠错、failure live、键盘/AX、布局、性能、重启与 A→B；缓存完整语义权威、Renderer 不可变快照、同/跨项目异步所有权及 Unicode quote 边界已关闭，最终独立复审 P0=0/P1=0/P2=0。
 - 2026-07-26 已建立本地 Git `main` 基线；后续改动必须通过提交保留可审计差异。该基线不追溯此前历史，阶段事实仍以 `v0/DEVELOPMENT-STATUS.md` 和当次可复现测试证据为准。
