@@ -3,6 +3,7 @@
 > 状态：**V0 候选原型，2026-07-27 真实作者验收预检与隔离副本技术候选已签字；真实作者、付费 API 与发布验收仍待执行** · 发起方：Max
 > 当前开发真相与唯一续作入口：[`v0/DEVELOPMENT-STATUS.md`](v0/DEVELOPMENT-STATUS.md)。配图现已覆盖评分、插入/保留/移入废纸篓、可见列表、单项恢复和确认式快照清空；五项竞态缺口已关闭，最终独立复审 **P0=0/P1=0/P2=1（非阻断）**。该签字尚不能替代真实 `sk-api-`/作者与发布验收；现有 App/ZIP 禁止分发。
 > 下一阶段验收边界：[`docs/AUTHOR-ACCEPTANCE-V1-CONTRACT.md`](docs/AUTHOR-ACCEPTANCE-V1-CONTRACT.md) 已冻结；真实调用、作者内容与发布证据必须遵守其中的隐私和付费门禁。
+> 日终停点：0.0Q Main-owned Watcher flush 已完成底层强制快照、debounce drain、single-flight、扫描失败与 close 竞态实现，定向 **20/20**；尚未接入 Main/IPC/preload/Renderer，也未替换真实 Electron 的 1.5 秒静默 helper，因此仍是未签字的在制工作。
 
 ## 2026-07-27 当前复核快照
 

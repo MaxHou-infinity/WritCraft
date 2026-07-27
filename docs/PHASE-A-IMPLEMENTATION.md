@@ -8,7 +8,7 @@
 
 > **工程交接（2026-07-27，真实作者验收前置）**：Image Trash 保持签字；Author CLI 已将 Python helper 替换为随 App 打包的 universal Mach-O。单一快照、cwd/inode 祖先绑定、私有 stage readiness、parent-fd 相对排他发布、三态 committed truth、精确清理、硬上限、空 `PATH`、embedded-NUL 和 helper 故障均有动态回归；Author **42/42**、离线 API **15/15**、package **6/6**、本地 release **7/7**、完整 test/verify 与最终强制 Electron **32/32** 通过。Onboarding 旧超时已定位为 E2E watcher 静默判断缺口，静默/fatal/CDP 加固前后聚焦真实 Electron 累计 8 次通过。ad-hoc App/ZIP 仍禁止分发。
 > **下一阶段合同**：`docs/AUTHOR-ACCEPTANCE-V1-CONTRACT.md` 已冻结，明确付费网络门禁、允许记录的隐私安全证据、真实长文旅程与发布前签字顺序。
-> **当前实现停点**：0.0P 原生 helper、打包与 E2E 稳定性增量最终独立复审 **P0=0/P1=0/P2=3**，允许技术签字。下一产品门禁是由作者显式选择满足五章节、2,000 汉字和来源要求的真实项目，并提供完整 `sk-api-`；不得扫描无关私人文稿、自动创建真实副本或用 fixture 替代作者证据。
+> **当前实现停点**：0.0P 原生 helper、打包与 E2E 稳定性增量最终独立复审 **P0=0/P1=0/P2=3**，允许技术签字。0.0Q 已完成 watcher 底层显式 flush 与定向 **20/20**，但 Main/IPC/preload/Renderer/barrier 和真实 Electron 替换尚未接通、不得签字。该内部 P2 关闭后，下一产品门禁才是作者显式选择满足五章节、2,000 汉字和来源要求的真实项目并提供完整 `sk-api-`；不得扫描无关私人文稿、自动创建真实副本或用 fixture 替代作者证据。
 
 ## 1. 阶段目标
 
@@ -216,6 +216,7 @@ Main 为当前窗口保存不可伪造的 project session，不允许 renderer �
 - 目录枚举设置文件数、深度和单文件大小保护；超限时局部折叠并提示，不让 renderer 卡死。
 - 树节点使用相对路径作为身份，显示名仅用于 UI。
 - 外部新增、修改、重命名或删除通过 Main watcher 转成结构化事件；watcher 事件只是失效信号，renderer 应重新读取权威快照。
+- 在 watcher 驱动的状态之后生成新 AI capability 时，Renderer 的队列排空或时间稳定窗都不能充当权威证明。必须由 Main 等待在途 poll、强制新快照并清空 pending 后签发绑定当前项目实例与 mutation generation 的一次性 flush barrier；任何扫描不完整、项目切换或 watcher degraded 均 fail-closed。
 
 ### 7.3 标签页状态
 

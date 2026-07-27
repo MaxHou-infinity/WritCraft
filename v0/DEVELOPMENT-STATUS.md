@@ -1,10 +1,10 @@
 # 笔触 · WritCraft · V0 开发状态与续作入口
 
-> 最后更新：2026-07-27（Asia/Shanghai，0.0P 原生 helper 与 Onboarding 稳定性收口）
+> 最后更新：2026-07-27（Asia/Shanghai，0.0Q Watcher flush 日终停点）
 > 当前状态：**V0 候选原型。Image Trash 等既有本地产品链保持签字；0.0P 原生 helper、打包与 E2E 稳定性增量最终独立复审 P0=0/P1=0/P2=3，允许技术签字。真实付费图片、真实作者旅程和正式发布验收仍缺。**
 > 发布判断：**仍禁止分发；当前配置为 Coding Plan，合同禁止调用 `image-01`；最近项目不满足 5 章/2000 字/来源门槛。本轮已从当前源码重建本地 ad-hoc App/ZIP 并通过 7/7 完整性检查，但尚未完成真实作者、付费 API、干净账户启动、Developer ID 签名、公证与 Gatekeeper 复审。**
-> 在制任务：**Author 42/42、离线 API 15/15（合计 57/57、0 网络）、macOS package 6/6、重建产物 release verify 7/7、完整 test/verify 与最终真实 Electron 32/32 已通过；Onboarding 聚焦真实 Electron累计 8 次 2/2。最终独立复审 P0=0/P1=0/P2=3；当前只剩文档/Nowledge Mem 同步与本地 Git 提交。**
-> 当前源码证据：**Author Preflight 42/42、Real API Offline Contract 15/15；Diagnostic Service 13/13、Handler 10/10、Renderer 7/7；Image Generation 15/15、Image Review Service 16/16、Review Handler 9/9、Trash Service 21/21、Trash Handler 7/7、Trash Integration 4/4、Image Renderer 8/8、Trash Renderer 7/7、Metrics Renderer 20/20、Network Boundary 15/15；Recovery 24/24、Change History 14/14、ChangeSet Review 15/15、Composite Guard 5/5、Changes Renderer 协议 16/16、Workspace 恢复 7/7、Changes integration 6/6、Persistent Watcher Main/IPC 3/3；最终精确候选 `npm test` 与沙箱外 Electron-enabled `npm run verify` 均 exit 0，标准强制真实 Electron E2E 32/32。**
+> 在制任务：**0.0P 已在提交 `1944950` 收口。0.0Q 当前只完成 watcher-local 强制快照、debounce drain、single-flight、扫描不完整与 close 竞态，定向 20/20；Main handler、IPC/preload exact barrier、Renderer authority gate、静态/动态边界和真实 Electron 替换均未完成。明日严格按此顺序续作，不得从真实作者验收或其他 P2 插队。**
+> 当前源码证据：**Author Preflight 42/42、Real API Offline Contract 15/15；Diagnostic Service 13/13、Handler 10/10、Renderer 7/7；Image Generation 15/15、Image Review Service 16/16、Review Handler 9/9、Trash Service 21/21、Trash Handler 7/7、Trash Integration 4/4、Image Renderer 8/8、Trash Renderer 7/7、Metrics Renderer 20/20、Network Boundary 15/15；Recovery 24/24、Change History 14/14、ChangeSet Review 15/15、Composite Guard 5/5、Changes Renderer 协议 16/16、Workspace 恢复 7/7、Changes integration 6/6、Persistent Watcher Main/IPC 3/3；0.0Q watcher-local 20/20（仅在制层，不等于全链签字）；0.0P 最终精确候选 `npm test` 与沙箱外 Electron-enabled `npm run verify` 均 exit 0，标准强制真实 Electron E2E 32/32。**
 > 最近历史基线（本批前）：**强制真实 Electron E2E 31/31 是 0.0M Image Review 阶段证据，已被上方当前源码 32/32 覆盖。**
 > Graph 历史签字基线：**性能修复前的既有源码曾完整 `npm test`、Electron-enabled `npm run verify`、强制真实 Electron 26/26 exit 0；Graph Filter 15/15、Workbench 14/14、dynamic 5/5、Large 5/5、Watcher 15/15、Network 11/11、Intelligence 17/17，第二轮复审 P0=0/P1=0/P2=2。该数字只保留为历史过程，已被上方当前最终源码证据覆盖。**  
 > Graph 动态边界：**300 文件/1279 节点 cold-to-interactive、cache/incremental、筛选/内存/布局、AX/键鼠、三类纠错、stale/Issue→Changes、failure live、重启与项目隔离均进入真实 Electron；正文/History/ledger 的零写入门禁通过。**  
@@ -27,6 +27,15 @@ Chat/Chapter、Onboarding v2、Research→Changes、Inline Rewrite 与 Plan Stri
 5. 每批合入后重跑定向测试；阶段完成时再运行完整 `npm test`、`npm run verify` 与 `WRITCRAFT_E2E_FORCE=1 npm run e2e:electron`，保存当次证据。
 6. 真实 API 只使用用户显式配置的 Key；记录延迟、限流、超时、故障和费用，不记录 Key、Prompt、模型原文或正文。本轮 ad-hoc 包只用于验证；完成真实作者闭环后仍须重建并做干净账户、Developer ID、公证和 Gatekeeper 复审。
 
+### 0.0Q 2026-07-27 Main-owned Watcher flush（合同冻结，实施中）
+
+- **目标**：删除 Renderer 以 1.5 秒时间稳定推断 watcher 已静默的做法。任何在 own-save 或受控外部写后铸造 AI/Onboarding authority 的路径，都先取得 Main 对当前项目 watcher 的显式 flush 证明。
+- **权威顺序**：Main 等待既有 polling → 强制再做一轮项目快照 → 立即发布/清空 debounce pending → 发送只含随机 `flushId`、当前 `projectInstanceId` 与 mutation generation 的 barrier。Preload 必须在 invoke 前监听 exact barrier；Renderer 收到 barrier 后继续等待自己的 `externalQueue`，然后才捕获 AI guard。
+- **失败矩阵**：不可信 sender、项目切换、watcher degraded/closed、internal mutation in-flight、扫描/哈希/entry-limit 不完整、barrier 发送失败均 fail-closed；不得返回成功、不得铸造新 authority。并发 flush 在 watcher 内 single-flight，不重复扫描或重复推进 generation。
+- **隐私与能力边界**：Renderer 只传当前 project instance ID，不传 root、路径、revision、正文或 flush 结果内容；flush 是只读同步点，可因发现真实外部变化推进既有 Main/Renderer generation，但不得写稿件或吞掉 change。
+- **验证要求**：Project Watcher 定向测试覆盖强制快照、debounce drain、single-flight、扫描不完整失败和 close 竞态；Main/preload/Renderer 静态与动态边界覆盖 exact barrier、项目漂移和 listener 清理；真实 Electron Onboarding 不再含时间静默 helper，并至少完成聚焦重复与完整 32 阶段回归。
+- **日终可恢复检查点**：`src/main/project-watcher.js` 已完成 watcher-local `flush()`，定向 `verify-v0-project-watcher.js` **20/20**；尚未修改 `main.js`、`preload.js`、`workspace.js` 或 Electron E2E。明日顺序固定为 Main authority → preload invoke 前监听 exact barrier → Renderer 等 barrier 后 drain `externalQueue` → 删除 E2E 1.5 秒 helper → 定向/完整/重复真实 Electron → 独立复审。未完成前保持“实施中”，不得把既有 32/32 写成 0.0Q 证据。
+
 ### 0.0P 2026-07-27 原生 helper 与 Onboarding E2E 稳定性收口
 
 - **原生发布助手**：用仓库内 `native/author-copy-helper.c` 和 universal Mach-O `src/main/native/author-copy-helper` 取代 `/usr/bin/python3 -I` 脚本。服务只执行绝对 bundled helper；helper 继续通过继承 fd 3/4 执行 reserve、inspect 和 `renameatx_np(RENAME_EXCL)` publish，不重新解析父目录路径。
@@ -37,7 +46,7 @@ Chat/Chapter、Onboarding v2、Research→Changes、Inline Rewrite 与 Plan Stri
 - **当前回归**：Author **42/42** + API Offline **15/15** = **57/57、0 网络**；`npm test`、Electron-enabled `npm run verify` 均 exit 0；package **6/6**、release **7/7**、最终强制 Electron **32/32**。
 - **复审纠错**：第一轮增量复审在全部绿灯后仍找出 4 个 P1：helper 未独立签名、App/helper minOS 断层、最后 CDP 命令后 Electron exit 可假绿、CDP 初始化失败可能泄漏 child；第二轮又动态证明纯 CDP close 未进入 fatal latch，并发现 ZIP 的 412 个 `._*` AppleDouble 会让标准 unzip 后签名失效。上述缺口均先复现再修复，说明外层 `--deep`、同工具打包/解包、自增 passed 计数和单一 client abort 都不能替代终态证明。
 - **最终独立复审**：**P0=0/P1=0/P2=3，允许技术签字**。P2 为：Watcher 1.5 秒稳定窗不是 Main 显式 flush barrier；native reserve 的 `mkdirat→openat` 极窄 external-process/失败空 stage 残余；build-info 的 C source/binary hash 是并列证据，直接绕过标准 `npm run package:mac` 时不是强因果证明。标准 npm 打包路径会先强制重建。
-- **下一步**：完成文档/Nowledge/Git 收口；随后由作者显式选择合格项目和完整 `sk-api-` 执行真实旅程。不得把本地 ad-hoc 包当公开发布候选。
+- **下一步**：0.0P 已在提交 `1944950` 完成文档/Nowledge/Git 收口。当前先把 Watcher 时间静默证据升级为 Main 显式 flush barrier；随后由作者显式选择合格项目和完整 `sk-api-` 执行真实旅程。不得把本地 ad-hoc 包当公开发布候选。
 
 ### 0.0O 2026-07-27 真实作者验收预检与隔离副本底座
 

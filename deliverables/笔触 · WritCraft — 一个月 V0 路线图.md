@@ -1,8 +1,8 @@
 # 笔触 · WritCraft · 一个月 V0 路线图
 
-> 文档版本：2026-07-27（v2.3，原生 helper 与 E2E 稳定性收口）
+> 文档版本：2026-07-27（v2.4，0.0Q Watcher flush 日终停点）
 > 状态：**V0 续作中，完整产品未完成**；产品范围以 `docs/WRITCRAFT-PRD-V3.md` 为准  
-> 2026-07-27 续作交接：既有产品链保持签字；真实作者项目预检/隔离副本已换成 bundled universal Mach-O helper。Author **42/42**、真实 API 离线合同 **15/15**、组合 **57/57、0 网络**、package **6/6**、本地 release **7/7**、完整 test/verify 与最终强制 Electron **32/32** 通过。Onboarding 旧超时已定位为 E2E watcher 静默判断缺口并通过连续聚焦复跑。下一步由作者选择合格项目和完整 `sk-api-` 执行真实旅程；ad-hoc App/ZIP 未签名公证且禁止分发，准确事实与 TODO 只看 `v0/DEVELOPMENT-STATUS.md`。
+> 2026-07-27 续作交接：既有产品链与 0.0P 原生 helper 保持签字，既有最终全链为 **32/32**。0.0Q 已完成 watcher 底层强制快照/drain/single-flight 与失败竞态，定向 **20/20**；跨层 barrier 和真实 Electron 替换尚未完成。明日先关闭该内部 P2，再由作者选择合格项目和完整 `sk-api-` 执行真实旅程；ad-hoc App/ZIP 未签名公证且禁止分发，准确事实与 TODO 只看 `v0/DEVELOPMENT-STATUS.md`。
 > 范围：Month 1（4 周 × 7 天 = 28 天）
 
 ---
@@ -168,4 +168,4 @@
 
 ## 九、 下一步
 
-2026-07-22 第十二次收口后，已关闭 Onboarding 当前源码 App 三项体验、Research→Changes、Inline Rewrite、Plan Strict、Graph、Metrics 与 Research Accuracy 的自动化产品链。下一步严格按 `docs/AUTHOR-ACCEPTANCE-V1-CONTRACT.md` 执行真实付费 API、完整 `sk-api-` 图片、真实 2000+ 字/5+ 章作者旅程和私有价值证据；只有其后才可重建产物、运行 `npm run release:verify` 并进入签名/公证/Gatekeeper 复审。完整 V0 通过且真实指标 Continue 后，方可进入 V1（3–6 个月）。
+2026-07-27 日终先停在 0.0Q watcher-local flush **20/20**；明日严格按 `v0/DEVELOPMENT-STATUS.md` 依次完成 Main handler、preload exact-barrier 握手、Renderer authority gate、静态/动态边界和真实 Electron 回归。该内部 P2 签字后，再按 `docs/AUTHOR-ACCEPTANCE-V1-CONTRACT.md` 执行真实付费 API、完整 `sk-api-` 图片、真实 2000+ 字/5+ 章作者旅程和私有价值证据；只有其后才可重建产物并进入签名/公证/Gatekeeper 复审。

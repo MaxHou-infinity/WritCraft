@@ -138,6 +138,134 @@ async function run() {
     }
   });
 
+  await check('flush 强制新快照并在返回前发布 debounce 中的外部变化', async () => {
+    const root = tempProject();
+    const native = new EventEmitter();
+    native.close = () => {};
+    const payloads = [];
+    fs.writeFileSync(path.join(root, 'edit.md'), 'before');
+    const instance = watcher.createProjectWatcher(root, payload => payloads.push(payload), {
+      watchFn: () => native,
+      debounceMs: 10_000,
+      pollIntervalMs: 0,
+    });
+    try {
+      const baseline = await instance.flush();
+      assert.strictEqual(baseline.ok, true);
+      assert.strictEqual(payloads.length, 0);
+      fs.writeFileSync(path.join(root, 'edit.md'), 'after');
+      const barrier = await instance.flush();
+      assert.strictEqual(barrier.ok, true);
+      assert(barrier.emittedChanges >= 1);
+      assert(payloads.some(payload =>
+        payload.changes.some(change => change.path === 'edit.md' && change.kind === 'changed')
+      ));
+    } finally {
+      instance.close();
+      fs.rmSync(root, { recursive: true, force: true });
+    }
+  });
+
+  await check('并发 flush 共享同一强制扫描和同一终态', async () => {
+    const root = tempProject();
+    const native = new EventEmitter();
+    native.close = () => {};
+    const file = path.join(root, 'edit.md');
+    fs.writeFileSync(file, 'before');
+    let hashCalls = 0;
+    let releaseHash = null;
+    let blockHash = false;
+    const instance = watcher.createProjectWatcher(root, () => {}, {
+      watchFn: () => native,
+      pollIntervalMs: 0,
+      hashFile: async absolute => {
+        hashCalls += 1;
+        if (blockHash) await new Promise(resolve => { releaseHash = resolve; });
+        return fs.readFileSync(absolute, 'utf8');
+      },
+    });
+    try {
+      await instance.flush();
+      assert.strictEqual(hashCalls, 1);
+      fs.writeFileSync(file, 'after');
+      blockHash = true;
+      const first = instance.flush();
+      const second = instance.flush();
+      assert.strictEqual(first, second);
+      while (!releaseHash) await new Promise(resolve => setTimeout(resolve, 1));
+      releaseHash();
+      const [left, right] = await Promise.all([first, second]);
+      assert.deepStrictEqual(left, right);
+      assert.strictEqual(hashCalls, 2, 'single-flight flush must perform one new hash pass');
+    } finally {
+      instance.close();
+      fs.rmSync(root, { recursive: true, force: true });
+    }
+  });
+
+  await check('flush 对 entry 上限和扫描失败 fail-closed', async () => {
+    const root = tempProject();
+    const native = new EventEmitter();
+    native.close = () => {};
+    fs.writeFileSync(path.join(root, 'a.md'), 'a');
+    fs.writeFileSync(path.join(root, 'b.md'), 'b');
+    const bounded = watcher.createProjectWatcher(root, () => {}, {
+      watchFn: () => native,
+      pollIntervalMs: 0,
+      maxEntries: 1,
+    });
+    try {
+      await assert.rejects(
+        () => bounded.flush(),
+        error => error?.code === 'PROJECT_WATCHER_FLUSH_INCOMPLETE'
+      );
+    } finally {
+      bounded.close();
+    }
+
+    const missing = watcher.createProjectWatcher(root, () => {}, {
+      watchFn: () => native,
+      pollIntervalMs: 0,
+    });
+    fs.rmSync(root, { recursive: true, force: true });
+    try {
+      await assert.rejects(
+        () => missing.flush(),
+        error => error?.code === 'PROJECT_WATCHER_FLUSH_INCOMPLETE'
+      );
+    } finally {
+      missing.close();
+    }
+  });
+
+  await check('close 与在途 flush 竞态返回 closed 且不发布', async () => {
+    const root = tempProject();
+    const native = new EventEmitter();
+    native.close = () => {};
+    fs.writeFileSync(path.join(root, 'edit.md'), 'before');
+    let releaseHash = null;
+    const payloads = [];
+    const instance = watcher.createProjectWatcher(root, payload => payloads.push(payload), {
+      watchFn: () => native,
+      pollIntervalMs: 0,
+      hashFile: async () => {
+        await new Promise(resolve => { releaseHash = resolve; });
+        return 'hash';
+      },
+    });
+    try {
+      const pending = instance.flush();
+      while (!releaseHash) await new Promise(resolve => setTimeout(resolve, 1));
+      instance.close();
+      releaseHash();
+      assert.deepStrictEqual(await pending, { ok: false, reason: 'closed' });
+      assert.deepStrictEqual(payloads, []);
+    } finally {
+      instance.close();
+      fs.rmSync(root, { recursive: true, force: true });
+    }
+  });
+
   await check('native watcher 的异步 error 被消费并安全降级到 polling', async () => {
     const root = tempProject();
     const native = new EventEmitter();

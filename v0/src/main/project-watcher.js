@@ -94,18 +94,27 @@ async function projectSnapshot(rootPath, options = {}) {
   const hashFile = typeof options.hashFile === 'function' ? options.hashFile : defaultHashFile;
   const entries = new Map();
   const queue = [{ absolute: rootPath, prefix: '' }];
+  let scanErrors = 0;
 
   while (queue.length && entries.size < maxEntries) {
     const { absolute, prefix } = queue.shift();
     let children = [];
-    try { children = await fs.promises.readdir(absolute, { withFileTypes: true }); } catch (_) { continue; }
+    try { children = await fs.promises.readdir(absolute, { withFileTypes: true }); }
+    catch (_) {
+      scanErrors += 1;
+      continue;
+    }
     children.sort((left, right) => left.name.localeCompare(right.name, 'zh-CN'));
     for (const child of children) {
       if (child.name.startsWith('.') || IGNORED_TOP_LEVEL.has(child.name)) continue;
       const relative = prefix ? `${prefix}/${child.name}` : child.name;
       const target = path.join(absolute, child.name);
       let stat;
-      try { stat = await fs.promises.lstat(target); } catch (_) { continue; }
+      try { stat = await fs.promises.lstat(target); }
+      catch (_) {
+        scanErrors += 1;
+        continue;
+      }
       const type = stat.isDirectory() ? 'directory' : stat.isFile() ? 'file' : 'other';
       const old = previous.get(relative);
       const mtimeMs = Math.trunc(stat.mtimeMs);
@@ -177,6 +186,7 @@ async function projectSnapshot(rootPath, options = {}) {
       hashedBytes,
       hashedPaths,
       hashErrors,
+      scanErrors,
       entryLimitReached: entries.size >= maxEntries,
     },
   };
@@ -229,7 +239,8 @@ function createProjectWatcher(rootPath, onChange, options = {}) {
   let pollTimer = null;
   let lastSnapshot = null;
   let scanCursor = 0;
-  let pollInFlight = false;
+  let pollPromise = null;
+  let flushPromise = null;
 
   function disableNativeWatchers() {
     if (closed) return;
@@ -253,16 +264,17 @@ function createProjectWatcher(rootPath, onChange, options = {}) {
 
   function emit() {
     timer = null;
-    if (closed || !pending.length) return;
+    if (closed || !pending.length) return 0;
     const changes = coalesceChanges(pending);
     pending = [];
-    if (!changes.length) return;
+    if (!changes.length) return 0;
     onChange({
       schema: EVENT_SCHEMA,
       reason: 'filesystem',
       changes,
       emittedAt: new Date().toISOString(),
     });
+    return changes.length;
   }
 
   function enqueue(changes) {
@@ -312,25 +324,70 @@ function createProjectWatcher(rootPath, onChange, options = {}) {
     attachPortable();
   }
 
-  async function pollOnce() {
-    if (closed || pollInFlight) return;
-    pollInFlight = true;
-    try {
+  function pollOnce(strict = false) {
+    if (closed) return Promise.resolve(null);
+    if (pollPromise) return pollPromise;
+    const active = (async () => {
       const next = await projectSnapshot(root, {
         ...snapshotOptions,
         previous: lastSnapshot,
         cursor: scanCursor,
       });
-      if (closed) return;
+      if (closed) return null;
+      if (next.stats.scanErrors > 0) {
+        if (strict) {
+          const error = new Error('Project watcher flush scan was incomplete');
+          error.code = 'PROJECT_WATCHER_FLUSH_INCOMPLETE';
+          throw error;
+        }
+        return null;
+      }
+      if (strict && (next.stats.entryLimitReached || next.stats.hashErrors.length > 0)) {
+        const error = new Error('Project watcher flush exceeded its authority bounds');
+        error.code = 'PROJECT_WATCHER_FLUSH_INCOMPLETE';
+        throw error;
+      }
       scanCursor = next.nextCursor;
       if (lastSnapshot) enqueue(diffSnapshots(lastSnapshot, next));
       lastSnapshot = next;
-    } catch (_) {
+      return next;
+    })().catch(error => {
+      if (strict) throw error;
       // Polling is a fallback. Native watch remains active; a transient scan
       // error must not crash the main process or invent a project deletion.
-    } finally {
-      pollInFlight = false;
-    }
+      return null;
+    }).finally(() => {
+      if (pollPromise === active) pollPromise = null;
+    });
+    pollPromise = active;
+    return active;
+  }
+
+  function flush() {
+    if (closed) return Promise.resolve(Object.freeze({ ok: false, reason: 'closed' }));
+    if (flushPromise) return flushPromise;
+    const active = (async () => {
+      // A scheduled fallback may already be reading the tree. Let it finish,
+      // then force one newer authoritative pass rather than treating that
+      // older in-flight snapshot as the barrier.
+      if (pollPromise) await pollPromise;
+      if (closed) return Object.freeze({ ok: false, reason: 'closed' });
+      const snapshot = await pollOnce(true);
+      if (closed || !snapshot) return Object.freeze({ ok: false, reason: 'closed' });
+      clearTimeout(timer);
+      timer = null;
+      const emittedChanges = emit();
+      return Object.freeze({
+        ok: true,
+        emittedChanges,
+        entries: snapshot.stats.entries,
+        hashedFiles: snapshot.stats.hashedFiles,
+      });
+    })().finally(() => {
+      if (flushPromise === active) flushPromise = null;
+    });
+    flushPromise = active;
+    return active;
   }
 
   try {
@@ -354,6 +411,7 @@ function createProjectWatcher(rootPath, onChange, options = {}) {
   }
 
   return Object.freeze({
+    flush,
     pauseAndFlush() {
       if (closed) return;
       closed = true;

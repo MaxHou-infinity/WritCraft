@@ -6,7 +6,7 @@
 > 适用范围：V0 起的桌面写作 IDE  
 > 优先级：若本文件与旧版 PRD、路线图或原型行为冲突，以本文件为准；工程实现以 `docs/PHASE-A-IMPLEMENTATION.md` 为准。
 
-> **实现状态注记（2026-07-27 作者验收前置）**：本文仍是产品权威规格，**完整 PRD 尚未实现**。图片本地产品链保持签字；真实作者预检/隔离副本已用 bundled universal Mach-O helper 移除系统 Python 运行时依赖，Author **42/42**、离线 API **15/15**、package **6/6**、本地 release **7/7**、完整 test/verify 与最终真实 Electron **32/32** 通过。Onboarding 旧超时已定位为 E2E watcher 静默判断缺口并通过连续聚焦复跑。下一步是作者选择合格项目、完整 `sk-api-` 与真实旅程；ad-hoc App/ZIP 禁止分发，当前事实与顺序只看 `v0/DEVELOPMENT-STATUS.md`。
+> **实现状态注记（2026-07-27 日终）**：本文仍是产品权威规格，**完整 PRD 尚未实现**。图片本地产品链及 0.0P 原生 helper 候选保持签字；Author **42/42**、离线 API **15/15**、package **6/6**、本地 release **7/7**、完整 test/verify 与最终真实 Electron **32/32** 通过。0.0Q 正把 Onboarding 的 1.5 秒 watcher 时间推断升级为 Main 显式 flush barrier；底层 watcher 已定向 **20/20**，跨层接线与 Electron 回归尚未完成。完成该内部 P2 后，才进入作者选择合格项目、完整 `sk-api-` 与真实旅程；ad-hoc App/ZIP 禁止分发，当前事实与顺序只看 `v0/DEVELOPMENT-STATUS.md`。
 
 > **完成定义**：任何“V0 完成”声明必须同时满足 §10.1–§10.4、全量自动回归、真实 Electron E2E 和独立复审。局部 suite 通过、本地 ad-hoc App 或历史 ZIP 均不能单独构成完成证据。
 
