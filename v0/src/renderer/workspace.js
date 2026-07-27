@@ -4,6 +4,7 @@
   const bridge = window.writCraft && window.writCraft.project;
   const rewriteBridge = window.writCraft;
   const inlineRewriteTransaction = window.WritCraftInlineRewriteTransaction;
+  const externalSyncState = window.WritCraftExternalSyncState?.createExternalSyncState();
   const projectTitle = document.getElementById('project-title');
   const projectTree = document.getElementById('project-tree');
   const tabBar = document.getElementById('tab-bar');
@@ -79,7 +80,6 @@
     conflictRecovery: false,
     conflictRevision: null,
     externalDeleted: false,
-    externalQueue: Promise.resolve(),
     loading: false,
     openGeneration: 0,
     onboardingController: null,
@@ -1724,6 +1724,7 @@
       return;
     }
     closeProjectOnboarding();
+    externalSyncState?.reset();
     window.__assistantDock?.close?.();
     state.project = result.project;
     ++state.inlineRecoveryGeneration;
@@ -2197,7 +2198,7 @@
 
   function canUseAI() {
     return Boolean(state.project && !state.inlineMutationBlocked && !state.projectPromptMissing &&
-      !state.conflictRecovery && !state.externalDeleted);
+      !state.conflictRecovery && !state.externalDeleted && externalSyncState?.available());
   }
 
   function captureAIRequestGuard() {
@@ -2208,12 +2209,31 @@
     return canUseAI() && Boolean(window.__aiRequestGuard?.matches(guard, state));
   }
 
+  async function flushExternalChanges() {
+    const projectInstanceId = state.project?.instanceId;
+    if (!projectInstanceId || typeof bridge?.flushExternalChanges !== 'function') {
+      throw new Error('项目文件同步服务未连接，请重新打开项目');
+    }
+    const result = normalizeResult(await bridge.flushExternalChanges(projectInstanceId));
+    if (!result.ok) {
+      const message = resultMessage(result, '项目文件同步失败，请重新打开项目');
+      setSaveState(`⚠ ${message}`, 'error');
+      throw new Error(message);
+    }
+    if (state.project?.instanceId !== projectInstanceId ||
+        result.projectInstanceId !== projectInstanceId) {
+      throw new Error('项目状态已变化，请重新发起 AI 请求');
+    }
+    if (!externalSyncState) throw new Error('项目文件同步服务未连接，请重新打开项目');
+    await externalSyncState.drain();
+    if (state.project?.instanceId !== projectInstanceId) {
+      throw new Error('项目状态已变化，请重新发起 AI 请求');
+    }
+    return result;
+  }
+
   async function settleOwnWriteEcho() {
-    // Native fs.watch echoes are debounced for 140 ms. Waiting only after an
-    // explicit flush lets a filename-less self-write invalidation settle
-    // before the AI guard is captured, without slowing already-clean requests.
-    await new Promise(resolve => setTimeout(resolve, 220));
-    try { await state.externalQueue; } catch (_) {}
+    return flushExternalChanges();
   }
 
   async function refreshExternalEditContext(payload) {
@@ -2509,9 +2529,10 @@
   }
 
   const unsubscribeExternalChanges = bridge?.onExternalChange?.(payload => {
-    state.externalQueue = state.externalQueue
-      .then(() => handleExternalChange(payload))
-      .catch(error => showError(error.message));
+    externalSyncState?.enqueue(
+      () => handleExternalChange(payload),
+      error => showError(error.message)
+    );
   });
   window.addEventListener('unload', () => unsubscribeExternalChanges?.(), { once: true });
 
@@ -2524,6 +2545,7 @@
     captureChatRequestIntent,
     beginChatRequest,
     isChatRequestCurrent,
+    flushExternalChanges,
     settleOwnWriteEcho,
     getCurrentPath: () => state.currentPath,
     persistCurrent,

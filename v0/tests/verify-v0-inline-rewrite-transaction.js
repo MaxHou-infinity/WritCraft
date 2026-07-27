@@ -221,6 +221,21 @@ async function run() {
     assert.strictEqual(Transaction.preparedBindingMatches(prepared.binding, currentState, currentSelection, 'general'), true);
     assert.strictEqual(Transaction.preparedBindingMatches(prepared.binding, state({ revision: R1, dirty: false }), currentSelection, 'general'), false);
     assert.strictEqual(Transaction.createRequest(prepared.binding).expectedRevision, R2);
+
+    currentState = state();
+    currentSelection = selection(rangeIdentity);
+    const watcherFailureIntent = Transaction.captureIntent(currentState, currentSelection, 'general');
+    const watcherFailure = await Transaction.prepareIntent(watcherFailureIntent, {
+      getState: () => currentState,
+      getSelection: () => currentSelection,
+      getStyle: () => 'general',
+      persist: async () => {
+        currentState = state({ revision: R2, dirty: false });
+        return { ok: true, revision: R2 };
+      },
+      settleWatcher: async () => { throw new Error('barrier failed'); },
+    });
+    assert.deepStrictEqual(watcherFailure, { ok: false, reason: 'WATCHER_UNAVAILABLE' });
   });
 
   await test('clean intent cannot smuggle a revision transition and watcher/selection drift stops before IPC', async () => {
@@ -451,7 +466,8 @@ async function run() {
     assert.strictEqual(owner.getActive().state, Transaction.STATES.PREPARING);
   });
 
-  console.log(`\nInline Rewrite Renderer transaction verification passed: ${passed}/${passed}.`);
+  assert.strictEqual(passed, 14);
+  console.log(`\nInline Rewrite Renderer transaction verification passed: ${passed}/14.`);
 }
 
 run().catch(error => {

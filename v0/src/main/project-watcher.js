@@ -15,6 +15,8 @@ const DEFAULT_POLL_INTERVAL_MS = 1200;
 const MAX_MARKDOWN_BYTES = 5 * 1024 * 1024;
 const DEFAULT_HASH_FILES_PER_ROUND = 8;
 const DEFAULT_HASH_BYTES_PER_ROUND = 10 * 1024 * 1024;
+const DEFAULT_FLUSH_HASH_FILES = 5000;
+const DEFAULT_FLUSH_HASH_BYTES = 64 * 1024 * 1024;
 const DEFAULT_MAX_ENTRIES = 5000;
 const IGNORED_TOP_LEVEL = new Set(['node_modules']);
 
@@ -89,8 +91,13 @@ function positiveInteger(value, fallback) {
 async function projectSnapshot(rootPath, options = {}) {
   const previous = snapshotEntries(options.previous) instanceof Map ? snapshotEntries(options.previous) : new Map();
   const maxEntries = positiveInteger(options.maxEntries, DEFAULT_MAX_ENTRIES);
-  const maxHashFiles = positiveInteger(options.maxHashFiles, DEFAULT_HASH_FILES_PER_ROUND);
-  const maxHashBytes = positiveInteger(options.maxHashBytes, DEFAULT_HASH_BYTES_PER_ROUND);
+  const completeHash = options.completeHash === true;
+  const maxHashFiles = completeHash
+    ? positiveInteger(options.flushMaxHashFiles, DEFAULT_FLUSH_HASH_FILES)
+    : positiveInteger(options.maxHashFiles, DEFAULT_HASH_FILES_PER_ROUND);
+  const maxHashBytes = completeHash
+    ? positiveInteger(options.flushMaxHashBytes, DEFAULT_FLUSH_HASH_BYTES)
+    : positiveInteger(options.maxHashBytes, DEFAULT_HASH_BYTES_PER_ROUND);
   const hashFile = typeof options.hashFile === 'function' ? options.hashFile : defaultHashFile;
   const entries = new Map();
   const queue = [{ absolute: rootPath, prefix: '' }];
@@ -134,10 +141,11 @@ async function projectSnapshot(rootPath, options = {}) {
     }
   }
 
-  const markdown = [...entries.entries()]
-    .filter(([relative, entry]) => entry.type === 'file' && /\.(?:md|markdown)$/i.test(relative) && entry.size <= MAX_MARKDOWN_BYTES)
+  const allMarkdown = [...entries.entries()]
+    .filter(([relative, entry]) => entry.type === 'file' && /\.(?:md|markdown)$/i.test(relative))
     .map(([relative, entry]) => ({ relative, entry }))
     .sort((left, right) => left.relative.localeCompare(right.relative, 'zh-CN'));
+  const markdown = allMarkdown.filter(candidate => candidate.entry.size <= MAX_MARKDOWN_BYTES);
   const edit = markdown.find(candidate => candidate.relative === 'edit.md');
   const rotating = markdown.filter(candidate => candidate !== edit);
   const rawCursor = Number.isInteger(options.cursor) && options.cursor >= 0 ? options.cursor : 0;
@@ -181,11 +189,15 @@ async function projectSnapshot(rootPath, options = {}) {
     nextCursor: cursor,
     stats: {
       entries: entries.size,
-      markdownFiles: markdown.length,
+      markdownFiles: allMarkdown.length,
+      oversizedMarkdownFiles: allMarkdown.length - markdown.length,
       hashedFiles,
       hashedBytes,
       hashedPaths,
       hashErrors,
+      hashCoverageComplete: completeHash
+        ? hashedFiles === allMarkdown.length && hashErrors.length === 0
+        : false,
       scanErrors,
       entryLimitReached: entries.size >= maxEntries,
     },
@@ -228,6 +240,8 @@ function createProjectWatcher(rootPath, onChange, options = {}) {
     maxEntries: options.maxEntries,
     maxHashFiles: options.maxHashFiles,
     maxHashBytes: options.maxHashBytes,
+    flushMaxHashFiles: options.flushMaxHashFiles,
+    flushMaxHashBytes: options.flushMaxHashBytes,
     hashFile: options.hashFile,
   };
   let closed = false;
@@ -241,6 +255,7 @@ function createProjectWatcher(rootPath, onChange, options = {}) {
   let scanCursor = 0;
   let pollPromise = null;
   let flushPromise = null;
+  let strictBaselinePublished = false;
 
   function disableNativeWatchers() {
     if (closed) return;
@@ -332,6 +347,7 @@ function createProjectWatcher(rootPath, onChange, options = {}) {
         ...snapshotOptions,
         previous: lastSnapshot,
         cursor: scanCursor,
+        completeHash: strict,
       });
       if (closed) return null;
       if (next.stats.scanErrors > 0) {
@@ -342,13 +358,17 @@ function createProjectWatcher(rootPath, onChange, options = {}) {
         }
         return null;
       }
-      if (strict && (next.stats.entryLimitReached || next.stats.hashErrors.length > 0)) {
+      if (strict && (next.stats.entryLimitReached || !next.stats.hashCoverageComplete)) {
         const error = new Error('Project watcher flush exceeded its authority bounds');
         error.code = 'PROJECT_WATCHER_FLUSH_INCOMPLETE';
         throw error;
       }
       scanCursor = next.nextCursor;
       if (lastSnapshot) enqueue(diffSnapshots(lastSnapshot, next));
+      if (strict && !strictBaselinePublished) {
+        enqueue([{ path: null, kind: 'invalidated' }]);
+        strictBaselinePublished = true;
+      }
       lastSnapshot = next;
       return next;
     })().catch(error => {

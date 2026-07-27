@@ -677,7 +677,9 @@
     const prepared = await rewriteTransaction.prepareIntent(entry.intent, adapters);
     if (!rewriteOwner.owns(entry.token) || activeRewrite !== entry) return;
     if (!prepared.ok || !window.__workspace?.canUseAI?.()) {
-      await failGeneration(entry, '⚠️ 选段、文件或项目在保存期间已变化，请重新选中');
+      await failGeneration(entry, prepared.reason === 'WATCHER_UNAVAILABLE'
+        ? '⚠️ 项目文件同步不可用，请重新打开项目后再校改'
+        : '⚠️ 选段、文件或项目在保存期间已变化，请重新选中');
       return;
     }
     entry.binding = prepared.binding;
@@ -1159,7 +1161,11 @@
       const prepared = await prepareChatRequestGuard(chatIntent);
       if (!prepared?.ok) {
         markChatRequestCanceled(userMessageNode,
-          prepared?.reason === 'CHAT_SAVE_FAILED' ? '当前文件未能安全保存' : '项目、文件或选段在保存期间已变化');
+          prepared?.reason === 'CHAT_SAVE_FAILED'
+            ? '当前文件未能安全保存'
+            : prepared?.reason === 'CHAT_WATCHER_UNAVAILABLE'
+              ? '项目文件同步不可用，请重新打开项目'
+              : '项目、文件或选段在保存期间已变化');
         return;
       }
       aiGuard = prepared.aiGuard;

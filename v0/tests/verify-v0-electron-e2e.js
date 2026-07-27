@@ -331,30 +331,6 @@ async function waitForValue(client, expression, description, timeoutMs = START_T
   throw new Error(`Timed out waiting for ${description}`);
 }
 
-async function waitForExternalQuiescence(
-  client,
-  description,
-  stableMs = 1500,
-  timeoutMs = START_TIMEOUT_MS
-) {
-  const deadline = Date.now() + timeoutMs;
-  let generation = null;
-  let stableSince = 0;
-  while (Date.now() < deadline) {
-    const current = await client.evaluate(`Promise.resolve(
-      window.__workspace?.state?.externalQueue
-    ).then(() => window.__workspace?.state?.aiContextGeneration ?? null)`);
-    if (current !== generation) {
-      generation = current;
-      stableSince = Date.now();
-    } else if (generation !== null && Date.now() - stableSince >= stableMs) {
-      return generation;
-    }
-    await delay(100);
-  }
-  throw new Error(`Timed out waiting for ${description}; last generation=${generation}`);
-}
-
 async function pressKey(client, key) {
   const descriptors = {
     Enter: { key: 'Enter', code: 'Enter', windowsVirtualKeyCode: 13, nativeVirtualKeyCode: 13 },
@@ -748,16 +724,21 @@ async function run() {
         `window.__workspace.state.aiContextGeneration`
       );
       fs.unlinkSync(secondPath);
-      await waitForValue(first.client, `(() => {
-        const state = window.__workspace?.state;
-        if (!state || state.aiContextGeneration <= ${JSON.stringify(generationBeforeConflictCleanup)}) return null;
-        return Promise.resolve(state.externalQueue).then(() =>
-          state.aiContextGeneration > ${JSON.stringify(generationBeforeConflictCleanup)} ? true : null
-        );
-      })()`, 'external conflict cleanup to settle before minting a fresh Onboarding capability');
-      await waitForExternalQuiescence(
-        first.client,
-        'all watcher events from external conflict cleanup to become quiescent'
+      const watcherBarrier = await first.client.evaluate(
+        'window.__workspace.flushExternalChanges()'
+      );
+      assert.strictEqual(watcherBarrier.ok, true);
+      const runtimeProjectInstanceId = await first.client.evaluate(
+        'window.__workspace.state.project.instanceId'
+      );
+      assert.strictEqual(watcherBarrier.projectInstanceId, runtimeProjectInstanceId);
+      assert(Number.isSafeInteger(watcherBarrier.mutationGeneration));
+      const generationAfterConflictCleanup = await first.client.evaluate(
+        'window.__workspace.state.aiContextGeneration'
+      );
+      assert(
+        generationAfterConflictCleanup > generationBeforeConflictCleanup,
+        'Main flush barrier must publish the external deletion before minting a fresh capability'
       );
       await first.client.evaluate(`(() => {
         window.__workspace.openProjectOnboarding();
@@ -1191,10 +1172,22 @@ async function run() {
         document.querySelector('.change-file-actions .change-decision--accepted').click();
         document.getElementById('changes-apply').click();
       })()`);
-      await waitForValue(first.client, `(() =>
-        document.getElementById('changes-status')?.textContent.includes('已安全应用 1 个文件') &&
-        window.__editor.getContent().includes(${JSON.stringify(electronAiFixture.CHAPTER_GENERATED_MARKER)})
-      )()`, 'the accepted whole-chapter write');
+      try {
+        await waitForValue(first.client, `(() =>
+          document.getElementById('changes-status')?.textContent.includes('已安全应用 1 个文件') &&
+          window.__editor.getContent().includes(${JSON.stringify(electronAiFixture.CHAPTER_GENERATED_MARKER)})
+        )()`, 'the accepted whole-chapter write');
+      } catch (error) {
+        const snapshot = await first.client.evaluate(`(() => ({
+          status: document.getElementById('changes-status')?.textContent || '',
+          cards: [...document.querySelectorAll('.change-hunk-card')].map(card => card.className),
+          applyDisabled: document.getElementById('changes-apply')?.disabled,
+          saveState: document.getElementById('save-state')?.textContent || '',
+          canUseAI: window.__workspace?.canUseAI?.(),
+          editorHasMarker: window.__editor?.getContent?.().includes(${JSON.stringify(electronAiFixture.CHAPTER_GENERATED_MARKER)}),
+        }))()`).catch(() => null);
+        throw new Error(`${error.message}; state=${JSON.stringify(snapshot)}`);
+      }
       const generated = projectService.readFile(project.rootPath, createdPath);
       assert(generated.includes(electronAiFixture.CHAPTER_GENERATED_MARKER));
 
@@ -1453,10 +1446,21 @@ async function run() {
       assert(decisions.states[2].includes('is-pending'));
       assert.strictEqual(decisions.disabled, false);
       await first.client.evaluate(`document.getElementById('changes-apply').click()`);
-      await waitForValue(first.client, `(() => {
-        const status = document.getElementById('changes-status').textContent;
-        return status.includes('本轮已接受 1、拒绝 1') && document.querySelectorAll('.change-hunk-card').length === 1;
-      })()`, 'one residual pending hunk after the first reviewed batch');
+      try {
+        await waitForValue(first.client, `(() => {
+          const status = document.getElementById('changes-status').textContent;
+          return status.includes('本轮已接受 1、拒绝 1') && document.querySelectorAll('.change-hunk-card').length === 1;
+        })()`, 'one residual pending hunk after the first reviewed batch');
+      } catch (error) {
+        const snapshot = await first.client.evaluate(`(() => ({
+          status: document.getElementById('changes-status')?.textContent || '',
+          cards: [...document.querySelectorAll('.change-hunk-card')].map(card => card.className),
+          applyDisabled: document.getElementById('changes-apply')?.disabled,
+          saveState: document.getElementById('save-state')?.textContent || '',
+          canUseAI: window.__workspace?.canUseAI?.(),
+        }))()`).catch(() => null);
+        throw new Error(`${error.message}; state=${JSON.stringify(snapshot)}`);
+      }
       let afterFirst = projectService.readFile(project.rootPath, createdPath);
       assert(afterFirst.includes(electronAiFixture.CHANGES_AFTER[0]));
       assert(afterFirst.includes(electronAiFixture.CHANGES_BEFORE[1]));
@@ -1870,13 +1874,16 @@ async function run() {
       assert.deepStrictEqual(incremental.analyzedPaths, [incrementalPath]);
       assert(incremental.elapsed <= GRAPH_INCREMENTAL_BUDGET_MS,
         `real Electron incremental Graph build ${incremental.elapsed.toFixed(1)} ms exceeded ${GRAPH_INCREMENTAL_BUDGET_MS} ms`);
-      await waitForValue(first.client, `(() => {
-        const state = window.__workspace?.state;
-        if (!state || state.aiContextGeneration <= ${JSON.stringify(generationBeforeIncrementalWrite)}) return null;
-        return Promise.resolve(state.externalQueue).then(() =>
-          state.aiContextGeneration > ${JSON.stringify(generationBeforeIncrementalWrite)} ? true : null
-        );
-      })()`, 'the external incremental write to settle before the authoritative Graph UI refresh');
+      const incrementalBarrier = await first.client.evaluate(`(async () => {
+        const result = await window.__workspace.flushExternalChanges();
+        return {
+          ok: result?.ok === true,
+          generation: window.__workspace.state.aiContextGeneration,
+        };
+      })()`);
+      assert.strictEqual(incrementalBarrier.ok, true);
+      assert(incrementalBarrier.generation > generationBeforeIncrementalWrite,
+        'the Main watcher barrier must publish the external incremental write before Graph refresh');
       await first.client.evaluate(`window.__graphView.refresh()`);
       try {
         await waitForValue(first.client, `document.querySelectorAll('.graph-node').length >= 500 &&

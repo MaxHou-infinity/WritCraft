@@ -126,7 +126,12 @@
     if (!intentMatchesAfterOwnFlush(intent, adapters.getState(), adapters.getInteraction())) {
       return Object.freeze({ ok: false, reason: 'CHAT_INTENT_STALE' });
     }
-    if (intent.neededFlush && typeof adapters.settle === 'function') await adapters.settle();
+    if (intent.neededFlush && typeof adapters.settle === 'function') {
+      try { await adapters.settle(); }
+      catch (_) {
+        return Object.freeze({ ok: false, reason: 'CHAT_WATCHER_UNAVAILABLE' });
+      }
+    }
     const stateAfter = adapters.getState();
     if (!intentMatchesAfterOwnFlush(intent, stateAfter, adapters.getInteraction()) ||
         (typeof adapters.canUseAI === 'function' && !adapters.canUseAI())) {

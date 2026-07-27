@@ -209,7 +209,10 @@
     if (!preparedBindingMatches(binding, adapters.getState(), adapters.getSelection(), adapters.getStyle())) {
       return Object.freeze({ ok: false, reason: 'INTENT_STALE' });
     }
-    await adapters.settleWatcher();
+    try { await adapters.settleWatcher(); }
+    catch (_) {
+      return Object.freeze({ ok: false, reason: 'WATCHER_UNAVAILABLE' });
+    }
     if (!preparedBindingMatches(binding, adapters.getState(), adapters.getSelection(), adapters.getStyle())) {
       return Object.freeze({ ok: false, reason: 'INTENT_STALE' });
     }

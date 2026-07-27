@@ -14,6 +14,8 @@ const projectWatcher = require('../src/main/project-watcher');
 const GRAPH_COLD_BUDGET_MS = 2500;
 const GRAPH_CACHE_BUDGET_MS = 700;
 const GRAPH_INCREMENTAL_BUDGET_MS = 800;
+const WATCHER_FLUSH_BUDGET_MS = 2500;
+const EXPECTED_CHECKS = 6;
 
 let passed = 0;
 async function test(name, fn) {
@@ -131,10 +133,24 @@ console.log('\nLarge project end-to-end verification');
       assert(snapshot.entries.get('edit.md').contentHash);
       assert(Number.isInteger(snapshot.nextCursor));
     });
+
+    await test('fully hashes a 300-file project inside the explicit flush budget', async () => {
+      const started = performance.now();
+      const snapshot = await projectWatcher.projectSnapshot(root, {
+        completeHash: true,
+      });
+      const elapsed = performance.now() - started;
+      assert.strictEqual(snapshot.stats.markdownFiles, 301);
+      assert.strictEqual(snapshot.stats.hashedFiles, 301);
+      assert.strictEqual(snapshot.stats.hashCoverageComplete, true);
+      assert(elapsed <= WATCHER_FLUSH_BUDGET_MS,
+        `explicit watcher flush ${elapsed.toFixed(1)} ms exceeded ${WATCHER_FLUSH_BUDGET_MS} ms`);
+    });
   } finally {
     fs.rmSync(root, { recursive: true, force: true });
   }
-  console.log(`\n${passed}/5 large project checks passed.`);
+  assert.strictEqual(passed, EXPECTED_CHECKS);
+  console.log(`\n${passed}/${EXPECTED_CHECKS} large project checks passed.`);
 })().catch(error => {
   console.error(error);
   process.exitCode = 1;

@@ -6,6 +6,104 @@
 
 const { contextBridge, ipcRenderer } = require('electron');
 
+const WATCHER_FLUSH_RESULT_SCHEMA = 'writcraft.watcher-flush-result/v1';
+const WATCHER_FLUSH_BARRIER_SCHEMA = 'writcraft.watcher-flush-barrier/v1';
+const WATCHER_FLUSH_BARRIER_CHANNEL = 'writcraft:project:watcher-flushed';
+const WATCHER_FLUSH_TIMEOUT_MS = 15_000;
+
+function watcherFlushFailure(error, message) {
+  return Object.freeze({ ok: false, error, message });
+}
+
+function exactKeys(value, expected) {
+  if (!value || typeof value !== 'object' || Array.isArray(value)) return false;
+  return Object.keys(value).sort().join('\0') === [...expected].sort().join('\0');
+}
+
+function validWatcherFlushResult(value, projectInstanceId) {
+  return exactKeys(value, ['ok', 'schema', 'flushId', 'projectInstanceId', 'mutationGeneration']) &&
+    value.ok === true &&
+    value.schema === WATCHER_FLUSH_RESULT_SCHEMA &&
+    typeof value.flushId === 'string' && value.flushId.length > 0 &&
+    value.projectInstanceId === projectInstanceId &&
+    Number.isSafeInteger(value.mutationGeneration) && value.mutationGeneration >= 0;
+}
+
+function validWatcherFlushBarrier(value) {
+  return exactKeys(value, ['schema', 'flushId', 'projectInstanceId', 'mutationGeneration']) &&
+    value.schema === WATCHER_FLUSH_BARRIER_SCHEMA &&
+    typeof value.flushId === 'string' && value.flushId.length > 0 &&
+    typeof value.projectInstanceId === 'string' && value.projectInstanceId.length > 0 &&
+    Number.isSafeInteger(value.mutationGeneration) && value.mutationGeneration >= 0;
+}
+
+function flushExternalChanges(projectInstanceId) {
+  if (typeof projectInstanceId !== 'string' || !projectInstanceId) {
+    return Promise.resolve(watcherFlushFailure(
+      'PROJECT_CHANGED',
+      '项目状态已变化，请重新发起 AI 请求'
+    ));
+  }
+  return new Promise(resolve => {
+    let response = null;
+    let settled = false;
+    const seenBarriers = new Map();
+    const finish = result => {
+      if (settled) return;
+      settled = true;
+      clearTimeout(timeout);
+      ipcRenderer.removeListener(WATCHER_FLUSH_BARRIER_CHANNEL, onBarrier);
+      resolve(result);
+    };
+    const maybeFinish = () => {
+      if (!response) return;
+      const barrier = seenBarriers.get(response.flushId);
+      if (!barrier ||
+          barrier.projectInstanceId !== response.projectInstanceId ||
+          barrier.mutationGeneration !== response.mutationGeneration) return;
+      finish(response);
+    };
+    const onBarrier = (_event, payload) => {
+      if (!validWatcherFlushBarrier(payload)) return;
+      seenBarriers.set(payload.flushId, payload);
+      while (seenBarriers.size > 16) seenBarriers.delete(seenBarriers.keys().next().value);
+      maybeFinish();
+    };
+
+    // Install the exact-barrier listener before invoke. Main sends the
+    // barrier before returning success, so the reverse order would race.
+    ipcRenderer.on(WATCHER_FLUSH_BARRIER_CHANNEL, onBarrier);
+    const timeout = setTimeout(() => finish(watcherFlushFailure(
+      'PROJECT_WATCHER_BARRIER_TIMEOUT',
+      '项目文件同步确认超时，请重新打开项目'
+    )), WATCHER_FLUSH_TIMEOUT_MS);
+    Promise.resolve()
+      .then(() => ipcRenderer.invoke('writcraft:project:flush-external-changes', projectInstanceId))
+      .then(result => {
+        if (!result || result.ok !== true) {
+          finish(result || watcherFlushFailure(
+            'PROJECT_WATCHER_UNAVAILABLE',
+            '项目文件监控没有返回结果'
+          ));
+          return;
+        }
+        if (!validWatcherFlushResult(result, projectInstanceId)) {
+          finish(watcherFlushFailure(
+            'PROJECT_WATCHER_BARRIER_INVALID',
+            '项目文件同步确认无效，请重新打开项目'
+          ));
+          return;
+        }
+        response = result;
+        maybeFinish();
+      })
+      .catch(() => finish(watcherFlushFailure(
+        'PROJECT_WATCHER_UNAVAILABLE',
+        '项目文件监控不可用，请重新打开项目'
+      )));
+  });
+}
+
 contextBridge.exposeInMainWorld('writCraft', {
   // Day 1: Key 类型检测
   detectKeyType: (key) => ipcRenderer.invoke('writcraft:detect-key-type', key),
@@ -52,6 +150,7 @@ contextBridge.exposeInMainWorld('writCraft', {
     open: () => ipcRenderer.invoke('writcraft:project:open'),
     openRecent: () => ipcRenderer.invoke('writcraft:project:open-recent'),
     listTree: () => ipcRenderer.invoke('writcraft:project:list'),
+    flushExternalChanges,
     readFile: (relPath) => ipcRenderer.invoke('writcraft:project:read', relPath),
     writeFile: (relPath, content, expectedRevision) => ipcRenderer.invoke('writcraft:project:write', relPath, content, expectedRevision),
     overwriteConflict: (relPath, content, observedRevision) => ipcRenderer.invoke('writcraft:project:overwrite-conflict', relPath, content, observedRevision),

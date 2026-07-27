@@ -10,6 +10,7 @@ const watcher = require('../src/main/project-watcher');
 const watcherInvalidationPolicy = require('../src/main/watcher-invalidation-policy');
 
 let pass = 0;
+const EXPECTED_CHECKS = 23;
 async function check(label, fn) {
   try {
     await fn();
@@ -152,13 +153,48 @@ async function run() {
     try {
       const baseline = await instance.flush();
       assert.strictEqual(baseline.ok, true);
-      assert.strictEqual(payloads.length, 0);
+      assert.deepStrictEqual(payloads[0]?.changes, [{ path: null, kind: 'invalidated' }]);
+      payloads.length = 0;
       fs.writeFileSync(path.join(root, 'edit.md'), 'after');
       const barrier = await instance.flush();
       assert.strictEqual(barrier.ok, true);
       assert(barrier.emittedChanges >= 1);
       assert(payloads.some(payload =>
         payload.changes.some(change => change.path === 'edit.md' && change.kind === 'changed')
+      ));
+    } finally {
+      instance.close();
+      fs.rmSync(root, { recursive: true, force: true });
+    }
+  });
+
+  await check('首次 strict flush 即使初始 poll 已吸收外部写也发布全项目失效', async () => {
+    const root = tempProject();
+    const native = new EventEmitter();
+    native.close = () => {};
+    const file = path.join(root, 'edit.md');
+    fs.writeFileSync(file, 'before');
+    const payloads = [];
+    let releaseInitialHash = null;
+    let hashCalls = 0;
+    const instance = watcher.createProjectWatcher(root, payload => payloads.push(payload), {
+      watchFn: () => native,
+      pollIntervalMs: 10_000,
+      hashFile: async absolute => {
+        hashCalls += 1;
+        if (hashCalls === 1) await new Promise(resolve => { releaseInitialHash = resolve; });
+        return fs.readFileSync(absolute, 'utf8');
+      },
+    });
+    try {
+      while (!releaseInitialHash) await new Promise(resolve => setTimeout(resolve, 1));
+      fs.writeFileSync(file, 'after!');
+      const pending = instance.flush();
+      releaseInitialHash();
+      const result = await pending;
+      assert.strictEqual(result.ok, true);
+      assert(payloads.some(payload =>
+        payload.changes.some(change => change.path === null && change.kind === 'invalidated')
       ));
     } finally {
       instance.close();
@@ -235,6 +271,62 @@ async function run() {
       );
     } finally {
       missing.close();
+    }
+  });
+
+  await check('flush 完整哈希能发现轮询预算外的同尺寸保留 mtime 修改', async () => {
+    const root = tempProject();
+    const native = new EventEmitter();
+    native.close = () => {};
+    const payloads = [];
+    const files = [];
+    for (let index = 0; index < 12; index += 1) {
+      const file = path.join(root, `chapter-${String(index).padStart(2, '0')}.md`);
+      fs.writeFileSync(file, `before-${String(index).padStart(2, '0')}`);
+      files.push(file);
+    }
+    const instance = watcher.createProjectWatcher(root, payload => payloads.push(payload), {
+      watchFn: () => native,
+      debounceMs: 10_000,
+      pollIntervalMs: 0,
+      maxHashFiles: 2,
+    });
+    try {
+      await instance.flush();
+      const target = files[11];
+      const before = fs.statSync(target);
+      fs.writeFileSync(target, 'after--11');
+      fs.utimesSync(target, before.atime, before.mtime);
+      const result = await instance.flush();
+      assert.strictEqual(result.ok, true);
+      assert(payloads.some(payload =>
+        payload.changes.some(change => change.path === 'chapter-11.md' && change.kind === 'changed')
+      ));
+    } finally {
+      instance.close();
+      fs.rmSync(root, { recursive: true, force: true });
+    }
+  });
+
+  await check('flush 完整哈希超过独立文件预算时 fail-closed', async () => {
+    const root = tempProject();
+    const native = new EventEmitter();
+    native.close = () => {};
+    fs.writeFileSync(path.join(root, 'a.md'), 'a');
+    fs.writeFileSync(path.join(root, 'b.md'), 'b');
+    const instance = watcher.createProjectWatcher(root, () => {}, {
+      watchFn: () => native,
+      pollIntervalMs: 0,
+      flushMaxHashFiles: 1,
+    });
+    try {
+      await assert.rejects(
+        () => instance.flush(),
+        error => error?.code === 'PROJECT_WATCHER_FLUSH_INCOMPLETE'
+      );
+    } finally {
+      instance.close();
+      fs.rmSync(root, { recursive: true, force: true });
     }
   });
 
@@ -471,7 +563,8 @@ async function run() {
     }
   });
 
-  if (!process.exitCode) console.log(`\n✅ Project watcher ${pass}/${pass} 全过`);
+  assert.strictEqual(pass, EXPECTED_CHECKS);
+  if (!process.exitCode) console.log(`\n✅ Project watcher ${pass}/${EXPECTED_CHECKS} 全过`);
 }
 
 run().catch(error => {

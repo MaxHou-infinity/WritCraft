@@ -328,6 +328,21 @@ async function verifyPreAwaitIntentFreeze() {
   assert.equal(prepared.aiGuard.currentPath, 'chapters/01.md');
   assert.equal(prepared.aiGuard.currentRevision, 'file-r1-own-save');
   assert.equal(ownSaveIntent.currentRevision, 'file-r1');
+
+  Object.assign(state, {
+    currentPath: 'chapters/01.md', revision: 'file-r1', editVersion: 4,
+    aiContextGeneration: 2, openGeneration: 7,
+    activeChatRequestToken: 14, dirty: true,
+  });
+  const watcherFailureIntent = AiRequestGuard.captureChatIntent(state, originalRequest, 14);
+  const watcherFailure = await AiRequestGuard.prepareChatIntent(watcherFailureIntent, {
+    getState: () => state,
+    getInteraction: interaction,
+    persist: async () => { state.revision = 'file-r1-saved'; state.dirty = false; return true; },
+    settle: async () => { throw new Error('barrier failed'); },
+    canUseAI: () => true,
+  });
+  assert.deepEqual(watcherFailure, { ok: false, reason: 'CHAT_WATCHER_UNAVAILABLE' });
 }
 
 check('Editor/Workspace 把同一 token guard 贯穿 preflight、模型边界与回复发布', () => {
@@ -356,5 +371,6 @@ checkAsync('预保存 intent、后发请求、文件切换与选段变化会在�
   await verifyConcurrentLifecycle();
 })
   .then(() => {
-    if (!process.exitCode) console.log(`\n✅ Chat context ${passed}/${passed} 全过`);
+    assert.strictEqual(passed, 11);
+    if (!process.exitCode) console.log(`\n✅ Chat context ${passed}/11 全过`);
   });

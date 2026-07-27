@@ -50,7 +50,13 @@ Freeze the failure/state matrix and authority boundary before implementation. Re
 
 Watcher-driven flows must not infer authority from elapsed time. A drained Renderer queue, one observed generation advance, or a stable window is only diagnostic evidence because native events, debounce, and polling fallback can arrive in separate waves. Before minting fresh AI authority, use a Main-owned barrier that waits in-flight polling, forces a new bounded snapshot, drains pending changes, and binds the exact project instance plus mutation generation; scan limits, watcher degradation, project drift, and barrier failure all fail closed. A time window may remain only as a temporary observation fallback and must be recorded as an open P2.
 
+A forced tree walk is not automatically a complete authority scan. If ordinary polling rotates a small hash budget, an explicit flush must use an independent bounded full-Markdown hash budget or fail closed; otherwise a same-size, restored-mtime edit outside the rotation can be missed. Propagate flush failure as an explicit user-visible blocked state—never as an unhandled Renderer rejection.
+
 Real Electron harnesses must not let their own infrastructure self-certify. Register a child immediately after spawn; clean it up across discovery, CDP connect/enable/reload/readiness failures; latch both unexpected process exit and CDP failure; check that latch before/after every stage and before the final green line; compare against a fixed expected stage count.
+
+When an integration assertion fails after the product boundary already succeeded, verify that the test compares against runtime authority rather than fixture metadata. Preserve the red run, classify the faulty assertion, and rerun only after the test has been corrected; do not patch product code to satisfy an undefined or incidental fixture field.
+
+When replacing a production synchronization primitive, search the test harness and diagnostics for every old wait/read before sign-off. Tests must call the new authority boundary; waiting on a removed private queue can overlap later work and create false performance or stale-state failures.
 
 For macOS packages, sign nested executable code before the outer App and verify each nested executable independently after ZIP extraction. `codesign --deep` on the outer bundle is not evidence that code stored in an unexpected location is signed. Keep `LSMinimumSystemVersion` aligned with every Mach-O slice, and bind generated native binaries to their source hash in release evidence. Create ZIPs with `ditto --norsrc`, assert there are no `._*` AppleDouble entries, and verify an App extracted by standard `unzip`; a `ditto`-only round trip can hide a broken archive.
 

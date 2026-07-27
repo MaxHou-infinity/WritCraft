@@ -1,8 +1,8 @@
 # 笔触 · WritCraft · 一个月 V0 路线图
 
-> 文档版本：2026-07-27（v2.4，0.0Q Watcher flush 日终停点）
+> 文档版本：2026-07-27（v2.5，0.0Q Main-owned Watcher flush 签收）
 > 状态：**V0 续作中，完整产品未完成**；产品范围以 `docs/WRITCRAFT-PRD-V3.md` 为准  
-> 2026-07-27 续作交接：既有产品链与 0.0P 原生 helper 保持签字，既有最终全链为 **32/32**。0.0Q 已完成 watcher 底层强制快照/drain/single-flight 与失败竞态，定向 **20/20**；跨层 barrier 和真实 Electron 替换尚未完成。明日先关闭该内部 P2，再由作者选择合格项目和完整 `sk-api-` 执行真实旅程；ad-hoc App/ZIP 未签名公证且禁止分发，准确事实与 TODO 只看 `v0/DEVELOPMENT-STATUS.md`。
+> 2026-07-27 续作交接：既有产品链与 0.0P 原生 helper 保持签字。0.0Q 已完成 Main/IPC/preload/Renderer exact barrier，Watcher **23/23**、跨层 **11/11**、同源完整 Electron 连续两次 **32/32**，独立复审 **P0=0/P1=0/P2=1**。明日先关闭 strict hash 的 no-follow fd P2，再处理其余本地 P2；作者合格项目、完整 `sk-api-`、真实旅程和正式发布仍是外部门禁。ad-hoc App/ZIP 禁止分发，准确事实与 TODO 只看 `v0/DEVELOPMENT-STATUS.md`。
 > 范围：Month 1（4 周 × 7 天 = 28 天）
 
 ---
@@ -168,4 +168,4 @@
 
 ## 九、 下一步
 
-2026-07-27 日终先停在 0.0Q watcher-local flush **20/20**；明日严格按 `v0/DEVELOPMENT-STATUS.md` 依次完成 Main handler、preload exact-barrier 握手、Renderer authority gate、静态/动态边界和真实 Electron 回归。该内部 P2 签字后，再按 `docs/AUTHOR-ACCEPTANCE-V1-CONTRACT.md` 执行真实付费 API、完整 `sk-api-` 图片、真实 2000+ 字/5+ 章作者旅程和私有价值证据；只有其后才可重建产物并进入签名/公证/Gatekeeper 复审。
+2026-07-27 日终 0.0Q 已签收。明日严格按 `v0/DEVELOPMENT-STATUS.md` 先把 strict watcher hash 改成 no-follow fd + fstat/inode/size 复核并补并发替换测试，再评估 native reserve 空 stage 与 build 因果 P2。作者提供合格项目和完整 `sk-api-` 后，才按 `docs/AUTHOR-ACCEPTANCE-V1-CONTRACT.md` 执行真实付费图片、2000+ 字/5+ 章作者旅程和私有价值证据；其后才可重建并进入签名/公证/Gatekeeper 复审。

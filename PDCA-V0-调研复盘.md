@@ -16,7 +16,9 @@
 
 > **发布与测试复审教训**：本轮 package/release 7/7 一度是假绿：外层 App 的 `--deep --strict` 没能证明放在 Resources 内的 helper 已签名，且 App 宣称支持 10.15、helper 实际要求 11.0。真实 Electron 32/32 也一度可能漏掉最后一条 CDP 命令后的进程/连接故障。修复原则是 nested code 移入 `Contents/Helpers` 并内到外签名，ZIP 解压后逐项验签、核对 minOS 和执行真实事务；E2E 从 spawn 起统一回收，进程 exit 与 CDP failure 都进入全局 fatal latch，并用固定 2/32 阶段数而非 `${passed}/${passed}` 自证。
 
-> **2026-07-27 日终复盘**：今天依次关闭 Image Trash 可靠性、真实作者隔离副本、原生 universal helper/打包验签和 E2E fatal 门禁，并启动 0.0Q。做对的是每次复审发现新 P1 都先复现、再修代码与测试、最后同步文档；做错的是曾把“1.5 秒没再变化”当作接近系统权威的证明，也一度让不同文档把下一步写成直接真实作者验收。日终已纠正：时间窗只能作临时观测，明日必须接完 Main-owned exact barrier；所有九个当前事实入口须在同一里程碑横向更新，版本页首与页尾也必须反查一致。
+> **2026-07-27 0.0Q 启动时的阶段性复盘（已被下一段收口覆盖）**：今天依次关闭 Image Trash 可靠性、真实作者隔离副本、原生 universal helper/打包验签和 E2E fatal 门禁，并启动 0.0Q。做对的是每次复审发现新 P1 都先复现、再修代码与测试、最后同步文档；做错的是曾把“1.5 秒没再变化”当作接近系统权威的证明，也一度让不同文档把下一步写成直接真实作者验收。该阶段确认时间窗只能作临时观测，并要求接完 Main-owned exact barrier；此项现已完成。所有九个当前事实入口仍须在同一里程碑横向更新，版本页首与页尾也必须反查一致。
+
+> **2026-07-27 0.0Q 收口复盘**：Main-owned exact barrier 已替代时间静默推断，并在独立复审发现 3 个 P1 后补齐 internal-mutation epoch、首次 strict 全项目失效和 Renderer 外部同步失败门禁。做对的是保留红灯、先写对抗测试、让独立 reviewer 二审，最后以同源连续两次 32/32 收口。做错或险些做错的有三点：把“强制遍历”误当“完整 hash”（实际仍复用了轮转预算）；测试把运行时实例与不存在的 fixture 字段比较，错把测试断言红当产品红；E2E 在 Graph 外部写后仍读取已删除的 `externalQueue`，造成 3.5 秒假性能红。今后任何权威 barrier 必须证明覆盖范围而非只证明动作发生；集成红灯先核对运行时 authority 与测试 fixture；删除生产同步原语时同步搜索并删除所有测试侧旧等待。当前保留 P2 是 strict hash 的 `lstat→path read` TOCTOU，明日优先用 no-follow fd + fstat 关闭。
 
 ---
 

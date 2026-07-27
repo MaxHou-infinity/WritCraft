@@ -15,6 +15,7 @@ const projectService = require('./project-service');
 const projectWatcher = require('./project-watcher');
 const watcherInvalidationPolicy = require('./watcher-invalidation-policy');
 const projectWatcherHealthService = require('./project-watcher-health');
+const projectWatcherFlushHandlerService = require('./project-watcher-flush-handler');
 const projectSearchService = require('./project-search-service');
 const changeSetService = require('./changeset-service');
 const changeSetReviewService = require('./changeset-review-service');
@@ -113,6 +114,7 @@ const imageTrashHandler = imageTrashHandlerModule.createImageTrashHandler({
 });
 let projectMutationGeneration = 0;
 let rendererNavigationEpoch = 0;
+let internalMutationEpoch = 0;
 let pendingChangeSets = null;
 const researchHandoffStore = researchHandoffService.createResearchHandoffStore({
   revokeCapability(capability) {
@@ -556,6 +558,7 @@ function publicContextFingerprint(project) {
 
 function beginInternalMutation(project) {
   const token = Object.freeze({ rootPath: project.rootPath, instanceId: project.instanceId, id: crypto.randomUUID() });
+  internalMutationEpoch += 1;
   internalMutationDepthByRoot.set(token.rootPath, (internalMutationDepthByRoot.get(token.rootPath) || 0) + 1);
   return token;
 }
@@ -1834,6 +1837,27 @@ ipcMain.handle('writcraft:project:list', async (event) => {
     return projectFailure(error);
   }
 });
+
+ipcMain.handle(
+  'writcraft:project:flush-external-changes',
+  projectWatcherFlushHandlerService.createProjectWatcherFlushHandler({
+    assertTrustedSender,
+    requireCurrentProject,
+    getCurrentProject: () => currentProject,
+    getCurrentWatcher: () => currentProjectWatcher,
+    assertWatcherAvailable: assertProjectWatcherAvailable,
+    markWatcherDegraded: project => projectWatcherHealth.markDegraded(project),
+    getMutationDepth: rootPath => internalMutationDepthByRoot.get(rootPath) || 0,
+    getInternalMutationEpoch: () => internalMutationEpoch,
+    getMutationGeneration: () => projectMutationGeneration,
+    getNavigationEpoch: () => rendererNavigationEpoch,
+    createError: (code, message) => new projectService.ProjectServiceError(code, message),
+    createId: () => crypto.randomUUID(),
+    projectChanged: staleAiProjectResult,
+    projectFailure,
+    sendBarrier: (event, channel, payload) => event.sender.send(channel, payload),
+  })
+);
 
 ipcMain.handle('writcraft:project:resolve-context', async (event, projectInstanceId, contextRequest) => {
   try {

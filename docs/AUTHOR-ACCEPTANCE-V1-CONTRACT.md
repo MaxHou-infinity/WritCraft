@@ -1,7 +1,7 @@
 # WritCraft V0 · Real Author Acceptance v1
 
 > Status: **frozen contract; 0.0P native-helper/package/E2E increment independently signed P0=0/P1=0/P2=3**. Current evidence (2026-07-27): author preflight **42/42**, real-API offline contract **15/15** (**57/57, 0 network**), package **6/6**, rebuilt local artifact verification **7/7**, `npm test` and Electron-enabled `npm run verify` exit 0, and final forced Electron **32/32**. The earlier Onboarding timeout was traced to the E2E harness waiting for only the first watcher event; a quiescence gate passed eight focused real-Electron runs across the final hardening. The configured credential is Coding Plan and the recent project fails the five-chapter/2,000-character/source requirements; real-author and paid gates remain closed.
-> Day-end implementation boundary: 0.0Q has implemented the watcher-local forced snapshot/drain primitive with focused **20/20**, but the Main/IPC/preload/Renderer barrier and real-Electron replacement are not wired or signed. The 1.5-second E2E window remains temporary evidence, not authoritative quiescence.
+> Day-end implementation boundary: 0.0Q is signed. Main/IPC/preload/Renderer now use an exact watcher barrier instead of the 1.5-second E2E window; Watcher **23/23**, cross-layer **11/11**, focused Electron **2/2**, and two consecutive same-source full Electron runs **32/32** pass. Independent review is **P0=0/P1=0/P2=1**; the remaining local P2 is the strict-hash `lstat→path read` replacement window, not an author or paid-provider acceptance substitute.
 
 Research accuracy instrumentation is governed by `RESEARCH-ACCURACY-V1-CONTRACT.md`; it records the author’s match judgment, never a platform truth score.
 
