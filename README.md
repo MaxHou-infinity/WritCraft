@@ -1,14 +1,14 @@
 # 笔触 · WritCraft（写作 IDE）
 
-> 状态：**V0 候选原型，2026-07-26 Image Review v1 自动化闭环已接入** · 发起方：Max
-> 当前开发真相与唯一续作入口：[`v0/DEVELOPMENT-STATUS.md`](v0/DEVELOPMENT-STATUS.md)。配图现在必须评分并明确插入、保留或移入可恢复废纸篓；自动化链复审 P0/P1=0，明天先补应用内废纸篓恢复/清空，再进入真实 `sk-api-`/作者与发布验收。现有 App/ZIP 禁止分发。
+> 状态：**V0 候选原型，2026-07-27 应用内图片废纸篓闭环已实现** · 发起方：Max
+> 当前开发真相与唯一续作入口：[`v0/DEVELOPMENT-STATUS.md`](v0/DEVELOPMENT-STATUS.md)。配图现已覆盖评分、插入/保留/移入废纸篓、可见列表、单项恢复和确认式快照清空；源码与真实 Electron 已通过，独立复审发现的五项竞态缺口均已修复并进入最终 closure，尚不得替代真实 `sk-api-`/作者与发布验收。现有 App/ZIP 禁止分发。
 > 下一阶段验收边界：[`docs/AUTHOR-ACCEPTANCE-V1-CONTRACT.md`](docs/AUTHOR-ACCEPTANCE-V1-CONTRACT.md) 已冻结；真实调用、作者内容与发布证据必须遵守其中的隐私和付费门禁。
 
-## 2026-07-26 当前复核快照
+## 2026-07-27 当前复核快照
 
 > Research Accuracy v1 签收时完成事务顺序、watcher degraded 门禁与 Renderer recorded-but-locked 语义；该历史批次的完整 Node/verify 与强制 Electron 26/26 已通过。当前最终 Graph 韧性源码的完整边界以本节下方和状态台账为准。
 
-> Graph 性能复验没有用单次重试绿灯覆盖失败：索引、布局、baseline 所有权、元素重挂、scene detach 与 dispatch-only 计时缺口均已进入根因修复和回归。该历史性能专项门禁等待两帧并读取实际 CSS 可见状态与 SVG 布局；同一源码无中间修改连续两次全链均为 **26/26**。当前项目总链以本节 31/31 和状态台账为准。
+> Graph 性能复验没有用单次重试绿灯覆盖失败：索引、布局、baseline 所有权、元素重挂、scene detach 与 dispatch-only 计时缺口均已进入根因修复和回归。该历史性能专项门禁等待两帧并读取实际 CSS 可见状态与 SVG 布局；同一源码无中间修改连续两次全链均为 **26/26**。当前项目总链以本节 32/32 和状态台账为准。
 
 - 项目 / 文件 / 段落三级工作区、`edit.md`、Inline Diff、localized ChangeSet/撤销、权威 Context、来源/脚注、recovery、Cursor 式标签和一致性图谱均已接入；当前源码已完成 Onboarding v2 自动化产品链，现有 App/ZIP 仍是旧链路且未重建。
 - 普通 Changes、Plan→Changes 与 Graph 的本轮结构性修复已完成独立复审；模型不再回传整篇 after，而由 Main 验证局部锚点、依赖和 stopReason 后构造修改。
@@ -19,10 +19,10 @@
 - Research 已形成 Main-owned 的 Claim / Source / Boundary → 专用 Changes → History/undo 闭环；Renderer 只传 card ID 与目标范围，A–D 只是用户提供的来源元数据声明，不是 WritCraft 的事实背书。
 - Research apply 已收敛为 Main 实际复用的生产事务；动态 11/11 以真实磁盘和 History 证明提交后的 stale、TTL、residual、tree 与状态迁移故障不会误报普通失败、泄漏 capability 或诱导重复确认。最终独立二审 P0/P1/P2=0。
 - Research Accuracy 已签字：加入显式“主张匹配/不匹配”作者判断和私有聚合；判断提交前重验 exact authority，watcher 持续不可用会锁住项目 AI/写入，证据提交后变化会保留历史样本但锁定旧卡片。
-- `image-01` 已实现安全落盘、解码尺寸/比例证明、必填 1–5 分、可选费用、插入/保留/可恢复废纸篓和项目聚合；未结算时不能重复生成或切换项目。Generation **15/15**、Review Service **16/16**、Handler **9/9**、Renderer **8/8**、动态 Metrics **20/20**，独立复审 **P0=0/P1=0/P2=1**；P2 为尚无应用内恢复/清空废纸篓入口，真实质量与费用仍待完整 `sk-api-`。
+- `image-01` 已实现安全落盘、解码尺寸/比例证明、必填 1–5 分、可选费用、插入/保留/可恢复废纸篓和项目聚合；废纸篓现可见数量/容量、逐项恢复和确认式精确快照清空，并明确长期保留、绝不后台删除。Trash Service **21/21**、Handler **7/7**、Integration **4/4**、Renderer **7/7**；独立复审发现的 path replacement、same-inode rewrite 与 committed TTL 五项 P1 已修复，最终 closure 尚待记录。真实质量与费用仍待完整 `sk-api-`。
 - Diagnostic Export v1 已接入设置页：作者先看到可能导出的完整 JSON，正文、Prompt、模型回答、Key、项目/文件名与路径均被排除；Renderer 只能回传一次性 token，Main 负责原生保存和不可覆盖写入。Service **13/13**、Handler **10/10**、Renderer **7/7**、Network boundary **15/15**，真实 Electron 已覆盖可见预览和隐私 sentinel。
 - Inline 当前源码隔离 App 已完成人工预览零写入、拒绝、重载、接受、History 与 Safe Undo；Plan 生成已强制 `end_turn`、单文本块、strict JSON、错误脱敏与目标/Prompt 资源上限，独立复审 P0=0/P1=0。
-- 当前最终源码 `npm test` **exit 0**、Electron-enabled `npm run verify` **exit 0**（真实 DOM sanitizer **13/13**）、标准强制 Electron **31/31**、Persistent Watcher Main/IPC **3/3**；Changes/History 为 Recovery **24/24**、Handler **10/10**、Renderer 协议 **16/16**、Workspace **7/7**，Graph 既有专项仍全绿。
+- 当前最终源码 Electron-enabled `npm run verify` **exit 0**（真实 DOM sanitizer **13/13**）、标准强制 Electron **32/32**、Persistent Watcher Main/IPC **3/3**；图片专项合计 **107/107**，Changes/History 为 Recovery **24/24**、Handler **10/10**、Renderer 协议 **16/16**、Workspace **7/7**，Graph 既有专项仍全绿。
 - Main 网络边界已固定文本/图片官方主机，加入 renderer HTTP(S)/WS(S) 双层断网、上下文 IPC 上限、owner abort、mutation generation、内部 revision/父目录回声隔离、零 POST retry、拒绝重定向、诊断 token-only 导出和错误脱敏；当前 network boundary **15/15**。
 - Graph 扩展已动态覆盖 300 文件/1279 节点、cold-to-interactive、stale/三类作者纠错、failure live、键盘/AX、布局、性能、重启与 A→B；缓存完整语义权威、Renderer 不可变快照、同/跨项目异步所有权及 Unicode quote 边界已关闭，最终独立复审 P0=0/P1=0/P2=0。
 - 2026-07-26 已建立本地 Git `main` 基线；后续改动必须通过提交保留可审计差异。该基线不追溯此前历史，阶段事实仍以 `v0/DEVELOPMENT-STATUS.md` 和当次可复现测试证据为准。

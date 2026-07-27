@@ -48,6 +48,8 @@ Wait for a delegated lane at most once without new evidence. After the first tim
 
 Freeze the failure/state matrix and authority boundary before implementation. Require a minimal runnable result before expanding scope. Report only changed facts, failures, and the next action; avoid repeating full logs. Synchronize `v0/DEVELOPMENT-STATUS.md` and Nowledge Mem at durable milestones—contract freeze, independently verified implementation, and final sign-off—not after every mechanical edit.
 
+For destructive filesystem work, an `lstat` followed by path-based `unlink` is not an identity guarantee. Move the path into a private unpredictable transaction quarantine, revalidate inode, size, canonical parent, and content digest, then remove only the quarantined identity. Snapshot deletion must bind content identity as well as inode; same-inode rewrites and late replacements fail closed. Once a mutation is committed, its exact retry truth must outlive the live capability TTL until fsync/partial recovery reaches a terminal state.
+
 ## Commit & Pull Request Guidelines
 
 Local Git history begins with the 2026-07-26 V0 baseline, so it does not describe earlier development conventions. Use concise imperative commits, for example `fix(onboarding): preserve committed state`. Keep source, tests, and affected documentation in the same commit. PRs should explain user impact, authority/state-machine changes, tests run, and remaining risks; include screenshots for UI changes and never attach secrets or stale release artifacts.

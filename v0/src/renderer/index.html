@@ -506,6 +506,20 @@
     #image-prompt:focus { border-color: var(--theme); }
     .image-compose-actions { display: flex; align-items: center; gap: 6px; margin-top: 7px; }
     .image-review-summary { margin-top: 6px; color: var(--ink-soft); font-size: 7px; line-height: 1.4; }
+    .image-trash-head { display: flex; align-items: center; gap: 6px; margin-top: 7px; }
+    #image-trash-toggle { border: 0; background: transparent; color: var(--theme-deep); padding: 0; cursor: pointer; font: 600 8px/1.4 inherit; }
+    .image-trash-policy { margin-left: auto; color: var(--ink-soft); font-size: 7px; }
+    .image-trash-panel { margin-top: 6px; padding: 7px; border: 1px solid #e4ddd2; border-radius: 5px; background: #faf7f1; }
+    .image-trash-panel[hidden] { display: none; }
+    .image-trash-status { min-height: 18px; margin: 0; color: var(--ink-soft); font-size: 7px; line-height: 1.45; }
+    .image-trash-status.is-error { color: #a3473e; }
+    .image-trash-list { display: grid; gap: 5px; margin-top: 5px; }
+    .image-trash-item { display: grid; grid-template-columns: minmax(0, 1fr) auto; align-items: center; gap: 6px; padding: 5px 6px; border: 1px solid #e4ddd2; border-radius: 4px; background: #fff; }
+    .image-trash-item span { min-width: 0; color: var(--ink-soft); font-size: 7px; overflow-wrap: anywhere; }
+    .image-trash-item button, .image-trash-actions button { border: 1px solid #d2c9bc; border-radius: 4px; background: #fff; color: var(--theme-deep); padding: 4px 6px; font-size: 8px; cursor: pointer; }
+    .image-trash-actions { display: flex; justify-content: flex-end; gap: 5px; margin-top: 7px; }
+    .image-trash-actions .is-danger { color: #a3473e; border-color: #d9b7b2; }
+    .image-trash-item button:disabled, .image-trash-actions button:disabled { opacity: .5; cursor: default; }
     #image-aspect { min-width: 0; border: 1px solid #d8d0c4; border-radius: 4px; background: #fff; padding: 5px; font-size: 9px; }
     #image-generate { margin-left: auto; border: 1px solid var(--theme); border-radius: 4px; background: var(--theme); color: #fff; padding: 5px 8px; cursor: pointer; font-size: 9px; }
     #image-generate:disabled { opacity: .5; cursor: default; }
@@ -834,6 +848,12 @@
           <textarea id="image-prompt" maxlength="1500" placeholder="描述画面主体、场景、光线与风格。生成后需要你明确插入正文。"></textarea>
           <div class="image-compose-actions"><select id="image-aspect" aria-label="配图比例"><option value="16:9">16:9 横图</option><option value="4:3">4:3 图片</option><option value="1:1">1:1 方图</option><option value="3:4">3:4 竖图</option><option value="9:16">9:16 长竖图</option></select><button id="image-generate" type="button" disabled>生成预览</button></div>
           <div id="image-review-summary" class="image-review-summary" aria-live="polite">本项目尚无图片评审记录</div>
+          <div class="image-trash-head"><button id="image-trash-toggle" type="button" aria-expanded="false" aria-controls="image-trash-panel">图片废纸篓 · 0</button><span class="image-trash-policy">长期保留 · 不会自动删除</span></div>
+          <section id="image-trash-panel" class="image-trash-panel" aria-label="图片废纸篓" hidden>
+            <p id="image-trash-status" class="image-trash-status" role="status" aria-live="polite">打开后可恢复图片或永久清空；不会修改正文。</p>
+            <div id="image-trash-list" class="image-trash-list"></div>
+            <div class="image-trash-actions"><button id="image-trash-refresh" type="button">刷新</button><button id="image-trash-empty" class="is-danger" type="button" disabled>永久清空</button></div>
+          </section>
           <div id="image-result" aria-live="polite" hidden></div>
         </div>
         <div class="chat-input-row"><button id="image-toggle" type="button" class="quiet-button" aria-expanded="false" aria-controls="image-compose">配图</button><input id="chat-input" type="text" maxlength="4000" placeholder="询问当前项目，或用 @ 引用文件…"><button id="chat-submit">发送</button></div>

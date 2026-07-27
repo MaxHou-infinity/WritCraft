@@ -117,6 +117,12 @@ contextBridge.exposeInMainWorld('writCraft', {
       ipcRenderer.invoke('writcraft:project:settle-image-review', projectInstanceId, review, insertionProof),
     getImageReviewAggregate: (projectInstanceId) =>
       ipcRenderer.invoke('writcraft:project:get-image-review-aggregate', projectInstanceId),
+    getImageTrash: (projectInstanceId) =>
+      ipcRenderer.invoke('writcraft:project:get-image-trash', projectInstanceId),
+    restoreImageTrash: (projectInstanceId, token) =>
+      ipcRenderer.invoke('writcraft:project:restore-image-trash', projectInstanceId, token),
+    emptyImageTrash: (projectInstanceId, token) =>
+      ipcRenderer.invoke('writcraft:project:empty-image-trash', projectInstanceId, token),
     recordAiMetric: (projectInstanceId, metric) => ipcRenderer.invoke('writcraft:project:record-ai-metric', projectInstanceId, metric),
     getAiMetricsAggregate: (projectInstanceId) => ipcRenderer.invoke('writcraft:project:get-ai-metrics-aggregate', projectInstanceId),
     onExternalChange: (handler) => {

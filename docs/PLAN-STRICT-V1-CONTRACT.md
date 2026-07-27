@@ -1,6 +1,6 @@
 # Project Plan Strict Output Contract
 
-> Status: implemented and independently reviewed at P0 = 0 / P1 = 0. The 21/21 forced-Electron result below and the later consecutive 26/26 runs are historical focused evidence, not the current project-wide total. Current final source passed full `npm test`, Electron-enabled `npm run verify`, and controlled forced Electron **31/31**; authoritative current status is `v0/DEVELOPMENT-STATUS.md`.
+> Status: implemented and independently reviewed at P0 = 0 / P1 = 0. The 21/21 forced-Electron result below and the later consecutive 26/26 runs are historical focused evidence, not the current project-wide total. Current final source passed Electron-enabled `npm run verify` and controlled forced Electron **32/32**; authoritative current status is `v0/DEVELOPMENT-STATUS.md`.
 > Public plan schema: `writcraft.plan/v2`
 
 ## 1. Product and authority boundary

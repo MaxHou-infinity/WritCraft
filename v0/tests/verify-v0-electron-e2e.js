@@ -552,6 +552,7 @@ async function run() {
   let first = null;
   let second = null;
   let productionProfile = null;
+  let imageReviewEvidenceAfterDelete = null;
   try {
     try {
       first = await launchElectron(scratch, project.rootPath);
@@ -3192,7 +3193,7 @@ async function run() {
           window.__workspace.state.project.instanceId,
           {
             token: generated.review.token,
-            decision: 'kept',
+            decision: 'deleted',
             qualityRating: 4,
           },
           null
@@ -3201,9 +3202,66 @@ async function run() {
       })()`);
       assert.strictEqual(result.ok, true, JSON.stringify(result));
       assert.strictEqual(result.settled?.ok, true, JSON.stringify(result));
-      assert.strictEqual(result.settled?.decision, 'kept');
+      assert.strictEqual(result.settled?.decision, 'deleted');
       assert(result.image?.previewDataUrl?.startsWith('data:image/png;base64,'));
       assert(result.image?.filePath?.startsWith('assets/generated/image-'));
+      imageReviewEvidenceAfterDelete = fs.readFileSync(
+        path.join(project.rootPath, '.writcraft', 'image-reviews.json'),
+        'utf8'
+      );
+    });
+
+    await stage('visibly restores image trash without changing manuscript or review evidence', async () => {
+      const markdownBefore = snapshotMarkdownFiles(project.rootPath);
+      const generatedDirectory = path.join(project.rootPath, 'assets', 'generated');
+      const trashDirectory = path.join(project.rootPath, '.writcraft', 'image-trash');
+      assert.deepStrictEqual(
+        fs.readdirSync(generatedDirectory).filter(name => /\.(?:png|jpg)$/i.test(name)),
+        []
+      );
+      assert.strictEqual(fs.readdirSync(trashDirectory).length, 1);
+
+      await first.client.evaluate(`(() => {
+        const panel = document.getElementById('image-trash-panel');
+        if (panel.hidden) document.getElementById('image-trash-toggle').click();
+      })()`);
+      const listed = await waitForValue(first.client, `(() => {
+        const panel = document.getElementById('image-trash-panel');
+        const button = document.querySelector('#image-trash-list button');
+        const status = document.getElementById('image-trash-status')?.textContent || '';
+        return !panel.hidden && button?.textContent.includes('恢复到素材区') &&
+          status.includes('长期保留') &&
+          document.getElementById('image-trash-toggle').textContent.includes('· 1')
+          ? { status, label: button.textContent }
+          : null;
+      })()`, 'the visible image trash entry');
+      assert(listed.status.includes('不会自动删除'));
+
+      await first.client.evaluate(`document.querySelector('#image-trash-list button').click()`);
+      await waitForValue(first.client, `document.getElementById('image-trash-toggle').textContent.includes('· 0') &&
+        document.getElementById('image-trash-status').textContent.includes('废纸篓为空')`,
+      'the visible image trash restore');
+      const restored = fs.readdirSync(generatedDirectory)
+        .filter(name => /\.(?:png|jpg)$/i.test(name));
+      assert.strictEqual(restored.length, 1);
+      assert.deepStrictEqual(snapshotMarkdownFiles(project.rootPath), markdownBefore);
+      assert.strictEqual(
+        fs.readFileSync(path.join(project.rootPath, '.writcraft', 'image-reviews.json'), 'utf8'),
+        imageReviewEvidenceAfterDelete
+      );
+
+      // Seed the restart half of the same real-user journey without invoking
+      // another product mutation. The strict filename matches review-owned
+      // private trash entries, and the bytes remain the already verified PNG.
+      const restartSeed = `${'e'.repeat(32)}-${'f'.repeat(24)}.asset`;
+      fs.renameSync(
+        path.join(generatedDirectory, restored[0]),
+        path.join(trashDirectory, restartSeed)
+      );
+      await first.client.evaluate(`window.__imageGenerationView.refreshTrash()`);
+      await waitForValue(first.client, `document.getElementById('image-trash-toggle').textContent.includes('· 1')`,
+        'the restart trash seed to become visible');
+      assert.deepStrictEqual(snapshotMarkdownFiles(project.rootPath), markdownBefore);
     });
 
     await stage('keeps the instrumented renderer reload at zero HTTP(S) network requests', async () => {
@@ -3237,6 +3295,59 @@ async function run() {
       assert.strictEqual(restored.chapterCount, 7);
       assert(projectService.readFile(project.rootPath, createdPath).includes(marker));
       assert.strictEqual(decodeURIComponent(new URL(restored.href).pathname), ENTRY_PATH);
+
+      const markdownBeforeTrashEmpty = snapshotMarkdownFiles(project.rootPath);
+      const reviewEvidenceBeforeTrashEmpty = fs.readFileSync(
+        path.join(project.rootPath, '.writcraft', 'image-reviews.json'),
+        'utf8'
+      );
+      assert.strictEqual(reviewEvidenceBeforeTrashEmpty, imageReviewEvidenceAfterDelete);
+      await second.client.evaluate(`(async () => {
+        document.querySelector('[data-assistant-mode="chat"]').click();
+        const panel = document.getElementById('image-trash-panel');
+        if (panel.hidden) document.getElementById('image-trash-toggle').click();
+        await window.__imageGenerationView.refreshTrash();
+      })()`);
+      await waitForValue(second.client, `document.getElementById('image-trash-toggle').textContent.includes('· 1') &&
+        document.getElementById('image-trash-status').textContent.includes('长期保留')`,
+      'the image trash after a real Electron restart');
+
+      const trashDirectory = path.join(project.rootPath, '.writcraft', 'image-trash');
+      const lateArrival = `${'a'.repeat(32)}-${'b'.repeat(24)}.asset`;
+      fs.writeFileSync(
+        path.join(trashDirectory, lateArrival),
+        Buffer.from(electronAiFixture.PNG_BASE64, 'base64')
+      );
+      await second.client.evaluate(`(() => {
+        window.__e2eTrashConfirmMessages = [];
+        window.confirm = message => {
+          window.__e2eTrashConfirmMessages.push(String(message));
+          return true;
+        };
+        document.getElementById('image-trash-empty').click();
+      })()`);
+      await waitForValue(second.client, `document.getElementById('image-trash-toggle').textContent.includes('· 1') &&
+        document.getElementById('image-trash-status').textContent.includes('长期保留')`,
+      'the late trash arrival to survive snapshot emptying');
+      assert.deepStrictEqual(fs.readdirSync(trashDirectory), [lateArrival]);
+
+      await second.client.evaluate(`document.getElementById('image-trash-empty').click()`);
+      const trashEmptyState = await waitForValue(second.client, `(() => {
+        const messages = window.__e2eTrashConfirmMessages || [];
+        return messages.length === 2 &&
+          document.getElementById('image-trash-toggle').textContent.includes('· 0') &&
+          document.getElementById('image-trash-status').textContent.includes('废纸篓为空')
+          ? { messages }
+          : null;
+      })()`, 'the explicit permanent trash empty confirmation');
+      assert(trashEmptyState.messages.every(message =>
+        message.includes('永久清空') && message.includes('无法撤销')));
+      assert.deepStrictEqual(fs.readdirSync(trashDirectory), []);
+      assert.deepStrictEqual(snapshotMarkdownFiles(project.rootPath), markdownBeforeTrashEmpty);
+      assert.strictEqual(
+        fs.readFileSync(path.join(project.rootPath, '.writcraft', 'image-reviews.json'), 'utf8'),
+        reviewEvidenceBeforeTrashEmpty
+      );
 
       await second.client.evaluate(`(() => {
         const scope = document.getElementById('graph-scope');
@@ -3318,7 +3429,7 @@ async function run() {
       assert.strictEqual(state.welcomeVisible, true);
     });
 
-    console.log(`\n✅ Real Electron E2E ${passed}/${passed} stages passed; project-card recovery/confirmation, temporary-profile isolation, Research stale/rerun/confirmation, project metrics IPC, own-save watcher isolation, explicit image insertion, restart recovery, 0 observed renderer network.`);
+    console.log(`\n✅ Real Electron E2E ${passed}/${passed} stages passed; project-card recovery/confirmation, temporary-profile isolation, Research stale/rerun/confirmation, project metrics IPC, own-save watcher isolation, explicit image insertion, visible image-trash restore/restart/snapshot-empty, restart recovery, 0 observed renderer network.`);
   } finally {
     await stopElectron(first).catch(() => {});
     await stopElectron(second).catch(() => {});

@@ -50,7 +50,7 @@ test('评分后必须显式选择插入、保留或移入废纸篓', () => {
   assert.match(view, /插入当前正文/);
   assert.match(view, /保留素材/);
   assert.match(view, /移入废纸篓/);
-  assert.match(view, /\.writcraft\/image-trash 手动恢复/);
+  assert.match(view, /可在本面板中恢复/);
   assert.match(view, /qualityRating/);
   assert.match(view, /settleImageReview/);
   assert.match(view, /getImageReviewAggregate/);
@@ -82,7 +82,7 @@ test('项目切换时通过 instanceId 和 sequence 丢弃旧图像结果', () =
   assert.match(view, /projectInstanceId !== window\.__workspace\?\.state\?\.project\?\.instanceId/);
   assert.match(view, /writcraft:project-entered/);
   assert.match(view, /clearResult\(\)/);
-  assert.match(view, /window\.__imageGenerationView = Object\.freeze\(\{ discardPending \}\)/);
+  assert.match(view, /window\.__imageGenerationView = Object\.freeze\(\{ discardPending, refreshTrash \}\)/);
   assert((workspace.match(/window\.__imageGenerationView\.discardPending\(\)/g) || []).length >= 2);
   assert.match(workspace, /请先对当前生成图片选择插入、保留或移入废纸篓/);
 });

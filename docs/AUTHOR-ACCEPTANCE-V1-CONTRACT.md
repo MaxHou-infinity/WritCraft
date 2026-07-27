@@ -1,6 +1,6 @@
 # WritCraft V0 · Real Author Acceptance v1
 
-> Status: **frozen; Image Review v1 instrumentation and offline journey signed, pending real paid-API and author execution**. Current evidence (2026-07-26): `npm test` and Electron-enabled `npm run verify` exit 0, forced Electron **31/31**, persistent watcher **3/3**, Image Generation 15/15, Review Service 16/16, Handler 9/9, Renderer 8/8, independent review P0=0/P1=0/P2=1. The disclosed P2 is the missing in-app restore/empty-trash UI and is the next local implementation task; fixture results cannot satisfy the later real journey.
+> Status: **frozen; Image Review instrumentation and offline journey implemented, pending final Image Trash independent closure plus real paid-API and author execution**. Current evidence (2026-07-27): Electron-enabled `npm run verify` exit 0, forced Electron **32/32**, persistent watcher **3/3**, Image Generation 15/15, Review Service 16/16, Review Handler 9/9, Trash Service 21/21, Trash Handler 7/7, Trash Integration 4/4, Image Renderer 8/8, and Trash Renderer 7/7. The former missing restore/empty P2 is implemented; five review-found race P1s were fixed, but final no-blocker closure has not yet returned. Fixture results still cannot satisfy the later real journey.
 
 Research accuracy instrumentation is governed by `RESEARCH-ACCURACY-V1-CONTRACT.md`; it records the author’s match judgment, never a platform truth score.
 

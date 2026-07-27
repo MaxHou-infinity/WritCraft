@@ -54,6 +54,8 @@ const refreshedResidualMetadata = researchApplyTransactionService.refreshedResid
 const imageGenerationService = require('./image-generation-service');
 const imageReviewServiceModule = require('./image-review-service');
 const imageReviewHandlerModule = require('./image-review-handler');
+const imageTrashServiceModule = require('./image-trash-service');
+const imageTrashHandlerModule = require('./image-trash-handler');
 const inlineRewriteContextService = require('./inline-rewrite-context-service');
 const inlineRewriteService = require('./inline-rewrite-service');
 const inlineRewriteCapabilityStoreService = require('./inline-rewrite-capability-store');
@@ -92,6 +94,7 @@ const projectWatcherHealth = projectWatcherHealthService.createProjectWatcherHea
 const diagnosticRecorder = diagnosticExportService.createDiagnosticRecorder();
 const diagnosticPreviewStore = diagnosticExportService.createDiagnosticPreviewStore();
 const imageReviewService = imageReviewServiceModule.createImageReviewService();
+const imageTrashService = imageTrashServiceModule.createImageTrashService();
 const activeImageGenerations = new Set();
 const imageReviewHandler = imageReviewHandlerModule.createImageReviewHandler({
   assertTrustedSender,
@@ -100,6 +103,13 @@ const imageReviewHandler = imageReviewHandlerModule.createImageReviewHandler({
   getNavigationEpoch: () => rendererNavigationEpoch,
   projectService,
   reviewService: imageReviewService,
+});
+const imageTrashHandler = imageTrashHandlerModule.createImageTrashHandler({
+  assertTrustedSender,
+  getCurrentProject: () => currentProject,
+  getMutationGeneration: () => projectMutationGeneration,
+  getNavigationEpoch: () => rendererNavigationEpoch,
+  trashService: imageTrashService,
 });
 let projectMutationGeneration = 0;
 let rendererNavigationEpoch = 0;
@@ -290,6 +300,7 @@ function projectFailure(error) {
     error instanceof researchHandoffService.ResearchHandoffError ||
     error instanceof imageGenerationService.ImageGenerationError ||
     error instanceof imageReviewServiceModule.ImageReviewError ||
+    error instanceof imageTrashServiceModule.ImageTrashError ||
     error instanceof inlineRewriteContextService.InlineRewriteContextError ||
     error instanceof inlineRewriteMutationGuardService.InlineRewriteMutationGuardError ||
     error instanceof inlineRewriteMutationGuardService.ChangesHistoryMutationGuardError ||
@@ -2906,6 +2917,44 @@ ipcMain.handle('writcraft:project:get-image-review-aggregate', async (
       ok: true,
       aggregate: imageReviewHandler.aggregate(event, projectInstanceId),
     };
+  } catch (error) {
+    return projectFailure(error);
+  }
+});
+
+ipcMain.handle('writcraft:project:get-image-trash', async (
+  event,
+  projectInstanceId
+) => {
+  try {
+    requireCurrentProject();
+    return imageTrashHandler.list(event, projectInstanceId);
+  } catch (error) {
+    return projectFailure(error);
+  }
+});
+
+ipcMain.handle('writcraft:project:restore-image-trash', async (
+  event,
+  projectInstanceId,
+  token
+) => {
+  try {
+    requireMutableProject();
+    return imageTrashHandler.restore(event, projectInstanceId, token);
+  } catch (error) {
+    return projectFailure(error);
+  }
+});
+
+ipcMain.handle('writcraft:project:empty-image-trash', async (
+  event,
+  projectInstanceId,
+  token
+) => {
+  try {
+    requireMutableProject();
+    return imageTrashHandler.empty(event, projectInstanceId, token);
   } catch (error) {
     return projectFailure(error);
   }

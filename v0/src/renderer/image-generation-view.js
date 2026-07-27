@@ -10,12 +10,212 @@
   const generate = document.getElementById('image-generate');
   const resultHost = document.getElementById('image-result');
   const reviewSummary = document.getElementById('image-review-summary');
+  const trashToggle = document.getElementById('image-trash-toggle');
+  const trashPanel = document.getElementById('image-trash-panel');
+  const trashStatus = document.getElementById('image-trash-status');
+  const trashList = document.getElementById('image-trash-list');
+  const trashRefresh = document.getElementById('image-trash-refresh');
+  const trashEmpty = document.getElementById('image-trash-empty');
   let pendingOwner = null;
   let loading = false;
   let reviewBusy = false;
   let reviewSettlement = null;
   let requestSequence = 0;
   let aggregateSequence = 0;
+  let trashSequence = 0;
+  let trashBusy = false;
+  let trashOwner = null;
+
+  function hasExactKeys(value, expected) {
+    const keys = value && typeof value === 'object' && !Array.isArray(value)
+      ? Object.keys(value).sort()
+      : [];
+    return keys.length === expected.length &&
+      expected.every((key, index) => keys[index] === key);
+  }
+
+  function safeTrashResult(result) {
+    const value = result && typeof result === 'object' && !Array.isArray(result)
+      ? result
+      : null;
+    if (!value || !hasExactKeys(value, [
+      'items', 'ok', 'policy', 'schema', 'snapshotToken', 'totalBytes', 'totalCount',
+    ]) || value.ok !== true || value.schema !== 'writcraft.image-trash/v1' ||
+        value.policy !== 'manual_until_restore_or_empty' ||
+        !Number.isSafeInteger(value.totalCount) || value.totalCount < 0 ||
+        !Number.isSafeInteger(value.totalBytes) || value.totalBytes < 0 ||
+        !Array.isArray(value.items) || value.items.length > 50 ||
+        (value.snapshotToken !== null &&
+          (typeof value.snapshotToken !== 'string' ||
+            !/^its_[a-f0-9]{48}$/.test(value.snapshotToken)))) {
+      return null;
+    }
+    const items = [];
+    for (const item of value.items) {
+      if (!item || !hasExactKeys(item, ['createdAt', 'sizeBytes', 'token']) ||
+          typeof item.token !== 'string' || !/^iti_[a-f0-9]{48}$/.test(item.token) ||
+          typeof item.createdAt !== 'string' || Number.isNaN(Date.parse(item.createdAt)) ||
+          !Number.isSafeInteger(item.sizeBytes) || item.sizeBytes < 1) {
+        return null;
+      }
+      items.push(Object.freeze({
+        token: item.token,
+        createdAt: item.createdAt,
+        sizeBytes: item.sizeBytes,
+      }));
+    }
+    if ((value.totalCount === 0) !== (value.snapshotToken === null) ||
+        value.totalCount < items.length) return null;
+    return Object.freeze({
+      totalCount: value.totalCount,
+      totalBytes: value.totalBytes,
+      items: Object.freeze(items),
+      snapshotToken: value.snapshotToken,
+    });
+  }
+
+  function formatTrashBytes(value) {
+    if (value < 1024) return `${value} B`;
+    if (value < 1024 * 1024) return `${(value / 1024).toFixed(1)} KB`;
+    return `${(value / (1024 * 1024)).toFixed(1)} MB`;
+  }
+
+  function trashMessage(text, error = false) {
+    if (!trashStatus) return;
+    trashStatus.textContent = text;
+    trashStatus.className = `image-trash-status${error ? ' is-error' : ''}`;
+  }
+
+  function resetTrash() {
+    trashSequence += 1;
+    trashBusy = false;
+    trashOwner = null;
+    trashList?.replaceChildren();
+    if (trashToggle) trashToggle.textContent = '图片废纸篓 · 0';
+    if (trashEmpty) trashEmpty.disabled = true;
+    trashMessage('长期保留，不会自动删除；只有恢复或清空才会改变废纸篓。');
+  }
+
+  function renderTrash(owner) {
+    if (!trashList || !trashToggle || !trashEmpty) return;
+    trashList.replaceChildren();
+    trashToggle.textContent = `图片废纸篓 · ${owner.totalCount}`;
+    trashEmpty.disabled = trashBusy || !owner.snapshotToken;
+    trashMessage(owner.totalCount
+      ? `共 ${owner.totalCount} 张，${formatTrashBytes(owner.totalBytes)}。长期保留，不会自动删除。`
+      : '废纸篓为空。图片长期保留，除非你明确恢复或清空。');
+    for (const [index, item] of owner.items.entries()) {
+      const row = document.createElement('div');
+      row.className = 'image-trash-item';
+      const detail = document.createElement('span');
+      const created = new Date(item.createdAt);
+      detail.textContent =
+        `图片 ${index + 1} · ${formatTrashBytes(item.sizeBytes)} · ${created.toLocaleString('zh-CN')}`;
+      const restore = document.createElement('button');
+      restore.type = 'button';
+      restore.textContent = '恢复到素材区';
+      restore.disabled = trashBusy;
+      restore.addEventListener('click', () => restoreTrashItem(owner, item));
+      row.append(detail, restore);
+      trashList.appendChild(row);
+    }
+    if (owner.totalCount > owner.items.length) {
+      const more = document.createElement('p');
+      more.className = 'image-trash-status';
+      more.textContent = `另有 ${owner.totalCount - owner.items.length} 张未展开；清空会以当前核验快照为准。`;
+      trashList.appendChild(more);
+    }
+  }
+
+  async function refreshTrash() {
+    const projectInstanceId = window.__workspace?.state?.project?.instanceId;
+    if (!projectInstanceId || !bridge?.getImageTrash || trashBusy) {
+      if (!projectInstanceId) resetTrash();
+      return false;
+    }
+    const sequence = ++trashSequence;
+    trashMessage('正在核验图片废纸篓…');
+    let result;
+    try {
+      result = await bridge.getImageTrash(projectInstanceId);
+    } catch (error) {
+      result = { ok: false, message: error.message };
+    }
+    if (sequence !== trashSequence ||
+        projectInstanceId !== window.__workspace?.state?.project?.instanceId) return false;
+    const safe = safeTrashResult(result);
+    if (!safe) {
+      trashOwner = null;
+      trashList?.replaceChildren();
+      if (trashEmpty) trashEmpty.disabled = true;
+      trashMessage(result?.message || '图片废纸篓读取失败；未改变任何文件。', true);
+      return false;
+    }
+    trashOwner = Object.freeze({ projectInstanceId, ...safe });
+    renderTrash(trashOwner);
+    return true;
+  }
+
+  async function restoreTrashItem(owner, item) {
+    if (trashBusy || trashOwner !== owner || !bridge?.restoreImageTrash) return false;
+    trashBusy = true;
+    renderTrash(owner);
+    trashMessage('正在把这张图片恢复到项目素材区…');
+    let result;
+    try {
+      result = await bridge.restoreImageTrash(owner.projectInstanceId, item.token);
+    } catch (error) {
+      result = { ok: false, message: error.message };
+    }
+    if (trashOwner !== owner ||
+        owner.projectInstanceId !== window.__workspace?.state?.project?.instanceId) {
+      trashBusy = false;
+      return false;
+    }
+    trashBusy = false;
+    if (!result?.ok) {
+      renderTrash(owner);
+      trashMessage(result?.message || '图片恢复失败；废纸篓内容保持不变。', true);
+      return false;
+    }
+    const safePath = typeof result.assetPath === 'string' &&
+      /^assets\/generated\/image-[a-f0-9]{64}\.(?:png|jpg)$/.test(result.assetPath)
+      ? result.assetPath
+      : '项目素材区';
+    trashMessage(`已恢复到 ${safePath}；正文没有修改。`);
+    return refreshTrash();
+  }
+
+  async function emptyTrash() {
+    const owner = trashOwner;
+    if (trashBusy || !owner?.snapshotToken || !bridge?.emptyImageTrash) return false;
+    const confirmed = window.confirm?.(
+      `永久清空当前核验的 ${owner.totalCount} 张图片？\n\n该操作无法撤销；清空期间新进入的图片不会被删除。`
+    );
+    if (!confirmed) return false;
+    trashBusy = true;
+    renderTrash(owner);
+    trashMessage('正在永久清空当前核验快照…');
+    let result;
+    try {
+      result = await bridge.emptyImageTrash(owner.projectInstanceId, owner.snapshotToken);
+    } catch (error) {
+      result = { ok: false, message: error.message };
+    }
+    if (trashOwner !== owner ||
+        owner.projectInstanceId !== window.__workspace?.state?.project?.instanceId) {
+      trashBusy = false;
+      return false;
+    }
+    trashBusy = false;
+    if (!result?.ok) {
+      renderTrash(owner);
+      trashMessage(result?.message || '清空尚未完成；请保持项目不变后重试。', true);
+      return false;
+    }
+    trashMessage(`已永久清空 ${Number.isSafeInteger(result.emptiedCount) ? result.emptiedCount : 0} 张；正在刷新。`);
+    return refreshTrash();
+  }
 
   async function refreshReviewSummary() {
     const projectInstanceId = window.__workspace?.state?.project?.instanceId;
@@ -159,9 +359,8 @@
       } else if (decision === 'kept') {
         renderState('已保留为项目素材，正文没有修改。');
       } else {
-        renderState(
-          '已移出素材区，正文没有修改。可从项目文件夹 .writcraft/image-trash 手动恢复。'
-        );
+        renderState('已移入图片废纸篓，正文没有修改。可在本面板中恢复。');
+        void refreshTrash();
       }
       return true;
     })();
@@ -366,6 +565,14 @@
     if (open) void refreshReviewSummary();
     sync();
   });
+  trashToggle?.addEventListener('click', () => {
+    const open = Boolean(trashPanel?.hidden);
+    if (trashPanel) trashPanel.hidden = !open;
+    trashToggle.setAttribute('aria-expanded', String(open));
+    if (open) void refreshTrash();
+  });
+  trashRefresh?.addEventListener('click', () => { void refreshTrash(); });
+  trashEmpty?.addEventListener('click', () => { void emptyTrash(); });
   prompt?.addEventListener('input', sync);
   generate?.addEventListener('click', run);
   document.addEventListener('writcraft:project-entered', () => {
@@ -373,7 +580,9 @@
     loading = false;
     if (!pendingOwner) clearResult();
     void refreshReviewSummary();
+    resetTrash();
+    if (trashPanel && !trashPanel.hidden) void refreshTrash();
     sync();
   });
-  window.__imageGenerationView = Object.freeze({ discardPending });
+  window.__imageGenerationView = Object.freeze({ discardPending, refreshTrash });
 })();
