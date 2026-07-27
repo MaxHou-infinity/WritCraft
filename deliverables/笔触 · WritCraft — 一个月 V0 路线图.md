@@ -1,8 +1,8 @@
 # 笔触 · WritCraft · 一个月 V0 路线图
 
-> 文档版本：2026-07-27（v2.1，Image Trash 最终签字）
+> 文档版本：2026-07-27（v2.2，真实作者验收前置）
 > 状态：**V0 续作中，完整产品未完成**；产品范围以 `docs/WRITCRAFT-PRD-V3.md` 为准  
-> 2026-07-27 续作交接：Inline、Plan Strict、Graph、Author Evidence Metrics、Research Accuracy、Changes/History durable recovery、Diagnostic Export、Image Review 与应用内 Image Trash 本地链均已签字；当前源码完整 `npm test`、Electron-enabled `npm run verify` 已通过，受控强制 Electron 为 **32/32**、Persistent Watcher 为 **3/3**，图片专项为 **107/107**。Image Trash 五项竞态 P1 已关闭，最终复审 **P0=0/P1=0/P2=1（非阻断）**。下一步直接进入真实付费 API（含完整 `sk-api-` 图片）、真实 2000+ 字/5+ 章作者旅程、价值证据、干净打包与发布复审；不得重开 Image Trash。现有 App/ZIP 与源码不同步且禁止分发；准确事实与 TODO 只看 `v0/DEVELOPMENT-STATUS.md`。
+> 2026-07-27 续作交接：既有产品链保持签字；真实作者项目预检/隔离副本技术候选经六轮独立复审为 **P0=0/P1=0/P2=3**。Author **39/39**、真实 API 离线合同 **15/15**、组合 **54/54、0 网络**、完整 test/verify 与最终强制 Electron **32/32** 通过；同日一次 Onboarding confirmation 超时仍作为 E2E P2 跟踪。下一步先做 clean-machine helper preflight，再由作者选择合格项目和完整 `sk-api-` 执行真实旅程。现有 App/ZIP 与源码不同步且禁止分发；准确事实与 TODO 只看 `v0/DEVELOPMENT-STATUS.md`。
 > 范围：Month 1（4 周 × 7 天 = 28 天）
 
 ---

@@ -1,6 +1,6 @@
 # WritCraft V0 · Real Author Acceptance v1
 
-> Status: **frozen; Image Review instrumentation and offline journey signed, pending real paid-API and author execution**. Current evidence (2026-07-27): `npm test` and Electron-enabled `npm run verify` exit 0, forced Electron **32/32**, persistent watcher **3/3**, Image Generation 15/15, Review Service 16/16, Review Handler 9/9, Trash Service 21/21, Trash Handler 7/7, Trash Integration 4/4, Image Renderer 8/8, and Trash Renderer 7/7. The former missing restore/empty P2 and five review-found race P1s are closed; final Trash review is **P0=0/P1=0/P2=1（non-blocking external open-FD residual）**. Fixture results still cannot satisfy the later real journey.
+> Status: **frozen contract; technical candidate signed P0=0/P1=0/P2=3 after six independent review rounds**. Current evidence (2026-07-27): author preflight **39/39**, real-API offline contract **15/15** (**54/54, 0 network**), `npm test` and Electron-enabled `npm run verify` exit 0, final forced Electron **32/32**. One same-day Onboarding confirmation timeout remains an explicit nondeterministic E2E P2 in `v0/DEVELOPMENT-STATUS.md`. The configured credential is Coding Plan and the recent project fails the five-chapter/2,000-character/source requirements; real-author and paid gates remain closed.
 
 Research accuracy instrumentation is governed by `RESEARCH-ACCURACY-V1-CONTRACT.md`; it records the author’s match judgment, never a platform truth score.
 
@@ -9,6 +9,23 @@ Research accuracy instrumentation is governed by `RESEARCH-ACCURACY-V1-CONTRACT.
 Use an author-owned working copy containing `edit.md`, at least five chapter Markdown files, source material, and at least 2,000 visible Chinese characters. Take a reversible snapshot before testing. The application may persist only normal project files, `.writcraft` metadata, generated assets, and Change History.
 
 Evidence may contain timestamps, stable error codes, durations, token counts, file counts, character counts, acceptance decisions, ratings, and before/after SHA-256 revisions. It must never contain API keys, prompts, answers, manuscript text, model text, quotes, base64, absolute paths, or key fingerprints. Samples below 20 must be labelled directional.
+
+### 1.1 Safe project preparation
+
+Preflight is read-only and prints only the allowlisted counts, stable errors, and snapshot digest:
+
+```bash
+npm run acceptance:author:prepare -- --project "/author-selected/project"
+```
+
+After it is eligible, create a separately named working copy in an author-selected parent:
+
+```bash
+npm run acceptance:author:prepare -- --project "/author-selected/project" \
+  --copy-to "/author-selected/acceptance-parent" --name "WritCraft 作者验收"
+```
+
+`src/main/author-acceptance-preflight-service.js` enforces a valid root `edit.md`, at least five Markdown files under `chapters/`, 2,000 visible Chinese characters, and at least one `references/` file. Its synchronous CLI-only transaction binds cwd and source/destination identities, reads eligibility and copy bytes from one scan, prepares a random private stage with an invalid manifest, commits readiness while the stage is private, performs the final source scan, then uses a parent-fd-relative macOS `renameatx_np(RENAME_EXCL)` helper to publish atomically without clobbering. Primary and secondary helper evidence form a three-state commit truth; unknown publication is reported as committed-risk and never enters precommit cleanup. A postcommit scan reports the narrow commit-window source race. Exact cleanup removes only owned identities and aborts on replacement. Do not scan unrelated home folders or treat fixtures as author evidence.
 
 ## 2. Paid-network gate
 
@@ -32,6 +49,19 @@ The image run additionally requires a complete `sk-api-` credential and may cons
 ## 4. Sign-off criteria
 
 - No silent manuscript write, cross-project result, stale apply, secret/content log, or unresolved P0/P1.
+
+### 7.1 Current blocking review matrix (2026-07-27)
+
+Before any real-author copy is created, implementation and adversarial tests must prove:
+
+1. eligibility and copied bytes derive from one authoritative source snapshot;
+2. source ancestor identities remain bound, and the final source recheck is the last pre-commit step;
+3. destination parent/stage identities cannot be replaced to redirect writes;
+4. publication is atomic no-clobber rather than `existsSync` followed by replacing `rename`;
+5. committed-then-threw publication is reconciled from disk and never reported as an ordinary pre-commit failure;
+6. internal resource bounds cannot exceed contract maxima and duplicate CLI arguments fail closed.
+
+The current 39/39 suite dynamically exercises snapshot and ancestor replacement, stage identity, private readiness, parent-fd publication, no-clobber, exact cleanup, mode/empty-directory fidelity, committed-then-threw, lost/malformed helper reports and committed-unknown truth. Sixth-round independent review signed **P0=0/P1=0/P2=3**. Remaining P2: the native `mkdirat→openat/fstat` external-process micro-window, clean-machine `/usr/bin/python3` availability, and an empty 0700 random stage if reservation output is lost. Real-author execution still requires an eligible user-selected project, complete `sk-api-` credential, helper preflight and explicit user gate.
 - Onboarding structured success/failure and manual-retry outcomes, Inline acceptance, Plan use/task adoption, Research accuracy/adoption, and image generation/adoption are visible as private project-scoped aggregates.
 - Full `npm test`, Electron-enabled `npm run verify`, forced Electron E2E, and an independent review pass after the real journey.
 - Only then rebuild from current source, run `npm run release:verify`, test Finder launch on a clean macOS account, and proceed to signing/notarization/Gatekeeper review.

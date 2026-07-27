@@ -52,6 +52,14 @@ For destructive filesystem work, an `lstat` followed by path-based `unlink` is n
 
 Tests must derive expectations from the production contract, not incidental ordering. If production sorts candidates by metadata, a race/fault injection must target the first candidate actually processed or explicitly control the metadata; never assume fixture creation order. Before changing product code for a next-session failure, first prove whether the failure is implementation drift, environmental variance, or a brittle test assumption.
 
+Real-author acceptance is an explicit privacy boundary. Validate only an author-selected project; never crawl unrelated home folders to find a convenient manuscript. Preflight must remain read-only and path/content-free, and testing must use an isolated working copy whose source snapshot is proven unchanged. Synthetic fixtures can verify mechanics but can never count as author evidence.
+
+For filesystem copy/publish workflows, freeze the complete read/copy/commit matrix before implementing the happy path. Eligibility and copied bytes must come from one authoritative snapshot; bind every source ancestor and destination parent/stage identity; make the final source recheck the last pre-commit action; publish with atomic no-clobber semantics; and reconcile committed-then-threw outcomes from disk. `O_NOFOLLOW` protects only the final path component, and `existsSync` followed by `renameSync` is neither ancestor-safe nor no-clobber. Add adversarial tests for each boundary before treating full-suite green as sign-off.
+
+Treat an external filesystem helper as a three-state transaction: proven uncommitted, proven committed, or unknown. If both the primary result and independent reconciliation are unavailable, report committed-risk and never enter precommit cleanup. Moving work into a native helper does not make `mkdir→open` atomic; attack the exact syscall gap or document the residual explicitly. Random names reduce likelihood but do not prove inode ownership.
+
+Never erase a red integration run with a green retry. Record both, inspect the failed boundary, and keep a flake as an explicit P2/TODO until its timing cause is explained or repeated clean runs justify closing it. A retry is evidence about nondeterminism, not proof that the first failure was harmless.
+
 ## Commit & Pull Request Guidelines
 
 Local Git history begins with the 2026-07-26 V0 baseline, so it does not describe earlier development conventions. Use concise imperative commits, for example `fix(onboarding): preserve committed state`. Keep source, tests, and affected documentation in the same commit. PRs should explain user impact, authority/state-machine changes, tests run, and remaining risks; include screenshots for UI changes and never attach secrets or stale release artifacts.

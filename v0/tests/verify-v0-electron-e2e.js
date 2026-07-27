@@ -217,6 +217,7 @@ class CdpClient {
     this.nextId = 1;
     this.pending = new Map();
     this.listeners = new Map();
+    this.failure = null;
   }
 
   async connect() {
@@ -228,9 +229,17 @@ class CdpClient {
     });
     this.socket.addEventListener('message', event => this.handleMessage(event.data));
     this.socket.addEventListener('close', () => {
-      for (const pending of this.pending.values()) pending.reject(new Error('CDP WebSocket closed'));
-      this.pending.clear();
+      this.abort(this.failure || new Error('CDP WebSocket closed'));
     });
+  }
+
+  abort(error) {
+    if (!this.failure) this.failure = error;
+    for (const pending of this.pending.values()) {
+      clearTimeout(pending.timer);
+      pending.reject(this.failure);
+    }
+    this.pending.clear();
   }
 
   handleMessage(raw) {
@@ -254,6 +263,7 @@ class CdpClient {
   }
 
   command(method, params = {}, timeoutMs = COMMAND_TIMEOUT_MS) {
+    if (this.failure) return Promise.reject(this.failure);
     if (!this.socket || this.socket.readyState !== WebSocket.OPEN) return Promise.reject(new Error('CDP is not connected'));
     const id = this.nextId++;
     return new Promise((resolve, reject) => {
@@ -353,6 +363,7 @@ async function waitForExit(child, timeoutMs = EXIT_TIMEOUT_MS) {
 async function stopElectron(instance) {
   if (!instance) return null;
   const { child, client } = instance;
+  instance.stopping = true;
   if (child.exitCode !== null || child.signalCode) {
     client?.close();
     return { code: child.exitCode, signal: child.signalCode };
@@ -455,7 +466,23 @@ async function launchElectron(profileRoot, recentProjectRoot, options = {}) {
   // renderer entry/resource lifecycle instead of only late requests.
   await client.command('Page.reload', { ignoreCache: true });
   await waitForRenderer(client);
-  return { child, client, page, logRef, networkRequests, profileRoot, userData };
+  const instance = {
+    child,
+    client,
+    page,
+    logRef,
+    networkRequests,
+    profileRoot,
+    userData,
+    stopping: false,
+  };
+  child.once('exit', (code, signal) => {
+    if (instance.stopping) return;
+    const error = new Error(`Electron exited unexpectedly (${code ?? signal ?? 'unknown'})`);
+    error.processLog = boundedLog(logRef.value);
+    client.abort(error);
+  });
+  return instance;
 }
 
 async function inspectRuntime(instance) {
@@ -3439,10 +3466,13 @@ async function run() {
 }
 
 if (require.main === module) {
-  run().catch(error => {
-    console.error(error && error.stack ? error.stack : error);
-    process.exitCode = 1;
-  });
+  const lifecycleGuard = setInterval(() => {}, 1000);
+  run()
+    .catch(error => {
+      console.error(error && error.stack ? error.stack : error);
+      process.exitCode = 1;
+    })
+    .finally(() => clearInterval(lifecycleGuard));
 }
 
 module.exports = {

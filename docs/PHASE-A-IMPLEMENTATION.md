@@ -6,9 +6,9 @@
 > 产品依据：`docs/WRITCRAFT-PRD-V3.md`  
 > 范围：把现有单文档 Electron 原型升级为安全、可恢复的本地多文件项目工作区。
 
-> **工程交接（2026-07-27，Image Trash 恢复/清空闭环）**：图片生成后由 Main 签发资产绑定 token，Renderer 必填评分并显式选择插入、保留或可恢复废纸篓；废纸篓现支持安全列表、单项恢复和确认式精确快照清空。Trash Service 21/21、Handler 7/7、Integration 4/4、Renderer 7/7，Electron-enabled `npm run verify` exit 0、强制真实 Electron 32/32。Diagnostic 与 Changes/History 保持签字；现有 App/ZIP 禁止分发。
+> **工程交接（2026-07-27，真实作者验收前置）**：Image Trash 保持签字；Author CLI 技术候选经过六轮独立复审，最终 **P0=0/P1=0/P2=3**。单一快照、cwd/inode 祖先绑定、私有 stage readiness、parent-fd 相对排他发布、三态 committed truth、精确清理、硬上限和 helper 故障均有动态回归；Author **39/39**、离线 API **15/15**、完整 test/verify 与最终强制 Electron **32/32** 通过。同日一次 Onboarding confirmation 超时保留为 E2E P2，见状态台账。现有 App/ZIP 仍禁止分发。
 > **下一阶段合同**：`docs/AUTHOR-ACCEPTANCE-V1-CONTRACT.md` 已冻结，明确付费网络门禁、允许记录的隐私安全证据、真实长文旅程与发布前签字顺序。
-> **当前实现停点**：0.0N Image Trash 实现、全量回归、真实 App 与最终独立复审均已通过，**P0=0/P1=0/P2=1（非阻断）**。下一步按作者验收合同执行真实 `sk-api-`、真实长文和发布前证据，不得退回旧图片协议。
+> **当前实现停点**：0.0O 技术复审已签字。下一步是先做 clean-machine `/usr/bin/python3` helper preflight，再由作者显式选择满足五章节、2,000 汉字和来源要求的真实项目，并提供完整 `sk-api-`；不得扫描无关私人文稿、自动创建真实副本或用 fixture 替代作者证据。
 
 ## 1. 阶段目标
 
