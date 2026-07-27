@@ -2,9 +2,9 @@
 
 > 最后更新：2026-07-27（Asia/Shanghai，应用内 Image Trash 恢复/清空闭环）
 > 当前状态：**V0 候选原型。图片生成、作者评分、插入/保留/废纸篓、可见列表、逐项恢复与确认式快照清空已形成真实 App 闭环；Diagnostic Export 与 Changes/History durable recovery 保持签字。真实付费 API、真实作者和发布验收仍缺。**
-> 发布判断：**仍禁止分发；下一步先完成 Image Trash 最终独立 closure 记录，再进入完整 `sk-api-` 图片实测、真实作者长文证据、干净打包与发布复审。现有 App/ZIP 未按当前源码重建。**
-> 在制任务：**0.0N 实现、对抗测试、全量 verify 与真实 Electron 已通过；两轮独立复审累计发现的五项 P1 已修复，但最终无阻断 closure 尚未返回，不能提前写成签字完成。**
-> 当前源码证据：**Diagnostic Service 13/13、Handler 10/10、Renderer 7/7；Image Generation 15/15、Image Review Service 16/16、Review Handler 9/9、Trash Service 21/21、Trash Handler 7/7、Trash Integration 4/4、Image Renderer 8/8、Trash Renderer 7/7、Metrics Renderer 20/20、Network Boundary 15/15；Recovery 24/24、Change History 14/14、ChangeSet Review 15/15、Composite Guard 5/5、Changes Renderer 协议 16/16、Workspace 恢复 7/7、Changes integration 6/6、Persistent Watcher Main/IPC 3/3；Electron-enabled `npm run verify` exit 0，标准强制真实 Electron E2E 32/32。**
+> 发布判断：**仍禁止分发；Image Trash 本地链已签字，下一步进入完整 `sk-api-` 图片实测、真实作者长文证据、干净打包与发布复审。现有 App/ZIP 未按当前源码重建。**
+> 在制任务：**0.0N 已完成实现、稳定性修正、全量验证与最终独立复审：P0=0/P1=0/P2=1（非阻断）。下一步先执行真实付费/作者门禁，不再扩展 Image Trash。**
+> 当前源码证据：**Diagnostic Service 13/13、Handler 10/10、Renderer 7/7；Image Generation 15/15、Image Review Service 16/16、Review Handler 9/9、Trash Service 21/21、Trash Handler 7/7、Trash Integration 4/4、Image Renderer 8/8、Trash Renderer 7/7、Metrics Renderer 20/20、Network Boundary 15/15；Recovery 24/24、Change History 14/14、ChangeSet Review 15/15、Composite Guard 5/5、Changes Renderer 协议 16/16、Workspace 恢复 7/7、Changes integration 6/6、Persistent Watcher Main/IPC 3/3；`npm test` 与 Electron-enabled `npm run verify` 均 exit 0，标准强制真实 Electron E2E 32/32。**
 > 最近历史基线（本批前）：**强制真实 Electron E2E 31/31 是 0.0M Image Review 阶段证据，已被上方当前源码 32/32 覆盖。**
 > Graph 历史签字基线：**性能修复前的既有源码曾完整 `npm test`、Electron-enabled `npm run verify`、强制真实 Electron 26/26 exit 0；Graph Filter 15/15、Workbench 14/14、dynamic 5/5、Large 5/5、Watcher 15/15、Network 11/11、Intelligence 17/17，第二轮复审 P0=0/P1=0/P2=2。该数字只保留为历史过程，已被上方当前最终源码证据覆盖。**  
 > Graph 动态边界：**300 文件/1279 节点 cold-to-interactive、cache/incremental、筛选/内存/布局、AX/键鼠、三类纠错、stale/Issue→Changes、failure live、重启与项目隔离均进入真实 Electron；正文/History/ledger 的零写入门禁通过。**  
@@ -14,15 +14,15 @@
 > 真实作者验收契约：`../docs/AUTHOR-ACCEPTANCE-V1-CONTRACT.md`（已冻结，待执行）
 > Changes/History 恢复契约：`../docs/CHANGES-HISTORY-RECOVERY-V1-CONTRACT.md`（2026-07-26 已冻结并完成全链签收）
 > Diagnostic Export 契约：`../docs/DIAGNOSTIC-EXPORT-V1-CONTRACT.md`（2026-07-26 已实现并完成自动化产品链签收）
-> Image Review 契约：`../docs/IMAGE-REVIEW-V1-CONTRACT.md`（2026-07-27 Trash 扩展已实现并通过动态链，待最终独立 closure 与真实付费验收）
+> Image Review 契约：`../docs/IMAGE-REVIEW-V1-CONTRACT.md`（2026-07-27 Trash 扩展已签字，待真实付费/作者验收）
 
 ## 0. 续作口令
 
 Chat/Chapter、Onboarding v2、Research→Changes、Inline Rewrite 与 Plan Strict 的当前主链已经关闭。下一轮恢复时不要重写这些协议，也不要分发现有 `release/` 产物。
 
 1. 读本文、`package.json`、当前源码文件与 `git log -1 --stat`；本地 Git 历史从 2026-07-26 V0 基线开始，不得据此臆测更早的开发过程。
-2. **Diagnostic Export v1、Research Accuracy v1、committed-warning、Graph 三项韧性缺口、Changes/History durable recovery 与 Image Review v1 原自动化链均已完整签收，不再重开；Image Trash 只剩最终独立 closure 记录，不得重写已通过的产品链。**
-3. 下一产品入口先取得 Image Trash 最终 P0/P1 closure，再做完整 `sk-api-` 图片实测、真实 API/作者证据、干净打包与发布复审；不得退回旧的“生成后只有插入/放弃”图片协议。
+2. **Diagnostic Export v1、Research Accuracy v1、committed-warning、Graph 三项韧性缺口、Changes/History durable recovery、Image Review v1 与 Image Trash 本地链均已完整签收，不再重开这些协议。**
+3. 下一产品入口是完整 `sk-api-` 图片实测与真实 API/作者证据，之后才做干净打包与发布复审；不得退回旧的“生成后只有插入/放弃”图片协议。
 4. 不重写已经签字的 Onboarding v2 service、capability store、batch、Main/preload 与 Renderer 契约；Main 动态 admission、single-flight 和 Renderer 生命周期 authority 清理均已关闭。
 5. 每批合入后重跑定向测试；阶段完成时再运行完整 `npm test`、`npm run verify` 与 `WRITCRAFT_E2E_FORCE=1 npm run e2e:electron`，保存当次证据。
 6. 真实 API 只使用用户显式配置的 Key；记录延迟、限流、超时、故障和费用，不记录 Key、Prompt、模型原文或正文。完成真实作者闭环后再重新打包并做签名、公证和发布复审。
@@ -34,8 +34,9 @@ Chat/Chapter、Onboarding v2、Research→Changes、Inline Rewrite 与 Plan Stri
 - **并发与真相**：恢复/清空先把精确路径原子移动到随机私有 transaction quarantine，再核验 inode/大小/digest，避免 `lstat→unlink` 窗口误删外来文件；恢复发布失败会清理由本次创建的 exact inode。同 inode 同尺寸原地改写、pre-link/path replacement、late arrival、部分提交、committed-then-threw、目录 fsync 与跨 TTL 精确重试均有动态回归。
 - **保留策略**：V0 不做后台或定时永久删除。清空只删除 opaque snapshot 当时核验的条目；期间新进入的图片保留。恢复和清空均不修改 Markdown、`edit.md` 或 `.writcraft/image-reviews.json`。
 - **当前证据**：Trash Service **21/21**、Handler **7/7**、Main/preload Integration **4/4**、Renderer **7/7**；完整图片专项 **107/107**、沙箱外 `npm run verify` exit 0、真实 Electron **32/32**。真实 Electron 可见覆盖删除→列表→恢复→重启→保留新到条目→两次确认式清空，且正文/评审证据不变、Renderer 0 HTTP(S)。
-- **独立复审与错误沉淀**：第一轮在 15/15 后发现 path-based unlink、committed TTL 和 restore 原地改写 3 项 P1；第二轮在 19/19 后继续发现 empty 缺 digest 快照与 pre-link replacement 遗留 foreign target 2 项 P1。五项均已修复并增至 21/21，但独立验收任务连续超时，最终 P0/P1 closure 未返回；因此本节准确状态是“实现与验证通过、最终独立签字待补”，不是发布完成。
-- **下一步严格顺序**：只读复审最新小 diff并记录 P0/P1；若无阻断，更新本节与 Nowledge 为签字状态，然后才进入真实 `sk-api-`/作者证据。不得因为全量绿灯跳过复审，也不得再次扩展 Image Trash 范围。
+- **独立复审与错误沉淀**：第一轮在 15/15 后发现 path-based unlink、committed TTL 和 restore 原地改写 3 项 P1；第二轮在 19/19 后继续发现 empty 缺 digest 快照与 pre-link replacement 遗留 foreign target 2 项 P1。五项均已关闭并增至 21/21。最终独立只读 sign-off 为 **P0=0/P1=0/P2=1，可以签字**；P2 仅是非协作外部进程预持 open FD 并在最后 digest 后改写同一 inode 的 POSIX 通用极窄残余，不会按旧路径误删替换文件。
+- **稳定性复盘**：竞态用例曾固定假设 `first` 一定先处理，但 `createdAt`/birthtime 排序并不保证该顺序，导致次日复跑偶发失败。测试现对“实际首个被处理条目”注入竞态，仍严格断言 foreign 内容保留、未处理 peer 不被删除；service 连续 20 轮 **20/20**，不是放宽产品断言。
+- **下一步严格顺序**：进入真实 `sk-api-`/作者证据；不得再次扩展 Image Trash，也不得用 fixture 质量替代真实作者判断。
 
 ### 0.0M 2026-07-26 Image Review v1 自动化闭环（历史已签字基线）
 
@@ -164,7 +165,7 @@ Chat/Chapter、Onboarding v2、Research→Changes、Inline Rewrite 与 Plan Stri
 - **每批必做**：任何功能完成、缺陷关闭、独立复审或全量验证，在开始下一项开发前，同步更新本文及受影响的合同、README 和路线图；未更新的旧 TODO 不得继续执行。
 - **历史数字标注**：20/20、21/21、26/26、28/28 等局部或旧源码数字必须说明日期和覆盖范围，且明确“非当前项目总链”；当前总链只能引用本文顶部的实际执行边界。
 - **续作检查**：恢复任务先读本文、相关合同和 `package.json`，再运行最小能验证当前判断的命令；若文档与源码/命令冲突，先修文档或状态结论，禁止以旧文档扩展修复范围。
-- **本轮审计结果（2026-07-27 0.0N 日终复核）**：README、PRD、Phase A、作者验收合同、Image Review 专项合同、`AGENTS.md` 与本文已按 Trash 实现同步；当前产品总链统一为 **32/32**。0.0M 的 31/31 保留为历史基线，Trash 最终独立 closure 明确列为唯一未签字环节。
+- **本轮审计结果（2026-07-27 0.0N 最终复核）**：README、PRD、Phase A、作者验收合同、Image Review 专项合同、`AGENTS.md` 与本文已按 Trash 签字同步；当前产品总链统一为 **32/32**。0.0M 的 31/31 保留为历史基线，下一未签门禁转为真实 API/作者证据。
 
 ### 0.1 Research Accuracy v1 最终签字（2026-07-22）
 
@@ -265,7 +266,7 @@ Onboarding v2 独立底座的权威文件为：
 
 - 离线 long-form service E2E 覆盖真实目录、`edit.md`、6 章、来源、原子保存、章节提案、三文件 ChangeSet/撤销、图谱增量分析和工作区恢复。
 - 当前最终源码在 `WRITCRAFT_E2E_FORCE=1` 下完成真实 Electron BrowserWindow E2E **32/32**：图片阶段覆盖评分后显式插入、删除、可见废纸篓恢复、重启后精确快照清空与新到条目保留；正文和评审证据保持不变。
-- 当前最终源码 Electron-enabled `npm run verify` **exit 0**；强制 Electron **32/32**、Persistent Watcher **3/3**。Image Review 原链签字保持有效，Image Trash 扩展待最终独立 closure。
+- 当前最终源码 `npm test` 与 Electron-enabled `npm run verify` 均 **exit 0**；强制 Electron **32/32**、Persistent Watcher **3/3**。Image Review 原链与 Image Trash 扩展均已签字。
 - 真实 MiniMax 验收脚本只使用合成项目数据并默认断网；显式门禁后，`/models`、最小 `/messages`、项目卡提案和 Research 均成功，正文磁盘保持零修改。当前 Coding Plan Key 可用于文本，但不能作为 image-01 的完整图片 API 凭据。
 
 ### 1.3 必须保留的产品语义
@@ -348,7 +349,7 @@ Onboarding v2 已取代上述“容错解析完整 `editContent` + 部分创建�
 | AI metrics | 🟡 | 真实 GUI 已验证项目内记录、聚合与落盘；项目切换隔离有专项动态证据，仍待真实作者样本 |
 | Research / A–D 溯源 | 🟡 | Main-owned Research→Changes v1 与 committed-warning 异常边界已签字；A–D 非事实背书，仍待真实作者准确率样本 |
 | image-01 插图 | 🟡 | 安全落盘、尺寸证明、1–5 分、可选费用、插入/保留/可恢复废纸篓及项目聚合已接入；独立复审 P0/P1=0，待完整 API Key 真实验收 |
-| 6→7 章 Electron E2E | 🟡 | 当前源码 force 模式 32/32；仍待 Image Trash 最终独立 closure、真实作者项目、真实 API 与干净打包验收 |
+| 6→7 章 Electron E2E | 🟡 | 当前源码 force 模式 32/32；仍待真实作者项目、真实 API 与干净打包验收 |
 | 10 名作者内测与 Continue 指标 | ⬜ | 尚无真实样本，不得做 Go/No-Go 结论 |
 | 公开发布 | ⬜ | 待真实 API/作者验收、重新打包、签名、公证和 Gatekeeper 复审 |
 
@@ -459,7 +460,7 @@ Graph Extended Acceptance v1 已签字。首轮复审曾以 P1=3 回退 watcher�
 - [x] 用合成内容完成真实 MiniMax 项目卡提案与 Research 证据卡验收；记录延迟、结构化结果、quote 修复和磁盘零修改，不记录秘密、正文或模型原文。
 - [ ] 使用完整 `sk-api-` 人工验收 image-01：记录延迟、限流、超时、故障提示、图片质量与费用，但不记录秘密、Prompt 或 base64。
 - [x] 为 `.writcraft/image-trash/` 增加可见恢复/清空入口与明确保留策略；V0 不自动永久删除，恢复/清空只走 Main 精确能力与真实 Electron 用户旅程。
-- [ ] 为 Image Trash 最新 21/21 竞态加固取得一次及时返回的最终独立 P0/P1 closure；不得把超时当成签字。
+- [x] Image Trash 最新 21/21 竞态加固最终独立复审：P0=0/P1=0/P2=1，可以签字；P2 为非阻断 external open-FD residual。
 - [ ] 在真实 GUI 完成“项目卡 → edit.md ChangeSet → 人工确认 → 磁盘落盘”，并以真实作者项目记录结构化输出失败率与修复重试结果。
 
 ### P2：Main 网络与安全审计

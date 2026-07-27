@@ -331,14 +331,16 @@ test('empty preserves a replacement that wins the commit-path race', () => {
   const item = fixture();
   const originalRename = fs.renameSync;
   let injected = false;
+  let racedSource = null;
   try {
     const first = item.add();
     const second = item.add();
     const foreign = png(0x66);
     const fileSystem = Object.create(fs);
     fileSystem.renameSync = (source, target) => {
-      if (!injected && source === first.target) {
+      if (!injected && [first.target, second.target].includes(source)) {
         injected = true;
+        racedSource = source;
         fs.unlinkSync(source);
         fs.writeFileSync(source, foreign);
       }
@@ -348,8 +350,10 @@ test('empty preserves a replacement that wins the commit-path race', () => {
     const listed = service.list(binding(item.root));
     expectCode('IMAGE_TRASH_STALE', () =>
       service.empty(binding(item.root), listed.snapshotToken));
-    assert.deepStrictEqual(fs.readFileSync(first.target), foreign);
-    assert.strictEqual(fs.existsSync(second.target), true);
+    assert([first.target, second.target].includes(racedSource));
+    assert.deepStrictEqual(fs.readFileSync(racedSource), foreign);
+    const untouched = racedSource === first.target ? second.target : first.target;
+    assert.strictEqual(fs.existsSync(untouched), true);
   } finally { item.cleanup(); }
 });
 

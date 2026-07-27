@@ -8,7 +8,7 @@
 
 > **工程交接（2026-07-27，Image Trash 恢复/清空闭环）**：图片生成后由 Main 签发资产绑定 token，Renderer 必填评分并显式选择插入、保留或可恢复废纸篓；废纸篓现支持安全列表、单项恢复和确认式精确快照清空。Trash Service 21/21、Handler 7/7、Integration 4/4、Renderer 7/7，Electron-enabled `npm run verify` exit 0、强制真实 Electron 32/32。Diagnostic 与 Changes/History 保持签字；现有 App/ZIP 禁止分发。
 > **下一阶段合同**：`docs/AUTHOR-ACCEPTANCE-V1-CONTRACT.md` 已冻结，明确付费网络门禁、允许记录的隐私安全证据、真实长文旅程与发布前签字顺序。
-> **当前实现停点**：0.0N Image Trash 实现、全量回归与真实 App 已通过；独立复审累计发现的五项 P1 已修复，但最终 P0/P1 closure 尚待记录。下一步只补该复审签字，再按作者验收合同执行真实 `sk-api-`、真实长文和发布前证据，不得退回旧图片协议。
+> **当前实现停点**：0.0N Image Trash 实现、全量回归、真实 App 与最终独立复审均已通过，**P0=0/P1=0/P2=1（非阻断）**。下一步按作者验收合同执行真实 `sk-api-`、真实长文和发布前证据，不得退回旧图片协议。
 
 ## 1. 阶段目标
 
@@ -381,7 +381,7 @@ Main 为当前窗口保存不可伪造的 project session，不允许 renderer �
 - [x] renderer sandbox、context isolation 和窄 preload API 保持开启。
 - [x] Phase A 地基、当前 Chat/Chapter 源码的单元/IPC 集成和强制真实 Electron 验收通过；失败证据不被静态 verify 掩盖。
 
-> 证据边界：当前最终源码 Electron-enabled `npm run verify` exit 0，强制 Electron 32/32、Persistent Watcher 3/3；Diagnostic Export、Image Review、Changes/History 与 Graph 定向证据均通过。Image Trash 入口已实现，唯一未关闭的本地门禁是最新竞态加固的最终独立 P0/P1 closure。真实 API、完整 `sk-api-` 图片、真实作者内测与发布复审仍未关闭。精确缺口见 `v0/DEVELOPMENT-STATUS.md`。
+> 证据边界：当前最终源码 Electron-enabled `npm run verify` exit 0，强制 Electron 32/32、Persistent Watcher 3/3；Diagnostic Export、Image Review、Image Trash、Changes/History 与 Graph 定向证据均通过。Image Trash 最终复审 P0=0/P1=0/P2=1，可以签字。真实 API、完整 `sk-api-` 图片、真实作者内测与发布复审仍未关闭。精确缺口见 `v0/DEVELOPMENT-STATUS.md`。
 
 Phase A 只有在全部清单有可复现证据时才算完成；“页面看起来像工作区”或“测试只检查元素存在”都不构成验收。
 
