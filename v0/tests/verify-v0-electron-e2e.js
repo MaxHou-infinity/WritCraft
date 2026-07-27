@@ -29,14 +29,17 @@ const COMMAND_TIMEOUT_MS = 5_000;
 const EXIT_TIMEOUT_MS = 8_000;
 const MAX_PROCESS_LOG_CHARS = 16_000;
 const RELEASE_REQUIRED = process.env.WRITCRAFT_E2E_FORCE === '1' || process.env.CI === 'true';
+const ONBOARDING_FOCUS = process.env.WRITCRAFT_E2E_FOCUS_ONBOARDING === '1';
 const LARGE_GRAPH_FILE_COUNT = 300;
 const GRAPH_COLD_BUDGET_MS = 2500;
 const GRAPH_CACHE_BUDGET_MS = 700;
 const GRAPH_INCREMENTAL_BUDGET_MS = 800;
 const GRAPH_INTERACTION_BUDGET_MS = 100;
 const GRAPH_RENDERER_HEAP_BUDGET_BYTES = 150 * 1024 * 1024;
+const EXPECTED_STAGE_COUNT = ONBOARDING_FOCUS ? 2 : 32;
 
 let passed = 0;
+const activeElectronInstances = new Set();
 
 function delay(ms) {
   return new Promise(resolve => setTimeout(resolve, ms));
@@ -59,9 +62,21 @@ function knownGuiFailure(log) {
 }
 
 async function stage(name, fn) {
+  assertNoUnexpectedElectronExit();
   await fn();
+  await delay(0);
+  assertNoUnexpectedElectronExit();
   passed += 1;
   console.log(`  ✓ ${name}`);
+}
+
+function assertNoUnexpectedElectronExit() {
+  for (const instance of activeElectronInstances) {
+    if (instance.fatalError) throw instance.fatalError;
+    if (!instance.stopping && instance.client?.failure) {
+      throw instance.client.failure;
+    }
+  }
 }
 
 function snapshotMarkdownFiles(rootPath) {
@@ -316,6 +331,30 @@ async function waitForValue(client, expression, description, timeoutMs = START_T
   throw new Error(`Timed out waiting for ${description}`);
 }
 
+async function waitForExternalQuiescence(
+  client,
+  description,
+  stableMs = 1500,
+  timeoutMs = START_TIMEOUT_MS
+) {
+  const deadline = Date.now() + timeoutMs;
+  let generation = null;
+  let stableSince = 0;
+  while (Date.now() < deadline) {
+    const current = await client.evaluate(`Promise.resolve(
+      window.__workspace?.state?.externalQueue
+    ).then(() => window.__workspace?.state?.aiContextGeneration ?? null)`);
+    if (current !== generation) {
+      generation = current;
+      stableSince = Date.now();
+    } else if (generation !== null && Date.now() - stableSince >= stableMs) {
+      return generation;
+    }
+    await delay(100);
+  }
+  throw new Error(`Timed out waiting for ${description}; last generation=${generation}`);
+}
+
 async function pressKey(client, key) {
   const descriptors = {
     Enter: { key: 'Enter', code: 'Enter', windowsVirtualKeyCode: 13, nativeVirtualKeyCode: 13 },
@@ -364,24 +403,24 @@ async function stopElectron(instance) {
   if (!instance) return null;
   const { child, client } = instance;
   instance.stopping = true;
-  if (child.exitCode !== null || child.signalCode) {
-    client?.close();
-    return { code: child.exitCode, signal: child.signalCode };
-  }
   try {
+    if (child.exitCode !== null || child.signalCode) {
+      return { code: child.exitCode, signal: child.signalCode };
+    }
     // Browser.close exercises Electron/Chromium's real shutdown path and gives
     // Chromium a chance to flush localStorage before the restart assertion.
-    await client.command('Browser.close', {}, 2000).catch(() => {});
+    await client?.command('Browser.close', {}, 2000).catch(() => {});
     const exited = await waitForExit(child, EXIT_TIMEOUT_MS).catch(() => null);
     if (exited) return exited;
+    child.kill('SIGTERM');
+    const terminated = await waitForExit(child, 3000).catch(() => null);
+    if (terminated) return terminated;
+    child.kill('SIGKILL');
+    return waitForExit(child, 3000);
   } finally {
-    client.close();
+    client?.close();
+    activeElectronInstances.delete(instance);
   }
-  child.kill('SIGTERM');
-  const terminated = await waitForExit(child, 3000).catch(() => null);
-  if (terminated) return terminated;
-  child.kill('SIGKILL');
-  return waitForExit(child, 3000);
 }
 
 function seedRecentProject(profileRoot, rootPath) {
@@ -444,45 +483,51 @@ async function launchElectron(profileRoot, recentProjectRoot, options = {}) {
   child.stdout.on('data', capture);
   child.stderr.on('data', capture);
 
-  let page;
-  try {
-    page = await discoverPage(port, child, logRef);
-  } catch (error) {
-    if (child.exitCode === null && !child.signalCode) child.kill('SIGTERM');
-    await waitForExit(child, 3000).catch(() => {});
-    throw error;
-  }
-  const client = new CdpClient(page.webSocketDebuggerUrl);
-  await client.connect();
-  const networkRequests = [];
-  client.on('Network.requestWillBeSent', event => networkRequests.push(event.request?.url || ''));
-  await Promise.all([
-    client.command('Runtime.enable'),
-    client.command('Page.enable'),
-    client.command('Network.enable'),
-  ]);
-  // Discovery attaches after Chromium's first navigation. Reload only after
-  // Network is enabled so the release assertion observes the complete
-  // renderer entry/resource lifecycle instead of only late requests.
-  await client.command('Page.reload', { ignoreCache: true });
-  await waitForRenderer(client);
   const instance = {
     child,
-    client,
-    page,
+    client: null,
+    page: null,
     logRef,
-    networkRequests,
+    networkRequests: [],
     profileRoot,
     userData,
     stopping: false,
+    fatalError: null,
   };
+  activeElectronInstances.add(instance);
   child.once('exit', (code, signal) => {
     if (instance.stopping) return;
     const error = new Error(`Electron exited unexpectedly (${code ?? signal ?? 'unknown'})`);
     error.processLog = boundedLog(logRef.value);
-    client.abort(error);
+    instance.fatalError = error;
+    instance.client?.abort(error);
   });
-  return instance;
+
+  try {
+    instance.page = await discoverPage(port, child, logRef);
+    instance.client = new CdpClient(instance.page.webSocketDebuggerUrl);
+    await instance.client.connect();
+    instance.client.on(
+      'Network.requestWillBeSent',
+      event => instance.networkRequests.push(event.request?.url || '')
+    );
+    await Promise.all([
+      instance.client.command('Runtime.enable'),
+      instance.client.command('Page.enable'),
+      instance.client.command('Network.enable'),
+    ]);
+    // Discovery attaches after Chromium's first navigation. Reload only after
+    // Network is enabled so the release assertion observes the complete
+    // renderer entry/resource lifecycle instead of only late requests.
+    await instance.client.command('Page.reload', { ignoreCache: true });
+    await waitForRenderer(instance.client);
+    assertNoUnexpectedElectronExit();
+    return instance;
+  } catch (error) {
+    if (!error.processLog) error.processLog = boundedLog(logRef.value);
+    await stopElectron(instance).catch(() => {});
+    throw error;
+  }
 }
 
 async function inspectRuntime(instance) {
@@ -710,6 +755,10 @@ async function run() {
           state.aiContextGeneration > ${JSON.stringify(generationBeforeConflictCleanup)} ? true : null
         );
       })()`, 'external conflict cleanup to settle before minting a fresh Onboarding capability');
+      await waitForExternalQuiescence(
+        first.client,
+        'all watcher events from external conflict cleanup to become quiescent'
+      );
       await first.client.evaluate(`(() => {
         window.__workspace.openProjectOnboarding();
         window.__workspace.state.onboardingController.setSession({
@@ -733,11 +782,41 @@ async function run() {
         document.querySelector('.change-file-actions .change-decision--accepted').click();
         document.getElementById('changes-apply').click();
       })()`);
-      await waitForValue(first.client, `(() => {
-        const confirm = [...document.querySelectorAll('button')]
-          .find(node => node.textContent.includes('确认创建所选初始文件'));
-        return confirm && !confirm.disabled ? true : null;
-      })()`, 'fresh one-time initial-file confirmation');
+      try {
+        await waitForValue(first.client, `(() => {
+          const confirm = [...document.querySelectorAll('button')]
+            .find(node => node.textContent.includes('确认创建所选初始文件'));
+          return confirm && !confirm.disabled ? true : null;
+        })()`, 'fresh one-time initial-file confirmation');
+      } catch (error) {
+        const diagnostic = await first.client.evaluate(`(() => {
+          const apply = document.getElementById('changes-apply');
+          const discard = document.getElementById('changes-discard');
+          const state = window.__workspace?.state;
+          return {
+            mode: window.__assistantDock?.getMode?.() || '',
+            status: document.getElementById('changes-status')?.textContent || '',
+            notice: document.getElementById('changes-commit-notice')?.textContent || '',
+            preview: document.querySelector('#changes-preview .tree-empty')?.textContent || '',
+            summary: document.querySelector('.onboarding-confirmation-summary')?.textContent || '',
+            apply: apply?.textContent || '',
+            applyHidden: Boolean(apply?.hidden),
+            applyDisabled: Boolean(apply?.disabled),
+            discard: discard?.textContent || '',
+            discardHidden: Boolean(discard?.hidden),
+            selectedSuggestions: document.querySelectorAll('[data-onboarding-path]:checked').length,
+            pendingHunks: document.querySelectorAll('.change-decision--pending').length,
+            acceptedHunks: document.querySelectorAll('.change-decision--accepted').length,
+            currentPath: state?.currentPath || '',
+            dirty: Boolean(state?.dirty),
+            mutationGeneration: state?.aiContextGeneration ?? null,
+            buttons: [...document.querySelectorAll('#changes-panel button')]
+              .map(node => ({ text: node.textContent.trim(), disabled: node.disabled, hidden: node.hidden })),
+          };
+        })()`);
+        error.message += `; renderer state=${JSON.stringify(diagnostic)}`;
+        throw error;
+      }
       assert.strictEqual(fs.existsSync(firstPath), false);
       assert.strictEqual(fs.existsSync(secondPath), false);
 
@@ -890,6 +969,14 @@ async function run() {
 
       await first.client.evaluate(`window.__assistantDock.close()`);
     });
+
+    if (ONBOARDING_FOCUS) {
+      await delay(0);
+      assertNoUnexpectedElectronExit();
+      assert.strictEqual(passed, EXPECTED_STAGE_COUNT);
+      console.log(`\n✅ Real Electron focused Onboarding E2E ${passed}/${EXPECTED_STAGE_COUNT} stages passed.`);
+      return;
+    }
 
     await stage('shows exact legacy Front Matter diagnostics and migrates v0 through a reviewed ChangeSet', async () => {
       const legacySave = await first.client.evaluate(`(async () => {
@@ -3456,7 +3543,10 @@ async function run() {
       assert.strictEqual(state.welcomeVisible, true);
     });
 
-    console.log(`\n✅ Real Electron E2E ${passed}/${passed} stages passed; project-card recovery/confirmation, temporary-profile isolation, Research stale/rerun/confirmation, project metrics IPC, own-save watcher isolation, explicit image insertion, visible image-trash restore/restart/snapshot-empty, restart recovery, 0 observed renderer network.`);
+    await delay(0);
+    assertNoUnexpectedElectronExit();
+    assert.strictEqual(passed, EXPECTED_STAGE_COUNT);
+    console.log(`\n✅ Real Electron E2E ${passed}/${EXPECTED_STAGE_COUNT} stages passed; project-card recovery/confirmation, temporary-profile isolation, Research stale/rerun/confirmation, project metrics IPC, own-save watcher isolation, explicit image insertion, visible image-trash restore/restart/snapshot-empty, restart recovery, 0 observed renderer network.`);
   } finally {
     await stopElectron(first).catch(() => {});
     await stopElectron(second).catch(() => {});

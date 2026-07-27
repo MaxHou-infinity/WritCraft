@@ -21,13 +21,9 @@ const IGNORED_NAMES = new Set(['.git', '.DS_Store']);
 const NO_FOLLOW = typeof fs.constants.O_NOFOLLOW === 'number'
   ? fs.constants.O_NOFOLLOW
   : 0;
-const ATOMIC_RENAME_HELPER = path.join(
-  __dirname,
-  '..',
-  '..',
-  'scripts',
-  'atomic-rename-exclusive.py'
-);
+const ATOMIC_RENAME_HELPER = process.resourcesPath && !process.defaultApp
+  ? path.join(process.resourcesPath, '..', 'Helpers', 'author-copy-helper')
+  : path.join(__dirname, 'native', 'author-copy-helper');
 
 let cwdLeaseActive = false;
 
@@ -395,8 +391,8 @@ function runAtomicDirectoryHelper(sourceParentFd, targetParentFd, request) {
     fail('COPY_ATOMIC_PUBLISH_UNAVAILABLE', '当前文件系统不支持排他发布');
   }
   const execution = childProcess.spawnSync(
-    '/usr/bin/python3',
-    ['-I', ATOMIC_RENAME_HELPER],
+    ATOMIC_RENAME_HELPER,
+    [],
     {
       input: JSON.stringify(request),
       encoding: 'utf8',

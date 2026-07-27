@@ -12,10 +12,13 @@ const releaseRoot = path.join(root, 'release');
 const outputRoot = path.join(releaseRoot, `WritCraft-darwin-${arch}`);
 const outputApp = path.join(outputRoot, 'WritCraft.app');
 const resources = path.join(outputApp, 'Contents', 'Resources');
+const helpers = path.join(outputApp, 'Contents', 'Helpers');
 const packagedApp = path.join(resources, 'app');
 const plist = path.join(outputApp, 'Contents', 'Info.plist');
 const oldExecutable = path.join(outputApp, 'Contents', 'MacOS', 'Electron');
 const executable = path.join(outputApp, 'Contents', 'MacOS', 'WritCraft');
+const nativeHelper = path.join(root, 'src', 'main', 'native', 'author-copy-helper');
+const packagedNativeHelper = path.join(helpers, 'author-copy-helper');
 const zipPath = `${outputRoot}.zip`;
 
 function required(target, label) {
@@ -28,6 +31,7 @@ function sha256(target) {
 
 required(electronApp, 'Electron macOS runtime');
 required(path.join(root, 'src', 'main', 'main.js'), 'WritCraft main process');
+required(nativeHelper, 'Author acceptance native helper');
 
 fs.mkdirSync(releaseRoot, { recursive: true });
 fs.rmSync(outputRoot, { recursive: true, force: true });
@@ -37,6 +41,10 @@ fs.cpSync(electronApp, outputApp, { recursive: true, preserveTimestamps: true, v
 fs.rmSync(path.join(resources, 'default_app.asar'), { force: true });
 fs.mkdirSync(packagedApp, { recursive: true });
 fs.cpSync(path.join(root, 'src'), path.join(packagedApp, 'src'), { recursive: true, preserveTimestamps: true });
+fs.mkdirSync(helpers, { recursive: true });
+fs.copyFileSync(nativeHelper, packagedNativeHelper);
+fs.chmodSync(packagedNativeHelper, 0o755);
+fs.rmSync(path.join(packagedApp, 'src', 'main', 'native', 'author-copy-helper'));
 
 function removeFinderMetadata(directory) {
   for (const entry of fs.readdirSync(directory, { withFileTypes: true })) {
@@ -80,6 +88,7 @@ for (const [key, value] of [
   ['CFBundleExecutable', 'WritCraft'],
   ['CFBundleShortVersionString', sourcePackage.version],
   ['CFBundleVersion', sourcePackage.version],
+  ['LSMinimumSystemVersion', '11.0'],
 ]) {
   execFileSync(plistBuddy, ['-c', `Set :${key} ${value}`, plist]);
 }
@@ -97,11 +106,14 @@ try {
   execFileSync(plistBuddy, ['-c', 'Set :NSAppTransportSecurity:NSAllowsArbitraryLoads false', plist]);
 } catch (_) {}
 
-// Ad-hoc signing makes local distribution internally consistent. A future
-// public release still needs a Developer ID identity and Apple notarization.
+// Sign nested code before the outer bundle. A future public release replaces
+// the ad-hoc identity with Developer ID and adds hardened runtime/notarization.
+execFileSync('codesign', ['--force', '--sign', '-', packagedNativeHelper], { stdio: 'inherit' });
+execFileSync('codesign', ['--verify', '--strict', packagedNativeHelper], { stdio: 'inherit' });
 execFileSync('codesign', ['--force', '--deep', '--sign', '-', outputApp], { stdio: 'inherit' });
+execFileSync('codesign', ['--verify', '--strict', packagedNativeHelper], { stdio: 'inherit' });
 execFileSync('codesign', ['--verify', '--deep', '--strict', outputApp], { stdio: 'inherit' });
-execFileSync('ditto', ['-c', '-k', '--keepParent', outputApp, zipPath]);
+execFileSync('ditto', ['-c', '-k', '--norsrc', '--keepParent', outputApp, zipPath]);
 
 const info = {
   schema: 'writcraft.release/v1',
@@ -113,6 +125,9 @@ const info = {
   archive: path.relative(root, zipPath),
   archiveBytes: fs.statSync(zipPath).size,
   archiveSha256: sha256(zipPath),
+  nativeHelperSourceSha256: sha256(path.join(root, 'native', 'author-copy-helper.c')),
+  nativeHelperSha256: sha256(packagedNativeHelper),
+  minimumSystemVersion: '11.0',
   signing: 'ad-hoc (local testing only)',
   notarized: false,
 };

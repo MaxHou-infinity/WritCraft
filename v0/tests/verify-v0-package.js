@@ -43,8 +43,13 @@ test('removes the Electron default app and assigns WritCraft bundle identity', (
 test('ad-hoc signs, verifies, archives and records a SHA-256 release manifest', () => {
   assert.match(script, /codesign/);
   assert.match(script, /--verify/);
+  assert.match(script, /packagedNativeHelper[\s\S]*codesign/);
+  assert.match(script, /LSMinimumSystemVersion', '11\.0'/);
   assert.match(script, /ditto/);
+  assert.match(script, /--norsrc/);
   assert.match(script, /archiveSha256/);
+  assert.match(script, /nativeHelperSourceSha256/);
+  assert.match(script, /nativeHelperSha256/);
   assert.match(script, /notarized: false/);
 });
 
@@ -64,4 +69,21 @@ test('bundles the self-contained PDF runtime (pdfjs legacy build + standard font
   assert(!fs.existsSync(path.join(root, 'src', 'main', 'pdf-extract-helper.py')));
 });
 
-console.log(`\n${passed}/5 macOS packaging checks passed.`);
+test('bundles a universal executable author-copy helper without Python', () => {
+  const helper = path.join(root, 'src', 'main', 'native', 'author-copy-helper');
+  const service = fs.readFileSync(
+    path.join(root, 'src', 'main', 'author-acceptance-preflight-service.js'),
+    'utf8'
+  );
+  fs.accessSync(helper, fs.constants.R_OK | fs.constants.X_OK);
+  assert.match(script, /Author acceptance native helper/);
+  assert.match(script, /Contents', 'Helpers'/);
+  assert.match(script, /author-copy-helper/);
+  assert.match(script, /fs\.rmSync\(path\.join\(packagedApp, 'src', 'main', 'native'/);
+  assert.doesNotMatch(service, /python3|atomic-rename-exclusive\.py/);
+  assert.match(service, /process\.resourcesPath/);
+  assert.match(service, /'Helpers', 'author-copy-helper'/);
+  assert.match(service, /native',\s*'author-copy-helper'/);
+});
+
+console.log(`\n${passed}/6 macOS packaging checks passed.`);

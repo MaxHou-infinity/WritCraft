@@ -8,6 +8,8 @@
     "postverify": "npm run verify:author-acceptance && node tests/verify-v0-localized-edit-service.js && node tests/verify-v0-project-changes-proposal.js && node tests/verify-v0-project-changes-scope.js && node tests/verify-v0-graph-evolution-renderer.js && node tests/verify-v0-graph-renderer-dynamic.js && node tests/verify-v0-graph-issue-handoff-transaction.js && node tests/verify-v0-graph-issue-handoff.js && node tests/verify-v0-graph-issue-handoff-integration.js && node tests/verify-v0-research-handoff.js && node tests/verify-v0-research-handoff-renderer.js",
     "start": "electron .",
     "dev": "electron . --dev",
+    "build:native-helper": "node scripts/build-native-helper.js",
+    "prepackage:mac": "npm run build:native-helper",
     "package:mac": "node scripts/package-macos.js",
     "release:verify": "node scripts/verify-release.js",
     "acceptance:api": "node tests/verify-v0-api.js",

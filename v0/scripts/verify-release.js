@@ -5,7 +5,7 @@ const crypto = require('crypto');
 const fs = require('fs');
 const os = require('os');
 const path = require('path');
-const { execFileSync } = require('child_process');
+const { execFileSync, spawnSync } = require('child_process');
 
 const root = path.resolve(__dirname, '..');
 const arch = process.arch === 'arm64' ? 'arm64' : process.arch === 'x64' ? 'x64' : process.arch;
@@ -13,6 +13,7 @@ const outputRoot = path.join(root, 'release', `WritCraft-darwin-${arch}`);
 const app = path.join(outputRoot, 'WritCraft.app');
 const zip = `${outputRoot}.zip`;
 const packagedRoot = path.join(app, 'Contents', 'Resources', 'app');
+const packagedHelper = path.join(app, 'Contents', 'Helpers', 'author-copy-helper');
 const info = JSON.parse(fs.readFileSync(path.join(outputRoot, 'build-info.json'), 'utf8'));
 
 let passed = 0;
@@ -70,6 +71,63 @@ function minimalPdf(text = 'Packaged PDF source') {
   return Buffer.from(pdf, 'binary');
 }
 
+function verifyMinimumSystemVersion(targetApp, helper) {
+  const minimum = execFileSync(
+    '/usr/libexec/PlistBuddy',
+    ['-c', 'Print :LSMinimumSystemVersion', path.join(targetApp, 'Contents', 'Info.plist')],
+    { encoding: 'utf8' }
+  ).trim();
+  assert.strictEqual(minimum, '11.0');
+  for (const architecture of ['arm64', 'x86_64']) {
+    const build = execFileSync(
+      'vtool',
+      ['-show-build', '-arch', architecture, helper],
+      { encoding: 'utf8' }
+    );
+    assert.match(build, /\bminos 11\.0\b/);
+  }
+}
+
+function exercisePackagedHelper(helper, temporary) {
+  fs.mkdirSync(temporary, { recursive: true });
+  const sourceParent = path.join(temporary, 'source');
+  const targetParent = path.join(temporary, 'target');
+  fs.mkdirSync(sourceParent);
+  fs.mkdirSync(targetParent);
+  const sourceFd = fs.openSync(sourceParent, fs.constants.O_RDONLY);
+  const targetFd = fs.openSync(targetParent, fs.constants.O_RDONLY);
+  try {
+    const run = request => spawnSync(helper, [], {
+      input: JSON.stringify(request),
+      encoding: 'utf8',
+      timeout: 5000,
+      maxBuffer: 1024 * 1024,
+      stdio: ['pipe', 'pipe', 'pipe', sourceFd, targetFd],
+    });
+    const reserved = run({ mode: 'reserve' });
+    assert.strictEqual(reserved.status, 0, reserved.stderr || reserved.stdout);
+    const reservation = JSON.parse(reserved.stdout);
+    assert.strictEqual(reservation.ok, true);
+    fs.writeFileSync(path.join(sourceParent, reservation.name, 'proof.txt'), 'packaged helper proof');
+    const published = run({
+      mode: 'publish',
+      source: reservation.name,
+      target: 'published-copy',
+      dev: reservation.dev,
+      ino: reservation.ino,
+    });
+    assert.strictEqual(published.status, 0, published.stderr || published.stdout);
+    assert.strictEqual(JSON.parse(published.stdout).expected, true);
+    assert.strictEqual(
+      fs.readFileSync(path.join(targetParent, 'published-copy', 'proof.txt'), 'utf8'),
+      'packaged helper proof'
+    );
+  } finally {
+    fs.closeSync(sourceFd);
+    fs.closeSync(targetFd);
+  }
+}
+
 console.log('\nWritCraft packaged release verification');
 
 (async () => {
@@ -77,16 +135,49 @@ console.log('\nWritCraft packaged release verification');
     assert.strictEqual(info.schema, 'writcraft.release/v1');
     assert.strictEqual(fs.statSync(zip).size, info.archiveBytes);
     assert.strictEqual(sha256File(zip), info.archiveSha256);
+    assert.strictEqual(
+      info.nativeHelperSourceSha256,
+      sha256File(path.join(root, 'native', 'author-copy-helper.c'))
+    );
+    assert.strictEqual(info.nativeHelperSha256, sha256File(packagedHelper));
+    assert.strictEqual(info.minimumSystemVersion, '11.0');
   });
 
-  await check('ZIP structure is readable and the app has a strict-valid local signature', () => {
+  await check('ZIP and every nested helper have strict-valid local signatures', () => {
     execFileSync('unzip', ['-tq', zip], { stdio: 'pipe' });
+    const archiveEntries = execFileSync('unzip', ['-Z1', zip], {
+      encoding: 'utf8',
+    }).trim().split('\n').filter(Boolean);
+    assert(!archiveEntries.some(entry => /(^|\/)\._/.test(entry)));
     execFileSync('codesign', ['--verify', '--deep', '--strict', app], { stdio: 'pipe' });
+    execFileSync('codesign', ['--verify', '--strict', packagedHelper], { stdio: 'pipe' });
+    const temporary = fs.mkdtempSync(path.join(os.tmpdir(), 'writcraft-release-zip-'));
+    try {
+      execFileSync('unzip', ['-q', zip, '-d', temporary], { stdio: 'pipe' });
+      const extractedApp = path.join(temporary, 'WritCraft.app');
+      const extractedHelper = path.join(
+        extractedApp,
+        'Contents',
+        'Helpers',
+        'author-copy-helper'
+      );
+      execFileSync('codesign', ['--verify', '--deep', '--strict', extractedApp], { stdio: 'pipe' });
+      execFileSync('codesign', ['--verify', '--strict', extractedHelper], { stdio: 'pipe' });
+      verifyMinimumSystemVersion(extractedApp, extractedHelper);
+      exercisePackagedHelper(extractedHelper, path.join(temporary, 'transaction'));
+    } finally {
+      fs.rmSync(temporary, { recursive: true, force: true });
+    }
   });
 
   await check('packaged application sources exactly match the current source tree', () => {
     const options = { ignoreFinderMetadata: true };
-    assert.deepStrictEqual(filesUnder(path.join(packagedRoot, 'src'), '', options), filesUnder(path.join(root, 'src'), '', options));
+    const sourceFiles = filesUnder(path.join(root, 'src'), '', options);
+    sourceFiles.delete('main/native/author-copy-helper');
+    assert.deepStrictEqual(filesUnder(path.join(packagedRoot, 'src'), '', options), sourceFiles);
+    assert.strictEqual(fs.existsSync(
+      path.join(packagedRoot, 'src', 'main', 'native', 'author-copy-helper')
+    ), false);
   });
 
   await check('package excludes secrets, environment files, tests, Python and macOS litter', () => {
@@ -116,6 +207,20 @@ console.log('\nWritCraft packaged release verification');
     }
   });
 
+  await check('packaged author-copy helper is executable, universal and interpreter-free', () => {
+    fs.accessSync(packagedHelper, fs.constants.R_OK | fs.constants.X_OK);
+    const architectures = execFileSync('lipo', ['-archs', packagedHelper], {
+      encoding: 'utf8',
+    }).trim().split(/\s+/).sort();
+    assert.deepStrictEqual(architectures, ['arm64', 'x86_64']);
+    verifyMinimumSystemVersion(app, packagedHelper);
+    const service = fs.readFileSync(
+      path.join(packagedRoot, 'src', 'main', 'author-acceptance-preflight-service.js'),
+      'utf8'
+    );
+    assert.doesNotMatch(service, /python3|atomic-rename-exclusive\.py/);
+  });
+
   await check('production manifest exposes no development scripts or dependencies', () => {
     const packaged = JSON.parse(fs.readFileSync(path.join(packagedRoot, 'package.json'), 'utf8'));
     assert.strictEqual(packaged.main, 'src/main/main.js');
@@ -124,7 +229,7 @@ console.log('\nWritCraft packaged release verification');
     assert.strictEqual(packaged.dependencies, undefined);
   });
 
-  console.log(`\n${passed}/6 packaged release checks passed.`);
+  console.log(`\n${passed}/7 packaged release checks passed.`);
 })().catch(error => {
   console.error(error);
   process.exitCode = 1;

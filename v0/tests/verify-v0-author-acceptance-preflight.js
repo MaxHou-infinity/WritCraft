@@ -29,6 +29,10 @@ function withScratch(fn) {
   }
 }
 
+function isAuthorCopyHelper(command) {
+  return String(command || '').endsWith('/native/author-copy-helper');
+}
+
 function buildEligible(scratch, name = '作者验收项目') {
   return fixture.buildLongformProject({ parentPath: scratch, projectService, name });
 }
@@ -67,6 +71,79 @@ test('accepts a five-plus chapter, 2000-plus Chinese character project with edit
     assert.strictEqual(report.checks.editPromptStatus, 'valid');
     assert.deepStrictEqual(report.errors, []);
     assert(/^[a-f0-9]{64}$/.test(report.snapshotDigest));
+  })
+);
+
+test('ships one executable universal native helper with no Python runtime dependency', () => {
+  const helper = path.join(__dirname, '..', 'src', 'main', 'native', 'author-copy-helper');
+  const serviceSource = fs.readFileSync(
+    path.join(__dirname, '..', 'src', 'main', 'author-acceptance-preflight-service.js'),
+    'utf8'
+  );
+  fs.accessSync(helper, fs.constants.R_OK | fs.constants.X_OK);
+  const architectures = childProcess.execFileSync('lipo', ['-archs', helper], {
+    encoding: 'utf8',
+  }).trim().split(/\s+/).sort();
+  assert.deepStrictEqual(architectures, ['arm64', 'x86_64']);
+  assert.doesNotMatch(serviceSource, /python3|\.py(?:['"]|\b)/);
+  assert.match(serviceSource, /native',\s*'author-copy-helper'/);
+});
+
+test('creates a working copy with PATH empty and no external interpreter lookup', () =>
+  withScratch(scratch => {
+    const sourceParent = path.join(scratch, 'source');
+    const destinationParent = path.join(scratch, 'copies');
+    fs.mkdirSync(sourceParent);
+    fs.mkdirSync(destinationParent);
+    const project = buildEligible(sourceParent);
+    const previousPath = process.env.PATH;
+    process.env.PATH = '';
+    try {
+      const result = service.createWorkingCopy({
+        rootPath: project.rootPath,
+        destinationParent,
+        copyName: '无解释器副本',
+      });
+      assert.strictEqual(result.ok, true);
+      assert.strictEqual(
+        JSON.parse(fs.readFileSync(
+          path.join(destinationParent, '无解释器副本', service.COPY_MANIFEST),
+          'utf8'
+        )).schema,
+        service.COPY_SCHEMA
+      );
+    } finally {
+      if (previousPath === undefined) delete process.env.PATH;
+      else process.env.PATH = previousPath;
+    }
+  })
+);
+
+test('native helper rejects embedded NUL and trailing request bytes before mutation', () =>
+  withScratch(scratch => {
+    const sourceParent = path.join(scratch, 'source');
+    const targetParent = path.join(scratch, 'target');
+    fs.mkdirSync(sourceParent);
+    fs.mkdirSync(targetParent);
+    const sourceFd = fs.openSync(sourceParent, fs.constants.O_RDONLY);
+    const targetFd = fs.openSync(targetParent, fs.constants.O_RDONLY);
+    try {
+      const result = childProcess.spawnSync(
+        path.join(__dirname, '..', 'src', 'main', 'native', 'author-copy-helper'),
+        [],
+        {
+          input: Buffer.from('{"mode":"reserve"}\0trailing', 'utf8'),
+          encoding: 'utf8',
+          stdio: ['pipe', 'pipe', 'pipe', sourceFd, targetFd],
+        }
+      );
+      assert.notStrictEqual(result.status, 0);
+      assert.deepStrictEqual(fs.readdirSync(sourceParent), []);
+      assert.deepStrictEqual(fs.readdirSync(targetParent), []);
+    } finally {
+      fs.closeSync(sourceFd);
+      fs.closeSync(targetFd);
+    }
   })
 );
 
@@ -682,7 +759,7 @@ test('reports committed truth if the source changes in the final commit syscall 
     childProcess.spawnSync = function changeAtPublish(command, args, options) {
       const request = JSON.parse(String(options?.input || '{}'));
       if (!injected &&
-          args.some(value => String(value).endsWith('atomic-rename-exclusive.py')) &&
+          isAuthorCopyHelper(command) &&
           request.mode === 'publish') {
         injected = true;
         fs.appendFileSync(sourceFile, '\n提交瞬间变化\n');
@@ -895,7 +972,7 @@ test('recovers an exclusive publish that committed before the helper reported fa
       const result = originalSpawn.call(childProcess, command, args, options);
       const request = JSON.parse(String(options?.input || '{}'));
       if (!injected &&
-          args.some(value => String(value).endsWith('atomic-rename-exclusive.py')) &&
+          isAuthorCopyHelper(command) &&
           request.mode === 'publish') {
         injected = true;
         return {
@@ -1347,4 +1424,4 @@ test('rejects duplicate CLI arguments instead of accepting the last value', () =
   );
 });
 
-console.log(`\n${passed}/39 author acceptance preflight checks passed.`);
+console.log(`\n${passed}/42 author acceptance preflight checks passed.`);

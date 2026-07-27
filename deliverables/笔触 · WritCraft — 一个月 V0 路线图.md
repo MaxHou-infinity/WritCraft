@@ -1,8 +1,8 @@
 # 笔触 · WritCraft · 一个月 V0 路线图
 
-> 文档版本：2026-07-27（v2.2，真实作者验收前置）
+> 文档版本：2026-07-27（v2.3，原生 helper 与 E2E 稳定性收口）
 > 状态：**V0 续作中，完整产品未完成**；产品范围以 `docs/WRITCRAFT-PRD-V3.md` 为准  
-> 2026-07-27 续作交接：既有产品链保持签字；真实作者项目预检/隔离副本技术候选经六轮独立复审为 **P0=0/P1=0/P2=3**。Author **39/39**、真实 API 离线合同 **15/15**、组合 **54/54、0 网络**、完整 test/verify 与最终强制 Electron **32/32** 通过；同日一次 Onboarding confirmation 超时仍作为 E2E P2 跟踪。下一步先做 clean-machine helper preflight，再由作者选择合格项目和完整 `sk-api-` 执行真实旅程。现有 App/ZIP 与源码不同步且禁止分发；准确事实与 TODO 只看 `v0/DEVELOPMENT-STATUS.md`。
+> 2026-07-27 续作交接：既有产品链保持签字；真实作者项目预检/隔离副本已换成 bundled universal Mach-O helper。Author **42/42**、真实 API 离线合同 **15/15**、组合 **57/57、0 网络**、package **6/6**、本地 release **7/7**、完整 test/verify 与最终强制 Electron **32/32** 通过。Onboarding 旧超时已定位为 E2E watcher 静默判断缺口并通过连续聚焦复跑。下一步由作者选择合格项目和完整 `sk-api-` 执行真实旅程；ad-hoc App/ZIP 未签名公证且禁止分发，准确事实与 TODO 只看 `v0/DEVELOPMENT-STATUS.md`。
 > 范围：Month 1（4 周 × 7 天 = 28 天）
 
 ---

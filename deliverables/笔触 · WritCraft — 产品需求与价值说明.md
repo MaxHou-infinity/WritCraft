@@ -1,11 +1,11 @@
 # 笔触 · WritCraft — 产品需求与价值说明
 
-> 文档版本：v2.8 | 2026-07-27（真实作者验收前置）
+> 文档版本：v2.9 | 2026-07-27（原生 helper 与 E2E 稳定性收口）
 > 发起方：Max Hou
 > 输入依据：T1–T9 全流程调研，含 T7 综合分析（25KB）/ T8 魔鬼质询（17KB）/ T9 战略路线（16KB）
 > 状态：产品背景与商业假设已定；**V0 仍在开发，未完成、未发布**
 
-> 实施说明：本文件描述产品价值、原始研究与商业假设；功能验收以 `docs/WRITCRAFT-PRD-V3.md` 为准，当前事实与 TODO 只以 `v0/DEVELOPMENT-STATUS.md` 为准。既有三级工作区、`edit.md`、Inline Diff、ChangeSet、来源/脚注、图谱、Diagnostic、Image Review/Trash 保持签字；真实作者预检/隔离副本技术候选经六轮独立复审 **P0=0/P1=0/P2=3**，Author **39/39**、离线 API **15/15**、完整 Node/verify 与最终强制 Electron **32/32** 通过；同日一次 Onboarding confirmation 超时仍作为 E2E P2 跟踪。后续由作者选择合格项目与完整 `sk-api-`，完成真实质量、费用、价值指标和发布门禁。
+> 实施说明：本文件描述产品价值、原始研究与商业假设；功能验收以 `docs/WRITCRAFT-PRD-V3.md` 为准，当前事实与 TODO 只以 `v0/DEVELOPMENT-STATUS.md` 为准。既有三级工作区、`edit.md`、Inline Diff、ChangeSet、来源/脚注、图谱、Diagnostic、Image Review/Trash 保持签字；真实作者预检/隔离副本已换成 bundled universal Mach-O helper，Author **42/42**、离线 API **15/15**、package **6/6**、本地 release **7/7**、完整 Node/verify 与最终强制 Electron **32/32** 通过。Onboarding 旧超时已按 watcher 静默根因关闭。后续由作者选择合格项目与完整 `sk-api-`，完成真实质量、费用、价值指标和发布门禁。
 
 ---
 
