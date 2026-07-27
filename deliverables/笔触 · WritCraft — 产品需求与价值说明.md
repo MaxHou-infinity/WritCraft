@@ -1,11 +1,11 @@
 # 笔触 · WritCraft — 产品需求与价值说明
 
-> 文档版本：v2.6 | 2026-07-26（Image Review v1 日终校准）
+> 文档版本：v2.7 | 2026-07-27（Image Trash 最终签字）
 > 发起方：Max Hou
 > 输入依据：T1–T9 全流程调研，含 T7 综合分析（25KB）/ T8 魔鬼质询（17KB）/ T9 战略路线（16KB）
 > 状态：产品背景与商业假设已定；**V0 仍在开发，未完成、未发布**
 
-> 实施说明：本文件描述产品价值、原始研究与商业假设；功能验收以 `docs/WRITCRAFT-PRD-V3.md` 为准，当前事实与 TODO 只以 `v0/DEVELOPMENT-STATUS.md` 为准。现有工程已具备三级项目工作区、`edit.md`、Inline Diff、ChangeSet、完整 Context、来源/脚注、项目向导、增强图谱及右侧四书签；Inline、Plan Strict、Graph、Metrics、Research Accuracy、Changes/History、Diagnostic Export 与 Image Review 自动化链已签字，当前总链为完整 Node/verify 通过、受控强制 Electron **31/31**、Persistent Watcher **3/3**。Image Review 仍有一个非阻断 P2：缺少应用内图片废纸篓恢复/清空；明天先关闭该本地缺口，再进入真实付费 MiniMax API、完整图片质量/费用、真实作者指标与公开发布。历史 stub GUI 的 9/9 仅是旧专项证据。
+> 实施说明：本文件描述产品价值、原始研究与商业假设；功能验收以 `docs/WRITCRAFT-PRD-V3.md` 为准，当前事实与 TODO 只以 `v0/DEVELOPMENT-STATUS.md` 为准。现有工程已具备三级项目工作区、`edit.md`、Inline Diff、ChangeSet、完整 Context、来源/脚注、项目向导、增强图谱及右侧四书签；Inline、Plan Strict、Graph、Metrics、Research Accuracy、Changes/History、Diagnostic Export、Image Review 与应用内 Image Trash 本地链已签字。当前源码完整 Node/verify 通过、受控强制 Electron **32/32**、Persistent Watcher **3/3**、图片专项 **107/107**；Image Trash 最终复审 **P0=0/P1=0/P2=1（非阻断）**。下一步进入真实付费 MiniMax API、完整图片质量/费用、真实作者指标与公开发布，不再扩展 Image Trash。历史 stub GUI 的 9/9 与 31/31 只作旧专项证据。
 
 ---
 
@@ -635,6 +635,6 @@ Plan Mode 完成率 ≥ 50%（创建了大纲的用户中，完成 >80% 章节�
 
 ---
 
-*文档版本：v2.0 | WritCraft 笔触 PRD 定稿 | 2026-07-14*
+*文档版本：v2.7 | WritCraft 笔触产品需求与价值说明 | 2026-07-27*
 *依据：T1–T9 全流程调研输出 | T7 综合分析 × T8 魔鬼质询 × T9 战略路线*
 *本文档为 Max 独立发起之产品需求文档，与其他项目 PRD 隔离*

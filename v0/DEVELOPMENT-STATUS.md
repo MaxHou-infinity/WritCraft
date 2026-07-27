@@ -37,6 +37,7 @@ Chat/Chapter、Onboarding v2、Research→Changes、Inline Rewrite 与 Plan Stri
 - **独立复审与错误沉淀**：第一轮在 15/15 后发现 path-based unlink、committed TTL 和 restore 原地改写 3 项 P1；第二轮在 19/19 后继续发现 empty 缺 digest 快照与 pre-link replacement 遗留 foreign target 2 项 P1。五项均已关闭并增至 21/21。最终独立只读 sign-off 为 **P0=0/P1=0/P2=1，可以签字**；P2 仅是非协作外部进程预持 open FD 并在最后 digest 后改写同一 inode 的 POSIX 通用极窄残余，不会按旧路径误删替换文件。
 - **稳定性复盘**：竞态用例曾固定假设 `first` 一定先处理，但 `createdAt`/birthtime 排序并不保证该顺序，导致次日复跑偶发失败。测试现对“实际首个被处理条目”注入竞态，仍严格断言 foreign 内容保留、未处理 peer 不被删除；service 连续 20 轮 **20/20**，不是放宽产品断言。
 - **下一步严格顺序**：进入真实 `sk-api-`/作者证据；不得再次扩展 Image Trash，也不得用 fixture 质量替代真实作者判断。
+- **当日复盘**：今天完成了从“图片只能移入废纸篓”到“用户可看见、恢复、确认清空且不误删并发替换”的产品闭环，并把五项复审发现的竞态缺口全部关闭。一次次日复跑失败并非产品回归，而是测试错误假设 fixture 创建顺序等于生产排序；修正为注入实际首个处理项后连续 20 次通过。另一次流程错误是把 10 秒工具轮询超时误当成 5–10 分钟复审交付窗口，过早中断 reviewer；后续规则是先给新 reviewer 一个真实证据窗口，再按约定 checkpoint 判断是否接管。这两条已写入 `AGENTS.md`。
 
 ### 0.0M 2026-07-26 Image Review v1 自动化闭环（历史已签字基线）
 

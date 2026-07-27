@@ -44,11 +44,13 @@ At each durable closeout, compare current `main`, test evidence, `README.md`, PR
 
 Split delegated work into one independently testable layer: contract, Main service, Main/IPC wiring, Renderer state/UI, or verification. Do not assign an entire cross-layer feature to one lane. Each lane must surface a runnable checkpoint within 5–10 minutes: changed files, tests run, remaining work, and blockers.
 
-Wait for a delegated lane at most once without new evidence. After the first timeout, request an immediate checkpoint; after a second timeout or another vague update, interrupt, take over, or split the task. Never spend repeated turns polling an agent that has not produced inspectable work.
+Distinguish a tool polling timeout from the lane's 5–10 minute delivery window. A 10-second `wait`/poll result is only a transport checkpoint and must not be treated as a failed review. Give a newly started reviewer one real evidence window (normally 60 seconds first, then a bounded checkpoint request); interrupt or take over only after the agreed delivery window expires without inspectable work. Never spend repeated turns polling an agent that has not produced evidence.
 
 Freeze the failure/state matrix and authority boundary before implementation. Require a minimal runnable result before expanding scope. Report only changed facts, failures, and the next action; avoid repeating full logs. Synchronize `v0/DEVELOPMENT-STATUS.md` and Nowledge Mem at durable milestones—contract freeze, independently verified implementation, and final sign-off—not after every mechanical edit.
 
 For destructive filesystem work, an `lstat` followed by path-based `unlink` is not an identity guarantee. Move the path into a private unpredictable transaction quarantine, revalidate inode, size, canonical parent, and content digest, then remove only the quarantined identity. Snapshot deletion must bind content identity as well as inode; same-inode rewrites and late replacements fail closed. Once a mutation is committed, its exact retry truth must outlive the live capability TTL until fsync/partial recovery reaches a terminal state.
+
+Tests must derive expectations from the production contract, not incidental ordering. If production sorts candidates by metadata, a race/fault injection must target the first candidate actually processed or explicitly control the metadata; never assume fixture creation order. Before changing product code for a next-session failure, first prove whether the failure is implementation drift, environmental variance, or a brittle test assumption.
 
 ## Commit & Pull Request Guidelines
 
