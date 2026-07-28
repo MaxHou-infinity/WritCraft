@@ -8,6 +8,7 @@
 const fs = require('fs');
 const path = require('path');
 const crypto = require('crypto');
+const { createProjectHashWorker } = require('./project-hash-worker');
 
 const EVENT_SCHEMA = 'writcraft.external/v1';
 const DEFAULT_DEBOUNCE_MS = 140;
@@ -89,9 +90,54 @@ function sameFileIdentity(actual, expected) {
     actual.ctimeNs === expected.ctimeNs;
 }
 
-// Hash an already-scanned regular file without resolving its pathname again
-// during reads. The pre/post identity checks turn replacement, growth, and
-// in-place mutation into an unreadable candidate instead of bypassing budgets.
+function sameReturnedFileIdentity(actual, expected) {
+  return actual &&
+    actual.dev === expected.dev &&
+    actual.ino === expected.ino &&
+    actual.size === expected.size &&
+    actual.mode === expected.mode &&
+    actual.nlink === expected.nlink &&
+    actual.mtimeNs === expected.mtimeNs &&
+    actual.ctimeNs === expected.ctimeNs;
+}
+
+function captureDirectoryIdentity(stat) {
+  return Object.freeze({
+    dev: stat.dev,
+    ino: stat.ino,
+    size: stat.size,
+    mode: stat.mode,
+    nlink: stat.nlink,
+    mtimeNs: stat.mtimeNs,
+    ctimeNs: stat.ctimeNs,
+  });
+}
+
+function sameRootBindingIdentity(actual, expected) {
+  return actual &&
+    expected &&
+    actual.dev === expected.dev &&
+    actual.ino === expected.ino &&
+    actual.mode === expected.mode;
+}
+
+function directoryAncestors(relative, identities) {
+  const parts = relative.split('/');
+  const result = [];
+  let current = '';
+  for (let index = 0; index < parts.length - 1; index += 1) {
+    current = current ? `${current}/${parts[index]}` : parts[index];
+    const identity = identities.get(current);
+    if (!identity) return null;
+    result.push(Object.freeze({ relative: current, ...identity }));
+  }
+  return Object.freeze(result);
+}
+
+// Legacy/custom-test hash path. Production snapshots use the native worker
+// below so every project-internal ancestor is traversed relative to the bound
+// root descriptor. Keep this only for explicit injected open/hash tests that
+// exercise the older final-component fd contract.
 async function hashFileByIdentity(absolute, expected, options = {}) {
   if (!expected || typeof expected.size !== 'bigint' || typeof expected.dev !== 'bigint' ||
       typeof expected.ino !== 'bigint' || typeof expected.mtimeNs !== 'bigint' ||
@@ -169,10 +215,20 @@ async function projectSnapshot(rootPath, options = {}) {
   const hashFile = typeof options.hashFile === 'function' ? options.hashFile : null;
   const entries = new Map();
   const identities = new Map();
+  const directoryIdentities = new Map();
   const queue = [{ absolute: rootPath, prefix: '' }];
   let scanErrors = 0;
+  let rootIdentity = null;
+  try {
+    const rootStat = await fs.promises.lstat(rootPath, { bigint: true });
+    if (!rootStat.isDirectory()) throw watcherHashError('PROJECT_WATCHER_ROOT_CHANGED', 'Project root is not a directory');
+    rootIdentity = captureDirectoryIdentity(rootStat);
+    directoryIdentities.set('', rootIdentity);
+  } catch (_) {
+    scanErrors += 1;
+  }
 
-  while (queue.length && entries.size < maxEntries) {
+  while (rootIdentity && queue.length && entries.size < maxEntries) {
     const { absolute, prefix } = queue.shift();
     let children = [];
     try { children = await fs.promises.readdir(absolute, { withFileTypes: true }); }
@@ -221,6 +277,9 @@ async function projectSnapshot(rootPath, options = {}) {
           ctimeNs: stat.ctimeNs,
         });
       }
+      if (type === 'directory') {
+        directoryIdentities.set(relative, captureDirectoryIdentity(stat));
+      }
       if (type === 'directory' && !stat.isSymbolicLink()) queue.push({ absolute: target, prefix: relative });
       if (entries.size >= maxEntries) break;
     }
@@ -228,7 +287,12 @@ async function projectSnapshot(rootPath, options = {}) {
 
   const allMarkdown = [...entries.entries()]
     .filter(([relative, entry]) => entry.type === 'file' && /\.(?:md|markdown)$/i.test(relative))
-    .map(([relative, entry]) => ({ relative, entry, identity: identities.get(relative) }))
+    .map(([relative, entry]) => ({
+      relative,
+      entry,
+      identity: identities.get(relative),
+      ancestors: directoryAncestors(relative, directoryIdentities),
+    }))
     .sort((left, right) => left.relative.localeCompare(right.relative, 'zh-CN'));
   const markdown = allMarkdown.filter(candidate => candidate.entry.size <= MAX_MARKDOWN_BYTES);
   const edit = markdown.find(candidate => candidate.relative === 'edit.md');
@@ -239,21 +303,11 @@ async function projectSnapshot(rootPath, options = {}) {
   let hashedBytes = 0;
   const hashedPaths = [];
   const hashErrors = [];
+  const selected = [];
 
-  async function hashCandidate(candidate) {
+  function selectCandidate(candidate) {
     if (!candidate || hashedFiles >= maxHashFiles || hashedBytes + candidate.entry.size > maxHashBytes) return false;
-    try {
-      const absolute = path.join(rootPath, ...candidate.relative.split('/'));
-      candidate.entry.contentHash = typeof options.hashFile === 'function'
-        ? await hashFile(absolute)
-        : await hashFileByIdentity(absolute, candidate.identity, {
-          maxBytes: candidate.entry.size,
-          openFile: options.openFile,
-        });
-    } catch (_) {
-      candidate.entry.contentHash = 'unreadable';
-      hashErrors.push(candidate.relative);
-    }
+    selected.push(candidate);
     hashedFiles += 1;
     hashedBytes += candidate.entry.size;
     hashedPaths.push(candidate.relative);
@@ -262,7 +316,7 @@ async function projectSnapshot(rootPath, options = {}) {
 
   // edit.md is the project-level prompt and always receives first claim on
   // each round's budget.
-  await hashCandidate(edit);
+  selectCandidate(edit);
 
   let considered = 0;
   while (rotating.length && considered < rotating.length && hashedFiles < maxHashFiles) {
@@ -271,8 +325,76 @@ async function projectSnapshot(rootPath, options = {}) {
     considered += 1;
     // If a file cannot fit the remaining byte budget, advance the cursor so a
     // permanently large neighbor cannot starve smaller files behind it.
-    await hashCandidate(candidate);
+    selectCandidate(candidate);
     if (hashedBytes >= maxHashBytes) break;
+  }
+
+  const customHash = typeof options.hashFile === 'function' || typeof options.openFile === 'function';
+  if (customHash) {
+    for (const candidate of selected) {
+      try {
+        const absolute = path.join(rootPath, ...candidate.relative.split('/'));
+        candidate.entry.contentHash = typeof options.hashFile === 'function'
+          ? await hashFile(absolute)
+          : await hashFileByIdentity(absolute, candidate.identity, {
+            maxBytes: candidate.entry.size,
+            openFile: options.openFile,
+          });
+      } catch (_) {
+        candidate.entry.contentHash = 'unreadable';
+        hashErrors.push(candidate.relative);
+      }
+    }
+  } else {
+    let worker = options.hashWorker || null;
+    let ownsWorker = false;
+    try {
+      if (options.hashWorkerError) throw options.hashWorkerError;
+      if (!worker) {
+        worker = createProjectHashWorker(rootPath, {
+          helperPath: options.nativeHashHelperPath,
+          spawn: options.spawnHashWorker,
+          beforeHashOpen: options.beforeHashOpen,
+          timeoutMs: options.hashWorkerTimeoutMs,
+        });
+        ownsWorker = true;
+      }
+      if (!sameRootBindingIdentity(worker.rootIdentity, rootIdentity)) {
+        throw watcherHashError(
+          'PROJECT_WATCHER_ROOT_CHANGED',
+          'Project root changed between snapshot scan and native hash binding'
+        );
+      }
+      const valid = selected.filter(candidate => Array.isArray(candidate.ancestors));
+      for (const candidate of selected) {
+        if (!Array.isArray(candidate.ancestors)) {
+          candidate.entry.contentHash = 'unreadable';
+          hashErrors.push(candidate.relative);
+        }
+      }
+      const results = await worker.hash(valid.map(candidate => ({
+        relative: candidate.relative,
+        maxBytes: candidate.entry.size,
+        identity: candidate.identity,
+        ancestors: candidate.ancestors,
+      })));
+      results.forEach((result, index) => {
+        const candidate = valid[index];
+        if (result.ok && sameReturnedFileIdentity(result.identity, candidate.identity)) {
+          candidate.entry.contentHash = result.digest;
+        } else {
+          candidate.entry.contentHash = 'unreadable';
+          hashErrors.push(candidate.relative);
+        }
+      });
+    } catch (_) {
+      for (const candidate of selected) {
+        candidate.entry.contentHash = 'unreadable';
+        if (!hashErrors.includes(candidate.relative)) hashErrors.push(candidate.relative);
+      }
+    } finally {
+      if (ownsWorker && worker) worker.close();
+    }
   }
 
   return {
@@ -327,6 +449,21 @@ function createProjectWatcher(rootPath, onChange, options = {}) {
   const pollIntervalMs = Number.isFinite(options.pollIntervalMs)
     ? Math.max(0, options.pollIntervalMs)
     : DEFAULT_POLL_INTERVAL_MS;
+  const usesCustomHash = typeof options.hashFile === 'function' || typeof options.openFile === 'function';
+  let hashWorker = options.hashWorker || null;
+  let hashWorkerError = null;
+  if (!usesCustomHash && !hashWorker) {
+    try {
+      hashWorker = createProjectHashWorker(root, {
+        helperPath: options.nativeHashHelperPath,
+        spawn: options.spawnHashWorker,
+        beforeHashOpen: options.beforeHashOpen,
+        timeoutMs: options.hashWorkerTimeoutMs,
+      });
+    } catch (error) {
+      hashWorkerError = error;
+    }
+  }
   const snapshotOptions = {
     maxEntries: options.maxEntries,
     maxHashFiles: options.maxHashFiles,
@@ -335,6 +472,8 @@ function createProjectWatcher(rootPath, onChange, options = {}) {
     flushMaxHashBytes: options.flushMaxHashBytes,
     hashFile: options.hashFile,
     openFile: options.openFile,
+    hashWorker,
+    hashWorkerError,
   };
   let closed = false;
   let timer = null;
@@ -534,6 +673,7 @@ function createProjectWatcher(rootPath, onChange, options = {}) {
       pending = [];
       for (const watcher of watchers) try { watcher.close(); } catch (_) {}
       watchers = [];
+      hashWorker?.close();
       if (changes.length) {
         onChange({
           schema: EVENT_SCHEMA,
@@ -553,6 +693,7 @@ function createProjectWatcher(rootPath, onChange, options = {}) {
       pending = [];
       for (const watcher of watchers) try { watcher.close(); } catch (_) {}
       watchers = [];
+      hashWorker?.close();
     },
   });
 }

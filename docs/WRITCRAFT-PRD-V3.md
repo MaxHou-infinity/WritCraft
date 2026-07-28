@@ -6,7 +6,7 @@
 > 适用范围：V0 起的桌面写作 IDE  
 > 优先级：若本文件与旧版 PRD、路线图或原型行为冲突，以本文件为准；工程实现以 `docs/PHASE-A-IMPLEMENTATION.md` 为准。
 
-> **实现状态注记（2026-07-28，0.0U）**：本文仍是产品权威规格，**完整 PRD 尚未实现**。0.0U 已删除 native reserve 在证明本次创建身份前修改替身目录的 `fchmod`，并动态证明 0755 替身会在权限/内容不变的情况下被拒绝；shared/setgid 父目录兼容仍成立。当前 Author **48/48**、离线 API **15/15**、完整 test/verify、persistent **3/3**、强制真实 Electron **32/32**、package **8/8**、release **7/7** 通过，本批复审 **P0=0/P1=0/P2=1**。P2 是同 UID 0700 空目录在 `mkdirat→openat` 窗口仍不可区分，已作为威胁模型残余接受而非声称关闭。祖先逐段 `openat`、真实作者、完整 `sk-api-`、付费与正式发布门禁仍开放；ad-hoc App/ZIP 禁止分发，当前事实与顺序只看 `v0/DEVELOPMENT-STATUS.md`。
+> **实现状态注记（2026-07-28，0.0V 已技术签字）**：本文仍是产品权威规格，**完整 PRD 尚未实现**。第二个 universal native helper 已从绑定项目根 fd 逐段 `openat` 并验证祖先/叶子 identity；worker **10/10**、Watcher **30/30**、cross-layer **11/11**、Large **6/6**、package **8/8**、release **7/7**、完整 test/verify、Persistent **3/3** 与真实 Electron **32/32** 通过，独立复审 **P0=0/P1=0/P2=2**。精确范围只覆盖已绑定项目根以下的内部祖先；初始根路径打开的外层祖先、hash 请求 metadata/payload 独立总字节上限及 0.0U 接受的同 UID 0700 空目录 residual 仍开放。真实作者、完整 `sk-api-`、付费与正式发布门禁仍开放；当前事实与恢复顺序只看 `v0/DEVELOPMENT-STATUS.md`。
 
 > **完成定义**：任何“V0 完成”声明必须同时满足 §10.1–§10.4、全量自动回归、真实 Electron E2E 和独立复审。局部 suite 通过、本地 ad-hoc App 或历史 ZIP 均不能单独构成完成证据。
 
@@ -398,7 +398,7 @@ Issue 类型首批支持：
 
 ### 10.3 Phase C：一致性星图
 
-本节的动态旅程、零写入边界、可访问性、最小窗口和大型图谱性能门禁由 `docs/GRAPH-ACCEPTANCE-V1-CONTRACT.md` 细化。产品契约于 2026-07-22 签字，2026-07-23 性能批源码完整 test/verify 与强制 Electron 连续两轮 26/26 通过，可见帧性能复审 P0/P1/P2=0。后续 Graph 韧性批又关闭完整语义权威、不可变快照、异步所有权与 Unicode quote 边界；当前最终源码完整 verify 通过、总链强制 Electron **32/32**，既有独立复审 P0/P1/P2=0。不得用 Node/源码字符串绿灯替代真实 Electron 验收。
+本节的动态旅程、零写入边界、可访问性、最小窗口和大型图谱性能门禁由 `docs/GRAPH-ACCEPTANCE-V1-CONTRACT.md` 细化。产品契约于 2026-07-22 签字，2026-07-23 性能批源码完整 test/verify 与强制 Electron 连续两轮 26/26 通过，可见帧性能复审 P0/P1/P2=0。后续 Graph 韧性批又关闭完整语义权威、不可变快照、异步所有权与 Unicode quote 边界；当前签字的 0.0V 基线完整 verify 通过、总链强制 Electron **32/32**。Graph 专项独立复审仍为 P0/P1/P2=0；0.0V watcher 全批复审为 P0=0/P1=0/P2=2。
 
 1. 能从至少三个项目文件增量生成统一节点、关系、证据和问题。
 2. 默认显示当前文件子图，可切换全项目并按类型、文件和问题筛选。

@@ -20,6 +20,8 @@ const oldExecutable = path.join(outputApp, 'Contents', 'MacOS', 'Electron');
 const executable = path.join(outputApp, 'Contents', 'MacOS', 'WritCraft');
 const nativeHelper = path.join(root, 'src', 'main', 'native', 'author-copy-helper');
 const packagedNativeHelper = path.join(helpers, 'author-copy-helper');
+const projectHashHelper = path.join(root, 'src', 'main', 'native', 'project-hash-helper');
+const packagedProjectHashHelper = path.join(helpers, 'project-hash-helper');
 const zipPath = `${outputRoot}.zip`;
 
 function required(target, label) {
@@ -42,8 +44,24 @@ function prepareNativeHelper(options = {}) {
   return nativeHelperBuildService.assertNativeHelperAttestation(attestation, { source, output });
 }
 
+function prepareProjectHashHelper(options = {}) {
+  const projectRoot = options.root || root;
+  const source = options.source || path.join(projectRoot, 'native', 'project-hash-helper.c');
+  const output = options.output || path.join(projectRoot, 'src', 'main', 'native', 'project-hash-helper');
+  const buildNativeHelper = options.buildNativeHelper || nativeHelperBuildService.buildNativeHelper;
+  const attestation = buildNativeHelper({ root: projectRoot, source, output });
+  return nativeHelperBuildService.assertNativeHelperAttestation(attestation, { source, output });
+}
+
+function prepareNativeHelpers(options = {}) {
+  return Object.freeze({
+    authorCopy: (options.prepareAuthorCopy || prepareNativeHelper)(options.authorCopy || {}),
+    projectHash: (options.prepareProjectHash || prepareProjectHashHelper)(options.projectHash || {}),
+  });
+}
+
 function beginPackage(options = {}) {
-  const prepare = options.prepareNativeHelper || prepareNativeHelper;
+  const prepare = options.prepareNativeHelpers || prepareNativeHelpers;
   return prepare();
 }
 
@@ -67,10 +85,13 @@ function signElectronRuntimeBundles() {
 function packageMac(options = {}) {
   // Exactly one build is permitted per package invocation. The returned
   // attestation is rechecked before any copy/sign/archive operation.
-  const nativeHelperBuild = beginPackage(options);
+  const nativeHelperBuilds = beginPackage(options);
+  const nativeHelperBuild = nativeHelperBuilds.authorCopy;
+  const projectHashHelperBuild = nativeHelperBuilds.projectHash;
   required(electronApp, 'Electron macOS runtime');
   required(path.join(root, 'src', 'main', 'main.js'), 'WritCraft main process');
   required(nativeHelper, 'Author acceptance native helper');
+  required(projectHashHelper, 'Project hash native helper');
 
 fs.mkdirSync(releaseRoot, { recursive: true });
 fs.rmSync(outputRoot, { recursive: true, force: true });
@@ -84,7 +105,11 @@ fs.mkdirSync(helpers, { recursive: true });
 fs.copyFileSync(nativeHelper, packagedNativeHelper);
 fs.chmodSync(packagedNativeHelper, 0o755);
 assertPackagedHelperBinding(nativeHelperBuild, packagedNativeHelper);
+fs.copyFileSync(projectHashHelper, packagedProjectHashHelper);
+fs.chmodSync(packagedProjectHashHelper, 0o755);
+assertPackagedHelperBinding(projectHashHelperBuild, packagedProjectHashHelper);
 fs.rmSync(path.join(packagedApp, 'src', 'main', 'native', 'author-copy-helper'));
+fs.rmSync(path.join(packagedApp, 'src', 'main', 'native', 'project-hash-helper'));
 
 function removeFinderMetadata(directory) {
   for (const entry of fs.readdirSync(directory, { withFileTypes: true })) {
@@ -151,14 +176,17 @@ try {
 // a different binary than the one the build attestation binds.
 signElectronRuntimeBundles();
 execFileSync('codesign', ['--verify', '--strict', packagedNativeHelper], { stdio: 'inherit' });
+execFileSync('codesign', ['--verify', '--strict', packagedProjectHashHelper], { stdio: 'inherit' });
 execFileSync('codesign', ['--force', '--sign', '-', outputApp], { stdio: 'inherit' });
 execFileSync('codesign', ['--verify', '--strict', packagedNativeHelper], { stdio: 'inherit' });
+execFileSync('codesign', ['--verify', '--strict', packagedProjectHashHelper], { stdio: 'inherit' });
 assertPackagedHelperBinding(nativeHelperBuild, packagedNativeHelper);
+assertPackagedHelperBinding(projectHashHelperBuild, packagedProjectHashHelper);
 execFileSync('codesign', ['--verify', '--deep', '--strict', outputApp], { stdio: 'inherit' });
 execFileSync('ditto', ['-c', '-k', '--norsrc', '--keepParent', outputApp, zipPath]);
 
 const info = {
-  schema: 'writcraft.release/v3',
+  schema: 'writcraft.release/v4',
   product: '笔触 · WritCraft',
   version: sourcePackage.version,
   platform: 'darwin',
@@ -167,7 +195,7 @@ const info = {
   archive: path.relative(root, zipPath),
   archiveBytes: fs.statSync(zipPath).size,
   archiveSha256: sha256(zipPath),
-  nativeHelperBuild,
+  nativeHelperBuilds,
   minimumSystemVersion: '11.0',
   signing: 'ad-hoc (local testing only)',
   notarized: false,
@@ -181,6 +209,8 @@ if (require.main === module) packageMac();
 
 module.exports = Object.freeze({
   prepareNativeHelper,
+  prepareProjectHashHelper,
+  prepareNativeHelpers,
   beginPackage,
   assertPackagedHelperBinding,
   packageMac,

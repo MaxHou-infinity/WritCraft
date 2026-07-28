@@ -58,6 +58,12 @@ Watcher-driven flows must not infer authority from elapsed time. A drained Rende
 
 A forced tree walk is not automatically a complete authority scan. If ordinary polling rotates a small hash budget, an explicit flush must use an independent bounded full-Markdown hash budget or fail closed; otherwise a same-size, restored-mtime edit outside the rotation can be missed. Propagate flush failure as an explicit user-visible blocked state—never as an unhandled Renderer rejection.
 
+Leaf-fd identity is not full path authority. An attacker can replace an ancestor while exposing the same hard-linked leaf, so a watcher hash must bind every project-internal ancestor identity and validate it through descriptor-relative traversal before and after the read. Keep the native project-root binding and helper attestation scope explicit: this does not prove the initial root-path open, make enumeration atomic, or eliminate concurrent same-UID fd writes.
+
+Treat native-helper stdout as untrusted input even after a valid response prefix. Catch the complete parse inside the event callback and convert malformed numeric identity or protocol fields into a bounded fail-closed error; an exception must never escape an EventEmitter callback into Electron Main. Bound serialized metadata separately from candidate content bytes.
+
+Packaged and development resource lookup are different contracts. Use packaged helper paths only when `process.resourcesPath` exists **and** `process.defaultApp` is false; verify both a source-tree Electron launch and the packaged App so a local run cannot accidentally search inside Electron.app.
+
 Real Electron harnesses must not let their own infrastructure self-certify. Register a child immediately after spawn; clean it up across discovery, CDP connect/enable/reload/readiness failures; latch both unexpected process exit and CDP failure; check that latch before/after every stage and before the final green line; compare against a fixed expected stage count.
 
 Classify a real-Electron process signal before editing product code. A sandbox-denied GUI launch can exit with `code === null` and `SIGABRT`; rerun the identical probe in the approved unsandboxed GUI context and record both outcomes. Only a failure that reproduces there is product or harness evidence.

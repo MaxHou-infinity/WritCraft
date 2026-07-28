@@ -20,7 +20,7 @@
     "verify:research-renderer": "node tests/verify-v0-sources-ui.js && node tests/verify-v0-research-handoff-renderer.js",
     "verify:research-main": "node tests/verify-v0-research-service.js && node tests/verify-v0-research-handoff.js && node tests/verify-v0-research-apply-transaction.js && node tests/verify-v0-research-judgment-transaction.js && node tests/verify-v0-project-watcher-health.js",
     "verify:graph-renderer": "node tests/verify-v0-graph-filter-state.js && node tests/verify-v0-graph-workbench.js && node tests/verify-v0-graph-renderer-dynamic.js && node tests/verify-v0-large-project.js",
-    "verify:watcher-flush": "node tests/verify-v0-project-watcher.js && node tests/verify-v0-watcher-flush-integration.js",
+    "verify:watcher-flush": "node tests/verify-v0-project-hash-worker.js && node tests/verify-v0-project-watcher.js && node tests/verify-v0-watcher-flush-integration.js",
     "verify:diagnostics": "npm run verify:watcher-flush && node tests/verify-v0-diagnostic-export-service.js && node tests/verify-v0-diagnostic-export-handler.js && node tests/verify-v0-diagnostic-export-renderer.js",
     "verify:image-review": "node tests/verify-v0-image-generation.js && node tests/verify-v0-image-review-service.js && node tests/verify-v0-image-review-handler.js && node tests/verify-v0-image-trash-service.js && node tests/verify-v0-image-trash-handler.js && node tests/verify-v0-image-trash-integration.js && node tests/verify-v0-image-generation-renderer.js && node tests/verify-v0-image-trash-renderer.js && node tests/verify-v0-ai-metrics-renderer.js",
     "verify:author-acceptance": "node tests/verify-v0-real-api-acceptance-contract.js && node tests/verify-v0-author-acceptance-preflight.js",

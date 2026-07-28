@@ -25,6 +25,16 @@ const BUILD_RECIPE = Object.freeze({
 const ATTESTATION_KEYS = Object.freeze([
   'schema', 'sourceSha256', 'binarySha256', 'recipeSha256', 'architectures', 'minimumSystemVersion',
 ]);
+const NATIVE_HELPERS = Object.freeze({
+  authorCopy: Object.freeze({
+    sourceName: 'author-copy-helper.c',
+    outputName: 'author-copy-helper',
+  }),
+  projectHash: Object.freeze({
+    sourceName: 'project-hash-helper.c',
+    outputName: 'project-hash-helper',
+  }),
+});
 
 function sha256File(target, fileSystem = fs) {
   return crypto.createHash('sha256').update(fileSystem.readFileSync(target)).digest('hex');
@@ -123,9 +133,25 @@ function buildNativeHelper(options = {}) {
   return createNativeHelperAttestation({ source, output, fileSystem });
 }
 
+function buildAllNativeHelpers(options = {}) {
+  const projectRoot = options.root || path.resolve(__dirname, '..');
+  const outputDirectory = options.outputDirectory || path.join(projectRoot, 'src', 'main', 'native');
+  const buildOne = options.buildOne || buildNativeHelper;
+  const result = {};
+  for (const [key, specification] of Object.entries(NATIVE_HELPERS)) {
+    result[key] = buildOne({
+      ...options,
+      root: projectRoot,
+      source: path.join(projectRoot, 'native', specification.sourceName),
+      outputDirectory,
+      output: path.join(outputDirectory, specification.outputName),
+    });
+  }
+  return Object.freeze(result);
+}
+
 if (require.main === module) {
-  const attestation = buildNativeHelper();
-  console.log(JSON.stringify(attestation, null, 2));
+  console.log(JSON.stringify(buildAllNativeHelpers(), null, 2));
 }
 
 module.exports = Object.freeze({
@@ -133,10 +159,12 @@ module.exports = Object.freeze({
   ATTESTATION_KEYS,
   ARCHITECTURES,
   MINIMUM_SYSTEM_VERSION,
+  NATIVE_HELPERS,
   BUILD_RECIPE,
   recipeSha256,
   createNativeHelperAttestation,
   assertNativeHelperAttestation,
   assertArtifactHelperBinding,
   buildNativeHelper,
+  buildAllNativeHelpers,
 });

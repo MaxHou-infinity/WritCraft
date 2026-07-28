@@ -32,8 +32,8 @@ test('provides a local macOS release command without adding an installer depende
   assert.strictEqual(packageJson.scripts['package:mac'], 'node scripts/package-macos.js');
   assert.strictEqual(packageJson.scripts['prepackage:mac'], undefined,
     'package script itself must own the native build; npm lifecycle hooks are bypassable');
-  assert.match(script, /prepareNativeHelper\(/,
-    'direct node scripts/package-macos.js must establish a fresh native build binding');
+  assert.match(script, /prepareNativeHelpers\(/,
+    'direct node scripts/package-macos.js must establish fresh bindings for every native helper');
   assert(!/electron-builder|electron-packager|electron-forge/.test(JSON.stringify(packageJson)));
 });
 
@@ -58,15 +58,33 @@ test('ad-hoc signs, verifies, archives and records a SHA-256 release manifest', 
   assert.match(nativeBuildScript, /codesign/,
     'the build must sign the helper before creating its attestation');
   assert.match(script, /assertPackagedHelperBinding\(nativeHelperBuild, packagedNativeHelper\)/,
-    'the package must reject a copied helper whose bytes differ from the build attestation');
+    'the package must reject a copied author helper whose bytes differ from the build attestation');
+  assert.match(script, /assertPackagedHelperBinding\(projectHashHelperBuild, packagedProjectHashHelper\)/,
+    'the package must reject a copied project-hash helper whose bytes differ from its build attestation');
   assert.doesNotMatch(script, /--sign', '-', packagedNativeHelper/,
     'package must not re-sign the nested helper after its attested build');
   assert.doesNotMatch(script, /--deep', '--sign', '-', outputApp/,
     'outer signing must not mutate the separately attested nested helper');
-  assert.match(releaseVerifyScript, /assertArtifactHelperBinding\(info\.nativeHelperBuild, packagedHelper\)/,
-    'release verification must bind the App helper to the build digest');
-  assert.match(releaseVerifyScript, /assertArtifactHelperBinding\(info\.nativeHelperBuild, extractedHelper\)/,
-    'release verification must bind the extracted ZIP helper to the same build digest');
+  assert.match(
+    releaseVerifyScript,
+    /assertArtifactHelperBinding\(info\.nativeHelperBuilds\.authorCopy, packagedHelper\)/,
+    'release verification must bind the App author helper to its build digest'
+  );
+  assert.match(
+    releaseVerifyScript,
+    /assertArtifactHelperBinding\(info\.nativeHelperBuilds\.projectHash, packagedProjectHashHelper\)/,
+    'release verification must bind the App project-hash helper to its build digest'
+  );
+  assert.match(
+    releaseVerifyScript,
+    /assertArtifactHelperBinding\(info\.nativeHelperBuilds\.authorCopy, extractedHelper\)/,
+    'release verification must bind the extracted ZIP author helper to the same build digest'
+  );
+  assert.match(
+    releaseVerifyScript,
+    /assertArtifactHelperBinding\(info\.nativeHelperBuilds\.projectHash, extractedProjectHashHelper\)/,
+    'release verification must bind the extracted ZIP project-hash helper to the same build digest'
+  );
   assert.match(releaseVerifyScript, /assertTreeEqual\(app, extractedApp\)/,
     'release verification must compare the complete App and extracted ZIP trees');
   assert.match(releaseVerifyScript, /assert\.strictEqual\(info\.product, PRODUCT_NAME\)/,
@@ -83,7 +101,7 @@ test('ad-hoc signs, verifies, archives and records a SHA-256 release manifest', 
   assert.match(script, /ditto/);
   assert.match(script, /--norsrc/);
   assert.match(script, /archiveSha256/);
-  assert.match(script, /nativeHelperBuild/);
+  assert.match(script, /nativeHelperBuilds/);
   assert.doesNotMatch(script, /nativeHelperPackagedSha256/,
     'the manifest must have one source-to-build digest, not an independent packaged digest');
   assert.match(script, /notarized: false/);
@@ -105,33 +123,54 @@ test('bundles the self-contained PDF runtime (pdfjs legacy build + standard font
   assert(!fs.existsSync(path.join(root, 'src', 'main', 'pdf-extract-helper.py')));
 });
 
-test('bundles a universal executable author-copy helper without Python', () => {
-  const helper = path.join(root, 'src', 'main', 'native', 'author-copy-helper');
+test('bundles universal executable author-copy and project-hash helpers', () => {
+  const authorHelper = path.join(root, 'src', 'main', 'native', 'author-copy-helper');
+  const projectHashHelper = path.join(root, 'src', 'main', 'native', 'project-hash-helper');
   const service = fs.readFileSync(
     path.join(root, 'src', 'main', 'author-acceptance-preflight-service.js'),
     'utf8'
   );
-  fs.accessSync(helper, fs.constants.R_OK | fs.constants.X_OK);
+  const worker = fs.readFileSync(
+    path.join(root, 'src', 'main', 'project-hash-worker.js'),
+    'utf8'
+  );
+  fs.accessSync(authorHelper, fs.constants.R_OK | fs.constants.X_OK);
+  fs.accessSync(projectHashHelper, fs.constants.R_OK | fs.constants.X_OK);
   assert.match(script, /Author acceptance native helper/);
+  assert.match(script, /Project hash native helper/);
   assert.match(script, /Contents', 'Helpers'/);
   assert.match(script, /author-copy-helper/);
+  assert.match(script, /project-hash-helper/);
   assert.match(script, /fs\.rmSync\(path\.join\(packagedApp, 'src', 'main', 'native'/);
   assert.doesNotMatch(service, /python3|atomic-rename-exclusive\.py/);
   assert.match(service, /process\.resourcesPath/);
   assert.match(service, /'Helpers', 'author-copy-helper'/);
   assert.match(service, /native',\s*'author-copy-helper'/);
+  assert.match(worker, /process\.resourcesPath/);
+  assert.match(worker, /process\.resourcesPath && !process\.defaultApp/,
+    'development Electron must use the source helper instead of Electron.app Contents/Helpers');
+  assert.match(worker, /'Helpers', 'project-hash-helper'/);
+  assert.match(worker, /native',\s*'project-hash-helper'/);
 });
 
-test('direct package path owns one current signed native build attestation and rejects stale or forged proof', () => {
+test('direct package path owns both current signed native build attestations and rejects stale proof', () => {
   const temporary = fs.mkdtempSync(path.join(os.tmpdir(), 'writcraft-build-causality-'));
   const source = path.join(temporary, 'native', 'author-copy-helper.c');
   const output = path.join(temporary, 'src', 'main', 'native', 'author-copy-helper');
+  const projectSource = path.join(temporary, 'native', 'project-hash-helper.c');
+  const projectOutput = path.join(temporary, 'src', 'main', 'native', 'project-hash-helper');
   try {
     fs.mkdirSync(path.dirname(source), { recursive: true });
     fs.mkdirSync(path.dirname(output), { recursive: true });
     fs.writeFileSync(source, 'int main(void) { return 0; }\n');
     fs.writeFileSync(output, 'compiled-native-helper');
+    fs.writeFileSync(projectSource, 'int main(void) { return 0; }\n');
+    fs.writeFileSync(projectOutput, 'compiled-project-hash-helper');
     const attestation = nativeHelperBuild.createNativeHelperAttestation({ source, output });
+    const projectAttestation = nativeHelperBuild.createNativeHelperAttestation({
+      source: projectSource,
+      output: projectOutput,
+    });
     let calls = 0;
     const prepared = packageMac.prepareNativeHelper({
       root: temporary,
@@ -146,15 +185,39 @@ test('direct package path owns one current signed native build attestation and r
     assert.strictEqual(calls, 1, 'package must invoke its builder exactly once');
     assert.deepStrictEqual(prepared, attestation);
 
+    let projectCalls = 0;
+    const preparedProject = packageMac.prepareProjectHashHelper({
+      root: temporary,
+      source: projectSource,
+      output: projectOutput,
+      buildNativeHelper(options) {
+        projectCalls += 1;
+        assert.deepStrictEqual(options, {
+          root: temporary,
+          source: projectSource,
+          output: projectOutput,
+        });
+        return projectAttestation;
+      },
+    });
+    assert.strictEqual(projectCalls, 1, 'package must invoke the project-hash builder exactly once');
+    assert.deepStrictEqual(preparedProject, projectAttestation);
+
     let coordinatorCalls = 0;
     assert.deepStrictEqual(packageMac.beginPackage({
-      prepareNativeHelper() {
+      prepareNativeHelpers() {
         coordinatorCalls += 1;
-        return attestation;
+        return Object.freeze({
+          authorCopy: attestation,
+          projectHash: projectAttestation,
+        });
       },
-    }), attestation);
+    }), {
+      authorCopy: attestation,
+      projectHash: projectAttestation,
+    });
     assert.strictEqual(coordinatorCalls, 1,
-      'the production package coordinator must obtain exactly one build attestation');
+      'the production package coordinator must obtain exactly one dual-helper attestation set');
 
     assert.throws(() => packageMac.prepareNativeHelper({
       root: temporary,
@@ -211,23 +274,26 @@ test('direct package path owns one current signed native build attestation and r
   }
 });
 
-test('full package coordinator invokes exactly one real native build before writing its manifest', () => {
+test('full package coordinator builds both native helpers before writing its manifest', () => {
   let builds = 0;
   const info = packageMac.packageMac({
-    prepareNativeHelper() {
-      return packageMac.prepareNativeHelper({
-        buildNativeHelper(options) {
-          builds += 1;
-          return nativeHelperBuild.buildNativeHelper(options);
-        },
+    prepareNativeHelpers() {
+      const buildNativeHelper = options => {
+        builds += 1;
+        return nativeHelperBuild.buildNativeHelper(options);
+      };
+      return Object.freeze({
+        authorCopy: packageMac.prepareNativeHelper({ buildNativeHelper }),
+        projectHash: packageMac.prepareProjectHashHelper({ buildNativeHelper }),
       });
     },
   });
-  assert.strictEqual(builds, 1,
-    'one complete package invocation must run the real helper builder exactly once');
-  assert.strictEqual(info.schema, 'writcraft.release/v3');
+  assert.strictEqual(builds, 2,
+    'one complete package invocation must build each native helper exactly once');
+  assert.strictEqual(info.schema, 'writcraft.release/v4');
   assert.strictEqual(info.product, '笔触 · WritCraft');
   assert.strictEqual(info.version, packageJson.version);
+  assert.deepStrictEqual(Object.keys(info.nativeHelperBuilds).sort(), ['authorCopy', 'projectHash']);
   assert.strictEqual(info.signing, 'ad-hoc (local testing only)');
   assert.strictEqual(info.notarized, false);
 });

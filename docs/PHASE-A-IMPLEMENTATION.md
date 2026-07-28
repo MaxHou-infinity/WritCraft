@@ -6,9 +6,9 @@
 > 产品依据：`docs/WRITCRAFT-PRD-V3.md`  
 > 范围：把现有单文档 Electron 原型升级为安全、可恢复的本地多文件项目工作区。
 
-> **工程交接（2026-07-28，0.0U native reserve 加固）**：0.0U 以测试专用进程在 `mkdirat→openat` 窗口放入 0755 空目录，确定性证明旧 helper 会先 `fchmod` 外来对象并错误采纳。生产 helper 现临时收紧 umask，删除预所有权 `fchmod`，在任何 receipt/清理/发布前验证 fd/path 同一身份、低九位 0700、当前 euid 与空目录；不再依赖 `st_nlink==2`，并保留 shared/setgid 父目录兼容。Author **48/48**、离线 API **15/15**、完整 test/verify、Persistent **3/3**、真实 Electron **32/32**、package **8/8**、release **7/7** 通过，独立复审 **P0=0/P1=0/P2=1**；ad-hoc App/ZIP 仍禁止分发。
+> **工程交接（2026-07-28，0.0V watcher 祖先遍历已签字）**：第二个 universal native helper 与持久 worker 已从绑定项目根 fd 逐段 `openat`，核验扫描时保存的祖先/叶子完整 identity，并在读取后重走链路；双-helper构建与发行哈希链已经完成。worker **10/10**、Watcher **30/30**、cross-layer **11/11**、Large **6/6**、package **8/8**、release **7/7**、完整 test/verify、Persistent **3/3**、真实 Electron **32/32** 通过；独立复审 **P0=0/P1=0/P2=2**。当前 App/ZIP 是 0.0V ad-hoc 本地证据，仍禁止分发。
 > **下一阶段合同**：`docs/AUTHOR-ACCEPTANCE-V1-CONTRACT.md` 已冻结，明确付费网络门禁、允许记录的隐私安全证据、真实长文旅程与发布前签字顺序。
-> **当前实现停点**：0.0U reserve 加固是最新批次；0.0T Plan timing、0.0S receipt/build、0.0R strict watcher fd hash 与 0.0Q Main barrier 保持签字。下一本地工程仅为纯 Node 祖先逐段 `openat`；native 微窗口中的同 UID 0700 空目录因公开 macOS ABI 不提供原子目录 fd 创建而被明确接受，只有引入 OS 保护的同卷 staging parent 或不同权限边界后才重开。真实产品门禁仍要求作者显式选择满足五章节、2,000 汉字和来源要求的项目并提供完整 `sk-api-`；不得扫描无关私人文稿、自动创建真实副本或用 fixture 替代作者证据。
+> **当前实现停点**：0.0V 已技术签字。下一本地任务是为 native hash batch 增加独立 metadata/payload 总字节上限并补深路径批量回归；初始项目根路径打开的外层祖先 TOCTOU 继续作为明确 P2。0.0T Plan timing、0.0S receipt/build、0.0U reserve 保持历史签字；同 UID 0700 空目录 residual 仍被明确接受。真实产品门禁仍要求作者显式选择满足五章节、2,000 汉字和来源要求的项目并提供完整 `sk-api-`；不得扫描无关私人文稿、自动创建真实副本或用 fixture 替代作者证据。
 
 ## 1. 阶段目标
 
@@ -217,7 +217,7 @@ Main 为当前窗口保存不可伪造的 project session，不允许 renderer �
 - 树节点使用相对路径作为身份，显示名仅用于 UI。
 - 外部新增、修改、重命名或删除通过 Main watcher 转成结构化事件；watcher 事件只是失效信号，renderer 应重新读取权威快照。
 - 在 watcher 驱动的状态之后生成新 AI capability 时，Renderer 的队列排空或时间稳定窗都不能充当权威证明。必须由 Main 等待在途 poll、强制新快照并清空 pending 后签发绑定当前项目实例与 mutation generation 的一次性 flush barrier；任何扫描不完整、项目切换或 watcher degraded 均 fail-closed。
-- strict flush 的 Markdown hash 必须以扫描时私有 BigInt identity 绑定 no-follow fd，在 fd 上按已验证 size 分块读取，并于读取前后复核 `dev/ino/size/mode/nlink/mtimeNs/ctimeNs` 与最终路径。最终组件替换、symlink、增长或原地改写均使覆盖不完整；公开 snapshot 仍保持既有 Number `size/mtimeMs` 兼容语义。`O_NOFOLLOW` 不证明祖先目录链，若将恶意祖先替换纳入威胁模型，须另用 native `openat` 逐段遍历。
+- strict flush 的 Markdown hash 必须以扫描时私有 BigInt identity 绑定祖先链和叶子。生产路径从已绑定项目根 fd 交给 native helper，逐段 `openat(O_DIRECTORY|O_NOFOLLOW)` 并在下降前验证每级目录；叶子在读前/读后验证，返回成功前再从根重走整条链。最终组件或祖先替换、symlink、增长、原地改写、预算/协议/helper 故障均使覆盖不完整；公开 snapshot 仍保持既有 Number `size/mtimeMs` 兼容语义。该合同不证明初始项目根路径打开时的上层祖先，也不让 readdir/fs.watch 与外部写入变成原子操作。
 
 ### 7.3 标签页状态
 
@@ -361,7 +361,7 @@ Main 为当前窗口保存不可伪造的 project session，不允许 renderer �
 - **Research→Changes**：`writcraft.research-handoff/v1` 已完成契约、实现、强制 Electron reject/A→B 与当前源码 App 人工旅程；来源保持只读并进入 ChangeSet provenance。生产 apply transaction 以真实磁盘/History 关闭 committed-warning 动态故障注入，最终独立二审 P0=0/P1=0/P2=0。
 - **Inline Rewrite**：已冻结并实现 selection/block anchor、target revision、`end_turn`、输出边界、保留路径禁写、Main capability/ACK、接受时依赖复核、durable reconciliation 和 Change History；原位红绿 Diff、阻断恢复与当前源码人工旅程均已签字。
 - **Plan 生成**：`docs/PLAN-STRICT-V1-CONTRACT.md` 已实现；request/project/target revision ownership、strict JSON、stopReason、单文本块、失败终态、资源上限及 identifier-only Plan→Changes provenance 均已冻结并验证。
-- **Graph 扩展验收**：`docs/GRAPH-ACCEPTANCE-V1-CONTRACT.md` 已签字；筛选/双证据/stale/作者纠错、failure live、键盘/AX、布局及大图性能已覆盖。后续韧性批又关闭 deferred async ownership、缓存/分析器完整语义权威、有界不可变 Renderer 快照与 Unicode quote 边界，独立二审 P0/P1/P2=0；当前总链真实 Electron 32/32。
+- **Graph 扩展验收**：`docs/GRAPH-ACCEPTANCE-V1-CONTRACT.md` 已签字；筛选/双证据/stale/作者纠错、failure live、键盘/AX、布局及大图性能已覆盖。后续韧性批又关闭 deferred async ownership、缓存/分析器完整语义权威、有界不可变 Renderer 快照与 Unicode quote 边界，独立二审 P0/P1/P2=0；当前签字总链为 0.0V 真实 Electron 32/32。
 - **Diagnostic Export**：`docs/DIAGNOSTIC-EXPORT-V1-CONTRACT.md` 已实现；Main 构造递归 allowlist JSON，Renderer 只显示精确预览并回传 token，原生保存拒绝覆盖并在失败时只清理由本次创建且 inode 相同的文件；取消、项目/导航漂移、TTL 跨 fsync 与并发替换均有动态门禁。
 - **Image Review**：`docs/IMAGE-REVIEW-V1-CONTRACT.md` 已实现自动化主链与 Trash 扩展；Main 绑定窗口/项目/代际/资产，Renderer 只回传 token、评分、终态、可选费用及 Trash opaque capability。恢复/清空使用 transaction quarantine、inode/digest 双复核和 committed-state 精确重试，不修改 Markdown 或既有评审证据。
 
@@ -383,7 +383,7 @@ Main 为当前窗口保存不可伪造的 project session，不允许 renderer �
 - [x] renderer sandbox、context isolation 和窄 preload API 保持开启。
 - [x] Phase A 地基、当前 Chat/Chapter 源码的单元/IPC 集成和强制真实 Electron 验收通过；失败证据不被静态 verify 掩盖。
 
-> 证据边界：当前最终源码 `npm test` 与沙箱外 Electron-enabled `npm run verify` exit 0，Author **48/48**、Offline API **15/15**、package **8/8**、release **7/7**、Persistent Watcher **3/3**、强制 Electron **32/32**。0.0U 独立复审 **P0=0/P1=0/P2=1**；P2 是已接受、未消除的同 UID 0700 空目录 reserve residual。纯 Node 祖先逐段 `openat` 仍待工程处理；真实 API、完整 `sk-api-` 图片、真实作者内测与发布复审也未关闭。精确缺口见 `v0/DEVELOPMENT-STATUS.md`。
+> 证据边界：0.0V 当前源码的 Author **48/48**、Offline **15/15**、worker **10/10**、Watcher **30/30**、package **8/8**、release **7/7**、Persistent **3/3**、强制 Electron **32/32** 及完整 test/verify 已通过；独立复审 **P0=0/P1=0/P2=2**。真实 API、完整 `sk-api-` 图片、真实作者内测与发布复审仍未关闭。精确缺口见 `v0/DEVELOPMENT-STATUS.md`。
 
 Phase A 只有在全部清单有可复现证据时才算完成；“页面看起来像工作区”或“测试只检查元素存在”都不构成验收。
 

@@ -10,7 +10,7 @@ const watcher = require('../src/main/project-watcher');
 const watcherInvalidationPolicy = require('../src/main/watcher-invalidation-policy');
 
 let pass = 0;
-const EXPECTED_CHECKS = 28;
+const EXPECTED_CHECKS = 30;
 async function check(label, fn) {
   try {
     await fn();
@@ -430,6 +430,34 @@ async function run() {
     }
   });
 
+  await check('快照扫描根与哈希 worker 绑定根不一致时失败关闭', async () => {
+    const root = tempProject();
+    fs.writeFileSync(path.join(root, 'edit.md'), 'trusted');
+    const scanned = fs.lstatSync(root, { bigint: true });
+    let hashCalled = false;
+    try {
+      const mismatchedWorker = {
+        rootIdentity: {
+          dev: scanned.dev,
+          ino: scanned.ino + 1n,
+          mode: scanned.mode,
+        },
+        async hash() {
+          hashCalled = true;
+          return [];
+        },
+      };
+      const snapshot = await watcher.projectSnapshot(root, {
+        hashWorker: mismatchedWorker,
+      });
+      assert.deepStrictEqual(snapshot.stats.hashErrors, ['edit.md']);
+      assert.strictEqual(snapshot.entries.get('edit.md').contentHash, 'unreadable');
+      assert.strictEqual(hashCalled, false);
+    } finally {
+      fs.rmSync(root, { recursive: true, force: true });
+    }
+  });
+
   await check('生产哈希拒绝 lstat 后被符号链接或普通文件替换的路径', async () => {
     const root = tempProject();
     const target = path.join(root, 'edit.md');
@@ -533,6 +561,55 @@ async function run() {
     } finally {
       instance.close();
       fs.rmSync(root, { recursive: true, force: true });
+    }
+  });
+
+  await check('strict flush 在读取前拒绝扫描后被替换的中间祖先并可恢复', async () => {
+    const root = tempProject();
+    const chapters = path.join(root, 'chapters');
+    const moved = path.join(root, '.original-chapters');
+    const outside = `${root}-outside`;
+    const native = new EventEmitter();
+    native.close = () => {};
+    const payloads = [];
+    let attacked = false;
+    fs.mkdirSync(chapters);
+    fs.mkdirSync(outside);
+    fs.writeFileSync(path.join(root, 'edit.md'), 'prompt');
+    fs.writeFileSync(path.join(chapters, 'one.md'), 'shared inode content');
+    fs.linkSync(path.join(chapters, 'one.md'), path.join(outside, 'one.md'));
+    const instance = watcher.createProjectWatcher(root, payload => payloads.push(payload), {
+      watchFn: () => native,
+      pollIntervalMs: 0,
+      beforeHashOpen({ relative }) {
+        if (!attacked && relative === 'chapters/one.md') {
+          attacked = true;
+          fs.renameSync(chapters, moved);
+          fs.symlinkSync(outside, chapters);
+        }
+      },
+    });
+    try {
+      await assert.rejects(
+        () => instance.flush(),
+        error => error?.code === 'PROJECT_WATCHER_FLUSH_INCOMPLETE'
+      );
+      assert.strictEqual(attacked, true);
+      assert.deepStrictEqual(payloads, []);
+
+      fs.unlinkSync(chapters);
+      fs.renameSync(moved, chapters);
+      const recovered = await instance.flush();
+      assert.strictEqual(recovered.ok, true);
+      assert.strictEqual(recovered.hashedFiles, 2);
+      assert.strictEqual(payloads.length, 1);
+      assert.deepStrictEqual(payloads[0].changes, [{ path: null, kind: 'invalidated' }]);
+    } finally {
+      instance.close();
+      if (fs.existsSync(chapters) && fs.lstatSync(chapters).isSymbolicLink()) fs.unlinkSync(chapters);
+      if (fs.existsSync(moved) && !fs.existsSync(chapters)) fs.renameSync(moved, chapters);
+      fs.rmSync(root, { recursive: true, force: true });
+      fs.rmSync(outside, { recursive: true, force: true });
     }
   });
 
