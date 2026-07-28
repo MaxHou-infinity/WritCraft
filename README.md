@@ -1,9 +1,9 @@
 # 笔触 · WritCraft（写作 IDE）
 
-> 状态：**V0 候选原型，2026-07-28 0.0S 作者预检/原生打包因果链已完成定向验证；真实作者、付费 API 与发布验收仍待执行** · 发起方：Max
+> 状态：**V0 候选原型，2026-07-28 0.0T Plan 写入终态时序已完成根因修复与独立验证；真实作者、付费 API 与发布验收仍待执行** · 发起方：Max
 > 当前开发真相与唯一续作入口：[`v0/DEVELOPMENT-STATUS.md`](v0/DEVELOPMENT-STATUS.md)。配图现已覆盖评分、插入/保留/移入废纸篓、可见列表、单项恢复和确认式快照清空；五项竞态缺口已关闭，最终独立复审 **P0=0/P1=0/P2=1（非阻断）**。该签字尚不能替代真实 `sk-api-`/作者与发布验收；现有 App/ZIP 禁止分发。
 > 下一阶段验收边界：[`docs/AUTHOR-ACCEPTANCE-V1-CONTRACT.md`](docs/AUTHOR-ACCEPTANCE-V1-CONTRACT.md) 已冻结；真实调用、作者内容与发布证据必须遵守其中的隐私和付费门禁。
-> 当前停点：0.0S 已让 stdout/status 单路丢失可由匿名 receipt 恢复精确 stage 身份；stdout 与 receipt 双证据同时丢失仍 fail-closed 并保留 unknown stage。build→已签名 helper→App→ZIP 的哈希链断裂也已关闭；Watcher 的 0.0R fd hash 与 0.0Q Main barrier 保持有效。Author **47/47**、离线 API **15/15**（合计 **62/62、0 网络**）、package **8/8**、release **7/7**、`npm test`/Electron-enabled `npm run verify` 均 exit 0；真实 Electron 首次 Plan write 曾 timeout，已补失败快照，同源后续连续两次 **32/32**，但时序根因尚未解释，仍是 P2。0.0S 第三轮独立复审 **P0=0/P1=0/P2=3，可以技术签字**。
+> 当前停点：0.0T 已证明 Plan 写入的磁盘/History 权威恢复完成后，Renderer 又等待第二轮重复刷新，导致终态可能超过 15 秒；现以 `authoritativeReloaded` 跳过该非权威链，并保留所有失败路径的 fail-closed 刷新。Renderer dynamic **25/25**，完整 test/verify、persistent **3/3** 通过；本地与独立复审共三次真实 Electron **32/32**，Plan apply 约 205–1078ms，本批复审 **P0=0/P1=0/P2=0**。0.0S reserve/build 与 0.0R/0.0Q watcher 链保持有效；仍开放两个安全 P2（祖先 `openat`、native `mkdirat→openat`）和真实作者/付费/发布门禁。
 
 ## 2026-07-28 当前复核快照
 
@@ -24,7 +24,7 @@
 - `image-01` 已实现安全落盘、解码尺寸/比例证明、必填 1–5 分、可选费用、插入/保留/可恢复废纸篓和项目聚合；废纸篓现可见数量/容量、逐项恢复和确认式精确快照清空，并明确长期保留、绝不后台删除。Trash Service **21/21**、Handler **7/7**、Integration **4/4**、Renderer **7/7**；path replacement、same-inode rewrite 与 committed TTL 五项 P1 已关闭，最终独立复审 **P0=0/P1=0/P2=1**。P2 仅为非协作外部 open-FD writer 的极窄通用残余；真实质量与费用仍待完整 `sk-api-`。
 - Diagnostic Export v1 已接入设置页：作者先看到可能导出的完整 JSON，正文、Prompt、模型回答、Key、项目/文件名与路径均被排除；Renderer 只能回传一次性 token，Main 负责原生保存和不可覆盖写入。Service **13/13**、Handler **10/10**、Renderer **7/7**、Network boundary **15/15**，真实 Electron 已覆盖可见预览和隐私 sentinel。
 - Inline 当前源码隔离 App 已完成人工预览零写入、拒绝、重载、接受、History 与 Safe Undo；Plan 生成已强制 `end_turn`、单文本块、strict JSON、错误脱敏与目标/Prompt 资源上限，独立复审 P0=0/P1=0。
-- 当前源码 `npm test` 与沙箱外 Electron-enabled `npm run verify` 均 **exit 0**（真实 DOM sanitizer **13/13**）、persistent watcher **3/3**；同源真实 Electron 在一次首次 Plan write timeout 后补入失败快照，随后连续两次 **32/32**。0.0Q Main barrier、0.0R no-follow fd 与 0.0S reserve receipt/build→App→ZIP 同一哈希链均已落地。作者验收前置 **47/47**、真实 API 离线合同 **15/15**，组合 **62/62、0 网络**；当前 ad-hoc App/ZIP 已重建并通过 package **8/8**、release **7/7**，但仍缺真实作者项目、完整 `sk-api-`、付费图片、干净账户、Developer ID、公证与 Gatekeeper，禁止分发。仍开放的本地边界是祖先目录 `openat`、`mkdirat→openat` 微窗口和未解释的 Plan timing P2。
+- 当前源码 `npm test` 与沙箱外 Electron-enabled `npm run verify` 均 **exit 0**（真实 DOM sanitizer **13/13**）、persistent watcher **3/3**；0.0T 保留首个 Plan 红灯并用挂起式回归证明终态错误依赖重复 refresh，修复后本地两次与独立复审一次真实 Electron 均 **32/32**。0.0Q Main barrier、0.0R no-follow fd 与 0.0S reserve receipt/build→App→ZIP 同一哈希链均已落地。作者验收前置 **47/47**、真实 API 离线合同 **15/15**，组合 **62/62、0 网络**；当前 ad-hoc App/ZIP 已重建并通过 package **8/8**、release **7/7**，但仍缺真实作者项目、完整 `sk-api-`、付费图片、干净账户、Developer ID、公证与 Gatekeeper，禁止分发。仍开放的本地边界只有祖先目录 `openat` 与 `mkdirat→openat` 微窗口。
 - Main 网络边界已固定文本/图片官方主机，加入 renderer HTTP(S)/WS(S) 双层断网、上下文 IPC 上限、owner abort、mutation generation、内部 revision/父目录回声隔离、零 POST retry、拒绝重定向、诊断 token-only 导出和错误脱敏；当前 network boundary **15/15**。
 - Graph 扩展已动态覆盖 300 文件/1279 节点、cold-to-interactive、stale/三类作者纠错、failure live、键盘/AX、布局、性能、重启与 A→B；缓存完整语义权威、Renderer 不可变快照、同/跨项目异步所有权及 Unicode quote 边界已关闭，最终独立复审 P0=0/P1=0/P2=0。
 - 2026-07-26 已建立本地 Git `main` 基线；后续改动必须通过提交保留可审计差异。该基线不追溯此前历史，阶段事实仍以 `v0/DEVELOPMENT-STATUS.md` 和当次可复现测试证据为准。

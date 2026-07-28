@@ -28,6 +28,8 @@ Main owns filesystem, revision, capability, and network authority. Renderer code
 
 Before any paid call or irreversible side effect, complete authority/capacity preflight and acquire an owner-specific single-flight lease. Release only a lease this request actually acquired. After a commit, retries must preserve committed truth: do not rerun stale pre-commit validation or repeat the mutation; retry only missing evidence, fsync, or response reconstruction.
 
+When a Main-owned reconciliation has already installed authoritative tree, current-file, and History state and cleared the exact recovery marker, publish the committed terminal UI from that result. Do not make success depend on a second unbounded refresh chain. Any optional follow-up refresh must not obscure committed truth; retain the old fail-closed refresh path when authoritative reload is absent or untrusted.
+
 ## Testing Guidelines
 
 Tests use Node's built-in `assert` and executable scripts rather than a test framework. Add failure, stale revision, project-switch, no-op, and async-destroy coverage where relevant. Directed tests are not sign-off: run full verification, real Electron behavior, manual user journeys, and independent review as required by Phase A §11.4.

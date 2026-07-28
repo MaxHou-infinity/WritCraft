@@ -1,8 +1,8 @@
 # 笔触 · WritCraft · 一个月 V0 路线图
 
-> 文档版本：2026-07-28（v2.7，0.0S reserve receipt 与构建因果链）
+> 文档版本：2026-07-28（v2.8，0.0T Plan 写入终态时序收口）
 > 状态：**V0 续作中，完整产品未完成**；产品范围以 `docs/WRITCRAFT-PRD-V3.md` 为准  
-> 2026-07-28 续作交接：0.0S 已用匿名 0600 reserve receipt 关闭 stdout/status 丢失后的空 stage 猜测，并让构建后的 signed helper、App helper 和标准 `unzip` ZIP helper 绑定同一 hash。Author **47/47**、离线 **15/15**（**62/62、0 网络**）、package **8/8**、release **7/7**、`npm test`/verify exit 0、persistent watcher **3/3**。当前 ad-hoc App/ZIP 已按源码重建但禁止分发。真实 Electron 首次 Plan write timeout 虽已补失败快照、随后同源连续两次 **32/32**，根因仍未解释，保留 timing P2；祖先 `openat`、`mkdirat→openat` 微窗口与真实作者/付费/发布门禁也仍开放。准确事实与 TODO 只看 `v0/DEVELOPMENT-STATUS.md`。
+> 2026-07-28 续作交接：0.0T 保留首次 Plan write timeout，并用永久挂起重复 refresh 的红测证明“权威恢复已完成后仍等待第二轮 IPC”是结构性原因；修复后 Renderer **25/25**、完整 test/verify、persistent **3/3** 通过，本地及独立复审共三次真实 Electron **32/32**，本批 **P0=0/P1=0/P2=0**。0.0S reserve/build、Author **47/47**、离线 **15/15**、package **8/8**、release **7/7** 保持有效；ad-hoc App/ZIP 禁止分发。下一本地工程只剩祖先 `openat` 与 native `mkdirat→openat` 两个安全 P2；真实作者/付费/发布门禁仍开放。准确事实与 TODO 只看 `v0/DEVELOPMENT-STATUS.md`。
 > 范围：Month 1（4 周 × 7 天 = 28 天）
 
 ---
@@ -168,4 +168,4 @@
 
 ## 九、 下一步
 
-2026-07-28 日终 0.0S 已关闭 native reserve receipt 与 build→App→ZIP hash 链 P2；不要从旧路线图重开它们。下一步严格按 `v0/DEVELOPMENT-STATUS.md`：先解释并稳定复现首次 Plan write timing timeout，同时保留失败快照；祖先 `openat` 与 `mkdirat→openat` 微窗口若进入威胁模型，须先冻结原生协议。只有作者提供合格项目和完整 `sk-api-`，才按 `docs/AUTHOR-ACCEPTANCE-V1-CONTRACT.md` 执行真实付费图片、2000+ 字/5+ 章作者旅程和私有价值证据；其后基于最新源码重建并进入签名/公证/Gatekeeper 复审。
+2026-07-28 0.0T 已关闭 Plan write timing，不得从 0.0S 旧路线重开。下一步严格按 `v0/DEVELOPMENT-STATUS.md`：祖先 `openat` 与 `mkdirat→openat` 微窗口若进入威胁模型，须先冻结原生协议。只有作者提供合格项目和完整 `sk-api-`，才按 `docs/AUTHOR-ACCEPTANCE-V1-CONTRACT.md` 执行真实付费图片、2000+ 字/5+ 章作者旅程和私有价值证据；其后基于最新源码重建并进入签名/公证/Gatekeeper 复审。

@@ -226,10 +226,12 @@ function loadChangesHarness(overrides = {}) {
     discardChanges: 0,
     refresh: 0,
     reload: 0,
+    open: 0,
+    history: 0,
     metrics: [],
   };
   const bridge = {
-    listChangeHistory: async () => ({ ok: true, history: [] }),
+    listChangeHistory: async () => { calls.history += 1; return { ok: true, history: [] }; },
     applyChanges: async () => { calls.apply += 1; return overrides.applyResult; },
     confirmOnboardingFiles: async (...args) => {
       calls.confirm += 1;
@@ -273,10 +275,14 @@ function loadChangesHarness(overrides = {}) {
           authoritativeReloaded: false,
         };
     },
-    refreshTree: async () => { calls.refresh += 1; if (overrides.refreshError) throw overrides.refreshError; },
-    getCurrentPath: () => 'edit.md',
+    refreshTree: async () => {
+      calls.refresh += 1;
+      if (overrides.refreshNever) return new Promise(() => {});
+      if (overrides.refreshError) throw overrides.refreshError;
+    },
+    getCurrentPath: () => overrides.currentPath || 'edit.md',
     reloadCurrent: async () => { calls.reload += 1; return true; },
-    openFile: async () => true,
+    openFile: async (...args) => { calls.open += 1; calls.openArgs = args; return true; },
     setAIVisible() {},
   };
   const window = {
@@ -321,6 +327,22 @@ function changedProposal() {
       files: [{
         path: 'edit.md', summary: '更新项目说明', selectionPolicy: 'file',
         hunks: [{ id: 'h1', oldStart: 1, oldLines: 1, newStart: 1, newLines: 1, lines: [{ kind: 'add', text: '项目主旨' }] }],
+      }],
+    },
+  };
+}
+
+function ordinaryProposal() {
+  return {
+    ok: true,
+    noChanges: false,
+    proposalKind: 'changeset',
+    changeSetId: 'pc_33333333333333333333333333333333',
+    review: {
+      changeSetId: 'pc_33333333333333333333333333333333', totalHunks: 1,
+      files: [{
+        path: 'chapters/a.md', summary: '更新正文', selectionPolicy: 'file',
+        hunks: [{ id: 'h1', oldStart: 1, oldLines: 1, newStart: 1, newLines: 1, lines: [{ kind: 'add', text: '新正文' }] }],
       }],
     },
   };
@@ -464,6 +486,78 @@ function extractFunction(source, name) {
     assert(allText(harness.document.getElementById('changes-preview')).includes('已创建 1 个初始文件'));
   });
 
+  await test('authoritative apply recovery reaches the shared terminal state without repeating refresh IPCs', async () => {
+    const harness = loadChangesHarness({
+      applyResult: { ok: true, applied: [{ path: 'chapters/a.md', revision: 'b'.repeat(64) }] },
+      refreshNever: true,
+    });
+    assert.strictEqual(harness.window.__changesView.acceptProposal(ordinaryProposal()).ok, true);
+    await findByText(harness.document.getElementById('changes-preview'), '全部接受').click();
+    const applying = harness.document.getElementById('changes-apply').click();
+    const settled = await Promise.race([
+      applying.then(() => 'settled'),
+      new Promise(resolve => setTimeout(() => resolve('timed-out'), 40)),
+    ]);
+    assert.strictEqual(settled, 'settled');
+    assert.strictEqual(harness.calls.refresh, 0);
+    assert.strictEqual(harness.calls.reload, 0);
+    assert.strictEqual(harness.calls.reconcile, 1);
+    assert(harness.document.getElementById('changes-status').textContent.includes('已安全应用 1 个文件'));
+  });
+
+  await test('authoritative Research residual recovery reaches its terminal state without duplicate refresh IPCs', async () => {
+    const harness = loadChangesHarness({
+      applyResult: {
+        ok: true,
+        proposalKind: 'research_card',
+        applied: [{ path: 'chapters/a.md', revision: 'b'.repeat(64) }],
+        residualUnavailable: true,
+      },
+      refreshNever: true,
+    });
+    const proposal = { ...ordinaryProposal(), proposalKind: 'research_card' };
+    assert.strictEqual(harness.window.__changesView.acceptProposal(proposal).ok, true);
+    await findByText(harness.document.getElementById('changes-preview'), '全部接受').click();
+    const historyBeforeApply = harness.calls.history;
+    const applying = harness.document.getElementById('changes-apply').click();
+    const settled = await Promise.race([
+      applying.then(() => 'settled'),
+      new Promise(resolve => setTimeout(() => resolve('timed-out'), 40)),
+    ]);
+    assert.strictEqual(settled, 'settled');
+    assert.strictEqual(harness.calls.refresh, 0);
+    assert.strictEqual(harness.calls.reload, 0);
+    assert.strictEqual(harness.calls.history, historyBeforeApply);
+    assert(harness.document.getElementById('changes-status').textContent.includes('Research 提交已生效'));
+  });
+
+  await test('authoritative Onboarding recovery opens edit.md without repeating refresh, reload or history', async () => {
+    const harness = loadChangesHarness({
+      applyResult: {
+        ok: true,
+        applied: [{ path: 'edit.md', revision: 'b'.repeat(64) }],
+        onboardingConfirmation: confirmation('review'),
+      },
+      currentPath: 'chapters/a.md',
+      refreshNever: true,
+    });
+    assert.strictEqual(harness.window.__changesView.acceptProposal(changedProposal()).ok, true);
+    await findByText(harness.document.getElementById('changes-preview'), '全部接受').click();
+    const historyBeforeApply = harness.calls.history;
+    const applying = harness.document.getElementById('changes-apply').click();
+    const settled = await Promise.race([
+      applying.then(() => 'settled'),
+      new Promise(resolve => setTimeout(() => resolve('timed-out'), 40)),
+    ]);
+    assert.strictEqual(settled, 'settled');
+    assert.strictEqual(harness.calls.open, 1);
+    assert.deepStrictEqual(JSON.parse(JSON.stringify(harness.calls.openArgs)), ['edit.md', { pin: true }]);
+    assert.strictEqual(harness.calls.refresh, 0);
+    assert.strictEqual(harness.calls.reload, 0);
+    assert.strictEqual(harness.calls.history, historyBeforeApply);
+    assert.strictEqual(harness.document.getElementById('changes-apply').textContent, '确认创建所选初始文件');
+  });
+
   await test('project switch settles the exact Onboarding operation before releasing its confirmation', async () => {
     const harness = loadChangesHarness({
       applyResult: { ok: true, applied: [{ path: 'edit.md', revision: 'b'.repeat(64) }], onboardingConfirmation: confirmation('review') },
@@ -586,6 +680,7 @@ function extractFunction(source, name) {
   await test('committed edit refresh failure records accepted for the exact Onboarding operation', async () => {
     const harness = loadChangesHarness({
       applyResult: { ok: true, applied: [{ path: 'edit.md', revision: 'b'.repeat(64) }], onboardingConfirmation: confirmation('review') },
+      reconcileResult: { ok: true, status: 'applied', mutationTrusted: true, authoritativeReloaded: false },
       refreshError: new Error('tree unavailable after commit'),
     });
     const operationId = '1'.repeat(32);
@@ -638,6 +733,7 @@ function extractFunction(source, name) {
         applied: [{ path: 'edit.md', revision: 'b'.repeat(64) }],
         onboardingConfirmation: confirmation('review'),
       },
+      reconcileResult: { ok: true, status: 'applied', mutationTrusted: true, authoritativeReloaded: false },
       refreshError: new Error('tree unavailable after commit'),
       discardConfirmationResult: () => {
         releaseAttempts += 1;

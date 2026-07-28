@@ -1028,13 +1028,17 @@
     );
   }
 
-  async function refreshCommittedEdit() {
-    await window.__workspace.refreshTree();
-    const refreshed = window.__workspace.getCurrentPath?.() === 'edit.md'
-      ? await window.__workspace.reloadCurrent()
-      : await window.__workspace.openFile('edit.md', { pin: true });
+  async function refreshCommittedEdit(options = {}) {
+    const authoritativeReloaded = options.authoritativeReloaded === true;
+    if (!authoritativeReloaded) await window.__workspace.refreshTree();
+    const currentIsEdit = window.__workspace.getCurrentPath?.() === 'edit.md';
+    const refreshed = authoritativeReloaded && currentIsEdit
+      ? true
+      : currentIsEdit
+        ? await window.__workspace.reloadCurrent()
+        : await window.__workspace.openFile('edit.md', { pin: true });
     if (!refreshed) throw new Error('edit.md 已写入磁盘，但编辑器刷新失败；请重新打开文件');
-    await loadHistory();
+    if (!authoritativeReloaded) await loadHistory();
   }
 
   function normalizedOnboardingConfirmation(raw) {
@@ -1800,6 +1804,7 @@
         );
         return setStatus('修改未写入磁盘，项目状态已重新核对', true);
       }
+      const authoritativeReloaded = reconciled.authoritativeReloaded === true;
       if (!result?.ok) {
         const message = result?.status === 'conflict'
           ? `文件 ${result.path || ''} 已变化，ChangeSet 未应用`
@@ -1820,11 +1825,11 @@
           appliedCount
             ? '本轮 Research 修改已经提交，但剩余建议未能安全保留。请刷新项目后重新 Research；不要重复提交旧审阅。'
             : '本轮 Research 审阅决定已经记录，但剩余建议未能安全保留。请重新 Research；不要重复提交旧审阅。');
-        if (appliedCount) {
+        if (appliedCount && !authoritativeReloaded) {
           await window.__workspace.refreshTree();
           await window.__workspace.reloadCurrent();
         }
-        await loadHistory();
+        if (!authoritativeReloaded) await loadHistory();
         setStatus('Research 提交已生效；剩余审阅已回收，请重新 Research', true);
         return;
       }
@@ -1839,7 +1844,7 @@
         const researchResidual = pending.proposalKind === 'research_card' && activeResearchRequest
           ? activeResearchRequest : null;
         if (researchResidual) researchResidual.phase = 'refreshing';
-        if (appliedCount) {
+        if (appliedCount && !authoritativeReloaded) {
           await window.__workspace.refreshTree();
           await window.__workspace.reloadCurrent();
         }
@@ -1851,7 +1856,7 @@
           );
           researchResidual.phase = 'review';
         }
-        await loadHistory();
+        if (!authoritativeReloaded) await loadHistory();
         setStatus(completedPlan
           ? `Plan 任务已写入正文；原 Plan 已完成，请处理剩余 ${result.remainingHunkCount || nextState.review.totalHunks} 个修改块，后续任务请新建 Plan。`
           : `本轮已接受 ${result.acceptedHunkCount || 0}、拒绝 ${result.rejectedHunkCount || 0}；剩余 ${result.remainingHunkCount || nextState.review.totalHunks} 个待决定`);
@@ -1873,7 +1878,7 @@
         renderIssueMode();
       }
       if (isOnboardingProposal && result.onboardingConfirmation) {
-        if (appliedCount) await refreshCommittedEdit();
+        if (appliedCount) await refreshCommittedEdit({ authoritativeReloaded });
         if (!enterOnboardingConfirmation(result.onboardingConfirmation, selectedInitialFiles, {
           projectInstanceId,
           editNoChanges: false,
@@ -1884,7 +1889,7 @@
       if (isOnboardingProposal && appliedCount &&
           (result.confirmationUnavailable || !result.onboardingConfirmation)) {
         let refreshWarning = '';
-        try { await refreshCommittedEdit(); }
+        try { await refreshCommittedEdit({ authoritativeReloaded }); }
         catch (error) { refreshWarning = ` 界面刷新未完成：${error.message}；请重新打开当前项目。`; }
         applyButton.hidden = true;
         discardButton.hidden = true;
@@ -1899,13 +1904,13 @@
       }
       applyButton.hidden = true;
       discardButton.hidden = true;
-      if (isEditPromptProposal && appliedCount) await refreshCommittedEdit();
+      if (isEditPromptProposal && appliedCount) await refreshCommittedEdit({ authoritativeReloaded });
       else {
-        if (appliedCount) {
+        if (appliedCount && !authoritativeReloaded) {
           await window.__workspace.refreshTree();
           await window.__workspace.reloadCurrent();
         }
-        await loadHistory();
+        if (!authoritativeReloaded) await loadHistory();
       }
       discardButton.textContent = '丢弃';
       resetCommitControls();

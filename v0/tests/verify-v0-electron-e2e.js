@@ -1772,29 +1772,69 @@ async function run() {
       assert.strictEqual(raceState.readonly, true);
       assert(projectService.readFile(project.rootPath, createdPath).includes(electronAiFixture.PROPOSAL_RACE_BEFORE));
 
-      await first.client.evaluate(`(() => {
-        document.querySelector('.change-file-actions .change-decision--accepted').click();
-        document.getElementById('changes-apply').click();
-      })()`);
+      const planWriteTiming = {
+        reviewReadyAt: Date.now(),
+        acceptDispatchedAt: null,
+        acceptedAt: null,
+        applyDispatchedAt: null,
+        appliedAt: null,
+      };
+      let planWritePhase = 'accept';
       try {
+        planWriteTiming.acceptDispatchedAt = Date.now();
+        await first.client.evaluate(`document.querySelector('.change-file-actions .change-decision--accepted').click()`);
+        const accepted = await waitForValue(first.client, `(() => {
+          const apply = document.getElementById('changes-apply');
+          const cards = [...document.querySelectorAll('.change-hunk-card')];
+          const counts = {
+            total: cards.length,
+            accepted: cards.filter(card => card.classList.contains('is-accepted')).length,
+            rejected: cards.filter(card => card.classList.contains('is-rejected')).length,
+            pending: cards.filter(card => card.classList.contains('is-pending')).length,
+          };
+          const acceptedPressed = cards.length === 1 &&
+            cards[0].querySelector('.change-decision--accepted')?.getAttribute('aria-pressed') === 'true';
+          return acceptedPressed && counts.accepted === 1 && counts.pending === 0 &&
+            !apply.hidden && !apply.disabled ? counts : null;
+        })()`, 'the accepted and enabled Plan review');
+        assert.deepStrictEqual(accepted, { total: 1, accepted: 1, rejected: 0, pending: 0 });
+        planWriteTiming.acceptedAt = Date.now();
+        planWritePhase = 'apply';
+        planWriteTiming.applyDispatchedAt = Date.now();
+        await first.client.evaluate(`document.getElementById('changes-apply').click()`);
         await waitForValue(first.client, `document.getElementById('changes-status').textContent.includes('Plan 任务已安全写入并完成')`, 'the explicitly accepted Plan task write');
+        planWriteTiming.appliedAt = Date.now();
+        console.log(`    Plan write timing: accept=${planWriteTiming.acceptedAt - planWriteTiming.acceptDispatchedAt}ms, apply=${planWriteTiming.appliedAt - planWriteTiming.applyDispatchedAt}ms, total=${planWriteTiming.appliedAt - planWriteTiming.reviewReadyAt}ms`);
       } catch (error) {
         const diagnostic = await first.client.evaluate(`(() => ({
           status: document.getElementById('changes-status')?.textContent || '',
           applyHidden: Boolean(document.getElementById('changes-apply')?.hidden),
           applyDisabled: Boolean(document.getElementById('changes-apply')?.disabled),
-          planBanner: document.querySelector('.changes-plan-mode')?.textContent || '',
+          planBannerVisible: Boolean(document.querySelector('.changes-plan-mode') && !document.querySelector('.changes-plan-mode').hidden),
+          planBannerTextLength: document.querySelector('.changes-plan-mode')?.textContent.length || 0,
           instructionReadOnly: Boolean(document.getElementById('changes-instruction')?.readOnly),
-          cards: [...document.querySelectorAll('.change-hunk-card')].map(card => ({
-            className: card.className,
-            textLength: card.textContent.length,
-            acceptedPressed: card.querySelector('.change-decision--accepted')?.getAttribute('aria-pressed') || '',
-          })),
+          counts: [...document.querySelectorAll('.change-hunk-card')].reduce((result, card) => ({
+            ...result,
+            total: result.total + 1,
+            accepted: result.accepted + Number(card.classList.contains('is-accepted')),
+            rejected: result.rejected + Number(card.classList.contains('is-rejected')),
+            pending: result.pending + Number(card.classList.contains('is-pending')),
+          }), { total: 0, accepted: 0, rejected: 0, pending: 0 }),
+          acceptedPressed: [...document.querySelectorAll('.change-hunk-card')]
+            .map(card => card.querySelector('.change-decision--accepted')?.getAttribute('aria-pressed') || ''),
         }))()`);
         const disk = projectService.readFile(project.rootPath, createdPath);
         diagnostic.disk = {
           bytes: Buffer.byteLength(disk, 'utf8'),
           sha256: crypto.createHash('sha256').update(disk).digest('hex'),
+        };
+        diagnostic.phase = planWritePhase;
+        diagnostic.timing = {
+          reviewReadyAt: planWriteTiming.reviewReadyAt,
+          acceptDispatchedAt: planWriteTiming.acceptDispatchedAt,
+          acceptedAt: planWriteTiming.acceptedAt,
+          applyDispatchedAt: planWriteTiming.applyDispatchedAt,
+          elapsedMs: Date.now() - planWriteTiming.reviewReadyAt,
         };
         throw new Error(`${error.message}; diagnostic=${JSON.stringify(diagnostic)}`);
       }
