@@ -57,6 +57,8 @@ const imageReviewServiceModule = require('./image-review-service');
 const imageReviewHandlerModule = require('./image-review-handler');
 const imageTrashServiceModule = require('./image-trash-service');
 const imageTrashHandlerModule = require('./image-trash-handler');
+const markdownTrashServiceModule = require('./markdown-trash-service');
+const markdownTrashHandlerModule = require('./markdown-trash-handler');
 const inlineRewriteContextService = require('./inline-rewrite-context-service');
 const inlineRewriteService = require('./inline-rewrite-service');
 const inlineRewriteCapabilityStoreService = require('./inline-rewrite-capability-store');
@@ -112,6 +114,15 @@ const imageTrashHandler = imageTrashHandlerModule.createImageTrashHandler({
   getMutationGeneration: () => projectMutationGeneration,
   getNavigationEpoch: () => rendererNavigationEpoch,
   trashService: imageTrashService,
+});
+const markdownTrashService = markdownTrashServiceModule.createMarkdownTrashService({ projectService });
+const markdownTrashHandler = markdownTrashHandlerModule.createMarkdownTrashHandler({
+  assertTrustedSender,
+  getCurrentProject: () => currentProject,
+  getMutationGeneration: () => projectMutationGeneration,
+  getNavigationEpoch: () => rendererNavigationEpoch,
+  settleListAuthority: settleMarkdownTrashListAuthority,
+  trashService: markdownTrashService,
 });
 let projectMutationGeneration = 0;
 let rendererNavigationEpoch = 0;
@@ -207,6 +218,7 @@ const activeAiRequests = new Set();
 const ownMarkdownWatcherStates = new Map();
 const deferredWatcherPayloadsByRoot = new Map();
 const internalMutationDepthByRoot = new Map();
+const internalMutationLeaseByRoot = new Map();
 const chatConversationStore = chatConversationService.createChatConversationStore();
 let lastContextResponse = null;
 const RENDERER_ENTRY = path.join(__dirname, '..', 'renderer', 'index.html');
@@ -305,6 +317,7 @@ function projectFailure(error) {
     error instanceof imageGenerationService.ImageGenerationError ||
     error instanceof imageReviewServiceModule.ImageReviewError ||
     error instanceof imageTrashServiceModule.ImageTrashError ||
+    error instanceof markdownTrashServiceModule.MarkdownTrashError ||
     error instanceof inlineRewriteContextService.InlineRewriteContextError ||
     error instanceof inlineRewriteMutationGuardService.InlineRewriteMutationGuardError ||
     error instanceof inlineRewriteMutationGuardService.ChangesHistoryMutationGuardError ||
@@ -326,11 +339,23 @@ function requireCurrentProject() {
   return currentProject;
 }
 
-function assertInlineRewriteMutationAvailable(project) {
+function assertInternalMutationAvailable(project, allowedLease = null) {
+  const active = internalMutationLeaseByRoot.get(project.rootPath);
+  if (active && active !== allowedLease) {
+    throw new projectService.ProjectServiceError(
+      'PROJECT_MUTATION_IN_PROGRESS',
+      '项目文件正在提交，请稍后重试'
+    );
+  }
+}
+
+function assertInlineRewriteMutationAvailable(project, allowedLease = null) {
   if (!project || typeof project.rootPath !== 'string') {
     throw new projectService.ProjectServiceError('NO_PROJECT', '请先创建或打开一个写作项目');
   }
+  assertInternalMutationAvailable(project, allowedLease);
   assertProjectWatcherAvailable(project);
+  markdownTrashService.assertMutationAvailable(project);
   inlineRewriteMutationGuard.assertAvailable(project.rootPath);
   return project;
 }
@@ -339,9 +364,11 @@ function assertChangesHistoryRecoveryAvailable(project) {
   if (!project || typeof project.rootPath !== 'string') {
     throw new projectService.ProjectServiceError('NO_PROJECT', '请先创建或打开一个写作项目');
   }
+  assertInternalMutationAvailable(project);
   assertProjectWatcherAvailable(project);
   // Changes recovery must bypass its own marker while still refusing to race
   // an unresolved Inline Rewrite transaction.
+  markdownTrashService.assertMutationAvailable(project);
   inlineRewriteOnlyMutationGuard.assertAvailable(project.rootPath);
   return project;
 }
@@ -353,12 +380,87 @@ function assertProjectWatcherAvailable(project) {
   ));
 }
 
+async function settleMarkdownTrashListAuthority(project) {
+  assertProjectWatcherAvailable(project);
+  const watcher = currentProjectWatcher;
+  const navigationEpoch = rendererNavigationEpoch;
+  const mutationEpoch = internalMutationEpoch;
+  if (!watcher || typeof watcher.flush !== 'function') {
+    throw new projectService.ProjectServiceError(
+      'PROJECT_WATCHER_UNAVAILABLE',
+      '项目文件监控不可用；请重新打开项目'
+    );
+  }
+  if ((internalMutationDepthByRoot.get(project.rootPath) || 0) > 0) {
+    throw new projectService.ProjectServiceError(
+      'PROJECT_MUTATION_IN_PROGRESS',
+      '项目文件正在提交，请稍后刷新回收区'
+    );
+  }
+  let flushed;
+  try {
+    flushed = await watcher.flush();
+  } catch (_) {
+    projectWatcherHealth.markDegraded(project);
+    throw new projectService.ProjectServiceError(
+      'PROJECT_WATCHER_UNAVAILABLE',
+      '项目文件监控无法完成一致性扫描；请重新打开项目'
+    );
+  }
+  if (!currentProject || currentProject.instanceId !== project.instanceId ||
+      currentProject.rootPath !== project.rootPath ||
+      currentProjectWatcher !== watcher ||
+      rendererNavigationEpoch !== navigationEpoch) {
+    throw new projectService.ProjectServiceError('PROJECT_CHANGED', '项目状态已变化，请重新刷新回收区');
+  }
+  if (!flushed?.ok || internalMutationEpoch !== mutationEpoch ||
+      (internalMutationDepthByRoot.get(project.rootPath) || 0) > 0) {
+    throw new projectService.ProjectServiceError(
+      'PROJECT_MUTATION_IN_PROGRESS',
+      '项目文件状态尚未收敛，请稍后刷新回收区'
+    );
+  }
+  assertProjectWatcherAvailable(project);
+}
+
 function requireMutableProject() {
   return assertInlineRewriteMutationAvailable(requireCurrentProject());
 }
 
 function publicProject(project) {
   return { name: project.name, projectId: project.projectId, instanceId: project.instanceId };
+}
+
+function attachPrivateProjectRootIdentity(project) {
+  if (!project || typeof project.rootPath !== 'string') {
+    throw new projectService.ProjectServiceError('PROJECT_CHANGED', '项目根目录身份无效');
+  }
+  const directoryFlags = fs.constants.O_RDONLY |
+    (fs.constants.O_DIRECTORY || 0) |
+    (fs.constants.O_NOFOLLOW || 0) |
+    (fs.constants.O_NONBLOCK || 0);
+  let descriptor = null;
+  try {
+    descriptor = fs.openSync(project.rootPath, directoryFlags);
+    const stat = fs.fstatSync(descriptor, { bigint: true });
+    if (!stat.isDirectory()) {
+      throw new projectService.ProjectServiceError('PROJECT_CHANGED', '项目根目录身份已经变化');
+    }
+    Object.defineProperty(project, 'rootIdentity', {
+      configurable: false,
+      enumerable: false,
+      writable: false,
+      value: Object.freeze({ dev: stat.dev, ino: stat.ino, mode: stat.mode }),
+    });
+    return project;
+  } catch (error) {
+    if (error instanceof projectService.ProjectServiceError) throw error;
+    throw new projectService.ProjectServiceError('PROJECT_CHANGED', '项目根目录无法建立可信身份');
+  } finally {
+    if (descriptor !== null) {
+      try { fs.closeSync(descriptor); } catch (_) {}
+    }
+  }
 }
 
 function abortActiveAiRequests() {
@@ -562,18 +664,23 @@ function publicContextFingerprint(project) {
 
 function beginInternalMutation(project) {
   const token = Object.freeze({ rootPath: project.rootPath, instanceId: project.instanceId, id: crypto.randomUUID() });
+  if (internalMutationLeaseByRoot.has(token.rootPath)) {
+    throw new projectService.ProjectServiceError(
+      'PROJECT_MUTATION_IN_PROGRESS',
+      '项目文件正在提交，请稍后重试'
+    );
+  }
   internalMutationEpoch += 1;
-  internalMutationDepthByRoot.set(token.rootPath, (internalMutationDepthByRoot.get(token.rootPath) || 0) + 1);
+  internalMutationLeaseByRoot.set(token.rootPath, token);
+  internalMutationDepthByRoot.set(token.rootPath, 1);
   return token;
 }
 
 function endInternalMutation(token, project) {
   if (!token || token.rootPath !== project.rootPath) return;
-  const remaining = Math.max(0, (internalMutationDepthByRoot.get(token.rootPath) || 0) - 1);
-  if (remaining) {
-    internalMutationDepthByRoot.set(token.rootPath, remaining);
-    return;
-  }
+  const active = internalMutationLeaseByRoot.get(token.rootPath);
+  if (active !== token) return;
+  internalMutationLeaseByRoot.delete(token.rootPath);
   internalMutationDepthByRoot.delete(token.rootPath);
   const pending = deferredWatcherPayloadsByRoot.get(token.rootPath) || [];
   deferredWatcherPayloadsByRoot.delete(token.rootPath);
@@ -889,18 +996,18 @@ const changesHistoryHandler = changesHistoryHandlerService.createChangesHistoryH
   },
 });
 
-function lifecycleSuccess(project, file) {
+function lifecycleSuccess(project, file, publicFile = file) {
   rememberOwnFileMutation(file);
   invalidateProjectDerivedState();
   try {
-    return { ok: true, file, tree: projectService.listTree(project.rootPath) };
+    return { ok: true, file: publicFile, tree: projectService.listTree(project.rootPath) };
   } catch (error) {
     // The file operation is already committed. Never report it as failed and
     // tempt the renderer to repeat it merely because a later tree refresh hit
     // an unrelated limit or external filesystem change.
     return {
       ok: true,
-      file,
+      file: publicFile,
       treeRefreshRequired: true,
       treeError: error && error.code ? error.code : 'TREE_REFRESH_FAILED',
     };
@@ -1385,7 +1492,7 @@ function cacheWithLimit(cache, token, entry, limit = 8) {
   while (cache.size > limit) cache.delete(cache.keys().next().value);
 }
 
-function openProjectRoot(rootPath) {
+async function openProjectRoot(rootPath) {
   const preview = projectService.previewLegacyEditMigration(rootPath);
   if (preview.status === 'ready') {
     const token = crypto.randomUUID();
@@ -1405,7 +1512,8 @@ function openProjectRoot(rootPath) {
     };
   }
   const promptMissing = preview.status === 'missing';
-  const project = projectService.openProject(rootPath);
+  const project = attachPrivateProjectRootIdentity(projectService.openProject(rootPath));
+  const markdownTrashRecovery = await markdownTrashService.bindProject(project);
   const reopenedSameProject = Boolean(currentProject &&
     currentProject.rootPath === project.rootPath &&
     currentProject.instanceId === project.instanceId);
@@ -1426,6 +1534,7 @@ function openProjectRoot(rootPath) {
     tree,
     projectPromptMissing: promptMissing,
     promptFrontMatter,
+    markdownTrashRecoveryRequired: markdownTrashRecovery.ok !== true,
     migrationNotice: preview.status === 'conflict' ? {
       kind: 'legacy-edit-conflict',
       source: boundedMigrationPreview(preview.source),
@@ -1914,11 +2023,20 @@ ipcMain.handle('writcraft:project:create', async (event, name) => {
       properties: ['openDirectory', 'createDirectory'],
     });
     if (result.canceled || !result.filePaths[0]) return { ok: false, canceled: true };
-    const project = projectService.createProjectAt(result.filePaths[0], name);
+    const project = attachPrivateProjectRootIdentity(
+      projectService.createProjectAt(result.filePaths[0], name)
+    );
+    const markdownTrashRecovery = await markdownTrashService.bindProject(project);
     const tree = projectService.listTree(project.rootPath);
     setCurrentProject(project);
     rememberRecentProject(project);
-    return { ok: true, project: publicProject(project), tree, onboardingRecommended: true };
+    return {
+      ok: true,
+      project: publicProject(project),
+      tree,
+      onboardingRecommended: true,
+      markdownTrashRecoveryRequired: markdownTrashRecovery.ok !== true,
+    };
   } catch (error) {
     return projectFailure(error);
   }
@@ -1933,7 +2051,7 @@ ipcMain.handle('writcraft:project:open', async (event) => {
       properties: ['openDirectory'],
     });
     if (result.canceled || !result.filePaths[0]) return { ok: false, canceled: true };
-    return openProjectRoot(result.filePaths[0]);
+    return await openProjectRoot(result.filePaths[0]);
   } catch (error) {
     return projectFailure(error);
   }
@@ -1952,7 +2070,7 @@ ipcMain.handle('writcraft:project:open-recent', async (event) => {
     }
     // Persisted roots are untrusted input. Re-open through the same project
     // validation boundary before it can become the authority for later IPC.
-    return openProjectRoot(rootPath);
+    return await openProjectRoot(rootPath);
   } catch (error) {
     return projectFailure(error);
   }
@@ -2122,13 +2240,55 @@ ipcMain.handle('writcraft:project:move-file', async (event, sourcePath, targetPa
 });
 
 ipcMain.handle('writcraft:project:trash-file', async (event, relPath, expectedRevision) => {
+  let mutationLease = null;
+  let mutationProject = null;
   try {
     assertTrustedSender(event);
     const project = requireMutableProject();
-    const file = projectService.trashMarkdownFile(project.rootPath, relPath, expectedRevision);
-    return lifecycleSuccess(project, file);
+    mutationProject = project;
+    mutationLease = beginInternalMutation(project);
+    const file = await markdownTrashHandler.trash(event, relPath, expectedRevision);
+    return lifecycleSuccess(project, file, {
+      fromPath: file.fromPath,
+      bytes: file.bytes,
+      trashed: true,
+    });
   } catch (error) {
     return projectFailure(error);
+  } finally {
+    if (mutationLease && mutationProject) endInternalMutation(mutationLease, mutationProject);
+  }
+});
+
+ipcMain.handle('writcraft:project:get-markdown-trash', async (event, projectInstanceId) => {
+  try {
+    requireCurrentProject();
+    return await markdownTrashHandler.list(event, projectInstanceId);
+  } catch (error) {
+    return projectFailure(error);
+  }
+});
+
+ipcMain.handle('writcraft:project:restore-markdown-trash', async (
+  event,
+  projectInstanceId,
+  token
+) => {
+  let mutationLease = null;
+  let mutationProject = null;
+  try {
+    const project = requireMutableProject();
+    mutationProject = project;
+    mutationLease = beginInternalMutation(project);
+    const restored = await markdownTrashHandler.restore(event, projectInstanceId, token);
+    return {
+      ...restored,
+      ...lifecycleSuccess(project, restored.file),
+    };
+  } catch (error) {
+    return projectFailure(error);
+  } finally {
+    if (mutationLease && mutationProject) endInternalMutation(mutationLease, mutationProject);
   }
 });
 
@@ -2149,6 +2309,12 @@ ipcMain.handle('writcraft:project:confirm-legacy-edit', async (event, token) => 
       // Even before this legacy root becomes current, either durable recovery
       // marker owns all mutation authority for the folder.
       inlineRewriteMutationGuard.assertAvailable(pending.rootPath);
+      const recoveryProbe = attachPrivateProjectRootIdentity({
+        instanceId: `legacy-migration:${token}`,
+        rootPath: pending.rootPath,
+      });
+      await markdownTrashService.bindProject(recoveryProbe);
+      markdownTrashService.assertMutationAvailable(recoveryProbe);
     }
     const migration = projectService.migrateLegacyEditFile(pending.rootPath, {
       confirmed: true,
@@ -2158,7 +2324,7 @@ ipcMain.handle('writcraft:project:confirm-legacy-edit', async (event, token) => 
     rememberOwnMarkdownState('editor.md', null);
     pendingLegacyEditMigrations.delete(token);
     invalidateProjectDerivedState();
-    return openProjectRoot(pending.rootPath);
+    return await openProjectRoot(pending.rootPath);
   } catch (error) {
     return projectFailure(error);
   }
@@ -2642,6 +2808,7 @@ ipcMain.handle('writcraft:project:import-reference', async (event, projectInstan
       throw new projectService.ProjectServiceError('PROJECT_CHANGED', '项目已切换，未导入来源');
     }
     const mutationGeneration = projectMutationGeneration;
+    let mutationLease = null;
     const assertGeneration = () => {
       if (!currentProject || currentProject.rootPath !== project.rootPath ||
           currentProject.instanceId !== project.instanceId ||
@@ -2649,7 +2816,7 @@ ipcMain.handle('writcraft:project:import-reference', async (event, projectInstan
           projectMutationGeneration !== mutationGeneration) {
         throw new projectService.ProjectServiceError('PROJECT_CHANGED', '项目已切换，未导入来源');
       }
-      assertInlineRewriteMutationAvailable(project);
+      assertInlineRewriteMutationAvailable(project, mutationLease);
     };
     const selected = await dialog.showOpenDialog(mainWindow, {
       title: '导入本地来源附件',
@@ -2666,7 +2833,7 @@ ipcMain.handle('writcraft:project:import-reference', async (event, projectInstan
     // The absolute source path originates only from the native dialog. The
     // renderer never supplies a filesystem path or project root.
     let reference;
-    const mutationLease = beginInternalMutation(project);
+    mutationLease = beginInternalMutation(project);
     try {
       reference = await referenceImportService.importReference(project.rootPath, selected.filePaths[0], {
         beforeCommit: assertGeneration,

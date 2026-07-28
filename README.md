@@ -1,17 +1,17 @@
 # 笔触 · WritCraft（写作 IDE）
 
-> 状态：**V0 候选原型；0.0AA Main-owned Chat 多轮连续性已签字，真实作者/付费/正式发布门禁仍开放** · 发起方：Max
+> 状态：**V0 候选原型；0.0AB 普通 Markdown 项目回收区已签字，本地产品缺口清零，真实作者/付费/正式发布门禁仍开放** · 发起方：Max
 > 当前开发真相与唯一续作入口：[`v0/DEVELOPMENT-STATUS.md`](v0/DEVELOPMENT-STATUS.md)。配图现已覆盖评分、插入/保留/移入废纸篓、可见列表、单项恢复和确认式快照清空；五项竞态缺口已关闭，最终独立复审 **P0=0/P1=0/P2=1（非阻断）**。该签字尚不能替代真实 `sk-api-`/作者与发布验收；现有 App/ZIP 禁止分发。
 > 下一阶段验收边界：[`docs/AUTHOR-ACCEPTANCE-V1-CONTRACT.md`](docs/AUTHOR-ACCEPTANCE-V1-CONTRACT.md) 已冻结；真实调用、作者内容与发布证据必须遵守其中的隐私和付费门禁。
-> 当前停点：0.0AA 已让 Main 在项目、Renderer 导航和内容 generation 边界内保存最多 6 轮最近对话，显示实际使用轮数，并提供可见“新对话”；新提交、同项目重开和上下文变化都不会让不可见旧回答污染后续摘要。Chat Conversation **8/8**、Chat Context **12/12**、Inspector **9/9**、Network **15/15**、Workspace **10/10**、package **8/8**、release **7/7**、全量 test/verify、Persistent **3/3**、最终源码真实 Electron 连续两次 **34/34**，独立复审 **P0=0/P1=0/P2=0**。下一本地批只剩普通 Markdown 回收区恢复 UI。
+> 当前停点：0.0AB 已在 Explorer 提供可见“项目回收区”，支持有界列表、刷新和单项恢复；Main 以 opaque token、watcher barrier、exact-owner mutation lease 和 native fd-relative journal transaction 绑定恢复权威，冲突、替换、崩溃与响应丢失均 fail-closed。native worker **20/20**、Trash service/handler **11/11**、完整 test/verify、Persistent **3/3**、真实 Electron **35/35**、package **8/8**、release **7/7** 全绿；独立复审 **P0=0/P1=0/P2=0**。当前没有未完成的本地产品实现批，下一步是作者显式选择合格真实项目及完整 `sk-api-` 等外部门禁。
 
 ## 2026-07-28 当前复核快照
 
 > Research Accuracy v1 签收时完成事务顺序、watcher degraded 门禁与 Renderer recorded-but-locked 语义；该历史批次的完整 Node/verify 与强制 Electron 26/26 已通过。当前最终 Graph 韧性源码的完整边界以本节下方和状态台账为准。
 
-> Graph 性能复验没有用单次重试绿灯覆盖失败：索引、布局、baseline 所有权、元素重挂、scene detach 与 dispatch-only 计时缺口均已进入根因修复和回归。该历史性能专项门禁等待两帧并读取实际 CSS 可见状态与 SVG 布局；同一源码无中间修改连续两次全链均为 **26/26**。当前签字项目总链是 0.0AA 的 34/34；精确证据只看状态台账。
+> Graph 性能复验没有用单次重试绿灯覆盖失败：索引、布局、baseline 所有权、元素重挂、scene detach 与 dispatch-only 计时缺口均已进入根因修复和回归。该历史性能专项门禁等待两帧并读取实际 CSS 可见状态与 SVG 布局；同一源码无中间修改连续两次全链均为 **26/26**。当前签字项目总链是 0.0AB 的 35/35；精确证据只看状态台账。
 
-- 项目 / 文件 / 段落三级工作区、`edit.md` Onboarding/落盘与分区 Prompt、Inline Diff、localized ChangeSet/撤销、Main-owned Chat 最近对话、来源/脚注、草稿/冲突恢复、Cursor 式标签和一致性图谱均已接入；当前源码已完成 Onboarding v2 自动化产品链。这里的“恢复”不包含普通 Markdown 回收区的应用内列表/恢复入口。0.0AA ad-hoc App/ZIP 已按当前源码重建并验证，但仍不是 Developer ID/公证/Gatekeeper 发布产物，禁止分发。
+- 项目 / 文件 / 段落三级工作区、`edit.md` Onboarding/落盘与分区 Prompt、Inline Diff、localized ChangeSet/撤销、Main-owned Chat 最近对话、来源/脚注、草稿/冲突恢复、普通 Markdown 项目回收区、Cursor 式标签和一致性图谱均已接入。0.0AB ad-hoc App/ZIP 已按当前源码重建并验证，但仍不是 Developer ID/公证/Gatekeeper 发布产物，禁止分发。
 - 普通 Changes、Plan→Changes 与 Graph 的本轮结构性修复已完成独立复审；模型不再回传整篇 after，而由 Main 验证局部锚点、依赖和 stopReason 后构造修改。
 - Chat 已实现 project/file/selection 三种明确作用域、selection 必选、精确选区邻段、受限项目检索、正文 H1 Source locator 和 request/phase-owned Inspector/Chips。0.0AA 新增 Main-owned 最近对话：最多 6 轮、双预算、项目/导航/generation 绑定、可见新对话与同项目重开清理；摘要正文不返回 Renderer，Inspector 只披露轮数和大小。
 - `edit.md` 生成、审阅和确认落盘已签字；Chat/Context 的超预算项目卡现在按 ATX 标题整章选择，四类硬约束优先。Inspector 显示本次使用/省略、原因、字节与 revision-safe 原文定位；短项目卡保持全文语义，恶意标题或必需章节超限会稳定阻断。
@@ -25,7 +25,7 @@
 - `image-01` 已实现安全落盘、解码尺寸/比例证明、必填 1–5 分、可选费用、插入/保留/可恢复废纸篓和项目聚合；废纸篓现可见数量/容量、逐项恢复和确认式精确快照清空，并明确长期保留、绝不后台删除。Trash Service **21/21**、Handler **7/7**、Integration **4/4**、Renderer **7/7**；path replacement、same-inode rewrite 与 committed TTL 五项 P1 已关闭，最终独立复审 **P0=0/P1=0/P2=1**。P2 仅为非协作外部 open-FD writer 的极窄通用残余；真实质量与费用仍待完整 `sk-api-`。
 - Diagnostic Export v1 已接入设置页：作者先看到可能导出的完整 JSON，正文、Prompt、模型回答、Key、项目/文件名与路径均被排除；Renderer 只能回传一次性 token，Main 负责原生保存和不可覆盖写入。Service **13/13**、Handler **10/10**、Renderer **7/7**、Network boundary **15/15**，真实 Electron 已覆盖可见预览和隐私 sentinel。
 - Inline 当前源码隔离 App 已完成人工预览零写入、拒绝、重载、接受、History 与 Safe Undo；Plan 生成已强制 `end_turn`、单文本块、strict JSON、错误脱敏与目标/Prompt 资源上限，独立复审 P0=0/P1=0。
-- 0.0AA 当前源码已通过 `npm test`、非沙箱 `npm run verify`、Persistent **3/3**、强制真实 Electron 连续两次 **34/34**、package **8/8** 与 release **7/7**。超长 Prompt 分区能力仍只接入 Chat/Context；Chapter、Inline Rewrite 等模式保持各自既有 Prompt 合同。
+- 0.0AB 当前源码已通过 `npm test`、非沙箱 `npm run verify`、Persistent **3/3**、强制真实 Electron **35/35**、package **8/8** 与 release **7/7**。超长 Prompt 分区能力仍只接入 Chat/Context；Chapter、Inline Rewrite 等模式保持各自既有 Prompt 合同。
 - Main 网络边界已固定文本/图片官方主机，加入 renderer HTTP(S)/WS(S) 双层断网、上下文 IPC 上限、owner abort、mutation generation、内部 revision/父目录回声隔离、零 POST retry、拒绝重定向、诊断 token-only 导出和错误脱敏；当前 network boundary **15/15**。
 - Graph 扩展已动态覆盖 300 文件/1279 节点、cold-to-interactive、stale/三类作者纠错、failure live、键盘/AX、布局、性能、重启与 A→B；缓存完整语义权威、Renderer 不可变快照、同/跨项目异步所有权及 Unicode quote 边界已关闭，最终独立复审 P0=0/P1=0/P2=0。
 - 2026-07-26 已建立本地 Git `main` 基线；后续改动必须通过提交保留可审计差异。该基线不追溯此前历史，阶段事实仍以 `v0/DEVELOPMENT-STATUS.md` 和当次可复现测试证据为准。

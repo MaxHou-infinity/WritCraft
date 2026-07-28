@@ -22,6 +22,8 @@ const nativeHelper = path.join(root, 'src', 'main', 'native', 'author-copy-helpe
 const packagedNativeHelper = path.join(helpers, 'author-copy-helper');
 const projectHashHelper = path.join(root, 'src', 'main', 'native', 'project-hash-helper');
 const packagedProjectHashHelper = path.join(helpers, 'project-hash-helper');
+const markdownTrashHelper = path.join(root, 'src', 'main', 'native', 'markdown-trash-helper');
+const packagedMarkdownTrashHelper = path.join(helpers, 'markdown-trash-helper');
 const zipPath = `${outputRoot}.zip`;
 
 function required(target, label) {
@@ -53,10 +55,20 @@ function prepareProjectHashHelper(options = {}) {
   return nativeHelperBuildService.assertNativeHelperAttestation(attestation, { source, output });
 }
 
+function prepareMarkdownTrashHelper(options = {}) {
+  const projectRoot = options.root || root;
+  const source = options.source || path.join(projectRoot, 'native', 'markdown-trash-helper.c');
+  const output = options.output || path.join(projectRoot, 'src', 'main', 'native', 'markdown-trash-helper');
+  const buildNativeHelper = options.buildNativeHelper || nativeHelperBuildService.buildNativeHelper;
+  const attestation = buildNativeHelper({ root: projectRoot, source, output });
+  return nativeHelperBuildService.assertNativeHelperAttestation(attestation, { source, output });
+}
+
 function prepareNativeHelpers(options = {}) {
   return Object.freeze({
     authorCopy: (options.prepareAuthorCopy || prepareNativeHelper)(options.authorCopy || {}),
     projectHash: (options.prepareProjectHash || prepareProjectHashHelper)(options.projectHash || {}),
+    markdownTrash: (options.prepareMarkdownTrash || prepareMarkdownTrashHelper)(options.markdownTrash || {}),
   });
 }
 
@@ -88,10 +100,12 @@ function packageMac(options = {}) {
   const nativeHelperBuilds = beginPackage(options);
   const nativeHelperBuild = nativeHelperBuilds.authorCopy;
   const projectHashHelperBuild = nativeHelperBuilds.projectHash;
+  const markdownTrashHelperBuild = nativeHelperBuilds.markdownTrash;
   required(electronApp, 'Electron macOS runtime');
   required(path.join(root, 'src', 'main', 'main.js'), 'WritCraft main process');
   required(nativeHelper, 'Author acceptance native helper');
   required(projectHashHelper, 'Project hash native helper');
+  required(markdownTrashHelper, 'Markdown trash native helper');
 
 fs.mkdirSync(releaseRoot, { recursive: true });
 fs.rmSync(outputRoot, { recursive: true, force: true });
@@ -108,8 +122,12 @@ assertPackagedHelperBinding(nativeHelperBuild, packagedNativeHelper);
 fs.copyFileSync(projectHashHelper, packagedProjectHashHelper);
 fs.chmodSync(packagedProjectHashHelper, 0o755);
 assertPackagedHelperBinding(projectHashHelperBuild, packagedProjectHashHelper);
+fs.copyFileSync(markdownTrashHelper, packagedMarkdownTrashHelper);
+fs.chmodSync(packagedMarkdownTrashHelper, 0o755);
+assertPackagedHelperBinding(markdownTrashHelperBuild, packagedMarkdownTrashHelper);
 fs.rmSync(path.join(packagedApp, 'src', 'main', 'native', 'author-copy-helper'));
 fs.rmSync(path.join(packagedApp, 'src', 'main', 'native', 'project-hash-helper'));
+fs.rmSync(path.join(packagedApp, 'src', 'main', 'native', 'markdown-trash-helper'));
 
 function removeFinderMetadata(directory) {
   for (const entry of fs.readdirSync(directory, { withFileTypes: true })) {
@@ -177,11 +195,14 @@ try {
 signElectronRuntimeBundles();
 execFileSync('codesign', ['--verify', '--strict', packagedNativeHelper], { stdio: 'inherit' });
 execFileSync('codesign', ['--verify', '--strict', packagedProjectHashHelper], { stdio: 'inherit' });
+execFileSync('codesign', ['--verify', '--strict', packagedMarkdownTrashHelper], { stdio: 'inherit' });
 execFileSync('codesign', ['--force', '--sign', '-', outputApp], { stdio: 'inherit' });
 execFileSync('codesign', ['--verify', '--strict', packagedNativeHelper], { stdio: 'inherit' });
 execFileSync('codesign', ['--verify', '--strict', packagedProjectHashHelper], { stdio: 'inherit' });
+execFileSync('codesign', ['--verify', '--strict', packagedMarkdownTrashHelper], { stdio: 'inherit' });
 assertPackagedHelperBinding(nativeHelperBuild, packagedNativeHelper);
 assertPackagedHelperBinding(projectHashHelperBuild, packagedProjectHashHelper);
+assertPackagedHelperBinding(markdownTrashHelperBuild, packagedMarkdownTrashHelper);
 execFileSync('codesign', ['--verify', '--deep', '--strict', outputApp], { stdio: 'inherit' });
 execFileSync('ditto', ['-c', '-k', '--norsrc', '--keepParent', outputApp, zipPath]);
 
@@ -210,6 +231,7 @@ if (require.main === module) packageMac();
 module.exports = Object.freeze({
   prepareNativeHelper,
   prepareProjectHashHelper,
+  prepareMarkdownTrashHelper,
   prepareNativeHelpers,
   beginPackage,
   assertPackagedHelperBinding,

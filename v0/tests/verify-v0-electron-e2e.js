@@ -37,7 +37,7 @@ const GRAPH_CACHE_BUDGET_MS = 700;
 const GRAPH_INCREMENTAL_BUDGET_MS = 800;
 const GRAPH_INTERACTION_BUDGET_MS = 100;
 const GRAPH_RENDERER_HEAP_BUDGET_BYTES = 150 * 1024 * 1024;
-const EXPECTED_STAGE_COUNT = ONBOARDING_FOCUS ? 2 : 34;
+const EXPECTED_STAGE_COUNT = ONBOARDING_FOCUS ? 2 : 35;
 
 let passed = 0;
 const activeElectronInstances = new Set();
@@ -1055,6 +1055,89 @@ async function run() {
       assert((await first.client.evaluate(`window.__editor.getContent()`)).includes(marker));
       await first.client.evaluate(`document.getElementById('editor').dispatchEvent(new KeyboardEvent('keyup', { bubbles: true, key: 'ArrowRight' }))`);
       await delay(500);
+    });
+
+    await stage('lists and restores ordinary Markdown from the visible project trash', async () => {
+      const beforeBytes = fs.readFileSync(path.join(project.rootPath, ...createdPath.split('/')));
+      const trashed = await first.client.evaluate(`(async () => {
+        const row = document.querySelector('.tree-file[data-path=${JSON.stringify(createdPath)}]')?.closest('.tree-file-row');
+        const menu = row?.querySelector('.tree-file-menu');
+        const action = [...(menu?.querySelectorAll('button') || [])].find(button => button.textContent === '移到回收区');
+        if (!menu || !action) return { ready: false };
+        const originalConfirm = window.confirm;
+        window.confirm = () => true;
+        try {
+          menu.open = true;
+          action.click();
+        } finally {
+          window.confirm = originalConfirm;
+        }
+        return { ready: true };
+      })()`);
+      assert.strictEqual(trashed.ready, true);
+      await waitForValue(first.client, `(() => {
+        const toggle = document.getElementById('markdown-trash-toggle');
+        return !document.querySelector('.tree-file[data-path=${JSON.stringify(createdPath)}]') &&
+          toggle?.textContent === '项目回收区 · 1';
+      })()`, 'ordinary Markdown visible trash list');
+      assert.strictEqual(fs.existsSync(path.join(project.rootPath, ...createdPath.split('/'))), false);
+      const listed = await first.client.evaluate(`(() => {
+        const panel = document.getElementById('markdown-trash');
+        panel.open = true;
+        return { opened: panel.open };
+      })()`);
+      assert.strictEqual(listed.opened, true);
+      await waitForValue(first.client, `(() => {
+        const panel = document.getElementById('markdown-trash-panel');
+        const item = document.querySelector('.markdown-trash-item');
+        const button = item?.querySelector('button');
+        return panel?.getAttribute('aria-busy') === 'false' && item && button && !button.disabled;
+      })()`, 'ordinary Markdown trash refresh after opening');
+      const refreshedList = await first.client.evaluate(`(() => {
+        const panel = document.getElementById('markdown-trash');
+        const item = document.querySelector('.markdown-trash-item');
+        return {
+          path: item?.querySelector('strong')?.textContent || '',
+          action: item?.querySelector('button')?.getAttribute('aria-label') || '',
+          text: panel.textContent,
+          busy: document.getElementById('markdown-trash-panel')?.getAttribute('aria-busy'),
+        };
+      })()`);
+      assert.strictEqual(refreshedList.path, createdPath);
+      assert(refreshedList.action.includes(createdPath));
+      assert.strictEqual(refreshedList.busy, 'false');
+      for (const forbidden of ['.writcraft', 'trashPath', 'revision', 'rootPath', 'digest', 'ino']) {
+        assert(!refreshedList.text.includes(forbidden));
+      }
+      await first.client.evaluate(`document.querySelector('.markdown-trash-item button').click()`);
+      try {
+        await waitForValue(first.client, `(() => {
+          return Boolean(document.querySelector('.tree-file[data-path=${JSON.stringify(createdPath)}]')) &&
+            document.getElementById('markdown-trash-toggle')?.textContent === '项目回收区 · 0';
+        })()`, 'ordinary Markdown restored to project tree');
+      } catch (error) {
+        const snapshot = await first.client.evaluate(`(() => ({
+          status: document.getElementById('markdown-trash-status')?.textContent || '',
+          toggle: document.getElementById('markdown-trash-toggle')?.textContent || '',
+          busy: document.getElementById('markdown-trash-panel')?.getAttribute('aria-busy') || '',
+          treeHasRestoredFile: Boolean(document.querySelector('.tree-file[data-path=${JSON.stringify(createdPath)}]')),
+          currentPathIsRestoredFile: window.__workspace.state.currentPath === ${JSON.stringify(createdPath)},
+          generation: window.__workspace.state.aiContextGeneration,
+        }))()`);
+        console.error('[e2e:markdown-trash-restore]', JSON.stringify({
+          ...snapshot,
+          diskHasRestoredFile: fs.existsSync(path.join(project.rootPath, ...createdPath.split('/'))),
+        }));
+        throw error;
+      }
+      assert.deepStrictEqual(
+        fs.readFileSync(path.join(project.rootPath, ...createdPath.split('/'))),
+        beforeBytes
+      );
+      assert.notStrictEqual(await first.client.evaluate(`window.__workspace.state.currentPath`), createdPath);
+      await first.client.evaluate(`window.__workspace.openFile(${JSON.stringify(createdPath)})`);
+      await waitForValue(first.client, `window.__workspace.state.currentPath === ${JSON.stringify(createdPath)}`,
+        'reopening the restored Markdown explicitly');
     });
 
     await stage('previews exact privacy-safe diagnostics from visible Settings without opening save', async () => {

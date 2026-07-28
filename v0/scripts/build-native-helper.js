@@ -34,6 +34,10 @@ const NATIVE_HELPERS = Object.freeze({
     sourceName: 'project-hash-helper.c',
     outputName: 'project-hash-helper',
   }),
+  markdownTrash: Object.freeze({
+    sourceName: 'markdown-trash-helper.c',
+    outputName: 'markdown-trash-helper',
+  }),
 });
 
 function sha256File(target, fileSystem = fs) {

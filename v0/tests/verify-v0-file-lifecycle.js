@@ -175,20 +175,35 @@ test('Main IPC 仅使用可信当前项目且返回权威树', () => {
     const end = main.indexOf('\nipcMain.handle(', start + 20);
     const block = main.slice(start, end < 0 ? main.length : end);
     assert.ok(start >= 0 && block.includes('assertTrustedSender(event)'));
-    assert.ok(block.includes('requireMutableProject()') && block.includes('project.rootPath'));
-    assert.ok(block.includes('lifecycleSuccess(project, file)'));
+    assert.ok(block.includes('requireMutableProject()'));
+    if (route === 'trash-file') {
+      assert.ok(block.includes('markdownTrashHandler.trash(event, relPath, expectedRevision)'));
+      assert.ok(block.includes('beginInternalMutation(project)'));
+      assert.ok(!block.includes('projectService.trashMarkdownFile'));
+    } else {
+      assert.ok(block.includes('project.rootPath'));
+    }
+    assert.ok(block.includes('lifecycleSuccess(project, file'));
   }
-  assert.ok(main.includes('function lifecycleSuccess(project, file)'));
+  assert.ok(main.includes('function lifecycleSuccess(project, file'));
   assert.ok(main.includes('treeRefreshRequired: true'));
   assert.ok(main.includes('invalidateProjectDerivedState()'));
   assert.ok(main.includes('pendingChangeSets.clear()'));
   assert.ok(main.includes('projectMutationGeneration !== mutationGeneration'));
+  const trashStart = main.indexOf("ipcMain.handle('writcraft:project:trash-file'");
+  const trashEnd = main.indexOf('\nipcMain.handle(', trashStart + 20);
+  const trashBlock = main.slice(trashStart, trashEnd);
+  assert.ok(trashBlock.includes('fromPath: file.fromPath') && trashBlock.includes('trashed: true'));
+  assert.ok(!trashBlock.includes('revision: file.revision'));
+  assert.ok(!trashBlock.includes('trashEntry: file.trashEntry'));
 });
 
 test('Preload 暴露窄参数接口且 renderer 不传 root', () => {
   assert.ok(preload.includes('renameFile: (sourcePath, targetPath, expectedRevision)'));
   assert.ok(preload.includes('moveFile: (sourcePath, targetPath, expectedRevision)'));
   assert.ok(preload.includes('trashFile: (relPath, expectedRevision)'));
+  assert.ok(preload.includes('getMarkdownTrash: (projectInstanceId)'));
+  assert.ok(preload.includes('restoreMarkdownTrash: (projectInstanceId, token)'));
   const block = preload.slice(preload.indexOf('project: Object.freeze({'), preload.indexOf('// 未来:'));
   assert.ok(!/rootPath|projectRoot/.test(block));
 });
@@ -231,6 +246,19 @@ test('项目树提供右键/更多菜单、flush 和危险确认，并同步工�
   assert.ok(changesView.includes("document.addEventListener('writcraft:file-lifecycle-changed'"));
   assert.ok(changesView.includes('旧提案已失效'));
   assert.ok(html.includes('.tree-file-menu-actions') && html.includes('.tree-file-row:focus-within'));
+  assert.ok(html.includes('id="markdown-trash-toggle"') &&
+    html.includes('aria-controls="markdown-trash-panel"') &&
+    html.includes('aria-expanded="false"') &&
+    html.includes('aria-label="项目回收区"') &&
+    html.includes('id="markdown-trash-status"') &&
+    html.includes('aria-live="polite"'));
+  assert.ok(workspace.includes("result.schema !== 'writcraft.markdown-trash-list/v1'"));
+  assert.ok(workspace.includes("keys !== 'deletedAt,originalPath,sizeBytes,token'"));
+  assert.ok(workspace.includes('markdownTrashOwner !== owner'));
+  assert.ok(workspace.includes('state.project?.instanceId !== owner.projectInstanceId'));
+  assert.ok(workspace.includes("invalidateDerivedViews('restore'"));
+  assert.ok(workspace.includes("event.key !== 'Escape'"));
+  assert.ok(workspace.includes("setAttribute('aria-expanded', String(markdownTrash.open))"));
   assert.ok(html.indexOf('file-lifecycle-state.js') < html.indexOf('workspace.js'));
 });
 

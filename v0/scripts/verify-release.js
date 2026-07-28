@@ -18,10 +18,13 @@ const zip = `${outputRoot}.zip`;
 const packagedRoot = path.join(app, 'Contents', 'Resources', 'app');
 const packagedHelper = path.join(app, 'Contents', 'Helpers', 'author-copy-helper');
 const packagedProjectHashHelper = path.join(app, 'Contents', 'Helpers', 'project-hash-helper');
+const packagedMarkdownTrashHelper = path.join(app, 'Contents', 'Helpers', 'markdown-trash-helper');
 const builtHelper = path.join(root, 'src', 'main', 'native', 'author-copy-helper');
 const builtProjectHashHelper = path.join(root, 'src', 'main', 'native', 'project-hash-helper');
+const builtMarkdownTrashHelper = path.join(root, 'src', 'main', 'native', 'markdown-trash-helper');
 const helperSource = path.join(root, 'native', 'author-copy-helper.c');
 const projectHashHelperSource = path.join(root, 'native', 'project-hash-helper.c');
+const markdownTrashHelperSource = path.join(root, 'native', 'markdown-trash-helper.c');
 const sourcePackage = JSON.parse(fs.readFileSync(path.join(root, 'package.json'), 'utf8'));
 const PRODUCT_NAME = '笔触 · WritCraft';
 const info = JSON.parse(fs.readFileSync(path.join(outputRoot, 'build-info.json'), 'utf8'));
@@ -67,7 +70,7 @@ function assertReleaseInfo() {
   assert.strictEqual(info.minimumSystemVersion, nativeHelperBuildService.MINIMUM_SYSTEM_VERSION);
   assert.strictEqual(info.signing, 'ad-hoc (local testing only)');
   assert.strictEqual(info.notarized, false);
-  assert(exactKeys(info.nativeHelperBuilds, ['authorCopy', 'projectHash']));
+  assert(exactKeys(info.nativeHelperBuilds, ['authorCopy', 'projectHash', 'markdownTrash']));
   nativeHelperBuildService.assertNativeHelperAttestation(info.nativeHelperBuilds.authorCopy, {
     source: helperSource,
     output: builtHelper,
@@ -76,8 +79,13 @@ function assertReleaseInfo() {
     source: projectHashHelperSource,
     output: builtProjectHashHelper,
   });
+  nativeHelperBuildService.assertNativeHelperAttestation(info.nativeHelperBuilds.markdownTrash, {
+    source: markdownTrashHelperSource,
+    output: builtMarkdownTrashHelper,
+  });
   assertArtifactHelperBinding(info.nativeHelperBuilds.authorCopy, packagedHelper);
   assertArtifactHelperBinding(info.nativeHelperBuilds.projectHash, packagedProjectHashHelper);
+  assertArtifactHelperBinding(info.nativeHelperBuilds.markdownTrash, packagedMarkdownTrashHelper);
 }
 
 function assertArtifactHelperBinding(attestation, target) {
@@ -261,6 +269,27 @@ async function exerciseProjectHashHelper(helper, temporary) {
   }
 }
 
+function exerciseMarkdownTrashHelper(helper, temporary) {
+  fs.mkdirSync(temporary, { recursive: true });
+  const rootFd = fs.openSync(temporary, fs.constants.O_RDONLY);
+  try {
+    const result = spawnSync(helper, [], {
+      input: 'P\nL\t1\n',
+      encoding: 'utf8',
+      timeout: 5000,
+      maxBuffer: 1024 * 1024,
+      stdio: ['pipe', 'pipe', 'pipe', rootFd],
+    });
+    assert.strictEqual(result.status, 0, result.stderr || result.stdout);
+    const lines = String(result.stdout || '').trim().split('\n');
+    assert.match(lines[0] || '', /^P\tOK\t[0-9]+\t[0-9]+\t[0-9]+$/);
+    assert.strictEqual(lines[1], 'L\t1\tEMPTY');
+    assert.strictEqual(lines[2], 'E\t1\tOK');
+  } finally {
+    fs.closeSync(rootFd);
+  }
+}
+
 console.log('\nWritCraft packaged release verification');
 
 (async () => {
@@ -279,6 +308,7 @@ console.log('\nWritCraft packaged release verification');
     execFileSync('codesign', ['--verify', '--deep', '--strict', app], { stdio: 'pipe' });
     execFileSync('codesign', ['--verify', '--strict', packagedHelper], { stdio: 'pipe' });
     execFileSync('codesign', ['--verify', '--strict', packagedProjectHashHelper], { stdio: 'pipe' });
+    execFileSync('codesign', ['--verify', '--strict', packagedMarkdownTrashHelper], { stdio: 'pipe' });
     const temporary = fs.mkdtempSync(path.join(os.tmpdir(), 'writcraft-release-zip-'));
     try {
       execFileSync('unzip', ['-q', zip, '-d', temporary], { stdio: 'pipe' });
@@ -295,18 +325,31 @@ console.log('\nWritCraft packaged release verification');
         'Helpers',
         'project-hash-helper'
       );
+      const extractedMarkdownTrashHelper = path.join(
+        extractedApp,
+        'Contents',
+        'Helpers',
+        'markdown-trash-helper'
+      );
       execFileSync('codesign', ['--verify', '--deep', '--strict', extractedApp], { stdio: 'pipe' });
       execFileSync('codesign', ['--verify', '--strict', extractedHelper], { stdio: 'pipe' });
       execFileSync('codesign', ['--verify', '--strict', extractedProjectHashHelper], { stdio: 'pipe' });
+      execFileSync('codesign', ['--verify', '--strict', extractedMarkdownTrashHelper], { stdio: 'pipe' });
       assertArtifactHelperBinding(info.nativeHelperBuilds.authorCopy, extractedHelper);
       assertArtifactHelperBinding(info.nativeHelperBuilds.projectHash, extractedProjectHashHelper);
+      assertArtifactHelperBinding(info.nativeHelperBuilds.markdownTrash, extractedMarkdownTrashHelper);
       assertTreeEqual(app, extractedApp);
       verifyMinimumSystemVersion(extractedApp, extractedHelper);
       verifyMinimumSystemVersion(extractedApp, extractedProjectHashHelper);
+      verifyMinimumSystemVersion(extractedApp, extractedMarkdownTrashHelper);
       exercisePackagedHelper(extractedHelper, path.join(temporary, 'transaction'));
       await exerciseProjectHashHelper(
         extractedProjectHashHelper,
         path.join(temporary, 'project-hash-transaction')
+      );
+      exerciseMarkdownTrashHelper(
+        extractedMarkdownTrashHelper,
+        path.join(temporary, 'markdown-trash-transaction')
       );
     } finally {
       fs.rmSync(temporary, { recursive: true, force: true });
@@ -318,12 +361,16 @@ console.log('\nWritCraft packaged release verification');
     const sourceFiles = filesUnder(path.join(root, 'src'), '', options);
     sourceFiles.delete('main/native/author-copy-helper');
     sourceFiles.delete('main/native/project-hash-helper');
+    sourceFiles.delete('main/native/markdown-trash-helper');
     assert.deepStrictEqual(filesUnder(path.join(packagedRoot, 'src'), '', options), sourceFiles);
     assert.strictEqual(fs.existsSync(
       path.join(packagedRoot, 'src', 'main', 'native', 'author-copy-helper')
     ), false);
     assert.strictEqual(fs.existsSync(
       path.join(packagedRoot, 'src', 'main', 'native', 'project-hash-helper')
+    ), false);
+    assert.strictEqual(fs.existsSync(
+      path.join(packagedRoot, 'src', 'main', 'native', 'markdown-trash-helper')
     ), false);
   });
 
@@ -355,7 +402,7 @@ console.log('\nWritCraft packaged release verification');
   });
 
   await check('packaged native helpers are executable, universal and interpreter-free', () => {
-    for (const helper of [packagedHelper, packagedProjectHashHelper]) {
+    for (const helper of [packagedHelper, packagedProjectHashHelper, packagedMarkdownTrashHelper]) {
       fs.accessSync(helper, fs.constants.R_OK | fs.constants.X_OK);
       const architectures = execFileSync('lipo', ['-archs', helper], {
         encoding: 'utf8',

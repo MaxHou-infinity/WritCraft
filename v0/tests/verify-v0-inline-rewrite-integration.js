@@ -86,6 +86,28 @@ test('navigation/project teardown revokes only pre-apply owner state and durable
 test('every public project/History mutation route passes the Main recovery guard', () => {
   assert(main.includes("'PROJECT_WATCHER_UNAVAILABLE',"));
   assert(main.includes('error instanceof projectService.ProjectServiceError'));
+  const sharedGuard = main.slice(
+    main.indexOf('function assertInlineRewriteMutationAvailable(project, allowedLease = null)'),
+    main.indexOf('function assertChangesHistoryRecoveryAvailable(project)')
+  );
+  const recoveryGuard = main.slice(
+    main.indexOf('function assertChangesHistoryRecoveryAvailable(project)'),
+    main.indexOf('function assertProjectWatcherAvailable(project)')
+  );
+  assert(sharedGuard.includes('markdownTrashService.assertMutationAvailable(project)'));
+  assert(sharedGuard.includes('assertInternalMutationAvailable(project, allowedLease)'));
+  assert(recoveryGuard.includes('markdownTrashService.assertMutationAvailable(project)'));
+  assert(recoveryGuard.includes('assertInternalMutationAvailable(project)'));
+  const leaseImplementation = main.slice(
+    main.indexOf('function beginInternalMutation(project)'),
+    main.indexOf('async function runAiRequest(')
+  );
+  assert(leaseImplementation.includes('internalMutationLeaseByRoot.has(token.rootPath)'));
+  assert(leaseImplementation.includes("'PROJECT_MUTATION_IN_PROGRESS'"));
+  assert(leaseImplementation.includes('internalMutationLeaseByRoot.set(token.rootPath, token)'));
+  assert(leaseImplementation.includes('if (active !== token) return;'));
+  assert(leaseImplementation.indexOf('if (active !== token) return;') <
+    leaseImplementation.indexOf('internalMutationLeaseByRoot.delete(token.rootPath)'));
   for (const channel of [
     'writcraft:project:write', 'writcraft:project:overwrite-conflict',
     'writcraft:project:recreate-deleted', 'writcraft:project:create-file',
@@ -116,11 +138,19 @@ test('every public project/History mutation route passes the Main recovery guard
   assert(legacyEdit.includes('currentProject && currentProject.rootPath === pending.rootPath'));
   assert(legacyEdit.includes('assertInlineRewriteMutationAvailable(currentProject)'));
   assert(legacyEdit.indexOf('assertInlineRewriteMutationAvailable(currentProject)') < legacyEdit.indexOf('migrateLegacyEditFile'));
+  assert(legacyEdit.includes('await markdownTrashService.bindProject(recoveryProbe)'));
+  assert(legacyEdit.includes('markdownTrashService.assertMutationAvailable(recoveryProbe)'));
+  assert(legacyEdit.indexOf('markdownTrashService.assertMutationAvailable(recoveryProbe)') <
+    legacyEdit.indexOf('migrateLegacyEditFile'));
   assert(handler('writcraft:rewrite:apply').includes('requireMutableProject()'));
   assert(!handler('writcraft:rewrite:reconciliation').includes('requireMutableProject()'));
   assert(!handler('writcraft:rewrite:reconciliation-clear').includes('requireMutableProject()'));
   assert(handler('writcraft:rewrite:reconciliation').includes('assertProjectWatcherAvailable(project)'));
   assert(handler('writcraft:rewrite:reconciliation-clear').includes('assertProjectWatcherAvailable(project)'));
+  const referenceImport = handler('writcraft:project:import-reference');
+  assert(referenceImport.includes('assertInlineRewriteMutationAvailable(project, mutationLease)'));
+  assert(referenceImport.indexOf('mutationLease = beginInternalMutation(project)') <
+    referenceImport.lastIndexOf('assertGeneration()'));
 });
 
 test('dynamic Main mutation guard fails closed for applying, terminal and unreadable markers', () => {

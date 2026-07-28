@@ -165,6 +165,9 @@ contextBridge.exposeInMainWorld('writCraft', {
     renameFile: (sourcePath, targetPath, expectedRevision) => ipcRenderer.invoke('writcraft:project:rename-file', sourcePath, targetPath, expectedRevision),
     moveFile: (sourcePath, targetPath, expectedRevision) => ipcRenderer.invoke('writcraft:project:move-file', sourcePath, targetPath, expectedRevision),
     trashFile: (relPath, expectedRevision) => ipcRenderer.invoke('writcraft:project:trash-file', relPath, expectedRevision),
+    getMarkdownTrash: (projectInstanceId) => ipcRenderer.invoke('writcraft:project:get-markdown-trash', projectInstanceId),
+    restoreMarkdownTrash: (projectInstanceId, token) =>
+      ipcRenderer.invoke('writcraft:project:restore-markdown-trash', projectInstanceId, token),
     confirmLegacyEdit: (token) => ipcRenderer.invoke('writcraft:project:confirm-legacy-edit', token),
     previewLegacyDraft: (content, requestedPath) => ipcRenderer.invoke('writcraft:project:preview-legacy-draft', content, requestedPath),
     confirmLegacyDraft: (token) => ipcRenderer.invoke('writcraft:project:confirm-legacy-draft', token),

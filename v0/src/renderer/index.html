@@ -132,6 +132,20 @@
       outline: none; background: #eee7dd;
     }
     .tree-file-menu-actions button.is-danger { color: #963e38; }
+    .markdown-trash { border-top: 1px solid var(--line); padding: 6px 8px 8px; }
+    .markdown-trash > summary { display: flex; align-items: center; justify-content: space-between; list-style: none; padding: 6px 5px; color: var(--ink-soft); cursor: pointer; font-size: 10px; }
+    .markdown-trash > summary::-webkit-details-marker { display: none; }
+    .markdown-trash > summary:focus-visible { outline: 2px solid var(--theme); outline-offset: 1px; border-radius: 4px; }
+    .markdown-trash-panel { max-height: 210px; overflow: auto; padding: 5px; border: 1px solid #d8d0c4; border-radius: 5px; background: #faf7f1; }
+    .markdown-trash-status { min-height: 17px; margin: 0 0 5px; color: var(--ink-soft); font-size: 9px; line-height: 1.5; }
+    .markdown-trash-status.is-error { color: #963e38; }
+    .markdown-trash-list { display: grid; gap: 5px; }
+    .markdown-trash-item { padding: 6px; border: 1px solid #ded6ca; border-radius: 5px; background: #fff; }
+    .markdown-trash-item strong { display: block; overflow: hidden; color: var(--ink); font-size: 10px; text-overflow: ellipsis; white-space: nowrap; }
+    .markdown-trash-item span { display: block; margin: 3px 0 5px; color: var(--ink-soft); font-size: 8px; line-height: 1.4; overflow-wrap: anywhere; }
+    .markdown-trash-item button, #markdown-trash-refresh { border: 1px solid #d2c9bc; border-radius: 4px; background: #fff; color: var(--theme-deep); padding: 4px 6px; font-size: 9px; cursor: pointer; }
+    .markdown-trash-item button:disabled, #markdown-trash-refresh:disabled { opacity: .5; cursor: default; }
+    .markdown-trash-actions { display: flex; justify-content: flex-end; margin-top: 6px; }
     .sidebar-foot { padding: 9px 12px; border-top: 1px solid var(--line); color: var(--ink-soft); font-size: 10px; display: flex; gap: 6px; align-items: center; }
     .index-dot { width: 7px; height: 7px; border-radius: 50%; background: #9aaa8e; }
     .sidebar-view { min-height: 0; flex: 1; display: flex; flex-direction: column; }
@@ -780,6 +794,14 @@
       <section class="sidebar-view" id="sidebar-explorer-view">
         <div class="explorer-label"><span>项目文件</span><button id="new-file-button" title="新建 Markdown 文件" disabled>＋</button></div>
         <div id="project-tree"><div class="tree-empty">创建或打开一个项目后，<br>这里会显示 edit.md 与全部写作文件。</div></div>
+        <details id="markdown-trash" class="markdown-trash">
+          <summary id="markdown-trash-toggle" aria-controls="markdown-trash-panel" aria-expanded="false">项目回收区 · 0</summary>
+          <section id="markdown-trash-panel" class="markdown-trash-panel" aria-label="项目回收区" aria-busy="false">
+            <p id="markdown-trash-status" class="markdown-trash-status" role="status" aria-live="polite">长期保留，不会自动删除；可恢复到原位置。</p>
+            <div id="markdown-trash-list" class="markdown-trash-list"></div>
+            <div class="markdown-trash-actions"><button id="markdown-trash-refresh" type="button">刷新</button></div>
+          </section>
+        </details>
         <div class="sidebar-foot"><span class="index-dot"></span><span id="project-index-state">等待项目</span></div>
       </section>
       <section class="sidebar-view" id="sidebar-search-view" hidden>

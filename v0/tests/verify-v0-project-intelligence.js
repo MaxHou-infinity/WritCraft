@@ -85,7 +85,10 @@ check('外部文件变化通过窄订阅接口触发权威重读', () => {
   assert.ok(preload.includes("ipcRenderer.removeListener('writcraft:project:external-change', listener)"));
 });
 check('缺失 edit.md 的普通 Markdown 目录可进入受限写作模式', () => {
-  assert.ok(main.includes('const project = projectService.openProject(rootPath)'));
+  assert.ok(main.includes(
+    'const project = attachPrivateProjectRootIdentity(projectService.openProject(rootPath))'
+  ));
+  assert.ok(main.includes('await markdownTrashService.bindProject(project)'));
   assert.ok(main.includes('projectPromptMissing: promptMissing'));
   assert.ok(main.includes("ipcMain.handle('writcraft:project:create-prompt'"));
   assert.ok(workspace.includes('projectPromptMissing'));

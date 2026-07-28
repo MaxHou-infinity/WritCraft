@@ -30,6 +30,12 @@
     document.getElementById('welcome-open-project'),
   ].filter(Boolean);
   const newFileButton = document.getElementById('new-file-button');
+  const markdownTrash = document.getElementById('markdown-trash');
+  const markdownTrashToggle = document.getElementById('markdown-trash-toggle');
+  const markdownTrashPanel = document.getElementById('markdown-trash-panel');
+  const markdownTrashStatus = document.getElementById('markdown-trash-status');
+  const markdownTrashList = document.getElementById('markdown-trash-list');
+  const markdownTrashRefresh = document.getElementById('markdown-trash-refresh');
   const createDialog = document.getElementById('project-dialog');
   const createForm = document.getElementById('project-form');
   const projectNameInput = document.getElementById('project-name-input');
@@ -57,6 +63,9 @@
   let migrationResolver = null;
   let legacyDraftSnoozed = false;
   let treeOpenTimer = null;
+  let markdownTrashSequence = 0;
+  let markdownTrashBusy = false;
+  let markdownTrashOwner = null;
 
   const state = {
     project: null,
@@ -134,6 +143,14 @@
       'changes-history',
       Boolean(blocked),
       message || 'Changes / History 提交状态待核对；请完成恢复后继续'
+    );
+  }
+
+  function setMarkdownTrashMutationBlocked(blocked, message = '') {
+    return setMutationBlocked(
+      'markdown-trash',
+      Boolean(blocked),
+      message || '项目回收区事务需要人工恢复；当前项目保持只读，请先备份并重新打开'
     );
   }
 
@@ -574,6 +591,150 @@
     }));
   }
 
+  function formatMarkdownTrashBytes(value) {
+    if (!Number.isSafeInteger(value) || value < 0) return '未知大小';
+    if (value < 1024) return `${value} B`;
+    if (value < 1024 * 1024) return `${(value / 1024).toFixed(1)} KB`;
+    return `${(value / (1024 * 1024)).toFixed(1)} MB`;
+  }
+
+  function setMarkdownTrashStatus(message, error = false) {
+    if (!markdownTrashStatus) return;
+    markdownTrashStatus.textContent = message;
+    markdownTrashStatus.className = `markdown-trash-status${error ? ' is-error' : ''}`;
+  }
+
+  function applyMarkdownTrashFailure(result) {
+    if (result?.error !== 'MARKDOWN_TRASH_RECOVERY_REQUIRED') return false;
+    setMarkdownTrashMutationBlocked(
+      true,
+      result.message || '项目回收区事务需要人工恢复；当前项目保持只读'
+    );
+    return true;
+  }
+
+  function resetMarkdownTrash() {
+    markdownTrashSequence += 1;
+    markdownTrashBusy = false;
+    markdownTrashOwner = null;
+    markdownTrashList?.replaceChildren();
+    if (markdownTrashToggle) markdownTrashToggle.textContent = '项目回收区 · 0';
+    if (markdownTrashPanel) markdownTrashPanel.setAttribute('aria-busy', 'false');
+    if (markdownTrashRefresh) markdownTrashRefresh.disabled = !state.project;
+    setMarkdownTrashStatus('长期保留，不会自动删除；可恢复到原位置。');
+  }
+
+  function safeMarkdownTrashResult(result) {
+    if (!result?.ok || result.schema !== 'writcraft.markdown-trash-list/v1' ||
+        !Number.isSafeInteger(result.totalCount) || result.totalCount < 0 ||
+        !Number.isSafeInteger(result.totalBytes) || result.totalBytes < 0 ||
+        !Array.isArray(result.items) || result.items.length !== result.totalCount) return null;
+    const items = [];
+    for (const item of result.items) {
+      if (!item || typeof item.token !== 'string' || !/^mti_[a-f0-9]{48}$/.test(item.token) ||
+          typeof item.originalPath !== 'string' || !/^(?!\.)(?!.*\/\.)[^\\]+\.(?:md|markdown)$/i.test(item.originalPath) ||
+          item.originalPath === 'edit.md' || Number.isNaN(Date.parse(item.deletedAt)) ||
+          !Number.isSafeInteger(item.sizeBytes) || item.sizeBytes < 0) return null;
+      const keys = Object.keys(item).sort().join(',');
+      if (keys !== 'deletedAt,originalPath,sizeBytes,token') return null;
+      items.push(Object.freeze({ ...item }));
+    }
+    if (items.reduce((sum, item) => sum + item.sizeBytes, 0) !== result.totalBytes) return null;
+    return Object.freeze({ totalCount: result.totalCount, totalBytes: result.totalBytes, items });
+  }
+
+  function renderMarkdownTrash(owner) {
+    if (!markdownTrashList || !markdownTrashToggle) return;
+    markdownTrashList.replaceChildren();
+    markdownTrashToggle.textContent = `项目回收区 · ${owner.totalCount}`;
+    markdownTrashPanel?.setAttribute('aria-busy', String(markdownTrashBusy));
+    if (markdownTrashRefresh) markdownTrashRefresh.disabled = markdownTrashBusy;
+    setMarkdownTrashStatus(owner.totalCount
+      ? `共 ${owner.totalCount} 个文件，${formatMarkdownTrashBytes(owner.totalBytes)}。恢复不会自动打开文件。`
+      : '项目回收区为空。');
+    for (const item of owner.items) {
+      const row = document.createElement('article');
+      row.className = 'markdown-trash-item';
+      const title = document.createElement('strong');
+      title.textContent = item.originalPath;
+      const detail = document.createElement('span');
+      detail.textContent = `${formatMarkdownTrashBytes(item.sizeBytes)} · ${new Date(item.deletedAt).toLocaleString('zh-CN')}`;
+      const restore = document.createElement('button');
+      restore.type = 'button';
+      restore.textContent = '恢复到原位置';
+      restore.setAttribute('aria-label', `恢复 ${item.originalPath} 到原位置`);
+      restore.disabled = markdownTrashBusy;
+      restore.addEventListener('click', () => restoreMarkdownTrashItem(owner, item));
+      row.append(title, detail, restore);
+      markdownTrashList.appendChild(row);
+    }
+  }
+
+  async function refreshMarkdownTrash() {
+    const projectInstanceId = state.project?.instanceId;
+    if (!projectInstanceId || !bridge?.getMarkdownTrash || markdownTrashBusy) {
+      if (!projectInstanceId) resetMarkdownTrash();
+      return false;
+    }
+    const sequence = ++markdownTrashSequence;
+    markdownTrashBusy = true;
+    if (markdownTrashOwner) renderMarkdownTrash(markdownTrashOwner);
+    else markdownTrashPanel?.setAttribute('aria-busy', 'true');
+    if (markdownTrashRefresh) markdownTrashRefresh.disabled = true;
+    setMarkdownTrashStatus('正在核验项目回收区…');
+    let result;
+    try { result = normalizeResult(await bridge.getMarkdownTrash(projectInstanceId)); }
+    catch (error) { result = { ok: false, message: error.message }; }
+    if (sequence !== markdownTrashSequence || state.project?.instanceId !== projectInstanceId) return false;
+    markdownTrashBusy = false;
+    const safe = safeMarkdownTrashResult(result);
+    if (!safe) {
+      markdownTrashOwner = null;
+      markdownTrashList?.replaceChildren();
+      markdownTrashPanel?.setAttribute('aria-busy', 'false');
+      if (markdownTrashRefresh) markdownTrashRefresh.disabled = false;
+      applyMarkdownTrashFailure(result);
+      setMarkdownTrashStatus(result?.message || '项目回收区读取失败；未改变任何文件。', true);
+      return false;
+    }
+    setMarkdownTrashMutationBlocked(false);
+    markdownTrashOwner = Object.freeze({ projectInstanceId, ...safe });
+    renderMarkdownTrash(markdownTrashOwner);
+    return true;
+  }
+
+  async function restoreMarkdownTrashItem(owner, item) {
+    if (markdownTrashBusy || markdownTrashOwner !== owner || !bridge?.restoreMarkdownTrash) return false;
+    markdownTrashBusy = true;
+    renderMarkdownTrash(owner);
+    setMarkdownTrashStatus(`正在恢复 ${item.originalPath}…`);
+    let result;
+    try { result = normalizeResult(await bridge.restoreMarkdownTrash(owner.projectInstanceId, item.token)); }
+    catch (error) { result = { ok: false, message: error.message }; }
+    if (markdownTrashOwner !== owner || state.project?.instanceId !== owner.projectInstanceId) {
+      markdownTrashBusy = false;
+      return false;
+    }
+    markdownTrashBusy = false;
+    if (!result.ok || result.file?.path !== item.originalPath ||
+        (!Array.isArray(result.tree) && !result.treeRefreshRequired)) {
+      renderMarkdownTrash(owner);
+      applyMarkdownTrashFailure(result);
+      setMarkdownTrashStatus(result?.message || '恢复失败；回收区文件保持不变。', true);
+      return false;
+    }
+    if (Array.isArray(result.tree)) state.tree = result.tree;
+    else await refreshTree();
+    state.aiContextGeneration += 1;
+    invalidateDerivedViews('restore', item.originalPath, item.originalPath);
+    renderTree();
+    document.dispatchEvent(new CustomEvent('writcraft:tree-changed'));
+    setSaveState(`已恢复 ${item.originalPath}`, 'saved');
+    const refreshed = await refreshMarkdownTrash();
+    if (refreshed && markdownTrashOwner?.totalCount === 0) markdownTrashToggle?.focus();
+    return refreshed;
+  }
+
   async function relocateFile(sourcePath, targetPath, method, label) {
     if (!state.project || !bridge?.[method] || sourcePath === 'edit.md') return false;
     if (!targetPath || targetPath === sourcePath) return false;
@@ -637,6 +798,7 @@
       result = { ok: false, message: error.message };
     }
     if (!result.ok) {
+      applyMarkdownTrashFailure(result);
       showError(resultMessage(result, '移到回收区失败'));
       return false;
     }
@@ -668,6 +830,7 @@
     scheduleWorkspaceSave();
     document.dispatchEvent(new CustomEvent('writcraft:tree-changed'));
     setSaveState('已移到项目回收区', 'saved');
+    await refreshMarkdownTrash();
     return true;
   }
 
@@ -1724,6 +1887,7 @@
       return;
     }
     closeProjectOnboarding();
+    resetMarkdownTrash();
     externalSyncState?.reset();
     window.__assistantDock?.close?.();
     state.project = result.project;
@@ -1731,6 +1895,7 @@
     ++state.changesHistoryRecoveryGeneration;
     state.mutationBlockers = {};
     state.changesHistoryRecovery = null;
+    setMarkdownTrashMutationBlocked(Boolean(result.markdownTrashRecoveryRequired));
     setChangesHistoryMutationBlocked(true, '正在核对上次 Changes / History 写入状态…');
     setSidebarView('explorer');
     state.editContext = '';
@@ -1819,6 +1984,7 @@
       }
     }
     document.dispatchEvent(new CustomEvent('writcraft:project-entered'));
+    await refreshMarkdownTrash();
     if (startOnboardingButton) startOnboardingButton.hidden = state.projectPromptMissing;
     if (result.onboardingRecommended && !state.projectPromptMissing) openProjectOnboarding();
   }
@@ -2500,6 +2666,17 @@
   });
   document.addEventListener('click', event => {
     if (!event.target.closest?.('.tree-file-menu')) closeFileMenus();
+  });
+  markdownTrash?.addEventListener('toggle', () => {
+    markdownTrashToggle?.setAttribute('aria-expanded', String(markdownTrash.open));
+    if (markdownTrash.open) refreshMarkdownTrash();
+  });
+  markdownTrashRefresh?.addEventListener('click', refreshMarkdownTrash);
+  markdownTrash?.addEventListener('keydown', event => {
+    if (event.key !== 'Escape' || !markdownTrash.open) return;
+    event.preventDefault();
+    markdownTrash.open = false;
+    markdownTrashToggle?.focus();
   });
   window.addEventListener('beforeunload', () => {
     saveRecovery();

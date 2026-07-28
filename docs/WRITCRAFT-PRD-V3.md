@@ -6,7 +6,7 @@
 > 适用范围：V0 起的桌面写作 IDE  
 > 优先级：若本文件与旧版 PRD、路线图或原型行为冲突，以本文件为准；工程实现以 `docs/PHASE-A-IMPLEMENTATION.md` 为准。
 
-> **实现状态注记（2026-07-28，0.0AA）**：本文仍是产品权威规格，**完整 PRD 尚未实现**。0.0Z 的超长 `edit.md` 章节化编译与 Inspector 披露保持签字；0.0AA 新增 Main-owned 最近对话，最多保留 6 个已完成轮次，绑定 owner/navigation/project/root/generation，并提供可见“新对话”、新提交抢占和同项目重开隔离。Chat Conversation **8/8**、Chat Context **12/12**、Resolver **26/26**、Inspector **9/9**、Policy **10/10**、Network **15/15**、Workspace **10/10**、完整 test/verify、Persistent **3/3**、最终源码真实 Electron 连续两次 **34/34**、package **8/8** 与 release **7/7** 通过；独立复审 **P0=0/P1=0/P2=0**。当前唯一剩余本地缺口是普通 Markdown 回收区恢复 UI；其他 AI 模式尚未统一采用 `edit.md` 分区编译器。
+> **实现状态注记（2026-07-28，0.0AB）**：本文仍是产品权威规格，**完整 PRD 尚未完成真实作者与正式发布验收**。0.0AA 的 Main-owned 最近对话保持签字；0.0AB 新增 Explorer 可见普通 Markdown 项目回收区，支持有界列表、刷新和单项恢复，并由 Main watcher barrier、opaque capability、exact-owner mutation lease 与 native fd-relative journal transaction 保护。native worker **20/20**、Trash service/handler **11/11**、完整 test/verify、Persistent **3/3**、真实 Electron **35/35**、package **8/8** 与 release **7/7** 通过；独立复审 **P0=0/P1=0/P2=0**。当前本地产品实现批已经清零；剩余为完整 `sk-api-` 图片验收、作者显式选择的合格真实项目、真实作者指标及 Developer ID/公证/Gatekeeper 等外部门禁。其他 AI 模式仍未统一采用 `edit.md` 分区编译器。
 
 > **完成定义**：任何“V0 完成”声明必须同时满足 §10.1–§10.4、全量自动回归、真实 Electron E2E 和独立复审。局部 suite 通过、本地 ad-hoc App 或历史 ZIP 均不能单独构成完成证据。
 
@@ -398,7 +398,7 @@ Issue 类型首批支持：
 
 ### 10.3 Phase C：一致性星图
 
-本节的动态旅程、零写入边界、可访问性、最小窗口和大型图谱性能门禁由 `docs/GRAPH-ACCEPTANCE-V1-CONTRACT.md` 细化。产品契约于 2026-07-22 签字，2026-07-23 性能批源码完整 test/verify 与强制 Electron 连续两轮 26/26 通过，可见帧性能复审 P0/P1/P2=0。后续 Graph 韧性批又关闭完整语义权威、不可变快照、异步所有权与 Unicode quote 边界；当前 0.0AA 基线完整 verify 通过、总链强制 Electron **34/34**。
+本节的动态旅程、零写入边界、可访问性、最小窗口和大型图谱性能门禁由 `docs/GRAPH-ACCEPTANCE-V1-CONTRACT.md` 细化。产品契约于 2026-07-22 签字，2026-07-23 性能批源码完整 test/verify 与强制 Electron 连续两轮 26/26 通过，可见帧性能复审 P0/P1/P2=0。后续 Graph 韧性批又关闭完整语义权威、不可变快照、异步所有权与 Unicode quote 边界；当前 0.0AB 基线完整 verify 通过、总链强制 Electron **35/35**。
 
 1. 能从至少三个项目文件增量生成统一节点、关系、证据和问题。
 2. 默认显示当前文件子图，可切换全项目并按类型、文件和问题筛选。
@@ -409,7 +409,7 @@ Issue 类型首批支持：
 
 ### 10.4 完整 V0 体验
 
-以一个包含 `edit.md`、不少于五个章节文件和来源材料的真实项目完成：项目定义 → 文件写作 → 段落 Diff → 跨文件修改 → 一致性检查 → 重启恢复。验收必须包含真实 Electron 行为测试；仅检查 DOM 元素或源码字符串不能证明完成。完整 V0 还需关闭真实 GUI 项目卡落盘、完整 `sk-api-` 图片、真实作者长文与价值指标、干净打包、签名/公证/Gatekeeper 门禁；精确顺序与命令以 `v0/DEVELOPMENT-STATUS.md` 为准。
+以一个包含 `edit.md`、不少于五个章节文件和来源材料的真实项目完成：项目定义 → 文件写作 → 段落 Diff → 跨文件修改 → 一致性检查 → 重启恢复。验收必须包含真实 Electron 行为测试；仅检查 DOM 元素或源码字符串不能证明完成。完整 V0 还需关闭作者显式选择项目上的真实 GUI 项目卡落盘验收、完整 `sk-api-` 图片、真实作者长文与价值指标、干净打包、签名/公证/Gatekeeper 门禁；精确顺序与命令以 `v0/DEVELOPMENT-STATUS.md` 为准。
 
 ## 11. 文档治理
 

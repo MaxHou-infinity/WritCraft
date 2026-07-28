@@ -234,7 +234,7 @@ test('authoritative project mutations abort in-flight AI and advance the generat
   assert.strictEqual(main.includes('deferredDuringInternalMutation'), false);
   assert.match(main, /beginInternalMutation\(project\)[\s\S]{0,700}referenceImportService\.importReference[\s\S]{0,700}endInternalMutation\(mutationLease, project\)/);
   assert.match(main, /internalMutationDepthByRoot/);
-  assert.match(main, /function assertInlineRewriteMutationAvailable\(project\)[\s\S]{0,300}assertProjectWatcherAvailable\(project\)/);
+  assert.match(main, /function assertInlineRewriteMutationAvailable\(project, allowedLease = null\)[\s\S]{0,360}assertProjectWatcherAvailable\(project\)/);
   assert.match(main, /async function runAiRequest\(projectInstanceId[\s\S]{0,260}assertProjectWatcherAvailable\(currentProject\)/);
   assert.match(handler('writcraft:chat:cancel-pending'), /assertTrustedSender\(event\)[\s\S]*matchesAiProjectOrigin\(projectInstanceId\)[\s\S]*chatConversationStore\.cancelPending\(chatConversationBinding\(event, currentProject\)\)/);
   assert.match(main, /function startProjectWatcher\(project\)[\s\S]{0,900}projectWatcherHealth\.clear\(project\)[\s\S]{0,180}projectWatcherHealth\.markDegraded\(project\)/);
