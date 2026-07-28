@@ -2,11 +2,12 @@
 
 // Read-only project hash worker.
 //
-// fd 3 is a Main-owned, already-bound project-root directory.  The protocol
-// intentionally accepts only relative paths and scanner identities; it never
-// accepts an absolute path or a filesystem mutation request.
+// fd 3 is a Main-owned, already-bound filesystem-root directory.  Main sends
+// one private, bounded absolute project path at startup; the helper binds that
+// path one no-follow component at a time and never returns or logs the path.
 //
 // Request (one strict LF-terminated line per record):
+//   P<TAB>absolute-project-path-hex
 //   B<TAB>sequence<TAB>count
 //   I<TAB>sequence<TAB>path-hex<TAB>max-bytes<TAB>leaf-identity
 //     <TAB>ancestor-count<TAB>ancestor-identity...
@@ -15,10 +16,12 @@
 // ctimeNs.  Ancestors exclude the already-bound project root and are ordered
 // from its direct child to the final file's parent.  For example, `a/b.md`
 // has one ancestor identity (`a`).  Responses are:
+//   P<TAB>OK<TAB>project-root-dev<TAB>project-root-ino<TAB>project-root-mode
+//   P<TAB>ERR<TAB>PATH|IO|PROTOCOL
 //   R<TAB>sequence<TAB>OK<TAB>sha256-hex<TAB>full-leaf-identity
 //   R<TAB>sequence<TAB>ERR<TAB>PATH|IDENTITY|BUDGET|IO
 //   E<TAB>sequence<TAB>OK
-//   E<TAB>sequence<TAB>ERR<TAB>PROTOCOL|BUDGET
+//   E<TAB>sequence<TAB>ERR<TAB>PROTOCOL|BUDGET|ROOT
 //
 // Any malformed header/item is a protocol failure for the entire batch.  A
 // serialized request above 16 MiB is a batch-level budget failure.  A
@@ -40,7 +43,7 @@
 #include <sys/types.h>
 #include <unistd.h>
 
-#define PROJECT_ROOT_FD 3
+#define TRUSTED_ROOT_FD 3
 #define MAX_BATCH_ITEMS 5000U
 #define MAX_BATCH_BYTES (64ULL * 1024ULL * 1024ULL)
 #define MAX_ITEM_BYTES (5ULL * 1024ULL * 1024ULL)
@@ -48,6 +51,7 @@
 #define HASH_CHUNK_BYTES (64U * 1024U)
 #define MAX_PATH_BYTES 4096U
 #define MAX_COMPONENTS 128U
+#define MAX_ROOT_REQUEST_BYTES ((MAX_PATH_BYTES * 2U) + 4U)
 #define IDENTITY_FIELDS 7U
 #define MAX_FIELDS (12U + ((MAX_COMPONENTS - 1U) * IDENTITY_FIELDS))
 #define MAX_LINE_BYTES 32768U
@@ -71,6 +75,13 @@ typedef struct {
   Identity ancestors[MAX_COMPONENTS - 1U];
 } Item;
 
+typedef struct {
+  char path[MAX_PATH_BYTES + 1U];
+  size_t component_count;
+  Identity components[MAX_COMPONENTS];
+  int project_fd;
+} RootBinding;
+
 typedef enum {
   READ_EOF = 0,
   READ_LINE = 1,
@@ -88,6 +99,25 @@ typedef enum {
 
 static bool write_line(const char *line) {
   return fputs(line, stdout) != EOF && fflush(stdout) == 0;
+}
+
+static bool write_root_error(const char *reason) {
+  char line[128];
+  int length = snprintf(line, sizeof(line), "P\tERR\t%s\n", reason);
+  return length > 0 && (size_t)length < sizeof(line) && write_line(line);
+}
+
+static bool write_root_success(const Identity *identity) {
+  char line[256];
+  int length = snprintf(
+    line,
+    sizeof(line),
+    "P\tOK\t%" PRIuMAX "\t%" PRIuMAX "\t%" PRIuMAX "\n",
+    identity->dev,
+    identity->ino,
+    identity->mode
+  );
+  return length > 0 && (size_t)length < sizeof(line) && write_line(line);
 }
 
 static bool write_batch_end(uint64_t sequence, const char *state, const char *reason) {
@@ -257,6 +287,28 @@ static bool split_safe_path(const char *path, size_t *component_count_out) {
   return true;
 }
 
+static bool safe_root_segment(const char *start, size_t length) {
+  if (length == 0U || length > NAME_MAX) return false;
+  return !((length == 1U && start[0] == '.') ||
+    (length == 2U && start[0] == '.' && start[1] == '.'));
+}
+
+static bool split_safe_absolute_path(const char *path, size_t *component_count_out) {
+  if (path == NULL || path[0] != '/' || path[1] == '\0') return false;
+  size_t components = 0U;
+  const char *segment = path + 1;
+  for (const char *cursor = segment;; cursor += 1) {
+    if (*cursor != '/' && *cursor != '\0') continue;
+    if (!safe_root_segment(segment, (size_t)(cursor - segment))) return false;
+    components += 1U;
+    if (components > MAX_COMPONENTS) return false;
+    if (*cursor == '\0') break;
+    segment = cursor + 1;
+  }
+  *component_count_out = components;
+  return true;
+}
+
 static ReadLineResult read_protocol_line(char *buffer, size_t capacity, size_t *length_out) {
   if (capacity < 2U) return READ_IO_ERROR;
   memset(buffer, 0, capacity);
@@ -272,6 +324,19 @@ static ReadLineResult read_protocol_line(char *buffer, size_t capacity, size_t *
   *newline = '\0';
   *length_out = (size_t)(newline - buffer);
   return READ_LINE;
+}
+
+static bool parse_root_request(char *line, RootBinding *binding) {
+  char *fields[2];
+  size_t field_count = 0U;
+  if (!split_fields(line, fields, 2U, &field_count) ||
+      field_count != 2U || strcmp(fields[0], "P") != 0 ||
+      !decode_path_hex(fields[1], binding->path, sizeof(binding->path)) ||
+      !split_safe_absolute_path(binding->path, &binding->component_count)) {
+    return false;
+  }
+  binding->project_fd = -1;
+  return true;
 }
 
 static bool parse_header(char *line, uint64_t *sequence_out, size_t *count_out) {
@@ -318,8 +383,71 @@ static bool parse_item(char *line, uint64_t batch_sequence, Item *out) {
   return true;
 }
 
-static int duplicate_root(void) {
-  int duplicate = fcntl(PROJECT_ROOT_FD, F_DUPFD_CLOEXEC, 0);
+static bool same_directory_binding(const struct stat *actual, const Identity *expected) {
+  return S_ISDIR(actual->st_mode) &&
+    (uintmax_t)actual->st_dev == expected->dev &&
+    (uintmax_t)actual->st_ino == expected->ino &&
+    (uintmax_t)actual->st_mode == expected->mode;
+}
+
+static HashResult walk_project_root(RootBinding *binding, bool capture, int *root_out) {
+  int current = fcntl(TRUSTED_ROOT_FD, F_DUPFD_CLOEXEC, 0);
+  if (current < 0) return HASH_IO;
+  struct stat trusted;
+  if (fstat(current, &trusted) != 0 || !S_ISDIR(trusted.st_mode)) {
+    (void)close(current);
+    return HASH_IO;
+  }
+
+  char working_path[MAX_PATH_BYTES + 1U];
+  memcpy(working_path, binding->path + 1, strlen(binding->path));
+  char *segment = working_path;
+  for (size_t index = 0U; index < binding->component_count; index += 1U) {
+    char *next = strchr(segment, '/');
+    if ((index + 1U < binding->component_count && next == NULL) ||
+        (index + 1U == binding->component_count && next != NULL)) {
+      (void)close(current);
+      return HASH_PATH;
+    }
+    if (next != NULL) *next = '\0';
+    int child = openat(
+      current,
+      segment,
+      O_RDONLY | O_DIRECTORY | O_NOFOLLOW | O_NONBLOCK | O_CLOEXEC
+    );
+    (void)close(current);
+    if (child < 0) return HASH_PATH;
+
+    struct stat value;
+    if (fstat(child, &value) != 0 || !S_ISDIR(value.st_mode)) {
+      (void)close(child);
+      return HASH_IO;
+    }
+    if (capture) {
+      if (!identity_from_stat(&value, &binding->components[index])) {
+        (void)close(child);
+        return HASH_IO;
+      }
+    } else if (!same_directory_binding(&value, &binding->components[index])) {
+      (void)close(child);
+      return HASH_IDENTITY;
+    }
+    current = child;
+    if (next != NULL) segment = next + 1;
+  }
+  *root_out = current;
+  return HASH_OK;
+}
+
+static bool revalidate_project_root(RootBinding *binding) {
+  int current = -1;
+  HashResult result = walk_project_root(binding, false, &current);
+  if (current >= 0 && close(current) != 0) return false;
+  return result == HASH_OK;
+}
+
+static int duplicate_root(const RootBinding *binding) {
+  int duplicate = fcntl(binding->project_fd, F_DUPFD_CLOEXEC, 0);
   if (duplicate < 0) return -1;
   struct stat root;
   if (fstat(duplicate, &root) != 0 || !S_ISDIR(root.st_mode)) {
@@ -329,8 +457,8 @@ static int duplicate_root(void) {
   return duplicate;
 }
 
-static HashResult open_checked_leaf(const Item *item, int *leaf_out) {
-  int current = duplicate_root();
+static HashResult open_checked_leaf(const RootBinding *binding, const Item *item, int *leaf_out) {
+  int current = duplicate_root(binding);
   if (current < 0) return HASH_IO;
   char working_path[MAX_PATH_BYTES + 1U];
   memcpy(working_path, item->path, sizeof(working_path));
@@ -378,13 +506,17 @@ static HashResult open_checked_leaf(const Item *item, int *leaf_out) {
   return HASH_OK;
 }
 
-static HashResult hash_item(const Item *item, char digest_hex[(CC_SHA256_DIGEST_LENGTH * 2U) + 1U]) {
+static HashResult hash_item(
+  const RootBinding *binding,
+  const Item *item,
+  char digest_hex[(CC_SHA256_DIGEST_LENGTH * 2U) + 1U]
+) {
   if (item->max_bytes > MAX_ITEM_BYTES || item->leaf.size > item->max_bytes ||
       item->leaf.size > MAX_BATCH_BYTES) {
     return HASH_BUDGET;
   }
   int leaf = -1;
-  HashResult opened = open_checked_leaf(item, &leaf);
+  HashResult opened = open_checked_leaf(binding, item, &leaf);
   if (opened != HASH_OK) return opened;
 
   unsigned char buffer[HASH_CHUNK_BYTES];
@@ -414,7 +546,7 @@ static HashResult hash_item(const Item *item, char digest_hex[(CC_SHA256_DIGEST_
   // a replacement of the final path or any checked ancestor while the content
   // fd was held, without falling back to a path traversal outside root fd.
   int rechecked = -1;
-  HashResult reopened = open_checked_leaf(item, &rechecked);
+  HashResult reopened = open_checked_leaf(binding, item, &rechecked);
   if (reopened != HASH_OK) return reopened;
   if (close(rechecked) != 0) return HASH_IO;
 
@@ -462,9 +594,30 @@ int main(void) {
   char line[MAX_LINE_BYTES];
   uint64_t batch_sequence = 0U;
   bool success = true;
+  RootBinding binding;
+  memset(&binding, 0, sizeof(binding));
+  binding.project_fd = -1;
+
+  size_t line_length = 0U;
+  ReadLineResult read_root = read_protocol_line(line, sizeof(line), &line_length);
+  if (read_root != READ_LINE || line_length + 1U > MAX_ROOT_REQUEST_BYTES ||
+      !parse_root_request(line, &binding)) {
+    success = write_root_error("PROTOCOL");
+    success = false;
+  } else {
+    int bound_root = -1;
+    HashResult bound = walk_project_root(&binding, true, &bound_root);
+    if (bound != HASH_OK) {
+      success = write_root_error(bound == HASH_PATH ? "PATH" : "IO");
+      success = false;
+    } else {
+      binding.project_fd = bound_root;
+      success = write_root_success(&binding.components[binding.component_count - 1U]);
+    }
+  }
 
   while (success) {
-    size_t line_length = 0U;
+    line_length = 0U;
     ReadLineResult read_header = read_protocol_line(line, sizeof(line), &line_length);
     (void)line_length;
     if (read_header == READ_EOF) break;
@@ -482,6 +635,7 @@ int main(void) {
     uint64_t request_bytes = (uint64_t)line_length + 1U;
     uint64_t batch_bytes = 0U;
     bool batch_error = false;
+    bool root_valid = revalidate_project_root(&binding);
     for (size_t index = 0U; index < count; index += 1U) {
       ReadLineResult read_item = read_protocol_line(line, sizeof(line), &line_length);
       Item item;
@@ -504,8 +658,9 @@ int main(void) {
       }
       batch_bytes += item.leaf.size;
 
+      if (!root_valid) continue;
       char digest[(CC_SHA256_DIGEST_LENGTH * 2U) + 1U];
-      HashResult result = hash_item(&item, digest);
+      HashResult result = hash_item(&binding, &item, digest);
       if (result == HASH_OK) success = write_item_success(item.sequence, digest, &item.leaf);
       else success = write_item_error(item.sequence, hash_result_name(result));
       if (!success) break;
@@ -514,9 +669,14 @@ int main(void) {
       if (batch_error) success = false;
       break;
     }
-    success = write_batch_end(batch_sequence, "OK", NULL);
+    if (!root_valid || !revalidate_project_root(&binding)) {
+      success = write_batch_end(batch_sequence, "ERR", "ROOT");
+    } else {
+      success = write_batch_end(batch_sequence, "OK", NULL);
+    }
   }
 
-  if (close(PROJECT_ROOT_FD) != 0) success = false;
+  if (binding.project_fd >= 0 && close(binding.project_fd) != 0) success = false;
+  if (close(TRUSTED_ROOT_FD) != 0) success = false;
   return success ? 0 : 1;
 }

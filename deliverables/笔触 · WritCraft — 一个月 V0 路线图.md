@@ -1,8 +1,8 @@
 # 笔触 · WritCraft · 一个月 V0 路线图
 
-> 文档版本：2026-07-28（v2.9，0.0W native hash 请求预算签收）
+> 文档版本：2026-07-28（v3.0，0.0X 可信根 fd 项目根链收口）
 > 状态：**V0 续作中，完整产品未完成**；产品范围以 `docs/WRITCRAFT-PRD-V3.md` 为准  
-> 2026-07-28 续作交接：当前工程基线为 **0.0W**。0.0V 已用 native helper 从绑定项目根 fd 逐段 `openat` 验证项目内部祖先；0.0W 又以 JS/C 一致的 16 MiB 增量上限关闭序列化 metadata P2。当前 worker **12/12**、Watcher **30/30**、cross-layer **11/11**、Large **6/6**、Author **48/48**、离线 API **15/15**、package **8/8**、release **7/7**、完整 test/verify、Persistent **3/3** 与真实 Electron **32/32** 通过，最终复审 **P0=0/P1=0/P2=1**。下一本地工程只处理初始项目根打开仍按路径解析外层祖先的 watcher P2；0.0U 同 UID 0700 空目录 residual 已被明确接受，不得再列成第二个待关闭任务。ad-hoc App/ZIP 禁止分发，真实作者、付费和正式发布门禁仍开放。准确事实与 TODO 只看 `v0/DEVELOPMENT-STATUS.md`。
+> 2026-07-28 续作交接：当前工程基线为 **0.0X**。0.0V 保护项目内部祖先，0.0W 增加 16 MiB 请求上限，0.0X 从可信 `/` fd 逐段绑定项目根外层祖先并在每批前后重走。当前 worker **15/15**、Watcher **31/31**、cross-layer **11/11**、Large **6/6**、Author **48/48**、离线 API **15/15**、package **8/8**、release **7/7**、完整 test/verify、Persistent **3/3** 与真实 Electron **32/32** 通过；独立复审 **P0=0/P1=0/P2=2**。下一本地工程先补 async-close 与 worker 构造错误脱敏回归。ad-hoc App/ZIP 禁止分发，真实作者、付费和正式发布门禁仍开放。
 > 范围：Month 1（4 周 × 7 天 = 28 天）
 
 ---
@@ -168,4 +168,4 @@
 
 ## 九、 下一步
 
-2026-07-28 0.0W 已关闭 native hash 请求 metadata 上限，不得从 0.0T/0.0V 的历史 TODO 重开已签字任务。下一步严格按 `v0/DEVELOPMENT-STATUS.md`：冻结从可信文件系统根 fd 到项目根的逐段身份合同与路径隐私边界，先写项目外祖先换壳红测，再实现 0.0X。只有作者提供合格项目和完整 `sk-api-`，才按 `docs/AUTHOR-ACCEPTANCE-V1-CONTRACT.md` 执行真实付费图片、2000+ 字/5+ 章作者旅程和私有价值证据；其后基于最新源码重建并进入签名/公证/Gatekeeper 复审。
+2026-07-28 0.0X 已关闭身份捕获后的项目外祖先根链竞态，不得从 0.0T/0.0V/0.0W 的历史 TODO 重开已签字任务。下一步严格按 `v0/DEVELOPMENT-STATUS.md`：先用红测关闭 async-close 与构造错误脱敏两个 P2，再审计尚未签字的 V0 产品合同。只有作者提供合格项目和完整 `sk-api-`，才执行真实付费图片、2000+ 字/5+ 章作者旅程和私有价值证据；其后基于最新源码重建并进入签名/公证/Gatekeeper 复审。

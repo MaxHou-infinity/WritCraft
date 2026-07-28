@@ -10,7 +10,7 @@ const watcher = require('../src/main/project-watcher');
 const watcherInvalidationPolicy = require('../src/main/watcher-invalidation-policy');
 
 let pass = 0;
-const EXPECTED_CHECKS = 30;
+const EXPECTED_CHECKS = 31;
 async function check(label, fn) {
   try {
     await fn();
@@ -610,6 +610,43 @@ async function run() {
       if (fs.existsSync(moved) && !fs.existsSync(chapters)) fs.renameSync(moved, chapters);
       fs.rmSync(root, { recursive: true, force: true });
       fs.rmSync(outside, { recursive: true, force: true });
+    }
+  });
+
+  await check('strict flush 拒绝 Main 捕获身份后、native 绑定前的项目外祖先换壳', async () => {
+    const scratch = fs.mkdtempSync(path.join(os.tmpdir(), 'writcraft-watcher-root-bind-'));
+    const outer = path.join(scratch, 'selected');
+    const movedOuter = path.join(scratch, 'selected-original');
+    const root = path.join(outer, 'project');
+    const native = new EventEmitter();
+    native.close = () => {};
+    const payloads = [];
+    let attacked = false;
+    fs.mkdirSync(root, { recursive: true });
+    fs.writeFileSync(path.join(root, 'edit.md'), 'original prompt');
+    const instance = watcher.createProjectWatcher(root, payload => payloads.push(payload), {
+      watchFn: () => native,
+      pollIntervalMs: 0,
+      beforeRootBind() {
+        attacked = true;
+        fs.renameSync(outer, movedOuter);
+        fs.mkdirSync(root, { recursive: true });
+        fs.writeFileSync(path.join(root, 'edit.md'), 'replacement prompt');
+      },
+    });
+    try {
+      await assert.rejects(
+        () => instance.flush(),
+        error => error?.code === 'PROJECT_WATCHER_FLUSH_INCOMPLETE' &&
+          !String(error.message).includes(root)
+      );
+      assert.strictEqual(attacked, true);
+      assert.deepStrictEqual(payloads, []);
+    } finally {
+      instance.close();
+      fs.rmSync(outer, { recursive: true, force: true });
+      if (fs.existsSync(movedOuter)) fs.renameSync(movedOuter, outer);
+      fs.rmSync(scratch, { recursive: true, force: true });
     }
   });
 

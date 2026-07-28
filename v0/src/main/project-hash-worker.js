@@ -8,6 +8,8 @@ const MAX_BATCH_ITEMS = 5000;
 const MAX_BATCH_BYTES = 64 * 1024 * 1024;
 const MAX_ITEM_BYTES = 5 * 1024 * 1024;
 const MAX_REQUEST_BYTES = 16 * 1024 * 1024;
+const MAX_ROOT_PATH_BYTES = 4096;
+const MAX_ROOT_COMPONENTS = 128;
 const MAX_RESPONSE_BYTES = 4 * 1024 * 1024;
 const MAX_RESPONSE_LINE_BYTES = 2048;
 const DEFAULT_TIMEOUT_MS = 30000;
@@ -26,6 +28,48 @@ function exactRootIdentity(actual, expected) {
     actual.dev === expected.dev &&
     actual.ino === expected.ino &&
     actual.mode === expected.mode;
+}
+
+function rootIdentity(value) {
+  if (!value || typeof value.dev !== 'bigint' ||
+      typeof value.ino !== 'bigint' || typeof value.mode !== 'bigint') {
+    throw workerError('PROJECT_WATCHER_HASH_PROTOCOL', 'Missing native root identity');
+  }
+  return Object.freeze({
+    dev: value.dev,
+    ino: value.ino,
+    mode: value.mode,
+  });
+}
+
+function sameRootIdentity(actual, expected) {
+  return actual && expected &&
+    actual.dev === expected.dev &&
+    actual.ino === expected.ino &&
+    actual.mode === expected.mode;
+}
+
+function normalizeRootPath(rootPath) {
+  if (typeof rootPath !== 'string' || !rootPath || rootPath.includes('\0') ||
+      !path.isAbsolute(rootPath) || path.resolve(rootPath) !== rootPath ||
+      rootPath === path.parse(rootPath).root ||
+      Buffer.byteLength(rootPath) > MAX_ROOT_PATH_BYTES) {
+    throw workerError('PROJECT_WATCHER_HASH_PROTOCOL', 'Invalid native root path');
+  }
+  const rootPrefix = path.parse(rootPath).root;
+  const relative = rootPath.slice(rootPrefix.length);
+  const parts = relative.split(path.sep);
+  if (!parts.length || parts.length > MAX_ROOT_COMPONENTS ||
+      parts.some(part => !part || part === '.' || part === '..' ||
+        Buffer.byteLength(part) > 255)) {
+    throw workerError('PROJECT_WATCHER_HASH_PROTOCOL', 'Invalid native root path');
+  }
+  return rootPath;
+}
+
+function encodeRootBind(rootPath) {
+  const normalized = normalizeRootPath(rootPath);
+  return `P\t${Buffer.from(normalized, 'utf8').toString('hex')}\n`;
 }
 
 function identityFields(identity) {
@@ -130,8 +174,9 @@ function encodeBatch(sequence, items) {
 
 class ProjectHashWorker {
   constructor(rootPath, options = {}) {
-    this.rootPath = rootPath;
+    this.rootPath = normalizeRootPath(fs.realpathSync(normalizeRootPath(rootPath)));
     this.beforeHashOpen = typeof options.beforeHashOpen === 'function' ? options.beforeHashOpen : null;
+    this.beforeRootBind = typeof options.beforeRootBind === 'function' ? options.beforeRootBind : null;
     this.timeoutMs = Number.isInteger(options.timeoutMs) && options.timeoutMs > 0
       ? options.timeoutMs
       : DEFAULT_TIMEOUT_MS;
@@ -142,6 +187,7 @@ class ProjectHashWorker {
     this.closed = false;
     this.responseBytes = 0;
     this.lineBuffer = Buffer.alloc(0);
+    this.rootIdentity = null;
 
     const openConstants = options.openConstants || fs.constants;
     if (!Number.isInteger(openConstants.O_RDONLY) ||
@@ -155,22 +201,23 @@ class ProjectHashWorker {
     const directoryFlags = openConstants.O_RDONLY |
       openConstants.O_DIRECTORY |
       openConstants.O_NOFOLLOW;
-    const rootFd = fs.openSync(rootPath, directoryFlags);
+    const rootStat = fs.lstatSync(this.rootPath, { bigint: true });
+    if (!rootStat.isDirectory() || rootStat.isSymbolicLink()) {
+      throw workerError('PROJECT_WATCHER_ROOT_CHANGED', 'Project root is not a stable directory');
+    }
+    this.expectedRootIdentity = options.expectedRootIdentity
+      ? rootIdentity(options.expectedRootIdentity)
+      : rootIdentity(rootStat);
+    if (this.beforeRootBind) {
+      this.beforeRootBind(Object.freeze({
+        rootPath: this.rootPath,
+        expectedRootIdentity: this.expectedRootIdentity,
+      }));
+    }
+
+    const trustedRoot = path.parse(this.rootPath).root;
+    const rootFd = fs.openSync(trustedRoot, directoryFlags);
     try {
-      const opened = fs.fstatSync(rootFd, { bigint: true });
-      const atPath = fs.lstatSync(rootPath, { bigint: true });
-      if (!exactRootIdentity(opened, atPath)) {
-        throw workerError('PROJECT_WATCHER_ROOT_CHANGED', 'Project root changed while binding native hash worker');
-      }
-      this.rootIdentity = Object.freeze({
-        dev: opened.dev,
-        ino: opened.ino,
-        size: opened.size,
-        mode: opened.mode,
-        nlink: opened.nlink,
-        mtimeNs: opened.mtimeNs,
-        ctimeNs: opened.ctimeNs,
-      });
       const spawn = options.spawn || childProcess.spawn;
       this.child = spawn(options.helperPath || HELPER_PATH, [], {
         stdio: ['pipe', 'pipe', 'pipe', rootFd],
@@ -182,6 +229,14 @@ class ProjectHashWorker {
     if (!this.child || !this.child.stdin || !this.child.stdout || !this.child.stderr) {
       throw workerError('PROJECT_WATCHER_HASH_HELPER_UNAVAILABLE', 'Native hash worker did not expose bounded pipes');
     }
+    this.bindingPromise = new Promise((resolve, reject) => {
+      const timer = setTimeout(() => {
+        this.#fail(workerError('PROJECT_WATCHER_HASH_HELPER_UNAVAILABLE', 'Native hash worker root bind timed out'));
+      }, this.timeoutMs);
+      timer.unref?.();
+      this.binding = { resolve, reject, timer };
+    });
+    this.bindingPromise.catch(() => {});
     this.child.stdout.on('data', chunk => this.#onData(chunk));
     this.child.stderr.on('data', chunk => {
       if (chunk.length > 0) this.#fail(workerError(
@@ -202,22 +257,22 @@ class ProjectHashWorker {
         ));
       }
     });
-  }
-
-  async #assertRootCurrent() {
-    let current;
-    try {
-      current = await fs.promises.lstat(this.rootPath, { bigint: true });
-    } catch (_) {
-      throw workerError('PROJECT_WATCHER_ROOT_CHANGED', 'Project root path is unavailable');
-    }
-    if (!exactRootIdentity(current, this.rootIdentity)) {
-      throw workerError('PROJECT_WATCHER_ROOT_CHANGED', 'Project root identity changed');
-    }
+    this.child.stdin.write(encodeRootBind(this.rootPath), error => {
+      if (error) this.#fail(workerError(
+        'PROJECT_WATCHER_HASH_HELPER_UNAVAILABLE',
+        'Native hash worker root bind request failed'
+      ));
+    });
   }
 
   #fail(error) {
     if (!this.failed) this.failed = error;
+    if (this.binding) {
+      const binding = this.binding;
+      this.binding = null;
+      clearTimeout(binding.timer);
+      binding.reject(this.failed);
+    }
     if (this.pending) {
       const pending = this.pending;
       this.pending = null;
@@ -225,6 +280,14 @@ class ProjectHashWorker {
       pending.reject(this.failed);
     }
     if (!this.closing && this.child && !this.child.killed) this.child.kill();
+  }
+
+  #rejectPending(error) {
+    if (!this.pending) return;
+    const pending = this.pending;
+    this.pending = null;
+    clearTimeout(pending.timer);
+    pending.reject(error);
   }
 
   #onData(chunk) {
@@ -262,6 +325,42 @@ class ProjectHashWorker {
   }
 
   #onLine(line) {
+    if (this.binding) {
+      const fields = line.split('\t');
+      if (fields[0] === 'P' && fields[1] === 'OK' && fields.length === 5) {
+        const bound = rootIdentity({
+          dev: parseUnsigned(fields[2]),
+          ino: parseUnsigned(fields[3]),
+          mode: parseUnsigned(fields[4]),
+        });
+        if (!sameRootIdentity(bound, this.expectedRootIdentity)) {
+          this.#fail(workerError(
+            'PROJECT_WATCHER_ROOT_CHANGED',
+            'Project root changed while binding native hash worker'
+          ));
+          return;
+        }
+        const binding = this.binding;
+        this.binding = null;
+        clearTimeout(binding.timer);
+        this.rootIdentity = bound;
+        binding.resolve(bound);
+        return;
+      }
+      if (fields[0] === 'P' && fields[1] === 'ERR' && fields.length === 3 &&
+          ['PATH', 'IO', 'PROTOCOL'].includes(fields[2])) {
+        const error = fields[2] === 'PATH'
+          ? workerError('PROJECT_WATCHER_ROOT_CHANGED', 'Project root chain could not be bound')
+          : fields[2] === 'PROTOCOL'
+            ? workerError('PROJECT_WATCHER_HASH_PROTOCOL', 'Native hash root bind protocol failed')
+            : workerError('PROJECT_WATCHER_HASH_HELPER_UNAVAILABLE', 'Native hash root bind failed');
+        this.#fail(error);
+        return;
+      }
+      this.#fail(workerError('PROJECT_WATCHER_HASH_PROTOCOL', 'Native hash root response is malformed'));
+      return;
+    }
+
     const pending = this.pending;
     if (!pending) {
       this.#fail(workerError('PROJECT_WATCHER_HASH_PROTOCOL', 'Native hash response has no owner'));
@@ -303,7 +402,25 @@ class ProjectHashWorker {
       ));
       return;
     }
+    if (fields[0] === 'E' && fields[1] === String(pending.sequence) &&
+        fields[2] === 'ERR' && fields[3] === 'ROOT' && fields.length === 4) {
+      this.#rejectPending(workerError(
+        'PROJECT_WATCHER_ROOT_CHANGED',
+        'Project root chain changed during native hashing'
+      ));
+      return;
+    }
     this.#fail(workerError('PROJECT_WATCHER_HASH_PROTOCOL', 'Native hash response is malformed'));
+  }
+
+  async ready() {
+    if (this.failed) throw this.failed;
+    if (this.binding) await this.bindingPromise;
+    if (this.failed) throw this.failed;
+    if (!this.rootIdentity) {
+      throw workerError('PROJECT_WATCHER_HASH_HELPER_UNAVAILABLE', 'Native hash worker root is unavailable');
+    }
+    return this.rootIdentity;
   }
 
   async hash(items) {
@@ -314,7 +431,7 @@ class ProjectHashWorker {
     if (this.pending) {
       throw workerError('PROJECT_WATCHER_HASH_PROTOCOL', 'Native hash worker already owns a batch');
     }
-    await this.#assertRootCurrent();
+    await this.ready();
     const sequence = this.sequence + 1;
     this.sequence = sequence;
     const encoded = encodeBatch(sequence, items);
@@ -324,7 +441,6 @@ class ProjectHashWorker {
         sequence,
       }));
     }
-    await this.#assertRootCurrent();
     this.responseBytes = 0;
     const results = await new Promise((resolve, reject) => {
       const timer = setTimeout(() => {
@@ -346,13 +462,16 @@ class ProjectHashWorker {
         ));
       });
     });
-    await this.#assertRootCurrent();
     return results;
   }
 
   close() {
     if (this.closing) return;
     this.closing = true;
+    if (this.binding) this.#fail(workerError(
+      'PROJECT_WATCHER_HASH_HELPER_UNAVAILABLE',
+      'Native hash worker closed during root bind'
+    ));
     if (this.pending) this.#fail(workerError(
       'PROJECT_WATCHER_HASH_HELPER_UNAVAILABLE',
       'Native hash worker closed during a batch'

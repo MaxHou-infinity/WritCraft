@@ -354,11 +354,14 @@ async function projectSnapshot(rootPath, options = {}) {
         worker = createProjectHashWorker(rootPath, {
           helperPath: options.nativeHashHelperPath,
           spawn: options.spawnHashWorker,
+          beforeRootBind: options.beforeRootBind,
           beforeHashOpen: options.beforeHashOpen,
           timeoutMs: options.hashWorkerTimeoutMs,
+          expectedRootIdentity: rootIdentity,
         });
         ownsWorker = true;
       }
+      if (typeof worker.ready === 'function') await worker.ready();
       if (!sameRootBindingIdentity(worker.rootIdentity, rootIdentity)) {
         throw watcherHashError(
           'PROJECT_WATCHER_ROOT_CHANGED',
@@ -457,6 +460,7 @@ function createProjectWatcher(rootPath, onChange, options = {}) {
       hashWorker = createProjectHashWorker(root, {
         helperPath: options.nativeHashHelperPath,
         spawn: options.spawnHashWorker,
+        beforeRootBind: options.beforeRootBind,
         beforeHashOpen: options.beforeHashOpen,
         timeoutMs: options.hashWorkerTimeoutMs,
       });

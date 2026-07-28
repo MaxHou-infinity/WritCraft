@@ -55,6 +55,20 @@ function item(root, relative) {
   });
 }
 
+function rootBindLine(root) {
+  const canonical = fs.realpathSync(root);
+  return `P\t${Buffer.from(canonical, 'utf8').toString('hex')}\n`;
+}
+
+function rootAck(root) {
+  const value = identity(root);
+  return `P\\tOK\\t${value.dev}\\t${value.ino}\\t${value.mode}\\n`;
+}
+
+function trustedRootFd(root) {
+  return fs.openSync(path.parse(fs.realpathSync(root)).root, fs.constants.O_RDONLY);
+}
+
 async function closeWorker(worker) {
   const closed = worker.closed ? Promise.resolve() : once(worker.child, 'close');
   worker.close();
@@ -93,16 +107,46 @@ async function run() {
     const scratch = fs.mkdtempSync(path.join(os.tmpdir(), 'writcraft-native-hash-'));
     const root = path.join(scratch, 'project');
     fs.mkdirSync(root);
-    const rootFd = fs.openSync(root, fs.constants.O_RDONLY);
+    const rootFd = trustedRootFd(root);
     try {
       const result = childProcess.spawnSync(HELPER_PATH, [], {
-        input: 'B\t7\t1\nBROKEN\n',
+        input: `${rootBindLine(root)}B\t7\t1\nBROKEN\n`,
         encoding: 'utf8',
         stdio: ['pipe', 'pipe', 'pipe', rootFd],
       });
       assert.strictEqual(result.status, 1);
-      assert.strictEqual(result.stdout, 'E\t7\tERR\tPROTOCOL\n');
+      const lines = result.stdout.trimEnd().split('\n');
+      assert.match(lines[0], /^P\tOK\t[0-9]+\t[0-9]+\t[0-9]+$/);
+      assert.strictEqual(lines[1], 'E\t7\tERR\tPROTOCOL');
       assert.strictEqual(result.stderr, '');
+      assert(!result.stdout.includes(fs.realpathSync(root)));
+      assert(!result.stdout.includes(Buffer.from(fs.realpathSync(root), 'utf8').toString('hex')));
+    } finally {
+      fs.closeSync(rootFd);
+      fs.rmSync(scratch, { recursive: true, force: true });
+    }
+  });
+
+  await check('native root bind rejects a symlink component without echoing the private path', () => {
+    const scratch = fs.mkdtempSync(path.join(os.tmpdir(), 'writcraft-native-hash-'));
+    const root = path.join(scratch, 'project');
+    const linked = path.join(scratch, 'linked-project');
+    fs.mkdirSync(root);
+    fs.symlinkSync(root, linked);
+    const rootFd = trustedRootFd(root);
+    try {
+      const privatePath = fs.realpathSync(scratch) + path.sep + path.basename(linked);
+      const input = `P\t${Buffer.from(privatePath, 'utf8').toString('hex')}\n`;
+      const result = childProcess.spawnSync(HELPER_PATH, [], {
+        input,
+        encoding: 'utf8',
+        stdio: ['pipe', 'pipe', 'pipe', rootFd],
+      });
+      assert.strictEqual(result.status, 1);
+      assert.strictEqual(result.stdout, 'P\tERR\tPATH\n');
+      assert.strictEqual(result.stderr, '');
+      assert(!result.stdout.includes(privatePath));
+      assert(!result.stdout.includes(Buffer.from(privatePath, 'utf8').toString('hex')));
     } finally {
       fs.closeSync(rootFd);
       fs.rmSync(scratch, { recursive: true, force: true });
@@ -126,6 +170,43 @@ async function run() {
       );
     } finally {
       await closeWorker(worker);
+      fs.rmSync(scratch, { recursive: true, force: true });
+    }
+  });
+
+  await check('rejects an external ancestor replacement between Main identity capture and native root bind', async () => {
+    const scratch = fs.mkdtempSync(path.join(os.tmpdir(), 'writcraft-native-hash-'));
+    const outer = path.join(scratch, 'selected');
+    const movedOuter = path.join(scratch, 'selected-original');
+    const root = path.join(outer, 'project');
+    const target = path.join(root, 'one.md');
+    fs.mkdirSync(root, { recursive: true });
+    fs.writeFileSync(target, 'original selected project');
+    const expected = item(root, 'one.md');
+    let attacked = false;
+    let worker = null;
+    try {
+      worker = createProjectHashWorker(root, {
+        beforeRootBind({ rootPath }) {
+          assert.strictEqual(rootPath, fs.realpathSync(root));
+          attacked = true;
+          fs.renameSync(outer, movedOuter);
+          fs.mkdirSync(root, { recursive: true });
+          fs.writeFileSync(target, 'replacement project');
+        },
+      });
+      assert.strictEqual(attacked, true);
+      await assert.rejects(
+        worker.hash([expected]),
+        error => error?.code === 'PROJECT_WATCHER_ROOT_CHANGED' &&
+          !String(error.message).includes(root)
+      );
+    } finally {
+      if (worker) await closeWorker(worker);
+      if (attacked) {
+        fs.rmSync(outer, { recursive: true, force: true });
+        if (fs.existsSync(movedOuter)) fs.renameSync(movedOuter, outer);
+      }
       fs.rmSync(scratch, { recursive: true, force: true });
     }
   });
@@ -211,6 +292,7 @@ async function run() {
     const expected = item(root, 'one.md');
     const worker = createProjectHashWorker(root);
     try {
+      await worker.ready();
       fs.renameSync(root, moved);
       fs.mkdirSync(root);
       fs.writeFileSync(path.join(root, 'one.md'), 'replacement root content');
@@ -228,6 +310,42 @@ async function run() {
       );
     } finally {
       if (!fs.existsSync(root) && fs.existsSync(moved)) fs.renameSync(moved, root);
+      await closeWorker(worker);
+      fs.rmSync(scratch, { recursive: true, force: true });
+    }
+  });
+
+  await check('rejects a bound external ancestor replacement and resumes after the original chain returns', async () => {
+    const scratch = fs.mkdtempSync(path.join(os.tmpdir(), 'writcraft-native-hash-'));
+    const outer = path.join(scratch, 'selected');
+    const movedOuter = path.join(scratch, 'selected-original');
+    const root = path.join(outer, 'project');
+    const target = path.join(root, 'one.md');
+    fs.mkdirSync(root, { recursive: true });
+    fs.writeFileSync(target, 'bound external chain');
+    const expected = item(root, 'one.md');
+    const worker = createProjectHashWorker(root);
+    try {
+      await worker.ready();
+      fs.renameSync(outer, movedOuter);
+      fs.mkdirSync(root, { recursive: true });
+      fs.writeFileSync(target, 'replacement external chain');
+      await assert.rejects(
+        worker.hash([expected]),
+        error => error?.code === 'PROJECT_WATCHER_ROOT_CHANGED' &&
+          !String(error.message).includes(root)
+      );
+
+      fs.rmSync(outer, { recursive: true, force: true });
+      fs.renameSync(movedOuter, outer);
+      const results = await worker.hash([expected]);
+      assert.strictEqual(results[0].ok, true);
+      assert.strictEqual(
+        results[0].digest,
+        crypto.createHash('sha256').update('bound external chain').digest('hex').slice(0, 16)
+      );
+    } finally {
+      if (!fs.existsSync(outer) && fs.existsSync(movedOuter)) fs.renameSync(movedOuter, outer);
       await closeWorker(worker);
       fs.rmSync(scratch, { recursive: true, force: true });
     }
@@ -264,6 +382,8 @@ async function run() {
     fs.writeFileSync(target, 'content');
     fs.writeFileSync(malformedHelper, [
       '#!/bin/sh',
+      'IFS= read -r bind || exit 1',
+      `printf '${rootAck(root)}'`,
       'IFS= read -r header || exit 1',
       "printf 'R\\t1\\tOK\\t0123456789abcdef0123456789abcdef0123456789abcdef0123456789abcdef\\tbad\\t2\\t3\\t4\\t5\\t6\\t7\\n'",
       'sleep 1',
@@ -292,6 +412,8 @@ async function run() {
     fs.writeFileSync(target, 'content');
     fs.writeFileSync(budgetHelper, [
       '#!/bin/sh',
+      'IFS= read -r bind || exit 1',
+      `printf '${rootAck(root)}'`,
       'IFS= read -r header || exit 1',
       "printf 'E\\t1\\tERR\\tBUDGET\\n'",
       'sleep 1',
@@ -396,9 +518,9 @@ async function run() {
     );
 
     const root = fs.mkdtempSync(path.join(os.tmpdir(), 'writcraft-native-hash-root-'));
-    const rootFd = fs.openSync(root, fs.constants.O_RDONLY);
+    const rootFd = trustedRootFd(root);
     try {
-      const input = `B\t77\t${count}\n${`${itemLine}\n`.repeat(count)}`;
+      const input = `${rootBindLine(root)}B\t77\t${count}\n${`${itemLine}\n`.repeat(count)}`;
       assert(Buffer.byteLength(input) > MAX_REQUEST_BYTES);
       const result = childProcess.spawnSync(HELPER_PATH, [], {
         input,
@@ -415,8 +537,8 @@ async function run() {
     }
   });
 
-  console.log(`\n${passed}/12 native project hash worker checks passed.`);
-  if (passed !== 12) process.exitCode = 1;
+  console.log(`\n${passed}/15 native project hash worker checks passed.`);
+  if (passed !== 15) process.exitCode = 1;
 }
 
 run().catch(error => {
