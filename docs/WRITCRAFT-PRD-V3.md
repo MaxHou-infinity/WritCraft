@@ -6,7 +6,7 @@
 > 适用范围：V0 起的桌面写作 IDE  
 > 优先级：若本文件与旧版 PRD、路线图或原型行为冲突，以本文件为准；工程实现以 `docs/PHASE-A-IMPLEMENTATION.md` 为准。
 
-> **实现状态注记（2026-07-28，0.0X 已完成全链验证）**：本文仍是产品权威规格，**完整 PRD 尚未实现**。0.0V 完成项目根以下逐段 `openat`，0.0W 关闭序列化 metadata 预算，0.0X 再从可信 `/` fd 逐段绑定外层项目根链并在 batch 前后重走。worker **15/15**、Watcher **31/31**、cross-layer **11/11**、Large **6/6**、package **8/8**、release **7/7**、完整 test/verify、Persistent **3/3** 与真实 Electron **32/32** 通过；独立复审 **P0=0/P1=0/P2=2**，待补 async-close 与构造错误脱敏。真实作者、完整 `sk-api-`、付费与正式发布门禁仍开放；当前事实与恢复顺序只看 `v0/DEVELOPMENT-STATUS.md`。
+> **实现状态注记（2026-07-28，0.0Y 已技术签字）**：本文仍是产品权威规格，**完整 PRD 尚未实现**。0.0Y 已在 0.0X 可信根链之上关闭 async-close write-after-end 与构造错误路径泄露。worker **18/18**、Watcher **31/31**、cross-layer **11/11**、Large **6/6**、package **8/8**、release **7/7**、完整 test/verify、Persistent **3/3** 与真实 Electron **32/32** 通过；独立复审 **P0=0/P1=0/P2=0**。真实作者、完整 `sk-api-`、付费与正式发布门禁仍开放；当前事实与恢复顺序只看 `v0/DEVELOPMENT-STATUS.md`。
 
 > **完成定义**：任何“V0 完成”声明必须同时满足 §10.1–§10.4、全量自动回归、真实 Electron E2E 和独立复审。局部 suite 通过、本地 ad-hoc App 或历史 ZIP 均不能单独构成完成证据。
 
@@ -398,7 +398,7 @@ Issue 类型首批支持：
 
 ### 10.3 Phase C：一致性星图
 
-本节的动态旅程、零写入边界、可访问性、最小窗口和大型图谱性能门禁由 `docs/GRAPH-ACCEPTANCE-V1-CONTRACT.md` 细化。产品契约于 2026-07-22 签字，2026-07-23 性能批源码完整 test/verify 与强制 Electron 连续两轮 26/26 通过，可见帧性能复审 P0/P1/P2=0。后续 Graph 韧性批又关闭完整语义权威、不可变快照、异步所有权与 Unicode quote 边界；当前 0.0X 基线完整 verify 通过、总链强制 Electron **32/32**。Graph 专项独立复审仍为 P0/P1/P2=0；0.0X watcher 全批复审为 P0=0/P1=0/P2=2。
+本节的动态旅程、零写入边界、可访问性、最小窗口和大型图谱性能门禁由 `docs/GRAPH-ACCEPTANCE-V1-CONTRACT.md` 细化。产品契约于 2026-07-22 签字，2026-07-23 性能批源码完整 test/verify 与强制 Electron 连续两轮 26/26 通过，可见帧性能复审 P0/P1/P2=0。后续 Graph 韧性批又关闭完整语义权威、不可变快照、异步所有权与 Unicode quote 边界；当前 0.0Y 基线完整 verify 通过、总链强制 Electron **32/32**。Graph 专项与 0.0Y watcher 全批独立复审均为 P0/P1/P2=0。
 
 1. 能从至少三个项目文件增量生成统一节点、关系、证据和问题。
 2. 默认显示当前文件子图，可切换全项目并按类型、文件和问题筛选。

@@ -1,11 +1,11 @@
 # 笔触 · WritCraft — 产品需求与价值说明
 
-> 文档版本：v3.6 | 2026-07-28（0.0X 可信根 fd 项目根链收口）
+> 文档版本：v3.7 | 2026-07-28（0.0Y worker 生命周期与脱敏签收）
 > 发起方：Max Hou
 > 输入依据：T1–T9 全流程调研，含 T7 综合分析（25KB）/ T8 魔鬼质询（17KB）/ T9 战略路线（16KB）
 > 状态：产品背景与商业假设已定；**V0 仍在开发，未完成、未发布**
 
-> 实施说明：本文件描述产品价值、原始研究与商业假设；功能验收以 `docs/WRITCRAFT-PRD-V3.md` 为准，当前事实与 TODO 只以 `v0/DEVELOPMENT-STATUS.md` 为准。2026-07-28 的当前工程基线为 **0.0X**：项目内逐段 `openat`、16 MiB 请求门禁及从可信 `/` fd 到项目根的外层逐段绑定均已实现；worker **15/15**、Watcher **31/31**、cross-layer **11/11**、Large **6/6**、Author **48/48**、离线 API **15/15**、package **8/8**、release **7/7**、完整 test/verify、Persistent **3/3** 与真实 Electron **32/32** 通过，独立复审 **P0=0/P1=0/P2=2**。两个 P2 是 async-close 确定性与 worker 构造错误模块级脱敏；0.0U residual 仍是已接受的另一事务边界。当前 ad-hoc App/ZIP 没有真实作者、完整 `sk-api-`、Developer ID、公证或 Gatekeeper，仍禁止分发。
+> 实施说明：本文件描述产品价值、原始研究与商业假设；功能验收以 `docs/WRITCRAFT-PRD-V3.md` 为准，当前事实与 TODO 只以 `v0/DEVELOPMENT-STATUS.md` 为准。2026-07-28 的当前工程基线为 **0.0Y**：可信根链、16 MiB 请求门禁、async-close 确定性与构造错误模块级脱敏均已实现；worker **18/18**、Watcher **31/31**、cross-layer **11/11**、Large **6/6**、Author **48/48**、离线 API **15/15**、package **8/8**、release **7/7**、完整 test/verify、Persistent **3/3** 与真实 Electron **32/32** 通过，独立复审 **P0=0/P1=0/P2=0**。0.0U residual 仍是已接受的另一事务边界。当前 ad-hoc App/ZIP 没有真实作者、完整 `sk-api-`、Developer ID、公证或 Gatekeeper，仍禁止分发。
 
 ---
 
@@ -635,6 +635,6 @@ Plan Mode 完成率 ≥ 50%（创建了大纲的用户中，完成 >80% 章节�
 
 ---
 
-*文档版本：v3.6 | WritCraft 笔触产品需求与价值说明 | 2026-07-28（0.0X）*
+*文档版本：v3.7 | WritCraft 笔触产品需求与价值说明 | 2026-07-28（0.0Y）*
 *依据：T1–T9 全流程调研输出 | T7 综合分析 × T8 魔鬼质询 × T9 战略路线*
 *本文档为 Max 独立发起之产品需求文档，与其他项目 PRD 隔离*

@@ -174,6 +174,119 @@ async function run() {
     }
   });
 
+  await check('does not write a batch when the worker closes after async readiness', async () => {
+    const scratch = fs.mkdtempSync(path.join(os.tmpdir(), 'writcraft-native-hash-'));
+    const root = path.join(scratch, 'project');
+    const target = path.join(root, 'one.md');
+    fs.mkdirSync(root);
+    fs.writeFileSync(target, 'close after ready');
+    const worker = createProjectHashWorker(root);
+    try {
+      await worker.ready();
+      const originalWrite = worker.child.stdin.write.bind(worker.child.stdin);
+      let batchWrites = 0;
+      worker.child.stdin.write = (...args) => {
+        batchWrites += 1;
+        return originalWrite(...args);
+      };
+      worker.ready = async () => {
+        worker.close();
+        return worker.rootIdentity;
+      };
+      await assert.rejects(
+        worker.hash([item(root, 'one.md')]),
+        error => error?.code === 'PROJECT_WATCHER_HASH_HELPER_UNAVAILABLE'
+      );
+      assert.strictEqual(batchWrites, 0);
+      assert.strictEqual(worker.pending, null);
+    } finally {
+      if (!worker.closed) await closeWorker(worker);
+      fs.rmSync(scratch, { recursive: true, force: true });
+    }
+  });
+
+  await check('does not write a batch when the worker closes inside an awaited hash hook', async () => {
+    const scratch = fs.mkdtempSync(path.join(os.tmpdir(), 'writcraft-native-hash-'));
+    const root = path.join(scratch, 'project');
+    const target = path.join(root, 'one.md');
+    fs.mkdirSync(root);
+    fs.writeFileSync(target, 'close inside hook');
+    let releaseHook;
+    let enteredHook;
+    const hookEntered = new Promise(resolve => {
+      enteredHook = resolve;
+    });
+    const hookRelease = new Promise(resolve => {
+      releaseHook = resolve;
+    });
+    const worker = createProjectHashWorker(root, {
+      async beforeHashOpen() {
+        enteredHook();
+        await hookRelease;
+      },
+    });
+    try {
+      await worker.ready();
+      const originalWrite = worker.child.stdin.write.bind(worker.child.stdin);
+      let batchWrites = 0;
+      worker.child.stdin.write = (...args) => {
+        batchWrites += 1;
+        return originalWrite(...args);
+      };
+      const hashing = worker.hash([item(root, 'one.md')]);
+      await hookEntered;
+      worker.close();
+      releaseHook();
+      await assert.rejects(
+        hashing,
+        error => error?.code === 'PROJECT_WATCHER_HASH_HELPER_UNAVAILABLE'
+      );
+      assert.strictEqual(batchWrites, 0);
+      assert.strictEqual(worker.pending, null);
+    } finally {
+      releaseHook?.();
+      if (!worker.closed) await closeWorker(worker);
+      fs.rmSync(scratch, { recursive: true, force: true });
+    }
+  });
+
+  await check('redacts project paths from constructor filesystem failures', () => {
+    const scratch = fs.mkdtempSync(path.join(os.tmpdir(), 'writcraft-native-hash-'));
+    const missingRoot = path.join(scratch, 'private-author-project');
+    try {
+      assert.throws(
+        () => createProjectHashWorker(missingRoot),
+        error => error?.code === 'PROJECT_WATCHER_ROOT_CHANGED' &&
+          !String(error.message).includes(missingRoot) &&
+          !String(error.stack).includes(missingRoot)
+      );
+
+      fs.mkdirSync(missingRoot);
+      const canonical = fs.realpathSync(missingRoot);
+      const originalLstatSync = fs.lstatSync;
+      fs.lstatSync = target => {
+        if (target === canonical) {
+          const error = new Error(`private lstat failure: ${canonical}`);
+          error.code = 'ENOENT';
+          throw error;
+        }
+        return originalLstatSync(target, { bigint: true });
+      };
+      try {
+        assert.throws(
+          () => createProjectHashWorker(canonical),
+          error => error?.code === 'PROJECT_WATCHER_ROOT_CHANGED' &&
+            !String(error.message).includes(canonical) &&
+            !String(error.stack).includes(canonical)
+        );
+      } finally {
+        fs.lstatSync = originalLstatSync;
+      }
+    } finally {
+      fs.rmSync(scratch, { recursive: true, force: true });
+    }
+  });
+
   await check('rejects an external ancestor replacement between Main identity capture and native root bind', async () => {
     const scratch = fs.mkdtempSync(path.join(os.tmpdir(), 'writcraft-native-hash-'));
     const outer = path.join(scratch, 'selected');
@@ -537,8 +650,8 @@ async function run() {
     }
   });
 
-  console.log(`\n${passed}/15 native project hash worker checks passed.`);
-  if (passed !== 15) process.exitCode = 1;
+  console.log(`\n${passed}/18 native project hash worker checks passed.`);
+  if (passed !== 18) process.exitCode = 1;
 }
 
 run().catch(error => {

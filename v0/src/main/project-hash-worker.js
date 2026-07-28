@@ -174,7 +174,16 @@ function encodeBatch(sequence, items) {
 
 class ProjectHashWorker {
   constructor(rootPath, options = {}) {
-    this.rootPath = normalizeRootPath(fs.realpathSync(normalizeRootPath(rootPath)));
+    const requestedRoot = normalizeRootPath(rootPath);
+    try {
+      this.rootPath = normalizeRootPath(fs.realpathSync(requestedRoot));
+    } catch (error) {
+      if (error?.code === 'PROJECT_WATCHER_HASH_PROTOCOL') throw error;
+      throw workerError(
+        'PROJECT_WATCHER_ROOT_CHANGED',
+        'Project root could not be resolved'
+      );
+    }
     this.beforeHashOpen = typeof options.beforeHashOpen === 'function' ? options.beforeHashOpen : null;
     this.beforeRootBind = typeof options.beforeRootBind === 'function' ? options.beforeRootBind : null;
     this.timeoutMs = Number.isInteger(options.timeoutMs) && options.timeoutMs > 0
@@ -201,7 +210,15 @@ class ProjectHashWorker {
     const directoryFlags = openConstants.O_RDONLY |
       openConstants.O_DIRECTORY |
       openConstants.O_NOFOLLOW;
-    const rootStat = fs.lstatSync(this.rootPath, { bigint: true });
+    let rootStat;
+    try {
+      rootStat = fs.lstatSync(this.rootPath, { bigint: true });
+    } catch (_) {
+      throw workerError(
+        'PROJECT_WATCHER_ROOT_CHANGED',
+        'Project root identity could not be captured'
+      );
+    }
     if (!rootStat.isDirectory() || rootStat.isSymbolicLink()) {
       throw workerError('PROJECT_WATCHER_ROOT_CHANGED', 'Project root is not a stable directory');
     }
@@ -288,6 +305,18 @@ class ProjectHashWorker {
     this.pending = null;
     clearTimeout(pending.timer);
     pending.reject(error);
+  }
+
+  #assertOpen() {
+    if (this.failed) throw this.failed;
+    if (this.closed || this.closing || !this.child || this.child.killed ||
+        !this.child.stdin || this.child.stdin.destroyed ||
+        this.child.stdin.writableEnded) {
+      throw workerError(
+        'PROJECT_WATCHER_HASH_HELPER_UNAVAILABLE',
+        'Native hash worker is closed'
+      );
+    }
   }
 
   #onData(chunk) {
@@ -424,23 +453,25 @@ class ProjectHashWorker {
   }
 
   async hash(items) {
-    if (this.failed) throw this.failed;
-    if (this.closed || this.closing || !this.child || this.child.killed) {
-      throw workerError('PROJECT_WATCHER_HASH_HELPER_UNAVAILABLE', 'Native hash worker is closed');
-    }
+    this.#assertOpen();
     if (this.pending) {
       throw workerError('PROJECT_WATCHER_HASH_PROTOCOL', 'Native hash worker already owns a batch');
     }
     await this.ready();
+    this.#assertOpen();
     const sequence = this.sequence + 1;
     this.sequence = sequence;
     const encoded = encodeBatch(sequence, items);
     if (this.beforeHashOpen) {
-      for (const item of encoded.normalized) await this.beforeHashOpen(Object.freeze({
-        relative: item.relative,
-        sequence,
-      }));
+      for (const item of encoded.normalized) {
+        await this.beforeHashOpen(Object.freeze({
+          relative: item.relative,
+          sequence,
+        }));
+        this.#assertOpen();
+      }
     }
+    this.#assertOpen();
     this.responseBytes = 0;
     const results = await new Promise((resolve, reject) => {
       const timer = setTimeout(() => {
