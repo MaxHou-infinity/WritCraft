@@ -3,7 +3,7 @@
 > 状态：**V0 候选原型；0.0Y worker 生命周期与构造错误脱敏已签收，真实作者/付费/正式发布门禁仍开放** · 发起方：Max
 > 当前开发真相与唯一续作入口：[`v0/DEVELOPMENT-STATUS.md`](v0/DEVELOPMENT-STATUS.md)。配图现已覆盖评分、插入/保留/移入废纸篓、可见列表、单项恢复和确认式快照清空；五项竞态缺口已关闭，最终独立复审 **P0=0/P1=0/P2=1（非阻断）**。该签字尚不能替代真实 `sk-api-`/作者与发布验收；现有 App/ZIP 禁止分发。
 > 下一阶段验收边界：[`docs/AUTHOR-ACCEPTANCE-V1-CONTRACT.md`](docs/AUTHOR-ACCEPTANCE-V1-CONTRACT.md) 已冻结；真实调用、作者内容与发布证据必须遵守其中的隐私和付费门禁。
-> 当前停点：0.0Y 在 0.0X 可信根链基础上关闭 async-close write-after-end 和构造错误路径泄露。当前证据为 worker **18/18**、Watcher **31/31**、cross-layer **11/11**、Large **6/6**、package **8/8**、release **7/7**、全量 test/verify、Persistent **3/3**、真实 Electron **32/32**；独立复审 **P0=0/P1=0/P2=0**。
+> 当前停点：0.0Y 在 0.0X 可信根链基础上关闭 async-close write-after-end 和构造错误路径泄露。当前证据为 worker **18/18**、Watcher **31/31**、cross-layer **11/11**、Large **6/6**、package **8/8**、release **7/7**、全量 test/verify、Persistent **3/3**、真实 Electron **32/32**；独立复审 **P0=0/P1=0/P2=0**。后续能力审计已完成；下一本地批是超长 `edit.md` 的章节化上下文编译与 Inspector 章节披露，之后才是 Chat 多轮连续性和普通 Markdown 回收区恢复 UI。
 
 ## 2026-07-28 当前复核快照
 
@@ -11,9 +11,10 @@
 
 > Graph 性能复验没有用单次重试绿灯覆盖失败：索引、布局、baseline 所有权、元素重挂、scene detach 与 dispatch-only 计时缺口均已进入根因修复和回归。该历史性能专项门禁等待两帧并读取实际 CSS 可见状态与 SVG 布局；同一源码无中间修改连续两次全链均为 **26/26**。当前签字项目总链是 0.0Y 的 32/32；精确证据只看状态台账。
 
-- 项目 / 文件 / 段落三级工作区、`edit.md`、Inline Diff、localized ChangeSet/撤销、权威 Context、来源/脚注、recovery、Cursor 式标签和一致性图谱均已接入；当前源码已完成 Onboarding v2 自动化产品链。0.0Y ad-hoc App/ZIP 已按当前源码重建并验证，但仍不是 Developer ID/公证/Gatekeeper 发布产物，禁止分发。
+- 项目 / 文件 / 段落三级工作区、`edit.md` Onboarding/落盘、Inline Diff、localized ChangeSet/撤销、单轮权威 Context、来源/脚注、草稿/冲突恢复、Cursor 式标签和一致性图谱均已接入；当前源码已完成 Onboarding v2 自动化产品链。这里的“恢复”不包含普通 Markdown 回收区的应用内列表/恢复入口。0.0Y ad-hoc App/ZIP 已按当前源码重建并验证，但仍不是 Developer ID/公证/Gatekeeper 发布产物，禁止分发。
 - 普通 Changes、Plan→Changes 与 Graph 的本轮结构性修复已完成独立复审；模型不再回传整篇 after，而由 Main 验证局部锚点、依赖和 stopReason 后构造修改。
-- Chat 已实现 project/file/selection 三种明确作用域、selection 必选、精确选区邻段、受限项目检索、正文 H1 Source locator 和 request/phase-owned Inspector/Chips；重开、折叠选区与外部文件变化都会主动取消失效请求，Main 权威 `PROJECT_CHANGED` 不再显示为普通调用失败。
+- Chat 已实现 project/file/selection 三种明确作用域、selection 必选、精确选区邻段、受限项目检索、正文 H1 Source locator 和 request/phase-owned Inspector/Chips；重开、折叠选区与外部文件变化都会主动取消失效请求，Main 权威 `PROJECT_CHANGED` 不再显示为普通调用失败。当前仍是单轮请求：最近对话摘要/多轮连续性尚未进入 Main-owned Context。
+- `edit.md` 生成、审阅和确认落盘已签字，但当前 Context Resolver 要求 `edit.md` 在 6000 字符/18 KiB 内完整进入模型；超预算会整体阻断，尚未实现按章节保留关键约束及 Inspector 的实际使用章节披露。
 - Chapter 已实现严格计划→逐块生成→Main 本地组装→整文件审阅，并把 project/target/instruction/context/pending 绑定到完整异步生命周期；no-op/provenance/result/capability 分类与确认式回收已动态固化，最终独立复审 P0/P1/P2=0。
 - Onboarding v2 已签字：service **22/22**、capability **15/15**、all-or-nothing batch **22/22**；生产 Handler **11/11**、Main/preload **14/14**；Renderer state/UI 为 **8/8、11/11**，当前 dynamic 已随 0.0T 扩展为 **25/25**。Main single-flight 保证同项目并发只调用一次模型；Renderer epoch 与生命周期清理同时关闭 await→mint、mint→IPC delivery 两侧孤儿 authority 窗口。最终独立复审 P0/P1/P2=0。
 - Author Evidence Metrics v1 保持签字；image 生成耗时/结果仍走八字段隐私事件，评分、三类终态和可选费用走独立私有 Image Review 证据。

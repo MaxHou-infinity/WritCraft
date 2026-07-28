@@ -8,7 +8,7 @@
 
 > **工程交接（2026-07-28，0.0Y worker 生命周期与构造错误脱敏已签收）**：0.0X 已完成可信根 fd 外层根链；0.0Y 在每个 awaited readiness/hook 后和最终写入前复检 worker 存活，并把构造阶段 realpath/lstat 异常映射为无路径稳定错误。worker **18/18**、Watcher **31/31**、cross-layer **11/11**、Large **6/6**、package **8/8**、release **7/7**、完整 test/verify、Persistent **3/3**、真实 Electron **32/32** 通过；独立复审 P0/P1/P2=0。当前 App/ZIP 是 0.0Y ad-hoc 本地证据，仍禁止分发。
 > **下一阶段合同**：`docs/AUTHOR-ACCEPTANCE-V1-CONTRACT.md` 已冻结，明确付费网络门禁、允许记录的隐私安全证据、真实长文旅程与发布前签字顺序。
-> **当前实现停点**：0.0Y 已关闭 0.0X 的两个复审 P2。下一本地任务是审计尚未签字的 V0 产品合同，分开本地产品缺口与作者/付费/发布外部门禁；不得从历史 TODO 重开 watcher 安全链。0.0T Plan timing、0.0S receipt/build、0.0U reserve 保持历史签字；同 UID 0700 空目录 residual 仍被明确接受。真实产品门禁仍要求作者显式选择满足五章节、2,000 汉字和来源要求的项目并提供完整 `sk-api-`。
+> **当前实现停点**：0.0Y 已关闭 0.0X 的两个复审 P2，随后完成 PRD→源码能力审计。下一本地任务固定为 `edit.md` section-aware 上下文编译与 Context Inspector 章节披露；其后依次是 Chat 最近对话摘要/多轮连续性、普通 Markdown 回收区恢复 UI。三项均是本地产品缺口，作者/付费/发布仍是独立外部门禁；不得从历史 TODO 重开 watcher 安全链。0.0T Plan timing、0.0S receipt/build、0.0U reserve 保持历史签字；同 UID 0700 空目录 residual 仍被明确接受。真实产品门禁仍要求作者显式选择满足五章节、2,000 汉字和来源要求的项目并提供完整 `sk-api-`。
 
 ## 1. 阶段目标
 

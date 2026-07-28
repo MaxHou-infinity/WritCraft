@@ -1,9 +1,10 @@
 # 笔触 · WritCraft · 一个月 V0 路线图
 
-> 文档版本：2026-07-28（v3.1，0.0Y worker 生命周期与脱敏签收）
+> 文档版本：2026-07-28（v3.2，0.0Y 后产品能力审计）
 > 状态：**V0 续作中，完整产品未完成**；产品范围以 `docs/WRITCRAFT-PRD-V3.md` 为准  
-> 2026-07-28 续作交接：当前工程基线为 **0.0Y**。0.0X 已完成可信根 fd 外层绑定；0.0Y 关闭 async-close write-after-end 与构造错误路径泄露。当前 worker **18/18**、Watcher **31/31**、cross-layer **11/11**、Large **6/6**、Author **48/48**、离线 API **15/15**、package **8/8**、release **7/7**、完整 test/verify、Persistent **3/3** 与真实 Electron **32/32** 通过；独立复审 **P0=0/P1=0/P2=0**。下一步审计尚未签字的 V0 产品合同。ad-hoc App/ZIP 禁止分发，真实作者、付费和正式发布门禁仍开放。
+> 2026-07-28 续作交接：当前工程基线为 **0.0Y**。0.0X 已完成可信根 fd 外层绑定；0.0Y 关闭 async-close write-after-end 与构造错误路径泄露。当前 worker **18/18**、Watcher **31/31**、cross-layer **11/11**、Large **6/6**、Author **48/48**、离线 API **15/15**、package **8/8**、release **7/7**、完整 test/verify、Persistent **3/3** 与真实 Electron **32/32** 通过；独立复审 **P0=0/P1=0/P2=0**。产品能力审计已完成；下一本地批是 `edit.md` section-aware 上下文编译与 Inspector 章节披露，之后才是 Chat 多轮连续性和普通 Markdown 回收区恢复 UI。ad-hoc App/ZIP 禁止分发，真实作者、付费和正式发布门禁仍开放。
 > 范围：Month 1（4 周 × 7 天 = 28 天）
+> 治理说明：第一至第八节保留原 28 天计划、早期模型/TipTap 假设和历史验收目标，仅供追溯，**不是当前 TODO 或实现合同**；当前执行顺序只看第九节与 `v0/DEVELOPMENT-STATUS.md`。
 
 ---
 
@@ -168,4 +169,4 @@
 
 ## 九、 下一步
 
-2026-07-28 0.0Y 已关闭 0.0X 的两个复审 P2，不得从 0.0T–0.0Y 的历史 TODO 重开已签字任务。下一步严格按 `v0/DEVELOPMENT-STATUS.md` 审计尚未签字的 V0 产品合同，先区分本地产品缺口与外部门禁。只有作者提供合格项目和完整 `sk-api-`，才执行真实付费图片、2000+ 字/5+ 章作者旅程和私有价值证据；其后基于最新源码重建并进入签名/公证/Gatekeeper 复审。
+2026-07-28 0.0Y 已关闭 0.0X 的两个复审 P2，不得从 0.0T–0.0Y 的历史 TODO 重开已签字任务。产品能力审计现已完成：按 `v0/DEVELOPMENT-STATUS.md`，先只实现 `edit.md` section-aware 上下文编译与 Inspector 章节披露；独立签字后再做 Chat 多轮连续性，随后补普通 Markdown 回收区恢复 UI。只有作者提供合格项目和完整 `sk-api-`，才执行真实付费图片、2000+ 字/5+ 章作者旅程和私有价值证据；其后基于最新源码重建并进入签名/公证/Gatekeeper 复审。

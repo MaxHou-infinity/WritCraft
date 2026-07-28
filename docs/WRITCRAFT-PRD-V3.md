@@ -6,7 +6,7 @@
 > 适用范围：V0 起的桌面写作 IDE  
 > 优先级：若本文件与旧版 PRD、路线图或原型行为冲突，以本文件为准；工程实现以 `docs/PHASE-A-IMPLEMENTATION.md` 为准。
 
-> **实现状态注记（2026-07-28，0.0Y 已技术签字）**：本文仍是产品权威规格，**完整 PRD 尚未实现**。0.0Y 已在 0.0X 可信根链之上关闭 async-close write-after-end 与构造错误路径泄露。worker **18/18**、Watcher **31/31**、cross-layer **11/11**、Large **6/6**、package **8/8**、release **7/7**、完整 test/verify、Persistent **3/3** 与真实 Electron **32/32** 通过；独立复审 **P0=0/P1=0/P2=0**。真实作者、完整 `sk-api-`、付费与正式发布门禁仍开放；当前事实与恢复顺序只看 `v0/DEVELOPMENT-STATUS.md`。
+> **实现状态注记（2026-07-28，0.0Y 已技术签字）**：本文仍是产品权威规格，**完整 PRD 尚未实现**。0.0Y 已在 0.0X 可信根链之上关闭 async-close write-after-end 与构造错误路径泄露。worker **18/18**、Watcher **31/31**、cross-layer **11/11**、Large **6/6**、package **8/8**、release **7/7**、完整 test/verify、Persistent **3/3** 与真实 Electron **32/32** 通过；独立复审 **P0=0/P1=0/P2=0**。源码对照审计确认三个本地缺口仍开放：超长 `edit.md` 的章节化保留/Inspector 披露、Chat 最近对话摘要/多轮连续性、普通 Markdown 回收区恢复 UI；前者是下一实现批。真实作者、完整 `sk-api-`、付费与正式发布门禁另行开放；当前事实与恢复顺序只看 `v0/DEVELOPMENT-STATUS.md`。
 
 > **完成定义**：任何“V0 完成”声明必须同时满足 §10.1–§10.4、全量自动回归、真实 Electron E2E 和独立复审。局部 suite 通过、本地 ad-hoc App 或历史 ZIP 均不能单独构成完成证据。
 

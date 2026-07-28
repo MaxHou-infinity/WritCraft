@@ -1,9 +1,9 @@
 # 笔触 · WritCraft · V0 开发状态与续作入口
 
-> 最后更新：2026-07-28（Asia/Shanghai，0.0Y worker 生命周期与构造错误脱敏签收）
-> 当前状态：**V0 候选原型。0.0Y 已关闭 0.0X 独立复审的两个 P2：任何异步 readiness/hook 返回后都会在写 child stdin 前重新确认 worker 存活，构造阶段的项目根文件系统异常也在模块边界映射为无路径稳定错误。独立复审 P0=0/P1=0/P2=0；真实付费图片、真实作者旅程和正式发布验收仍缺，因此不得写成 V0 或发布完成。**
+> 最后更新：2026-07-28（Asia/Shanghai，0.0Y 后产品能力审计与文档纠偏）
+> 当前状态：**V0 候选原型。0.0Y 已关闭 0.0X 独立复审的两个 P2，独立复审 P0=0/P1=0/P2=0；其后源码对照确认 Chat 多轮连续性、超长 `edit.md` 章节化上下文/披露、普通 Markdown 回收区恢复 UI 仍是本地产品缺口。真实付费图片、真实作者旅程和正式发布验收也仍缺，因此不得写成 V0 或发布完成。**
 > 发布判断：**仍禁止分发。当前 ad-hoc App/ZIP 已从 0.0Y 当前源码重建并通过 package/release 校验，但仅是本地证据，不是 Developer ID 签名、公证或 Gatekeeper 验收产物。当前仍为 Coding Plan，合同禁止调用 `image-01`；最近项目也不满足 5 章/2000 字/来源门槛。**
-> 下一本地任务：**审计 V0 尚未签字的产品合同，把“可本地实现的真实产品缺口”与“必须由作者/付费凭据/正式发布环境提供的外部门禁”分开，再只启动一个可验证的产品功能批。不得从 0.0V–0.0Y 历史 TODO 重开已关闭的 watcher 安全任务。**
+> 下一本地任务：**合同与源码对照审计已完成。下一批只实现 `edit.md` section-aware 上下文编译与 Context Inspector 章节披露：超预算时按标题保留硬约束/关键章节，并明确展示本次实际使用、截断与省略的章节。完成并独立签字后，再依次处理 Chat 多轮连续性与普通 Markdown 回收区恢复 UI。作者、付费凭据和正式发布环境仍是独立外部门禁；不得从 0.0V–0.0Y 历史 TODO 重开已关闭的 watcher 安全任务。**
 > 当前工作树证据：**native project hash worker 18/18、Project Watcher 31/31、cross-layer 11/11、Large 6/6、package 8/8、release 7/7；完整 `npm test` 与非沙箱 `npm run verify:full` exit 0，Persistent Main/IPC 3/3，强制真实 Electron 32/32。独立代码复审 P0=0/P1=0/P2=0。**
 > 本批保留红灯：**旧实现若在 `await ready()` 或 awaited test hook 后关闭 worker，仍会创建 pending 并写已结束 stdin，确定性触发未处理的 `ERR_STREAM_WRITE_AFTER_END`；原始 `realpath/lstat` 异常也可携带私有项目绝对路径。新增三项测试在修复前覆盖该失败面，修复后 worker 从 15/15 升为 18/18。一次不存在的 cross-layer 脚本名属于调用错误；仓库真实入口随后 11/11 通过，不计为产品红灯。**
 > Graph 历史签字基线：**性能修复前的既有源码曾完整 `npm test`、Electron-enabled `npm run verify`、强制真实 Electron 26/26 exit 0；Graph Filter 15/15、Workbench 14/14、dynamic 5/5、Large 5/5、Watcher 15/15、Network 11/11、Intelligence 17/17，第二轮复审 P0=0/P1=0/P2=2。该数字只保留为历史过程，当前总链只看顶部 0.0Y 证据。**
@@ -18,11 +18,11 @@
 
 ## 0. 续作口令
 
-Chat/Chapter、Onboarding v2、Research→Changes、Inline Rewrite 与 Plan Strict 的当前主链已经关闭。下一轮恢复时不要重写这些协议，也不要分发现有 `release/` 产物。
+Chat 的单轮 scope/context 主链、Chapter、Onboarding v2、Research→Changes、Inline Rewrite 与 Plan Strict 已经签字。Chat 最近对话摘要/多轮连续性仍开放；下一轮不要重写已签的单轮协议，也不要分发现有 `release/` 产物。
 
 1. 读本文、`package.json`、当前源码文件与 `git log -1 --stat`；本地 Git 历史从 2026-07-26 V0 基线开始，不得据此臆测更早的开发过程。
 2. **Diagnostic Export v1、Research Accuracy v1、committed-warning、Graph 三项韧性缺口、Changes/History durable recovery、Image Review v1 与 Image Trash 本地链均已完整签收，不再重开这些协议。**
-3. 0.0Y 已关闭 0.0X 的两个复审 P2。恢复顺序必须是：先确认本文与当前 Git 提交 → 审计尚未签字的 V0 产品合同 → 明确区分本地任务与外部门禁 → 只启动一个可独立验证的产品功能批。不得重开已关闭的 watcher 根链、metadata 上限、async-close 或错误脱敏。
+3. 0.0Y 已关闭 0.0X 的两个复审 P2，随后完成了 PRD→源码能力审计。恢复顺序必须是：先确认本文与当前 Git 提交 → 只启动 `edit.md` section-aware 上下文编译与 Inspector 章节披露这一批 → 独立签字后再评估 Chat 多轮连续性。普通 Markdown 回收区恢复 UI 排在其后，作者/付费/发布门禁单列。不得重开已关闭的 watcher 根链、metadata 上限、async-close 或错误脱敏。
 4. 不重写已经签字的 Onboarding v2 service、capability store、batch、Main/preload 与 Renderer 契约；Main 动态 admission、single-flight 和 Renderer 生命周期 authority 清理均已关闭。
 5. 每批合入后重跑定向测试；阶段完成时再运行完整 `npm test`、`npm run verify` 与 `WRITCRAFT_E2E_FORCE=1 npm run e2e:electron`，保存当次证据。
 6. 真实 API 只使用用户显式配置的 Key；记录延迟、限流、超时、故障和费用，不记录 Key、Prompt、模型原文或正文。本轮 ad-hoc 包只用于验证；完成真实作者闭环后仍须重建并做干净账户、Developer ID、公证和 Gatekeeper 复审。
@@ -436,7 +436,7 @@ Onboarding v2 已取代上述“容错解析完整 `editContent` + 部分创建�
 
 第十一次收口最终签字：同一 Onboarding review 现在用共享 `releasePromise` 合并并发丢弃与项目切换，成功后禁止二次消费、失败后允许安全重试；提交后刷新/confirmation transition 异常会用原项目和 exact token 显式清理，清理失败则阻断新向导与切项直至重试成功，同时原 operation 仍诚实记录 `accepted`。Onboarding dynamic **22/22**、Metrics Renderer **18/18**、Workspace **19/19**、UI **11/11**；最终源码 `npm test`、Electron-enabled `npm run verify` 均 exit 0，强制真实 Electron **26/26**，第三轮独立复审 **P0=0/P1=0/P2=0，可签字**。非阻断后续增强：可增加“首次 review capability release 失败、第二次成功”的独立动态用例，但不重开本轮主链。
 
-准确结论是“Chat/Chapter 主链已经签字；Onboarding v2 自动化产品链与当前源码 App 三项体验均已签字”。不准确的结论是“fixture 人工签字等于真实 API/作者价值或发布签字”、“完整 PRD 已实现”、“当前 ad-hoc App/ZIP 已满足正式发布门禁”或“已可发布”。0.0Y App/ZIP 与当前源码一致，但仅是本地证据。
+准确结论是“Chat 单轮 scope/context 与 Chapter 主链已经签字，Chat 多轮连续性仍开放；Onboarding v2 自动化产品链与当前源码 App 三项体验均已签字”。不准确的结论是“fixture 人工签字等于真实 API/作者价值或发布签字”、“完整 PRD 已实现”、“当前 ad-hoc App/ZIP 已满足正式发布门禁”或“已可发布”。0.0Y App/ZIP 与当前源码一致，但仅是本地证据。
 
 ## 3. 当前产品能力矩阵
 
@@ -444,9 +444,12 @@ Onboarding v2 已取代上述“容错解析完整 `editContent` + 部分创建�
 
 | 模块 | 状态 | 当前事实 |
 |---|---:|---|
-| Electron 安全壳、本地项目、保存/Watcher/recovery | ✅ | 安全边界、路径、revision 与恢复有自动化证据 |
-| 三级工作区与右侧协作栈 | ✅ | Chat 三层 scope、selection 必选、并发所有权、可点击 Chip、动态失效与 Main 权威取消均已接入；0.0Y 签字基线真实 Electron 32/32 |
-| 项目卡 → edit.md → Changes 提交闭环 | ✅ | Onboarding v2 自动化链与既有 App 三项人工体验均已签字；其中 **20/20** 是该链历史专项 Electron 证据，0.0Y 当前签字总链为 **32/32**；真实 API/作者价值仍属于发布前验收 |
+| Electron 安全壳、本地项目、保存/Watcher 与冲突恢复 | ✅ | 安全边界、路径、revision、外部修改与草稿/冲突恢复有自动化证据；本行不包含普通 Markdown 回收区 UI |
+| 三级工作区与右侧协作栈（单轮） | ✅ | Chat 三层 scope、selection 必选、并发所有权、可点击 Chip、动态失效与 Main 权威取消均已接入；0.0Y 签字基线真实 Electron 32/32 |
+| Chat 最近对话摘要 / 多轮连续性 | ⬜ | 当前每次请求只发送本轮问题和当次权威 Context；尚未把最近对话摘要纳入 Main-owned 上下文，不能宣称连续多轮对话已完成 |
+| 项目卡 → edit.md → Changes 提交闭环 | ✅ | Onboarding v2 生成、预览、确认落盘与第二阶段建文件已签字；其中 **20/20** 是该链历史专项 Electron 证据，0.0Y 当前签字总链为 **32/32** |
+| 超长 edit.md 的章节化上下文与 Inspector 披露 | ⬜ | 当前 `edit.md` 超过 6000 字符或 18 KiB 会整体 fail closed；尚未按标题保留硬约束/关键章节，也未披露本次实际使用和省略的章节 |
+| 普通 Markdown 回收区恢复 UI | ⬜ | Main service 已有回收清单与恢复能力，但 preload/Main IPC 和 Renderer 尚无列表/恢复入口；当前 App 仅提示手动参考 `.writcraft/trash/manifest.json` |
 | Chapter 生成/整体重写 | ✅ | strict plan/block、整文件审阅、撤销、完整异步所有权、no-op/provenance/result/capability 运行态门禁均已接入；最终复审 P0/P1/P2=0 |
 | Changes 分块审阅与 Plan→Changes | ✅ | 默认 pending、逐块/整文件决策、residual、审计/撤销和目标 revision 锁定均有服务与真实 Electron 证据 |
 | Graph v2 核心与扩展验收 | ✅ | 300 文件/1279 节点、纠错/stale/failure live、AX/键鼠、布局/性能、重启/A→B 均有行为证据；韧性批关闭语义权威、不可变快照与异步所有权，复审 P0/P1/P2=0，当前签字总链为 0.0Y 的 32/32 |
@@ -460,6 +463,13 @@ Onboarding v2 已取代上述“容错解析完整 `editContent` + 部分创建�
 | 公开发布 | ⬜ | 待真实 API/作者验收、重新打包、签名、公证和 Gatekeeper 复审 |
 
 ## 4. 后续 TODO（严格顺序）
+
+### P1：能力审计后的本地产品缺口
+
+- [ ] **当前唯一实现批**：`edit.md` section-aware 上下文编译。冻结标题解析、硬约束优先级、总预算、截断/省略语义和 revision 绑定；Context Inspector 必须逐章披露“实际使用 / 截断 / 省略”及原因。
+- [ ] **第二批**：Chat 最近对话摘要与多轮连续性。摘要必须由 Main 拥有并绑定当前项目/会话/上下文 generation，项目切换、Chat 重开和外部文件变化时不得串话。
+- [ ] **第三批**：普通 Markdown 回收区列表与恢复 UI。复用现有 Main service，补窄 IPC、冲突/替换 fail-closed、Renderer 可见列表、单项恢复和真实 Electron 旅程。
+- [ ] 以上三项是本地产品缺口，不得与真实作者、完整 `sk-api-`、Developer ID、公证或 Gatekeeper 外部门禁混写，也不得用 watcher 历史任务替代。
 
 ### P1：Chat/Chapter 独立复审阻断项（已关闭）
 
