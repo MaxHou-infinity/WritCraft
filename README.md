@@ -1,9 +1,9 @@
 # 笔触 · WritCraft（写作 IDE）
 
-> 状态：**V0 候选原型，2026-07-28 0.0T Plan 写入终态时序已完成根因修复与独立验证；真实作者、付费 API 与发布验收仍待执行** · 发起方：Max
+> 状态：**V0 候选原型，2026-07-28 0.0U 已完成 native reserve 预所有权副作用加固与独立验证；真实作者、付费 API 与发布验收仍待执行** · 发起方：Max
 > 当前开发真相与唯一续作入口：[`v0/DEVELOPMENT-STATUS.md`](v0/DEVELOPMENT-STATUS.md)。配图现已覆盖评分、插入/保留/移入废纸篓、可见列表、单项恢复和确认式快照清空；五项竞态缺口已关闭，最终独立复审 **P0=0/P1=0/P2=1（非阻断）**。该签字尚不能替代真实 `sk-api-`/作者与发布验收；现有 App/ZIP 禁止分发。
 > 下一阶段验收边界：[`docs/AUTHOR-ACCEPTANCE-V1-CONTRACT.md`](docs/AUTHOR-ACCEPTANCE-V1-CONTRACT.md) 已冻结；真实调用、作者内容与发布证据必须遵守其中的隐私和付费门禁。
-> 当前停点：0.0T 已证明 Plan 写入的磁盘/History 权威恢复完成后，Renderer 又等待第二轮重复刷新，导致终态可能超过 15 秒；现以 `authoritativeReloaded` 跳过该非权威链，并保留所有失败路径的 fail-closed 刷新。Renderer dynamic **25/25**，完整 test/verify、persistent **3/3** 通过；本地与独立复审共三次真实 Electron **32/32**，Plan apply 约 205–1078ms，本批复审 **P0=0/P1=0/P2=0**。0.0S reserve/build 与 0.0R/0.0Q watcher 链保持有效；仍开放两个安全 P2（祖先 `openat`、native `mkdirat→openat`）和真实作者/付费/发布门禁。
+> 当前停点：0.0U 已删除 helper 在证明本次目录所有权前对替身执行 `fchmod` 的副作用，并只在 fd/path 身份、0700、euid 与空目录全部通过后进入 receipt/清理/发布。Author **48/48**，完整 test/verify、persistent **3/3**、真实 Electron **32/32**、package **8/8**、release **7/7** 通过；独立复审 **P0=0/P1=0/P2=1**。P2 是当前 macOS 公共接口无法区分的同 UID 0700 空目录微窗口，已明确接受而非宣称关闭；下一本地安全项仅为祖先逐段 `openat`。
 
 ## 2026-07-28 当前复核快照
 
@@ -11,20 +11,20 @@
 
 > Graph 性能复验没有用单次重试绿灯覆盖失败：索引、布局、baseline 所有权、元素重挂、scene detach 与 dispatch-only 计时缺口均已进入根因修复和回归。该历史性能专项门禁等待两帧并读取实际 CSS 可见状态与 SVG 布局；同一源码无中间修改连续两次全链均为 **26/26**。当前项目总链以本节 32/32 和状态台账为准。
 
-- 项目 / 文件 / 段落三级工作区、`edit.md`、Inline Diff、localized ChangeSet/撤销、权威 Context、来源/脚注、recovery、Cursor 式标签和一致性图谱均已接入；当前源码已完成 Onboarding v2 自动化产品链。0.0S 已按当前源码重建本地 ad-hoc App/ZIP，并以同一 signed-helper 哈希贯通构建、App 和标准 `unzip` 后的 ZIP；未公证产物仍禁止分发。
+- 项目 / 文件 / 段落三级工作区、`edit.md`、Inline Diff、localized ChangeSet/撤销、权威 Context、来源/脚注、recovery、Cursor 式标签和一致性图谱均已接入；当前源码已完成 Onboarding v2 自动化产品链。0.0U 已按当前源码重建本地 ad-hoc App/ZIP，并以同一 signed-helper 哈希贯通构建、App 和标准 `unzip` 后的 ZIP；未公证产物仍禁止分发。
 - 普通 Changes、Plan→Changes 与 Graph 的本轮结构性修复已完成独立复审；模型不再回传整篇 after，而由 Main 验证局部锚点、依赖和 stopReason 后构造修改。
 - Chat 已实现 project/file/selection 三种明确作用域、selection 必选、精确选区邻段、受限项目检索、正文 H1 Source locator 和 request/phase-owned Inspector/Chips；重开、折叠选区与外部文件变化都会主动取消失效请求，Main 权威 `PROJECT_CHANGED` 不再显示为普通调用失败。
 - Chapter 已实现严格计划→逐块生成→Main 本地组装→整文件审阅，并把 project/target/instruction/context/pending 绑定到完整异步生命周期；no-op/provenance/result/capability 分类与确认式回收已动态固化，最终独立复审 P0/P1/P2=0。
-- Onboarding v2 已签字：service **22/22**、capability **15/15**、all-or-nothing batch **22/22**；生产 Handler **11/11**、Main/preload **14/14**；Renderer state/UI/dynamic **8/8、11/11、22/22**。Main single-flight 保证同项目并发只调用一次模型；Renderer epoch 与生命周期清理同时关闭 await→mint、mint→IPC delivery 两侧孤儿 authority 窗口。最终独立复审 P0/P1/P2=0。
+- Onboarding v2 已签字：service **22/22**、capability **15/15**、all-or-nothing batch **22/22**；生产 Handler **11/11**、Main/preload **14/14**；Renderer state/UI 为 **8/8、11/11**，当前 dynamic 已随 0.0T 扩展为 **25/25**。Main single-flight 保证同项目并发只调用一次模型；Renderer epoch 与生命周期清理同时关闭 await→mint、mint→IPC delivery 两侧孤儿 authority 窗口。最终独立复审 P0/P1/P2=0。
 - Author Evidence Metrics v1 保持签字；image 生成耗时/结果仍走八字段隐私事件，评分、三类终态和可选费用走独立私有 Image Review 证据。
-- 真实作者验收预检/工作副本技术候选已签字：资格和复制来自同一权威快照；源、目标父目录和私有 stage 绑定 inode；清单在私有 stage 内提交 readiness，最终源复核后通过 parent-fd 相对 `renameatx_np(RENAME_EXCL)` 原子发布。匿名 0600 回执 fd 使 reserve stdout/status 丢失仍能恢复精确 stage；双证据都不可用时 fail-closed 保留，绝不猜测清理。Author **47/47**、真实 API 离线合同 **15/15**。
+- 真实作者验收预检/工作副本技术候选已签字：资格和复制来自同一权威快照；源、目标父目录和私有 stage 绑定 inode；清单在私有 stage 内提交 readiness，最终源复核后通过 parent-fd 相对 `renameatx_np(RENAME_EXCL)` 原子发布。匿名 0600 回执 fd 使 reserve stdout/status 丢失仍能恢复精确 stage；0.0U 进一步保证可观测异常替身在所有权证明前不会被修改或采纳。Author **48/48**、真实 API 离线合同 **15/15**。
 - Research 已形成 Main-owned 的 Claim / Source / Boundary → 专用 Changes → History/undo 闭环；Renderer 只传 card ID 与目标范围，A–D 只是用户提供的来源元数据声明，不是 WritCraft 的事实背书。
 - Research apply 已收敛为 Main 实际复用的生产事务；动态 11/11 以真实磁盘和 History 证明提交后的 stale、TTL、residual、tree 与状态迁移故障不会误报普通失败、泄漏 capability 或诱导重复确认。最终独立二审 P0/P1/P2=0。
 - Research Accuracy 已签字：加入显式“主张匹配/不匹配”作者判断和私有聚合；判断提交前重验 exact authority，watcher 持续不可用会锁住项目 AI/写入，证据提交后变化会保留历史样本但锁定旧卡片。
 - `image-01` 已实现安全落盘、解码尺寸/比例证明、必填 1–5 分、可选费用、插入/保留/可恢复废纸篓和项目聚合；废纸篓现可见数量/容量、逐项恢复和确认式精确快照清空，并明确长期保留、绝不后台删除。Trash Service **21/21**、Handler **7/7**、Integration **4/4**、Renderer **7/7**；path replacement、same-inode rewrite 与 committed TTL 五项 P1 已关闭，最终独立复审 **P0=0/P1=0/P2=1**。P2 仅为非协作外部 open-FD writer 的极窄通用残余；真实质量与费用仍待完整 `sk-api-`。
 - Diagnostic Export v1 已接入设置页：作者先看到可能导出的完整 JSON，正文、Prompt、模型回答、Key、项目/文件名与路径均被排除；Renderer 只能回传一次性 token，Main 负责原生保存和不可覆盖写入。Service **13/13**、Handler **10/10**、Renderer **7/7**、Network boundary **15/15**，真实 Electron 已覆盖可见预览和隐私 sentinel。
 - Inline 当前源码隔离 App 已完成人工预览零写入、拒绝、重载、接受、History 与 Safe Undo；Plan 生成已强制 `end_turn`、单文本块、strict JSON、错误脱敏与目标/Prompt 资源上限，独立复审 P0=0/P1=0。
-- 当前源码 `npm test` 与沙箱外 Electron-enabled `npm run verify` 均 **exit 0**（真实 DOM sanitizer **13/13**）、persistent watcher **3/3**；0.0T 保留首个 Plan 红灯并用挂起式回归证明终态错误依赖重复 refresh，修复后本地两次与独立复审一次真实 Electron 均 **32/32**。0.0Q Main barrier、0.0R no-follow fd 与 0.0S reserve receipt/build→App→ZIP 同一哈希链均已落地。作者验收前置 **47/47**、真实 API 离线合同 **15/15**，组合 **62/62、0 网络**；当前 ad-hoc App/ZIP 已重建并通过 package **8/8**、release **7/7**，但仍缺真实作者项目、完整 `sk-api-`、付费图片、干净账户、Developer ID、公证与 Gatekeeper，禁止分发。仍开放的本地边界只有祖先目录 `openat` 与 `mkdirat→openat` 微窗口。
+- 当前源码 `npm test` 与沙箱外 Electron-enabled `npm run verify` 均 **exit 0**（真实 DOM sanitizer **13/13**）、persistent watcher **3/3**、强制真实 Electron **32/32**。0.0Q Main barrier、0.0R no-follow fd、0.0S receipt/build 哈希链及 0.0U reserve 零预所有权副作用均已落地。作者验收前置 **48/48**、真实 API 离线合同 **15/15**，组合 **63/63、0 网络**；当前 ad-hoc App/ZIP 已重建并通过 package **8/8**、release **7/7**，但仍缺真实作者项目、完整 `sk-api-`、付费图片、干净账户、Developer ID、公证与 Gatekeeper，禁止分发。祖先逐段 `openat` 仍待工程处理；同 UID 0700 空目录微窗口是已接受而未消除的 residual。
 - Main 网络边界已固定文本/图片官方主机，加入 renderer HTTP(S)/WS(S) 双层断网、上下文 IPC 上限、owner abort、mutation generation、内部 revision/父目录回声隔离、零 POST retry、拒绝重定向、诊断 token-only 导出和错误脱敏；当前 network boundary **15/15**。
 - Graph 扩展已动态覆盖 300 文件/1279 节点、cold-to-interactive、stale/三类作者纠错、failure live、键盘/AX、布局、性能、重启与 A→B；缓存完整语义权威、Renderer 不可变快照、同/跨项目异步所有权及 Unicode quote 边界已关闭，最终独立复审 P0=0/P1=0/P2=0。
 - 2026-07-26 已建立本地 Git `main` 基线；后续改动必须通过提交保留可审计差异。该基线不追溯此前历史，阶段事实仍以 `v0/DEVELOPMENT-STATUS.md` 和当次可复现测试证据为准。

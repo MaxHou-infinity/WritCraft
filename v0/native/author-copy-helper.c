@@ -1,6 +1,7 @@
 #define _DARWIN_C_SOURCE
 
 #include <errno.h>
+#include <dirent.h>
 #include <fcntl.h>
 #include <stdbool.h>
 #include <stdint.h>
@@ -10,6 +11,10 @@
 #include <sys/stat.h>
 #include <sys/types.h>
 #include <unistd.h>
+
+#ifdef WRITCRAFT_TEST_RESERVE_PREOWNERSHIP
+#include <sys/wait.h>
+#endif
 
 #ifndef RENAME_EXCL
 #define RENAME_EXCL 0x00000004
@@ -112,9 +117,88 @@ static bool write_reservation_receipt(const char *name, const struct stat *value
   return fsync(RESERVATION_RECEIPT_FD) == 0;
 }
 
+static bool directory_is_empty(int directory_fd) {
+  int scan_fd = fcntl(directory_fd, F_DUPFD_CLOEXEC, 0);
+  if (scan_fd < 0) return false;
+  DIR *directory = fdopendir(scan_fd);
+  if (directory == NULL) {
+    (void)close(scan_fd);
+    return false;
+  }
+  bool empty = true;
+  errno = 0;
+  for (struct dirent *entry = readdir(directory);
+       entry != NULL;
+       entry = readdir(directory)) {
+    if (strcmp(entry->d_name, ".") != 0 && strcmp(entry->d_name, "..") != 0) {
+      empty = false;
+      break;
+    }
+  }
+  int scan_error = errno;
+  int close_result = closedir(directory);
+  return empty && scan_error == 0 && close_result == 0;
+}
+
+static bool is_exact_private_reservation(
+  int directory_fd,
+  const struct stat *opened,
+  const struct stat *at_path
+) {
+  if (!S_ISDIR(opened->st_mode) || !S_ISDIR(at_path->st_mode) ||
+      opened->st_dev != at_path->st_dev || opened->st_ino != at_path->st_ino ||
+      (opened->st_mode & 0777) != 0700 ||
+      (at_path->st_mode & 0777) != 0700 ||
+      opened->st_uid != geteuid() || at_path->st_uid != geteuid() ||
+      opened->st_gid != at_path->st_gid) {
+    return false;
+  }
+  return directory_is_empty(directory_fd);
+}
+
+#ifdef WRITCRAFT_TEST_RESERVE_PREOWNERSHIP
+// The test build replaces the just-created directory before the parent opens
+// it. This deliberately lives behind a compile-time flag so release helpers
+// have neither this code path nor its test-only marker.
+static bool replace_reservation_before_open_for_test(const char *name) {
+  unsigned char random_bytes[12];
+  char original_name[sizeof(".original-") + (sizeof(random_bytes) * 2)];
+  arc4random_buf(random_bytes, sizeof(random_bytes));
+  memcpy(original_name, ".original-", sizeof(".original-") - 1);
+  for (size_t index = 0; index < sizeof(random_bytes); index += 1) {
+    snprintf(
+      original_name + sizeof(".original-") - 1 + (index * 2),
+      3,
+      "%02x",
+      random_bytes[index]
+    );
+  }
+  original_name[sizeof(original_name) - 1] = '\0';
+  pid_t child = fork();
+  if (child < 0) return false;
+  if (child == 0) {
+    if (renameatx_np(
+          SOURCE_PARENT_FD,
+          name,
+          SOURCE_PARENT_FD,
+          original_name,
+          RENAME_EXCL
+        ) != 0 ||
+        mkdirat(SOURCE_PARENT_FD, name, 0755) != 0) {
+      _exit(1);
+    }
+    _exit(0);
+  }
+  int status = 0;
+  return waitpid(child, &status, 0) == child &&
+    WIFEXITED(status) && WEXITSTATUS(status) == 0;
+}
+#endif
+
 // This is only used after an fd has established the exact directory identity.
-// A replacement observed by fstatat is never removed. The mkdirat->openat
-// interval remains the separately documented residual P2.
+// A replacement observed by fstatat is never removed. A same-UID, 0700, empty
+// directory can still be indistinguishable in the mkdirat->openat interval;
+// that pre-ownership case remains the separately documented residual P2.
 static void remove_known_reservation_if_unchanged(
   const char *name,
   const struct stat *opened
@@ -174,17 +258,25 @@ static int reserve_directory(void) {
       );
     }
     name[sizeof(name) - 1] = '\0';
-    if (mkdirat(SOURCE_PARENT_FD, name, 0700) != 0) {
+    mode_t previous_umask = umask(0077);
+    int mkdir_result = mkdirat(SOURCE_PARENT_FD, name, 0700);
+    int mkdir_error = errno;
+    (void)umask(previous_umask);
+    if (mkdir_result != 0) {
+      errno = mkdir_error;
       if (errno == EEXIST) continue;
       return 1;
     }
+#ifdef WRITCRAFT_TEST_RESERVE_PREOWNERSHIP
+    if (!replace_reservation_before_open_for_test(name)) return 1;
+#endif
     int directory_fd = openat(
       SOURCE_PARENT_FD,
       name,
       O_RDONLY | O_DIRECTORY | O_NOFOLLOW
     );
     if (directory_fd < 0) return 1;
-    bool valid = fchmod(directory_fd, 0700) == 0;
+    bool valid = true;
     struct stat opened;
     struct stat at_path;
     if (valid) valid = fstat(directory_fd, &opened) == 0;
@@ -198,9 +290,7 @@ static int reserve_directory(void) {
     }
     bool identity_known = false;
     if (valid) {
-      valid = S_ISDIR(opened.st_mode) &&
-        opened.st_dev == at_path.st_dev &&
-        opened.st_ino == at_path.st_ino;
+      valid = is_exact_private_reservation(directory_fd, &opened, &at_path);
     }
     if (valid) identity_known = true;
     if (valid) valid = fsync(SOURCE_PARENT_FD) == 0;

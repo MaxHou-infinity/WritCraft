@@ -208,6 +208,99 @@ test('native helper rejects a read-only recovery receipt before mutation', () =>
   })
 );
 
+test('test-only native helper rejects a 0755 pre-open replacement without changing either directory', () =>
+  withScratch(scratch => {
+    const sourceParent = path.join(scratch, 'source');
+    const targetParent = path.join(scratch, 'target');
+    const receiptPath = path.join(scratch, 'receipt');
+    const testHelper = path.join(scratch, 'author-copy-helper-preownership-test');
+    const productionTestHelper = path.join(scratch, 'author-copy-helper-production-test');
+    const sourceFile = path.join(__dirname, '..', 'native', 'author-copy-helper.c');
+    fs.mkdirSync(sourceParent);
+    fs.mkdirSync(targetParent);
+    fs.writeFileSync(receiptPath, '');
+    fs.chmodSync(receiptPath, 0o600);
+    childProcess.execFileSync('xcrun', [
+      '--sdk', 'macosx', 'clang',
+      '-std=c11', '-Wall', '-Wextra', '-Werror', '-Os',
+      '-mmacosx-version-min=11.0',
+      '-DWRITCRAFT_TEST_RESERVE_PREOWNERSHIP',
+      sourceFile,
+      '-o', testHelper,
+    ], { stdio: 'inherit' });
+    childProcess.execFileSync('xcrun', [
+      '--sdk', 'macosx', 'clang',
+      '-std=c11', '-Wall', '-Wextra', '-Werror', '-Os',
+      '-mmacosx-version-min=11.0',
+      sourceFile,
+      '-o', productionTestHelper,
+    ], { stdio: 'inherit' });
+    const productionStrings = childProcess.execFileSync('strings', [productionTestHelper], {
+      encoding: 'utf8',
+    });
+    assert(!productionStrings.includes('WRITCRAFT_TEST_RESERVE_PREOWNERSHIP'));
+    assert(!productionStrings.includes('.original-'));
+    const sourceFd = fs.openSync(sourceParent, fs.constants.O_RDONLY);
+    const targetFd = fs.openSync(targetParent, fs.constants.O_RDONLY);
+    const receiptFd = fs.openSync(receiptPath, fs.constants.O_RDWR);
+    try {
+      const result = childProcess.spawnSync(testHelper, [], {
+        input: '{"mode":"reserve"}',
+        encoding: 'utf8',
+        stdio: ['pipe', 'pipe', 'pipe', sourceFd, targetFd, receiptFd],
+      });
+      assert.notStrictEqual(result.status, 0);
+      assert.strictEqual(fs.readFileSync(receiptPath, 'utf8'), '');
+      const entries = fs.readdirSync(sourceParent).sort();
+      assert.strictEqual(entries.length, 2);
+      const originalName = entries.find(name => name.startsWith('.original-'));
+      const replacementName = entries.find(name => name.startsWith('.writcraft-author-copy-'));
+      assert(originalName);
+      assert(replacementName);
+      const original = fs.statSync(path.join(sourceParent, originalName));
+      const replacement = fs.statSync(path.join(sourceParent, replacementName));
+      assert(original.isDirectory());
+      assert(replacement.isDirectory());
+      assert.strictEqual(original.mode & 0o777, 0o700);
+      assert.strictEqual(replacement.mode & 0o777, 0o755);
+      assert.deepStrictEqual(fs.readdirSync(path.join(sourceParent, originalName)), []);
+      assert.deepStrictEqual(fs.readdirSync(path.join(sourceParent, replacementName)), []);
+    } finally {
+      fs.closeSync(receiptFd);
+      fs.closeSync(sourceFd);
+      fs.closeSync(targetFd);
+    }
+
+    const inheritedGroup = process.getgroups().find(group => group !== process.getegid());
+    if (inheritedGroup !== undefined) {
+      const groupParent = path.join(scratch, 'group-parent');
+      const groupReceipt = path.join(scratch, 'group-receipt');
+      fs.mkdirSync(groupParent);
+      fs.chownSync(groupParent, process.getuid(), inheritedGroup);
+      fs.chmodSync(groupParent, 0o2700);
+      fs.writeFileSync(groupReceipt, '');
+      fs.chmodSync(groupReceipt, 0o600);
+      const groupParentFd = fs.openSync(groupParent, fs.constants.O_RDONLY);
+      const groupReceiptFd = fs.openSync(groupReceipt, fs.constants.O_RDWR);
+      try {
+        const result = childProcess.spawnSync(productionTestHelper, [], {
+          input: '{"mode":"reserve"}',
+          encoding: 'utf8',
+          stdio: ['pipe', 'pipe', 'pipe', groupParentFd, groupParentFd, groupReceiptFd],
+        });
+        assert.strictEqual(result.status, 0);
+        const report = JSON.parse(result.stdout);
+        const reserved = fs.statSync(path.join(groupParent, report.name));
+        assert.strictEqual(reserved.gid, inheritedGroup);
+        assert.strictEqual(reserved.mode & 0o777, 0o700);
+      } finally {
+        fs.closeSync(groupReceiptFd);
+        fs.closeSync(groupParentFd);
+      }
+    }
+  })
+);
+
 test('reports every unmet author-project requirement without returning paths or content', () =>
   withScratch(scratch => {
     const descriptor = projectService.createProjectAt(scratch, '不足项目');
@@ -1607,4 +1700,4 @@ test('rejects duplicate CLI arguments instead of accepting the last value', () =
   );
 });
 
-console.log(`\n${passed}/47 author acceptance preflight checks passed.`);
+console.log(`\n${passed}/48 author acceptance preflight checks passed.`);

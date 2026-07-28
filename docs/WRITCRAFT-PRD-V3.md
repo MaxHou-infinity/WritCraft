@@ -6,7 +6,7 @@
 > 适用范围：V0 起的桌面写作 IDE  
 > 优先级：若本文件与旧版 PRD、路线图或原型行为冲突，以本文件为准；工程实现以 `docs/PHASE-A-IMPLEMENTATION.md` 为准。
 
-> **实现状态注记（2026-07-28，0.0T）**：本文仍是产品权威规格，**完整 PRD 尚未实现**。0.0T 已确定性证明并关闭 Plan 写入后终态错误依赖第二轮重复刷新：权威 tree/current/History 已安装时直接收口，失败与不可信路径继续 fail-closed；Renderer dynamic **25/25**，完整 test/verify 与 persistent **3/3** 通过，本地及独立复审共三次真实 Electron **32/32**，本批 **P0=0/P1=0/P2=0**。0.0S reserve/build 证据保持有效，Author **47/47**、离线 API **15/15**、package **8/8**、release **7/7**；当前 ad-hoc App/ZIP 仍禁止分发。祖先目录 `openat`、`mkdirat→openat` 微窗口、真实作者、完整 `sk-api-`、付费与正式发布门禁仍开放；当前事实与顺序只看 `v0/DEVELOPMENT-STATUS.md`。
+> **实现状态注记（2026-07-28，0.0U）**：本文仍是产品权威规格，**完整 PRD 尚未实现**。0.0U 已删除 native reserve 在证明本次创建身份前修改替身目录的 `fchmod`，并动态证明 0755 替身会在权限/内容不变的情况下被拒绝；shared/setgid 父目录兼容仍成立。当前 Author **48/48**、离线 API **15/15**、完整 test/verify、persistent **3/3**、强制真实 Electron **32/32**、package **8/8**、release **7/7** 通过，本批复审 **P0=0/P1=0/P2=1**。P2 是同 UID 0700 空目录在 `mkdirat→openat` 窗口仍不可区分，已作为威胁模型残余接受而非声称关闭。祖先逐段 `openat`、真实作者、完整 `sk-api-`、付费与正式发布门禁仍开放；ad-hoc App/ZIP 禁止分发，当前事实与顺序只看 `v0/DEVELOPMENT-STATUS.md`。
 
 > **完成定义**：任何“V0 完成”声明必须同时满足 §10.1–§10.4、全量自动回归、真实 Electron E2E 和独立复审。局部 suite 通过、本地 ad-hoc App 或历史 ZIP 均不能单独构成完成证据。
 

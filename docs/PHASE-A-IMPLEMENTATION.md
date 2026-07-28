@@ -6,9 +6,9 @@
 > 产品依据：`docs/WRITCRAFT-PRD-V3.md`  
 > 范围：把现有单文档 Electron 原型升级为安全、可恢复的本地多文件项目工作区。
 
-> **工程交接（2026-07-28，0.0T Plan 写入终态收口）**：0.0T 证明 Changes 在 Workspace 已安装 tree/current/History 并清除 marker 后，又无条件等待第二轮重复 refresh，导致已提交真相迟迟不能显示终态。Renderer 现只在 `authoritativeReloaded=true` 时跳过该非权威链；当前非 `edit.md` 的 Onboarding 仍显式打开它，false/undefined 与不可信响应仍 fail-closed。普通、Research residual-unavailable、Onboarding 非当前 edit 三条挂起式回归均转绿，Renderer dynamic **25/25**；完整 `npm test`、沙箱外 verify、Persistent **3/3** 通过，本地与独立复审共三次真实 Electron **32/32**，本批复审 **P0=0/P1=0/P2=0**。0.0S reserve receipt/build attestation 与 Author **47/47** + 离线 API **15/15**、package **8/8**、release **7/7** 保持有效；ad-hoc App/ZIP 仍禁止分发。
+> **工程交接（2026-07-28，0.0U native reserve 加固）**：0.0U 以测试专用进程在 `mkdirat→openat` 窗口放入 0755 空目录，确定性证明旧 helper 会先 `fchmod` 外来对象并错误采纳。生产 helper 现临时收紧 umask，删除预所有权 `fchmod`，在任何 receipt/清理/发布前验证 fd/path 同一身份、低九位 0700、当前 euid 与空目录；不再依赖 `st_nlink==2`，并保留 shared/setgid 父目录兼容。Author **48/48**、离线 API **15/15**、完整 test/verify、Persistent **3/3**、真实 Electron **32/32**、package **8/8**、release **7/7** 通过，独立复审 **P0=0/P1=0/P2=1**；ad-hoc App/ZIP 仍禁止分发。
 > **下一阶段合同**：`docs/AUTHOR-ACCEPTANCE-V1-CONTRACT.md` 已冻结，明确付费网络门禁、允许记录的隐私安全证据、真实长文旅程与发布前签字顺序。
-> **当前实现停点**：0.0T 已关闭 Plan-write timing；0.0S reserve/build、0.0R strict watcher fd hash 与 0.0Q Main-owned exact barrier 保持签字。保留的两个本地 P2 仅是纯 Node 无法对祖先目录逐段 `openat` 的架构边界，以及 native `mkdirat→openat/fstat` 微窗口；不得从旧 0.0S TODO 重开 Plan 时序，也不得把重跑绿灯写成 V0/发布完成。真实产品门禁仍要求作者显式选择满足五章节、2,000 汉字和来源要求的项目并提供完整 `sk-api-`；不得扫描无关私人文稿、自动创建真实副本或用 fixture 替代作者证据。
+> **当前实现停点**：0.0U reserve 加固是最新批次；0.0T Plan timing、0.0S receipt/build、0.0R strict watcher fd hash 与 0.0Q Main barrier 保持签字。下一本地工程仅为纯 Node 祖先逐段 `openat`；native 微窗口中的同 UID 0700 空目录因公开 macOS ABI 不提供原子目录 fd 创建而被明确接受，只有引入 OS 保护的同卷 staging parent 或不同权限边界后才重开。真实产品门禁仍要求作者显式选择满足五章节、2,000 汉字和来源要求的项目并提供完整 `sk-api-`；不得扫描无关私人文稿、自动创建真实副本或用 fixture 替代作者证据。
 
 ## 1. 阶段目标
 
@@ -383,7 +383,7 @@ Main 为当前窗口保存不可伪造的 project session，不允许 renderer �
 - [x] renderer sandbox、context isolation 和窄 preload API 保持开启。
 - [x] Phase A 地基、当前 Chat/Chapter 源码的单元/IPC 集成和强制真实 Electron 验收通过；失败证据不被静态 verify 掩盖。
 
-> 证据边界：当前最终源码 `npm test` 与沙箱外 Electron-enabled `npm run verify` exit 0，Author **47/47**、Offline API **15/15**、package **8/8**、release **7/7**、Persistent Watcher **3/3**、Renderer dynamic **25/25**；本地两次与独立复审一次强制 Electron 均 **32/32**。0.0T 的 Plan timing 根因类已由挂起式故障注入复现并关闭，独立复审 **P0=0/P1=0/P2=0**。仍保留纯 Node 祖先解析和 native reserve 微窗口两个本地安全 P2；真实 API、完整 `sk-api-` 图片、真实作者内测与发布复审也未关闭。精确缺口见 `v0/DEVELOPMENT-STATUS.md`。
+> 证据边界：当前最终源码 `npm test` 与沙箱外 Electron-enabled `npm run verify` exit 0，Author **48/48**、Offline API **15/15**、package **8/8**、release **7/7**、Persistent Watcher **3/3**、强制 Electron **32/32**。0.0U 独立复审 **P0=0/P1=0/P2=1**；P2 是已接受、未消除的同 UID 0700 空目录 reserve residual。纯 Node 祖先逐段 `openat` 仍待工程处理；真实 API、完整 `sk-api-` 图片、真实作者内测与发布复审也未关闭。精确缺口见 `v0/DEVELOPMENT-STATUS.md`。
 
 Phase A 只有在全部清单有可复现证据时才算完成；“页面看起来像工作区”或“测试只检查元素存在”都不构成验收。
 
