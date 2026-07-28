@@ -6,6 +6,7 @@ const fs = require('fs');
 const os = require('os');
 const path = require('path');
 const { execFileSync, spawnSync } = require('child_process');
+const nativeHelperBuildService = require('./build-native-helper');
 
 const root = path.resolve(__dirname, '..');
 const arch = process.arch === 'arm64' ? 'arm64' : process.arch === 'x64' ? 'x64' : process.arch;
@@ -14,7 +15,16 @@ const app = path.join(outputRoot, 'WritCraft.app');
 const zip = `${outputRoot}.zip`;
 const packagedRoot = path.join(app, 'Contents', 'Resources', 'app');
 const packagedHelper = path.join(app, 'Contents', 'Helpers', 'author-copy-helper');
+const builtHelper = path.join(root, 'src', 'main', 'native', 'author-copy-helper');
+const helperSource = path.join(root, 'native', 'author-copy-helper.c');
+const sourcePackage = JSON.parse(fs.readFileSync(path.join(root, 'package.json'), 'utf8'));
+const PRODUCT_NAME = '笔触 · WritCraft';
 const info = JSON.parse(fs.readFileSync(path.join(outputRoot, 'build-info.json'), 'utf8'));
+
+const RELEASE_INFO_KEYS = Object.freeze([
+  'schema', 'product', 'version', 'platform', 'arch', 'app', 'archive', 'archiveBytes', 'archiveSha256',
+  'nativeHelperBuild', 'minimumSystemVersion', 'signing', 'notarized',
+]);
 
 let passed = 0;
 async function check(name, fn) {
@@ -32,6 +42,37 @@ function sha256File(target) {
   return crypto.createHash('sha256').update(fs.readFileSync(target)).digest('hex');
 }
 
+function exactKeys(value, expected) {
+  if (!value || typeof value !== 'object' || Array.isArray(value) ||
+      Object.getPrototypeOf(value) !== Object.prototype) return false;
+  const keys = Object.keys(value).sort();
+  const sortedExpected = [...expected].sort();
+  return keys.length === sortedExpected.length && keys.every((key, index) => key === sortedExpected[index]);
+}
+
+function assertReleaseInfo() {
+  assert(exactKeys(info, RELEASE_INFO_KEYS), 'release build-info contains an unknown or missing key');
+  assert.strictEqual(info.schema, 'writcraft.release/v3');
+  assert.strictEqual(info.product, PRODUCT_NAME);
+  assert.strictEqual(info.version, sourcePackage.version);
+  assert.strictEqual(info.platform, 'darwin');
+  assert.strictEqual(info.arch, arch);
+  assert.strictEqual(info.app, path.relative(root, app));
+  assert.strictEqual(info.archive, path.relative(root, zip));
+  assert.strictEqual(info.minimumSystemVersion, nativeHelperBuildService.MINIMUM_SYSTEM_VERSION);
+  assert.strictEqual(info.signing, 'ad-hoc (local testing only)');
+  assert.strictEqual(info.notarized, false);
+  nativeHelperBuildService.assertNativeHelperAttestation(info.nativeHelperBuild, {
+    source: helperSource,
+    output: builtHelper,
+  });
+  assertArtifactHelperBinding(info.nativeHelperBuild, packagedHelper);
+}
+
+function assertArtifactHelperBinding(attestation, target) {
+  return nativeHelperBuildService.assertArtifactHelperBinding(attestation, target);
+}
+
 function filesUnder(directory, prefix = '', options = {}) {
   const result = new Map();
   for (const entry of fs.readdirSync(directory, { withFileTypes: true })) {
@@ -45,6 +86,37 @@ function filesUnder(directory, prefix = '', options = {}) {
     }
   }
   return result;
+}
+
+function treeSnapshot(directory, prefix = '', result = new Map()) {
+  const entries = fs.readdirSync(directory, { withFileTypes: true })
+    .sort((left, right) => left.name.localeCompare(right.name));
+  for (const entry of entries) {
+    const relative = prefix ? `${prefix}/${entry.name}` : entry.name;
+    const absolute = path.join(directory, entry.name);
+    if (entry.isDirectory()) {
+      result.set(relative, Object.freeze({
+        type: 'directory',
+        mode: Number(fs.lstatSync(absolute).mode & 0o777),
+      }));
+      treeSnapshot(absolute, relative, result);
+    } else if (entry.isSymbolicLink()) {
+      result.set(relative, Object.freeze({ type: 'symlink', target: fs.readlinkSync(absolute) }));
+    } else if (entry.isFile()) {
+      result.set(relative, Object.freeze({
+        type: 'file',
+        mode: Number(fs.lstatSync(absolute).mode & 0o777),
+        sha256: sha256File(absolute),
+      }));
+    } else {
+      throw new Error(`RELEASE_TREE_UNSUPPORTED_ENTRY:${relative}`);
+    }
+  }
+  return result;
+}
+
+function assertTreeEqual(left, right) {
+  assert.deepStrictEqual(treeSnapshot(left), treeSnapshot(right));
 }
 
 function minimalPdf(text = 'Packaged PDF source') {
@@ -96,13 +168,21 @@ function exercisePackagedHelper(helper, temporary) {
   fs.mkdirSync(targetParent);
   const sourceFd = fs.openSync(sourceParent, fs.constants.O_RDONLY);
   const targetFd = fs.openSync(targetParent, fs.constants.O_RDONLY);
+  const receiptPath = path.join(temporary, '.reservation-receipt');
+  const receiptFd = fs.openSync(
+    receiptPath,
+    fs.constants.O_RDWR | fs.constants.O_CREAT | fs.constants.O_EXCL,
+    0o600
+  );
+  fs.fchmodSync(receiptFd, 0o600);
+  fs.unlinkSync(receiptPath);
   try {
     const run = request => spawnSync(helper, [], {
       input: JSON.stringify(request),
       encoding: 'utf8',
       timeout: 5000,
       maxBuffer: 1024 * 1024,
-      stdio: ['pipe', 'pipe', 'pipe', sourceFd, targetFd],
+      stdio: ['pipe', 'pipe', 'pipe', sourceFd, targetFd, receiptFd],
     });
     const reserved = run({ mode: 'reserve' });
     assert.strictEqual(reserved.status, 0, reserved.stderr || reserved.stdout);
@@ -125,6 +205,7 @@ function exercisePackagedHelper(helper, temporary) {
   } finally {
     fs.closeSync(sourceFd);
     fs.closeSync(targetFd);
+    fs.closeSync(receiptFd);
   }
 }
 
@@ -132,15 +213,9 @@ console.log('\nWritCraft packaged release verification');
 
 (async () => {
   await check('release manifest matches archive bytes and SHA-256', () => {
-    assert.strictEqual(info.schema, 'writcraft.release/v1');
+    assertReleaseInfo();
     assert.strictEqual(fs.statSync(zip).size, info.archiveBytes);
     assert.strictEqual(sha256File(zip), info.archiveSha256);
-    assert.strictEqual(
-      info.nativeHelperSourceSha256,
-      sha256File(path.join(root, 'native', 'author-copy-helper.c'))
-    );
-    assert.strictEqual(info.nativeHelperSha256, sha256File(packagedHelper));
-    assert.strictEqual(info.minimumSystemVersion, '11.0');
   });
 
   await check('ZIP and every nested helper have strict-valid local signatures', () => {
@@ -163,6 +238,8 @@ console.log('\nWritCraft packaged release verification');
       );
       execFileSync('codesign', ['--verify', '--deep', '--strict', extractedApp], { stdio: 'pipe' });
       execFileSync('codesign', ['--verify', '--strict', extractedHelper], { stdio: 'pipe' });
+      assertArtifactHelperBinding(info.nativeHelperBuild, extractedHelper);
+      assertTreeEqual(app, extractedApp);
       verifyMinimumSystemVersion(extractedApp, extractedHelper);
       exercisePackagedHelper(extractedHelper, path.join(temporary, 'transaction'));
     } finally {

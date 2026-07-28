@@ -6,9 +6,9 @@
 > 产品依据：`docs/WRITCRAFT-PRD-V3.md`  
 > 范围：把现有单文档 Electron 原型升级为安全、可恢复的本地多文件项目工作区。
 
-> **工程交接（2026-07-27，真实作者验收前置）**：Image Trash 保持签字；Author CLI 已将 Python helper 替换为随 App 打包的 universal Mach-O。单一快照、cwd/inode 祖先绑定、私有 stage readiness、parent-fd 相对排他发布、三态 committed truth、精确清理、硬上限、空 `PATH`、embedded-NUL 和 helper 故障均有动态回归；Author **42/42**、离线 API **15/15**、package **6/6**、本地 release **7/7**、完整 test/verify 与最终强制 Electron **32/32** 通过。Onboarding 旧超时已定位为 E2E watcher 静默判断缺口，静默/fatal/CDP 加固前后聚焦真实 Electron 累计 8 次通过。ad-hoc App/ZIP 仍禁止分发。
+> **工程交接（2026-07-28，0.0S 本地收口、第三轮独立复审签收）**：Image Trash 保持签字；Author CLI 使用随 App 打包的 universal Mach-O。Main 现持有匿名 `0600 O_RDWR` reserve receipt fd 5：helper 在任何 `mkdirat` 前以 `fcntl` 预检，身份核验与 parent fsync 后写入并 fsync exact receipt；stdout/status 丢失仅可由 receipt 精确恢复，双证据丢失 fail-closed 并保留 unknown stage，readonly receipt 零 stage 拒绝，身份已知失败只经 exact recheck 清理且不删除换壳。单一快照、cwd/inode 祖先绑定、私有 stage readiness、parent-fd 相对排他发布、三态 committed truth、硬上限、空 `PATH`、embedded-NUL 和 helper 故障均有动态回归；Author **47/47** + 离线 API **15/15** = **62/62、0 网络**，package **8/8**、本地 release **7/7**，`npm test` 与沙箱外 verify exit 0。build signature 已纳入 recipe，attestation 串联 build helper→App helper→ZIP helper/完整 App tree；本地 ad-hoc App/ZIP 已按当前源码重建但仍禁止分发。真实 Electron 本轮首次 Plan write timeout 未复现；状态诊断后连续两次 **32/32**，但 timing 根因未解释，保留 P2。第三轮独立复审 **P0=0/P1=0/P2=3，可以技术签字**。
 > **下一阶段合同**：`docs/AUTHOR-ACCEPTANCE-V1-CONTRACT.md` 已冻结，明确付费网络门禁、允许记录的隐私安全证据、真实长文旅程与发布前签字顺序。
-> **当前实现停点**：0.0R strict watcher fd hash 已签收；0.0Q Main-owned exact barrier 保持签字。默认哈希已从 path stream 改为 `O_NOFOLLOW | O_NONBLOCK` fd、BigInt pre/post identity 与精确限长读取，关闭最终文件组件在 `lstat` 后被替换造成的预算/barrier 绕过。Watcher **28/28**、跨层 **11/11**、完整 test/verify 与同源真实 Electron 连续两次 **32/32**，独立复审 **P0=0/P1=0/P2=1**。保留 P2 是纯 Node 无法对祖先目录逐段 `openat` 的架构边界；下一本地任务转向 native reserve 空 stage/build 因果 P2。真实产品门禁仍要求作者显式选择满足五章节、2,000 汉字和来源要求的项目并提供完整 `sk-api-`；不得扫描无关私人文稿、自动创建真实副本或用 fixture 替代作者证据。
+> **当前实现停点**：0.0S 已关闭 native reserve 单路报告恢复/build 因果，第三轮独立复审 **P0=0/P1=0/P2=3，可以技术签字**；0.0R strict watcher fd hash 与 0.0Q Main-owned exact barrier 保持签字。保留 P2 是纯 Node 无法对祖先目录逐段 `openat` 的架构边界、native `mkdirat→openat/fstat` 微窗口，以及未解释的 Plan-write timing；不得把 receipt 或重跑绿灯写成已消除这些残余。真实产品门禁仍要求作者显式选择满足五章节、2,000 汉字和来源要求的项目并提供完整 `sk-api-`；不得扫描无关私人文稿、自动创建真实副本或用 fixture 替代作者证据。
 
 ## 1. 阶段目标
 
@@ -383,7 +383,7 @@ Main 为当前窗口保存不可伪造的 project session，不允许 renderer �
 - [x] renderer sandbox、context isolation 和窄 preload API 保持开启。
 - [x] Phase A 地基、当前 Chat/Chapter 源码的单元/IPC 集成和强制真实 Electron 验收通过；失败证据不被静态 verify 掩盖。
 
-> 证据边界：当前最终源码 `npm test` 与 Electron-enabled `npm run verify` exit 0，0.0R Watcher 28/28、跨层 11/11、同源强制 Electron 连续两次 32/32、Persistent Watcher 3/3；Diagnostic Export、Image Review、Image Trash、Changes/History 与 Graph 定向证据均通过。0.0R 独立复审 P0=0/P1=0/P2=1，保留项仅为祖先目录纯 Node 解析边界；真实 API、完整 `sk-api-` 图片、真实作者内测与发布复审仍未关闭。精确缺口见 `v0/DEVELOPMENT-STATUS.md`。
+> 证据边界：当前最终源码 `npm test` 与沙箱外 Electron-enabled `npm run verify` exit 0，Author **47/47**、Offline API **15/15**、package **8/8**、release **7/7**、Persistent Watcher **3/3**，状态诊断后的同源强制 Electron 连续两次 **32/32**；Diagnostic Export、Image Review、Image Trash、Changes/History 与 Graph 定向证据均通过。0.0S 第三轮独立复审 **P0=0/P1=0/P2=3，可以技术签字**；纯 Node 祖先解析、native reserve 微窗口和 Plan-write timing 仍保留。真实 API、完整 `sk-api-` 图片、真实作者内测与发布复审仍未关闭。精确缺口见 `v0/DEVELOPMENT-STATUS.md`。
 
 Phase A 只有在全部清单有可复现证据时才算完成；“页面看起来像工作区”或“测试只检查元素存在”都不构成验收。
 

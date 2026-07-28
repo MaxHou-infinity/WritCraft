@@ -66,6 +66,10 @@ When replacing a production synchronization primitive, search the test harness a
 
 For macOS packages, sign nested executable code before the outer App and verify each nested executable independently after ZIP extraction. `codesign --deep` on the outer bundle is not evidence that code stored in an unexpected location is signed. Keep `LSMinimumSystemVersion` aligned with every Mach-O slice, and bind generated native binaries to their source hash in release evidence. Create ZIPs with `ditto --norsrc`, assert there are no `._*` AppleDouble entries, and verify an App extracted by standard `unzip`; a `ditto`-only round trip can hide a broken archive.
 
+For fd-backed preflight, validate the opened descriptor's access mode as well as identity and permissions; adversarial tests must also attack failures after the private artifact is created, not only the pre-create path.
+
+Build evidence is one hash chain, not parallel digests: attest the signed helper during the build, prove the App helper and standard-`unzip` helper equal that digest, and never re-sign the attested helper during outer-App signing.
+
 For destructive filesystem work, an `lstat` followed by path-based `unlink` is not an identity guarantee. Move the path into a private unpredictable transaction quarantine, revalidate inode, size, canonical parent, and content digest, then remove only the quarantined identity. Snapshot deletion must bind content identity as well as inode; same-inode rewrites and late replacements fail closed. Once a mutation is committed, its exact retry truth must outlive the live capability TTL until fsync/partial recovery reaches a terminal state.
 
 Tests must derive expectations from the production contract, not incidental ordering. If production sorts candidates by metadata, a race/fault injection must target the first candidate actually processed or explicitly control the metadata; never assume fixture creation order. Before changing product code for a next-session failure, first prove whether the failure is implementation drift, environmental variance, or a brittle test assumption.

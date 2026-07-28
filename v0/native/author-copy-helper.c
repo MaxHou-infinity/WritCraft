@@ -17,6 +17,7 @@
 
 #define SOURCE_PARENT_FD 3
 #define TARGET_PARENT_FD 4
+#define RESERVATION_RECEIPT_FD 5
 #define INPUT_CAPACITY 4096
 #define STAGE_PREFIX ".writcraft-author-copy-"
 
@@ -63,6 +64,72 @@ static void identity_strings(
   snprintf(inode, inode_capacity, "%llu", (unsigned long long)value->st_ino);
 }
 
+// The parent creates this unlinked 0600 regular-file descriptor before the
+// helper starts. stdout is only a convenience receipt: if it is lost after a
+// successful reservation, this fd still binds the exact stage identity.
+static bool reservation_receipt_is_ready(void) {
+  struct stat receipt;
+  int flags = fcntl(RESERVATION_RECEIPT_FD, F_GETFL);
+  if (flags < 0 || (flags & O_ACCMODE) != O_RDWR ||
+      fstat(RESERVATION_RECEIPT_FD, &receipt) != 0 ||
+      !S_ISREG(receipt.st_mode) ||
+      (receipt.st_mode & 0777) != 0600) {
+    return false;
+  }
+  return true;
+}
+
+static bool write_reservation_receipt(const char *name, const struct stat *value) {
+  if (!reservation_receipt_is_ready()) return false;
+  char device[32];
+  char inode[32];
+  char payload[256];
+  identity_strings(value, device, sizeof(device), inode, sizeof(inode));
+  int length = snprintf(
+    payload,
+    sizeof(payload),
+    "{\"ok\":true,\"name\":\"%s\",\"dev\":\"%s\",\"ino\":\"%s\",\"mode\":%u}\n",
+    name,
+    device,
+    inode,
+    (unsigned int)(value->st_mode & 0777)
+  );
+  if (length <= 0 || (size_t)length >= sizeof(payload) ||
+      ftruncate(RESERVATION_RECEIPT_FD, 0) != 0) {
+    return false;
+  }
+  size_t offset = 0;
+  while (offset < (size_t)length) {
+    ssize_t written = pwrite(
+      RESERVATION_RECEIPT_FD,
+      payload + offset,
+      (size_t)length - offset,
+      (off_t)offset
+    );
+    if (written <= 0) return false;
+    offset += (size_t)written;
+  }
+  return fsync(RESERVATION_RECEIPT_FD) == 0;
+}
+
+// This is only used after an fd has established the exact directory identity.
+// A replacement observed by fstatat is never removed. The mkdirat->openat
+// interval remains the separately documented residual P2.
+static void remove_known_reservation_if_unchanged(
+  const char *name,
+  const struct stat *opened
+) {
+  struct stat current;
+  if (fstatat(SOURCE_PARENT_FD, name, &current, AT_SYMLINK_NOFOLLOW) != 0 ||
+      !S_ISDIR(current.st_mode) ||
+      current.st_dev != opened->st_dev || current.st_ino != opened->st_ino) {
+    return;
+  }
+  if (unlinkat(SOURCE_PARENT_FD, name, AT_REMOVEDIR) == 0) {
+    (void)fsync(SOURCE_PARENT_FD);
+  }
+}
+
 static bool inspect_at(int parent_fd, const char *name, OptionalStat *result) {
   memset(result, 0, sizeof(*result));
   if (fstatat(parent_fd, name, &result->value, AT_SYMLINK_NOFOLLOW) == 0) {
@@ -90,6 +157,9 @@ static void print_optional_identity(const OptionalStat *value) {
 }
 
 static int reserve_directory(void) {
+  // Do this before mkdirat. A reserve without a Main-owned recovery receipt
+  // must not create a stage whose committed identity cannot be recovered.
+  if (!reservation_receipt_is_ready()) return 1;
   for (int attempt = 0; attempt < 16; attempt += 1) {
     unsigned char random_bytes[24];
     char name[sizeof(STAGE_PREFIX) + (sizeof(random_bytes) * 2)];
@@ -126,14 +196,21 @@ static int reserve_directory(void) {
         AT_SYMLINK_NOFOLLOW
       ) == 0;
     }
+    bool identity_known = false;
     if (valid) {
       valid = S_ISDIR(opened.st_mode) &&
         opened.st_dev == at_path.st_dev &&
         opened.st_ino == at_path.st_ino;
     }
+    if (valid) identity_known = true;
     if (valid) valid = fsync(SOURCE_PARENT_FD) == 0;
+    if (valid) valid = write_reservation_receipt(name, &opened);
     int close_result = close(directory_fd);
-    if (!valid || close_result != 0) return 1;
+    if (!valid) {
+      if (identity_known) remove_known_reservation_if_unchanged(name, &opened);
+      return 1;
+    }
+    if (close_result != 0) return 1;
     char device[32];
     char inode[32];
     identity_strings(&opened, device, sizeof(device), inode, sizeof(inode));

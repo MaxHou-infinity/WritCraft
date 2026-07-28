@@ -1,8 +1,8 @@
 # 笔触 · WritCraft · 一个月 V0 路线图
 
-> 文档版本：2026-07-27（v2.6，0.0R strict watcher fd hash 签收）
+> 文档版本：2026-07-28（v2.7，0.0S reserve receipt 与构建因果链）
 > 状态：**V0 续作中，完整产品未完成**；产品范围以 `docs/WRITCRAFT-PRD-V3.md` 为准  
-> 2026-07-27 续作交接：既有产品链与 0.0P 原生 helper 保持签字；0.0Q Main exact barrier 与 0.0R strict watcher no-follow fd 均已完成。Watcher **28/28**、跨层 **11/11**、同源完整 Electron 连续两次 **32/32**，独立复审 **P0=0/P1=0/P2=1**；保留 P2 仅为纯 Node 无法逐段保护祖先目录。下一本地任务是 native reserve 失败空 stage 与 build 因果 P2；作者合格项目、完整 `sk-api-`、真实旅程和正式发布仍是外部门禁。0.0P App/ZIP 未随 0.0R 重建并禁止分发，准确事实与 TODO 只看 `v0/DEVELOPMENT-STATUS.md`。
+> 2026-07-28 续作交接：0.0S 已用匿名 0600 reserve receipt 关闭 stdout/status 丢失后的空 stage 猜测，并让构建后的 signed helper、App helper 和标准 `unzip` ZIP helper 绑定同一 hash。Author **47/47**、离线 **15/15**（**62/62、0 网络**）、package **8/8**、release **7/7**、`npm test`/verify exit 0、persistent watcher **3/3**。当前 ad-hoc App/ZIP 已按源码重建但禁止分发。真实 Electron 首次 Plan write timeout 虽已补失败快照、随后同源连续两次 **32/32**，根因仍未解释，保留 timing P2；祖先 `openat`、`mkdirat→openat` 微窗口与真实作者/付费/发布门禁也仍开放。准确事实与 TODO 只看 `v0/DEVELOPMENT-STATUS.md`。
 > 范围：Month 1（4 周 × 7 天 = 28 天）
 
 ---
@@ -168,4 +168,4 @@
 
 ## 九、 下一步
 
-2026-07-27 日终 0.0R 已签收：strict watcher hash 已使用 no-follow fd、BigInt pre/post identity 与有界读取关闭最终文件组件替换 P2。下一步严格按 `v0/DEVELOPMENT-STATUS.md` 处理 native reserve 失败空 stage 与 build 因果 P2。作者提供合格项目和完整 `sk-api-` 后，才按 `docs/AUTHOR-ACCEPTANCE-V1-CONTRACT.md` 执行真实付费图片、2000+ 字/5+ 章作者旅程和私有价值证据；其后基于最新源码重建并进入签名/公证/Gatekeeper 复审。
+2026-07-28 日终 0.0S 已关闭 native reserve receipt 与 build→App→ZIP hash 链 P2；不要从旧路线图重开它们。下一步严格按 `v0/DEVELOPMENT-STATUS.md`：先解释并稳定复现首次 Plan write timing timeout，同时保留失败快照；祖先 `openat` 与 `mkdirat→openat` 微窗口若进入威胁模型，须先冻结原生协议。只有作者提供合格项目和完整 `sk-api-`，才按 `docs/AUTHOR-ACCEPTANCE-V1-CONTRACT.md` 执行真实付费图片、2000+ 字/5+ 章作者旅程和私有价值证据；其后基于最新源码重建并进入签名/公证/Gatekeeper 复审。

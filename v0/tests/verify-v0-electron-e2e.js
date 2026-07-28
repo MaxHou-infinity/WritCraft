@@ -7,6 +7,7 @@
 // state inside a disposable OS temporary directory.
 
 const assert = require('assert');
+const crypto = require('crypto');
 const fs = require('fs');
 const http = require('http');
 const net = require('net');
@@ -1775,7 +1776,28 @@ async function run() {
         document.querySelector('.change-file-actions .change-decision--accepted').click();
         document.getElementById('changes-apply').click();
       })()`);
-      await waitForValue(first.client, `document.getElementById('changes-status').textContent.includes('Plan 任务已安全写入并完成')`, 'the explicitly accepted Plan task write');
+      try {
+        await waitForValue(first.client, `document.getElementById('changes-status').textContent.includes('Plan 任务已安全写入并完成')`, 'the explicitly accepted Plan task write');
+      } catch (error) {
+        const diagnostic = await first.client.evaluate(`(() => ({
+          status: document.getElementById('changes-status')?.textContent || '',
+          applyHidden: Boolean(document.getElementById('changes-apply')?.hidden),
+          applyDisabled: Boolean(document.getElementById('changes-apply')?.disabled),
+          planBanner: document.querySelector('.changes-plan-mode')?.textContent || '',
+          instructionReadOnly: Boolean(document.getElementById('changes-instruction')?.readOnly),
+          cards: [...document.querySelectorAll('.change-hunk-card')].map(card => ({
+            className: card.className,
+            textLength: card.textContent.length,
+            acceptedPressed: card.querySelector('.change-decision--accepted')?.getAttribute('aria-pressed') || '',
+          })),
+        }))()`);
+        const disk = projectService.readFile(project.rootPath, createdPath);
+        diagnostic.disk = {
+          bytes: Buffer.byteLength(disk, 'utf8'),
+          sha256: crypto.createHash('sha256').update(disk).digest('hex'),
+        };
+        throw new Error(`${error.message}; diagnostic=${JSON.stringify(diagnostic)}`);
+      }
       const afterDisk = projectService.readFile(project.rootPath, createdPath);
       assert(afterDisk.includes(electronAiFixture.PLAN_AFTER));
       assert(!afterDisk.includes(electronAiFixture.PLAN_BEFORE));

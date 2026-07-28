@@ -6,7 +6,7 @@
 
 > **开发阶段续作交接（2026-07-18，历史专项证据）**：调研结论不变；工程已完成三级工作区、`edit.md`、ChangeSet、完整有界 Context、项目向导、增强图谱、来源/脚注、Cursor 标签、右侧四书签和 300 文件压力基线。metrics、Research、image-01 当时通过真实 Electron 9/9 stub GUI 闭环；Main 固定主机、Renderer 双层断网、主动 abort、内部 Watcher revision 回声隔离、错误脱敏与真实 Chromium DOM sanitizer 13/13 也完成专项验证。当前总链以紧随其后的 0.0M 校准和 `v0/DEVELOPMENT-STATUS.md` 为准；仍待真实 MiniMax API、真实作者指标与发布复审，不得沿用历史测试数字或“已可发布”判断。
 
-> **当前收口校准（2026-07-27，0.0P）**：Image Trash 保持签字；真实作者验收预检/隔离副本已用 universal Mach-O helper 移除 `/usr/bin/python3` 运行时依赖。动态 **42/42** 覆盖单一快照、祖先/stage 身份、私有 readiness、parent-fd no-clobber 发布、精确清理、三态 committed truth、universal 架构、空 `PATH` 与 embedded-NUL 拒绝；真实 API 离线合同 **15/15**，组合 **57/57、0 网络**，package **6/6**、本地 release **7/7**、完整 test/verify 与最终强制 Electron **32/32** 通过。Onboarding 旧红灯已定位为测试只等首个 watcher 事件，补静默/fatal/CDP 门禁后聚焦真实 Electron 累计 8 次通过；最终独立复审 **P0=0/P1=0/P2=3**。Coding Plan、最近短项目和完整 `sk-api-` 仍是后续外部门禁。
+> **历史收口校准（2026-07-27，0.0P）**：Image Trash 保持签字；真实作者验收预检/隔离副本已用 universal Mach-O helper 移除 `/usr/bin/python3` 运行时依赖。动态 **42/42** 覆盖单一快照、祖先/stage 身份、私有 readiness、parent-fd no-clobber 发布、精确清理、三态 committed truth、universal 架构、空 `PATH` 与 embedded-NUL 拒绝；真实 API 离线合同 **15/15**，组合 **57/57、0 网络**，package **6/6**、本地 release **7/7**、完整 test/verify 与最终强制 Electron **32/32** 通过。Onboarding 旧红灯已定位为测试只等首个 watcher 事件，补静默/fatal/CDP 门禁后聚焦真实 Electron 累计 8 次通过；最终独立复审 **P0=0/P1=0/P2=3**。Coding Plan、最近短项目和完整 `sk-api-` 仍是后续外部门禁。
 
 > **当日工程复盘**：正确之处是先做无网络合同、只读凭据/项目资格预检、隔离副本工具和真实 CLI 回归，并在付费与隐私边界前停止；错误之处是设计时把“扫描、复制、复核、rename”当成若干顺序步骤，没有先冻结完整身份/提交状态矩阵，导致 11/11 与全链绿灯后仍一次暴露 6 个 P1。明日必须先把复审项逐条变成会失败的对抗测试，再改 service；不得继续扩测试数量或外部验收来掩盖事务协议未闭合。
 
@@ -20,7 +20,9 @@
 
 > **2026-07-27 0.0Q 收口复盘**：Main-owned exact barrier 已替代时间静默推断，并在独立复审发现 3 个 P1 后补齐 internal-mutation epoch、首次 strict 全项目失效和 Renderer 外部同步失败门禁。做对的是保留红灯、先写对抗测试、让独立 reviewer 二审，最后以同源连续两次 32/32 收口。做错或险些做错的有三点：把“强制遍历”误当“完整 hash”（实际仍复用了轮转预算）；测试把运行时实例与不存在的 fixture 字段比较，错把测试断言红当产品红；E2E 在 Graph 外部写后仍读取已删除的 `externalQueue`，造成 3.5 秒假性能红。今后任何权威 barrier 必须证明覆盖范围而非只证明动作发生；集成红灯先核对运行时 authority 与测试 fixture；删除生产同步原语时同步搜索并删除所有测试侧旧等待。当前保留 P2 是 strict hash 的 `lstat→path read` TOCTOU，明日优先用 no-follow fd + fstat 关闭。
 
-> **2026-07-27 0.0R 收口复盘（当前）**：strict watcher hash 已从 path stream 改为 `O_NOFOLLOW | O_NONBLOCK` fd，在扫描时私存 BigInt identity，读前后 `fstat`、返回前 `lstat`，并按已验证 size 有界读取；最终文件组件被 symlink、普通文件替换、增长或同 inode 改写时均 fail-closed，不再签发成功 barrier。做对的是先用 scan→open 对抗测试稳定复现，再分离私有纳秒权威与公开 `mtimeMs` 兼容语义，并补成功/失败 fd close；Watcher **28/28**、跨层 **11/11**、同源完整 Electron 连续两次 **32/32**。险些做错的是把内部精度升级直接暴露到公开 snapshot，造成旧舍入语义回归；今后安全精度升级必须与公开兼容字段分层。保留 P2 仅为纯 Node 无法逐段 `openat` 保护祖先目录，不能宣称全路径 TOCTOU 已消除。下一本地任务是 native reserve 失败空 stage 与 build 因果 P2；0.0P App/ZIP 未随 0.0R 重建，禁止分发。
+> **2026-07-27 0.0R 收口复盘（历史，已由 0.0S 覆盖）**：strict watcher hash 已从 path stream 改为 `O_NOFOLLOW | O_NONBLOCK` fd，在扫描时私存 BigInt identity，读前后 `fstat`、返回前 `lstat`，并按已验证 size 有界读取；最终文件组件被 symlink、普通文件替换、增长或同 inode 改写时均 fail-closed，不再签发成功 barrier。做对的是先用 scan→open 对抗测试稳定复现，再分离私有纳秒权威与公开 `mtimeMs` 兼容语义，并补成功/失败 fd close；Watcher **28/28**、跨层 **11/11**、同源完整 Electron 连续两次 **32/32**。险些做错的是把内部精度升级直接暴露到公开 snapshot，造成旧舍入语义回归；今后安全精度升级必须与公开兼容字段分层。保留 P2 仅为纯 Node 无法逐段 `openat` 保护祖先目录，不能宣称全路径 TOCTOU 已消除。当时的下一本地任务和未重建产物状态均已由下方 0.0S 覆盖。
+
+> **2026-07-28 0.0S 收口复盘（当前）**：先把 reserve 回执和构建因果各写成会失败的反证：没有 0600 receipt 的 reserve 必须在创建 stage 前失败；App helper 被篡改、ZIP 携带旧 helper 或 build 产物替换都必须拒绝。实现让 helper 写入 Main 持有的匿名回执 fd，stdout/status 丢失时仍恢复精确身份；build 在 attestation 前签 helper，package 只复制/校验，App 与标准 `unzip` ZIP 同比同一 hash，并比较完整 bundle tree（含 symlink 与 POSIX mode）。release 还拒绝伪造产品、版本、Developer ID 或已公证状态。Author **47/47**、离线 **15/15**、package **8/8**、release **7/7**、`npm test`/verify exit 0。一次首次 Plan write timeout 不能被随后两次同源 **32/32** 覆盖：已补仅含状态、长度和 SHA-256 的失败快照，但根因未解释，继续列为 timing P2。仍开放的是祖先 `openat`、`mkdirat→openat` 微窗口及真实作者/付费/正式发布门禁；ad-hoc App/ZIP 只作本地证据，禁止分发。
 
 ---
 

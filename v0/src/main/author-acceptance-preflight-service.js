@@ -24,6 +24,7 @@ const NO_FOLLOW = typeof fs.constants.O_NOFOLLOW === 'number'
 const ATOMIC_RENAME_HELPER = process.resourcesPath && !process.defaultApp
   ? path.join(process.resourcesPath, '..', 'Helpers', 'author-copy-helper')
   : path.join(__dirname, 'native', 'author-copy-helper');
+const RESERVATION_RECEIPT_MAX_BYTES = 512;
 
 let cwdLeaseActive = false;
 
@@ -386,9 +387,13 @@ function syncCurrentDirectory() {
   }
 }
 
-function runAtomicDirectoryHelper(sourceParentFd, targetParentFd, request) {
+function runAtomicDirectoryHelper(sourceParentFd, targetParentFd, request, options = {}) {
   if (process.platform !== 'darwin') {
     fail('COPY_ATOMIC_PUBLISH_UNAVAILABLE', '当前文件系统不支持排他发布');
+  }
+  const stdio = ['pipe', 'pipe', 'pipe', sourceParentFd, targetParentFd];
+  if (Number.isInteger(options.reservationReceiptFd) && options.reservationReceiptFd >= 0) {
+    stdio.push(options.reservationReceiptFd);
   }
   const execution = childProcess.spawnSync(
     ATOMIC_RENAME_HELPER,
@@ -399,7 +404,7 @@ function runAtomicDirectoryHelper(sourceParentFd, targetParentFd, request) {
       maxBuffer: 4096,
       timeout: 5000,
       windowsHide: true,
-      stdio: ['pipe', 'pipe', 'pipe', sourceParentFd, targetParentFd],
+      stdio,
     }
   );
   let report;
@@ -411,14 +416,8 @@ function runAtomicDirectoryHelper(sourceParentFd, targetParentFd, request) {
   return { execution, report };
 }
 
-function reservePrivateDirectory(parentFd) {
-  const { execution, report } = runAtomicDirectoryHelper(
-    parentFd,
-    parentFd,
-    { mode: 'reserve' }
-  );
-  if (execution.status !== 0 ||
-      !report ||
+function reservationFromReport(report) {
+  if (!report ||
       report.ok !== true ||
       typeof report.name !== 'string' ||
       !/^\.writcraft-author-copy-[a-f0-9]{48}$/.test(report.name) ||
@@ -428,15 +427,92 @@ function reservePrivateDirectory(parentFd) {
       !/^(?:0|[1-9][0-9]*)$/.test(report.ino) ||
       report.mode !== 0o700 ||
       Object.keys(report).sort().join(',') !== 'dev,ino,mode,name,ok') {
-    fail('COPY_RESERVATION_UNCERTAIN', '验收副本私有目录预留结果不确定');
+    return null;
   }
   return Object.freeze({
     name: report.name,
-    identity: Object.freeze({
-      dev: BigInt(report.dev),
-      ino: BigInt(report.ino),
-    }),
+    identity: Object.freeze({ dev: BigInt(report.dev), ino: BigInt(report.ino) }),
   });
+}
+
+function sameReservation(left, right) {
+  return Boolean(left && right && left.name === right.name &&
+    sameIdentity(left.identity, right.identity));
+}
+
+function createAnonymousReservationReceipt() {
+  const name = path.join(
+    os.tmpdir(),
+    `.writcraft-author-reservation-${crypto.randomBytes(24).toString('hex')}`
+  );
+  let fd;
+  try {
+    fd = fs.openSync(
+      name,
+      fs.constants.O_RDWR | fs.constants.O_CREAT | fs.constants.O_EXCL | NO_FOLLOW,
+      0o600
+    );
+    fs.fchmodSync(fd, 0o600);
+    const opened = fs.fstatSync(fd, { bigint: true });
+    const atPath = fs.lstatSync(name, { bigint: true });
+    if (!opened.isFile() || opened.nlink !== 1n ||
+        Number(opened.mode & 0o777n) !== 0o600 ||
+        !sameIdentity(identityOf(opened), identityOf(atPath))) {
+      fail('COPY_RESERVATION_UNCERTAIN', '验收副本预留回执身份异常');
+    }
+    fs.unlinkSync(name);
+    return fd;
+  } catch (error) {
+    if (fd !== undefined) {
+      try { fs.closeSync(fd); } catch (_) {}
+    }
+    if (error instanceof AuthorAcceptancePreflightError) throw error;
+    fail('COPY_RESERVATION_UNCERTAIN', '验收副本预留回执无法创建');
+  }
+}
+
+function readReservationReceipt(fd) {
+  try {
+    const stat = fs.fstatSync(fd, { bigint: true });
+    if (!stat.isFile() || Number(stat.mode & 0o777n) !== 0o600 ||
+        stat.size < 1n || stat.size > BigInt(RESERVATION_RECEIPT_MAX_BYTES)) {
+      return null;
+    }
+    const bytes = Buffer.alloc(Number(stat.size));
+    const read = fs.readSync(fd, bytes, 0, bytes.length, 0);
+    if (read !== bytes.length) return null;
+    return reservationFromReport(JSON.parse(bytes.toString('utf8')));
+  } catch (_) {
+    return null;
+  }
+}
+
+function reservePrivateDirectory(parentFd) {
+  const receiptFd = createAnonymousReservationReceipt();
+  try {
+    const { execution, report } = runAtomicDirectoryHelper(
+      parentFd,
+      parentFd,
+      { mode: 'reserve' },
+      { reservationReceiptFd: receiptFd }
+    );
+    const direct = execution.status === 0 ? reservationFromReport(report) : null;
+    const receipt = readReservationReceipt(receiptFd);
+    if (!direct && !receipt) {
+      fail('COPY_RESERVATION_UNCERTAIN', '验收副本私有目录预留结果不确定');
+    }
+    if (!direct && receipt) {
+      return Object.freeze({ ...receipt, receiptVerified: true });
+    }
+    if (direct && receipt && sameReservation(direct, receipt)) {
+      return Object.freeze({ ...direct, receiptVerified: true });
+    }
+    // A direct identity is sufficient to run exact cleanup, but never to
+    // continue writing when the durable receipt is missing or disagrees.
+    return Object.freeze({ ...direct, receiptVerified: false });
+  } finally {
+    try { fs.closeSync(receiptFd); } catch (_) {}
+  }
 }
 
 function inspectPublishedDirectory(sourceParentFd, targetParentFd, sourceName, targetName) {
@@ -1054,6 +1130,13 @@ function createWorkingCopy(input = {}, options = {}) {
       stageName = reservation.name;
       stagePath = path.join(parent.path, stageName);
       finalIdentity = reservation.identity;
+      if (reservation.receiptVerified !== true) {
+        throw new AuthorAcceptancePreflightError(
+          'COPY_RESERVATION_UNCERTAIN',
+          '验收副本私有目录预留回执无法持久化确认',
+          { committed: false }
+        );
+      }
       let stageStat;
       try {
         stageStat = fs.lstatSync(stageName, { bigint: true });
@@ -1070,7 +1153,7 @@ function createWorkingCopy(input = {}, options = {}) {
         throw new AuthorAcceptancePreflightError(
           'COPY_RESERVATION_UNCERTAIN',
           '验收副本私有目录身份异常',
-          { committed: false }
+          { committed: false, reservationOwnershipUncertain: true }
         );
       }
       copyTree.identity = finalIdentity;
@@ -1255,6 +1338,7 @@ function createWorkingCopy(input = {}, options = {}) {
           { committed: true, causeCode: error?.code || null }
         );
       }
+      if (error?.reservationOwnershipUncertain === true) throw error;
       if (!finalIdentity || !stageName) throw error;
       const cleaned = cleanupOwnedCopy(
         parent,

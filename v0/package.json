@@ -9,7 +9,6 @@
     "start": "electron .",
     "dev": "electron . --dev",
     "build:native-helper": "node scripts/build-native-helper.js",
-    "prepackage:mac": "npm run build:native-helper",
     "package:mac": "node scripts/package-macos.js",
     "release:verify": "node scripts/verify-release.js",
     "acceptance:api": "node tests/verify-v0-api.js",

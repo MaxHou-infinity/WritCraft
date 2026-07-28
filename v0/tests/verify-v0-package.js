@@ -2,7 +2,9 @@
 
 const assert = require('assert');
 const fs = require('fs');
+const os = require('os');
 const path = require('path');
+const { execFileSync } = require('child_process');
 
 let passed = 0;
 function test(name, fn) {
@@ -18,12 +20,20 @@ function test(name, fn) {
 
 const root = path.resolve(__dirname, '..');
 const script = fs.readFileSync(path.join(root, 'scripts', 'package-macos.js'), 'utf8');
+const nativeBuildScript = fs.readFileSync(path.join(root, 'scripts', 'build-native-helper.js'), 'utf8');
+const releaseVerifyScript = fs.readFileSync(path.join(root, 'scripts', 'verify-release.js'), 'utf8');
 const packageJson = JSON.parse(fs.readFileSync(path.join(root, 'package.json'), 'utf8'));
+const nativeHelperBuild = require('../scripts/build-native-helper');
+const packageMac = require('../scripts/package-macos');
 
 console.log('\nmacOS packaging verification');
 
 test('provides a local macOS release command without adding an installer dependency', () => {
   assert.strictEqual(packageJson.scripts['package:mac'], 'node scripts/package-macos.js');
+  assert.strictEqual(packageJson.scripts['prepackage:mac'], undefined,
+    'package script itself must own the native build; npm lifecycle hooks are bypassable');
+  assert.match(script, /prepareNativeHelper\(/,
+    'direct node scripts/package-macos.js must establish a fresh native build binding');
   assert(!/electron-builder|electron-packager|electron-forge/.test(JSON.stringify(packageJson)));
 });
 
@@ -43,13 +53,39 @@ test('removes the Electron default app and assigns WritCraft bundle identity', (
 test('ad-hoc signs, verifies, archives and records a SHA-256 release manifest', () => {
   assert.match(script, /codesign/);
   assert.match(script, /--verify/);
-  assert.match(script, /packagedNativeHelper[\s\S]*codesign/);
+  assert.match(nativeBuildScript, /SIGNING_RECIPE/,
+    'the attested recipe must include nested helper signing before its digest is recorded');
+  assert.match(nativeBuildScript, /codesign/,
+    'the build must sign the helper before creating its attestation');
+  assert.match(script, /assertPackagedHelperBinding\(nativeHelperBuild, packagedNativeHelper\)/,
+    'the package must reject a copied helper whose bytes differ from the build attestation');
+  assert.doesNotMatch(script, /--sign', '-', packagedNativeHelper/,
+    'package must not re-sign the nested helper after its attested build');
+  assert.doesNotMatch(script, /--deep', '--sign', '-', outputApp/,
+    'outer signing must not mutate the separately attested nested helper');
+  assert.match(releaseVerifyScript, /assertArtifactHelperBinding\(info\.nativeHelperBuild, packagedHelper\)/,
+    'release verification must bind the App helper to the build digest');
+  assert.match(releaseVerifyScript, /assertArtifactHelperBinding\(info\.nativeHelperBuild, extractedHelper\)/,
+    'release verification must bind the extracted ZIP helper to the same build digest');
+  assert.match(releaseVerifyScript, /assertTreeEqual\(app, extractedApp\)/,
+    'release verification must compare the complete App and extracted ZIP trees');
+  assert.match(releaseVerifyScript, /assert\.strictEqual\(info\.product, PRODUCT_NAME\)/,
+    'release verification must pin the declared product identity');
+  assert.match(releaseVerifyScript, /assert\.strictEqual\(info\.version, sourcePackage\.version\)/,
+    'release verification must pin the packaged version to package.json');
+  assert.match(releaseVerifyScript, /assert\.strictEqual\(info\.signing, 'ad-hoc \(local testing only\)'\)/,
+    'release verification must reject a manifest that overclaims signing');
+  assert.match(releaseVerifyScript, /assert\.strictEqual\(info\.notarized, false\)/,
+    'release verification must reject a manifest that overclaims notarization');
+  assert.match(releaseVerifyScript, /mode: Number\(fs\.lstatSync\(absolute\)\.mode & 0o777\)/,
+    'release tree comparison must bind POSIX modes as well as bytes and symlinks');
   assert.match(script, /LSMinimumSystemVersion', '11\.0'/);
   assert.match(script, /ditto/);
   assert.match(script, /--norsrc/);
   assert.match(script, /archiveSha256/);
-  assert.match(script, /nativeHelperSourceSha256/);
-  assert.match(script, /nativeHelperSha256/);
+  assert.match(script, /nativeHelperBuild/);
+  assert.doesNotMatch(script, /nativeHelperPackagedSha256/,
+    'the manifest must have one source-to-build digest, not an independent packaged digest');
   assert.match(script, /notarized: false/);
 });
 
@@ -86,4 +122,114 @@ test('bundles a universal executable author-copy helper without Python', () => {
   assert.match(service, /native',\s*'author-copy-helper'/);
 });
 
-console.log(`\n${passed}/6 macOS packaging checks passed.`);
+test('direct package path owns one current signed native build attestation and rejects stale or forged proof', () => {
+  const temporary = fs.mkdtempSync(path.join(os.tmpdir(), 'writcraft-build-causality-'));
+  const source = path.join(temporary, 'native', 'author-copy-helper.c');
+  const output = path.join(temporary, 'src', 'main', 'native', 'author-copy-helper');
+  try {
+    fs.mkdirSync(path.dirname(source), { recursive: true });
+    fs.mkdirSync(path.dirname(output), { recursive: true });
+    fs.writeFileSync(source, 'int main(void) { return 0; }\n');
+    fs.writeFileSync(output, 'compiled-native-helper');
+    const attestation = nativeHelperBuild.createNativeHelperAttestation({ source, output });
+    let calls = 0;
+    const prepared = packageMac.prepareNativeHelper({
+      root: temporary,
+      source,
+      output,
+      buildNativeHelper(options) {
+        calls += 1;
+        assert.deepStrictEqual(options, { root: temporary });
+        return attestation;
+      },
+    });
+    assert.strictEqual(calls, 1, 'package must invoke its builder exactly once');
+    assert.deepStrictEqual(prepared, attestation);
+
+    let coordinatorCalls = 0;
+    assert.deepStrictEqual(packageMac.beginPackage({
+      prepareNativeHelper() {
+        coordinatorCalls += 1;
+        return attestation;
+      },
+    }), attestation);
+    assert.strictEqual(coordinatorCalls, 1,
+      'the production package coordinator must obtain exactly one build attestation');
+
+    assert.throws(() => packageMac.prepareNativeHelper({
+      root: temporary,
+      source,
+      output,
+      buildNativeHelper: () => ({ ...attestation, unexpected: true }),
+    }), /NATIVE_HELPER_BUILD_ATTESTATION_INVALID/);
+
+    fs.writeFileSync(output, 'stale-or-replaced-helper');
+    assert.throws(() => packageMac.prepareNativeHelper({
+      root: temporary,
+      source,
+      output,
+      buildNativeHelper: () => attestation,
+    }), /NATIVE_HELPER_BUILD_MISMATCH/);
+
+    fs.writeFileSync(output, 'attested-helper-again');
+    const freshAttestation = nativeHelperBuild.createNativeHelperAttestation({ source, output });
+    const appHelper = path.join(temporary, 'app-helper');
+    const extractedZipHelper = path.join(temporary, 'zip-helper');
+    fs.copyFileSync(output, appHelper);
+    fs.copyFileSync(output, extractedZipHelper);
+    nativeHelperBuild.assertArtifactHelperBinding(freshAttestation, appHelper);
+    nativeHelperBuild.assertArtifactHelperBinding(freshAttestation, extractedZipHelper);
+    fs.writeFileSync(appHelper, 'tampered-app-helper');
+    assert.throws(
+      () => nativeHelperBuild.assertArtifactHelperBinding(freshAttestation, appHelper),
+      /NATIVE_HELPER_ARTIFACT_MISMATCH/,
+      'a tampered App helper must be rejected before archive creation'
+    );
+    fs.copyFileSync(output, appHelper);
+    nativeHelperBuild.assertArtifactHelperBinding(freshAttestation, appHelper);
+
+    const archiveRoot = path.join(temporary, 'archive-root');
+    const oldZip = path.join(temporary, 'old-helper.zip');
+    const unzipped = path.join(temporary, 'unzipped');
+    const archivedHelper = path.join(
+      archiveRoot, 'WritCraft.app', 'Contents', 'Helpers', 'author-copy-helper'
+    );
+    fs.mkdirSync(path.dirname(archivedHelper), { recursive: true });
+    fs.writeFileSync(archivedHelper, 'old-zip-helper');
+    execFileSync('zip', ['-qr', oldZip, 'WritCraft.app'], { cwd: archiveRoot });
+    execFileSync('unzip', ['-q', oldZip, '-d', unzipped]);
+    const extractedOldHelper = path.join(
+      unzipped, 'WritCraft.app', 'Contents', 'Helpers', 'author-copy-helper'
+    );
+    assert.throws(
+      () => nativeHelperBuild.assertArtifactHelperBinding(freshAttestation, extractedOldHelper),
+      /NATIVE_HELPER_ARTIFACT_MISMATCH/,
+      'a ZIP carrying an old helper must be rejected even when its App sibling is current'
+    );
+  } finally {
+    fs.rmSync(temporary, { recursive: true, force: true });
+  }
+});
+
+test('full package coordinator invokes exactly one real native build before writing its manifest', () => {
+  let builds = 0;
+  const info = packageMac.packageMac({
+    prepareNativeHelper() {
+      return packageMac.prepareNativeHelper({
+        buildNativeHelper(options) {
+          builds += 1;
+          return nativeHelperBuild.buildNativeHelper(options);
+        },
+      });
+    },
+  });
+  assert.strictEqual(builds, 1,
+    'one complete package invocation must run the real helper builder exactly once');
+  assert.strictEqual(info.schema, 'writcraft.release/v3');
+  assert.strictEqual(info.product, '笔触 · WritCraft');
+  assert.strictEqual(info.version, packageJson.version);
+  assert.strictEqual(info.signing, 'ad-hoc (local testing only)');
+  assert.strictEqual(info.notarized, false);
+});
+
+console.log(`\n${passed}/8 macOS packaging checks passed.`);

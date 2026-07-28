@@ -4,6 +4,7 @@ const crypto = require('crypto');
 const fs = require('fs');
 const path = require('path');
 const { execFileSync } = require('child_process');
+const nativeHelperBuildService = require('./build-native-helper');
 
 const root = path.resolve(__dirname, '..');
 const electronApp = path.join(root, 'node_modules', 'electron', 'dist', 'Electron.app');
@@ -29,9 +30,47 @@ function sha256(target) {
   return crypto.createHash('sha256').update(fs.readFileSync(target)).digest('hex');
 }
 
-required(electronApp, 'Electron macOS runtime');
-required(path.join(root, 'src', 'main', 'main.js'), 'WritCraft main process');
-required(nativeHelper, 'Author acceptance native helper');
+function prepareNativeHelper(options = {}) {
+  const projectRoot = options.root || root;
+  const source = options.source || path.join(projectRoot, 'native', 'author-copy-helper.c');
+  const output = options.output || path.join(projectRoot, 'src', 'main', 'native', 'author-copy-helper');
+  const buildNativeHelper = options.buildNativeHelper || nativeHelperBuildService.buildNativeHelper;
+  // This is deliberately owned by package-macos itself. `prepackage` hooks do
+  // not run when this script is invoked directly, so they cannot be the proof
+  // that the copied native executable came from the current C source.
+  const attestation = buildNativeHelper({ root: projectRoot });
+  return nativeHelperBuildService.assertNativeHelperAttestation(attestation, { source, output });
+}
+
+function beginPackage(options = {}) {
+  const prepare = options.prepareNativeHelper || prepareNativeHelper;
+  return prepare();
+}
+
+function assertPackagedHelperBinding(attestation, target = packagedNativeHelper) {
+  return nativeHelperBuildService.assertArtifactHelperBinding(attestation, target);
+}
+
+function signElectronRuntimeBundles() {
+  const frameworks = path.join(outputApp, 'Contents', 'Frameworks');
+  for (const entry of fs.readdirSync(frameworks, { withFileTypes: true })
+    .filter(candidate => candidate.isDirectory() && /\.(?:app|framework|xpc)$/.test(candidate.name))
+    .sort((left, right) => left.name.localeCompare(right.name))) {
+    // Repair Electron's own nested code only. The separately attested author
+    // helper lives in Contents/Helpers and must never be re-signed here.
+    execFileSync('codesign', ['--force', '--deep', '--sign', '-', path.join(frameworks, entry.name)], {
+      stdio: 'inherit',
+    });
+  }
+}
+
+function packageMac(options = {}) {
+  // Exactly one build is permitted per package invocation. The returned
+  // attestation is rechecked before any copy/sign/archive operation.
+  const nativeHelperBuild = beginPackage(options);
+  required(electronApp, 'Electron macOS runtime');
+  required(path.join(root, 'src', 'main', 'main.js'), 'WritCraft main process');
+  required(nativeHelper, 'Author acceptance native helper');
 
 fs.mkdirSync(releaseRoot, { recursive: true });
 fs.rmSync(outputRoot, { recursive: true, force: true });
@@ -44,6 +83,7 @@ fs.cpSync(path.join(root, 'src'), path.join(packagedApp, 'src'), { recursive: tr
 fs.mkdirSync(helpers, { recursive: true });
 fs.copyFileSync(nativeHelper, packagedNativeHelper);
 fs.chmodSync(packagedNativeHelper, 0o755);
+assertPackagedHelperBinding(nativeHelperBuild, packagedNativeHelper);
 fs.rmSync(path.join(packagedApp, 'src', 'main', 'native', 'author-copy-helper'));
 
 function removeFinderMetadata(directory) {
@@ -106,17 +146,19 @@ try {
   execFileSync(plistBuddy, ['-c', 'Set :NSAppTransportSecurity:NSAllowsArbitraryLoads false', plist]);
 } catch (_) {}
 
-// Sign nested code before the outer bundle. A future public release replaces
-// the ad-hoc identity with Developer ID and adds hardened runtime/notarization.
-execFileSync('codesign', ['--force', '--sign', '-', packagedNativeHelper], { stdio: 'inherit' });
+// The helper was signed in build-native-helper before its SHA-256 was
+// attested. Package only copies and verifies it; re-signing here would create
+// a different binary than the one the build attestation binds.
+signElectronRuntimeBundles();
 execFileSync('codesign', ['--verify', '--strict', packagedNativeHelper], { stdio: 'inherit' });
-execFileSync('codesign', ['--force', '--deep', '--sign', '-', outputApp], { stdio: 'inherit' });
+execFileSync('codesign', ['--force', '--sign', '-', outputApp], { stdio: 'inherit' });
 execFileSync('codesign', ['--verify', '--strict', packagedNativeHelper], { stdio: 'inherit' });
+assertPackagedHelperBinding(nativeHelperBuild, packagedNativeHelper);
 execFileSync('codesign', ['--verify', '--deep', '--strict', outputApp], { stdio: 'inherit' });
 execFileSync('ditto', ['-c', '-k', '--norsrc', '--keepParent', outputApp, zipPath]);
 
 const info = {
-  schema: 'writcraft.release/v1',
+  schema: 'writcraft.release/v3',
   product: '笔触 · WritCraft',
   version: sourcePackage.version,
   platform: 'darwin',
@@ -125,11 +167,21 @@ const info = {
   archive: path.relative(root, zipPath),
   archiveBytes: fs.statSync(zipPath).size,
   archiveSha256: sha256(zipPath),
-  nativeHelperSourceSha256: sha256(path.join(root, 'native', 'author-copy-helper.c')),
-  nativeHelperSha256: sha256(packagedNativeHelper),
+  nativeHelperBuild,
   minimumSystemVersion: '11.0',
   signing: 'ad-hoc (local testing only)',
   notarized: false,
 };
 fs.writeFileSync(path.join(outputRoot, 'build-info.json'), `${JSON.stringify(info, null, 2)}\n`, { mode: 0o644 });
 console.log(JSON.stringify(info, null, 2));
+return info;
+}
+
+if (require.main === module) packageMac();
+
+module.exports = Object.freeze({
+  prepareNativeHelper,
+  beginPackage,
+  assertPackagedHelperBinding,
+  packageMac,
+});

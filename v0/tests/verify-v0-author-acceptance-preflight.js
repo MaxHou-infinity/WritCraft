@@ -147,6 +147,67 @@ test('native helper rejects embedded NUL and trailing request bytes before mutat
   })
 );
 
+test('native helper rejects reserve without a recovery receipt before mutation', () =>
+  withScratch(scratch => {
+    const sourceParent = path.join(scratch, 'source');
+    const targetParent = path.join(scratch, 'target');
+    fs.mkdirSync(sourceParent);
+    fs.mkdirSync(targetParent);
+    const sourceFd = fs.openSync(sourceParent, fs.constants.O_RDONLY);
+    const targetFd = fs.openSync(targetParent, fs.constants.O_RDONLY);
+    try {
+      const result = childProcess.spawnSync(
+        path.join(__dirname, '..', 'src', 'main', 'native', 'author-copy-helper'),
+        [],
+        {
+          input: '{"mode":"reserve"}',
+          encoding: 'utf8',
+          stdio: ['pipe', 'pipe', 'pipe', sourceFd, targetFd],
+        }
+      );
+      assert.notStrictEqual(result.status, 0);
+      assert.deepStrictEqual(fs.readdirSync(sourceParent), []);
+      assert.deepStrictEqual(fs.readdirSync(targetParent), []);
+    } finally {
+      fs.closeSync(sourceFd);
+      fs.closeSync(targetFd);
+    }
+  })
+);
+
+test('native helper rejects a read-only recovery receipt before mutation', () =>
+  withScratch(scratch => {
+    const sourceParent = path.join(scratch, 'source');
+    const targetParent = path.join(scratch, 'target');
+    const receiptPath = path.join(scratch, 'receipt');
+    fs.mkdirSync(sourceParent);
+    fs.mkdirSync(targetParent);
+    fs.writeFileSync(receiptPath, '');
+    fs.chmodSync(receiptPath, 0o600);
+    const sourceFd = fs.openSync(sourceParent, fs.constants.O_RDONLY);
+    const targetFd = fs.openSync(targetParent, fs.constants.O_RDONLY);
+    const receiptFd = fs.openSync(receiptPath, fs.constants.O_RDONLY);
+    try {
+      const result = childProcess.spawnSync(
+        path.join(__dirname, '..', 'src', 'main', 'native', 'author-copy-helper'),
+        [],
+        {
+          input: '{"mode":"reserve"}',
+          encoding: 'utf8',
+          stdio: ['pipe', 'pipe', 'pipe', sourceFd, targetFd, receiptFd],
+        }
+      );
+      assert.notStrictEqual(result.status, 0);
+      assert.deepStrictEqual(fs.readdirSync(sourceParent), []);
+      assert.deepStrictEqual(fs.readdirSync(targetParent), []);
+    } finally {
+      fs.closeSync(receiptFd);
+      fs.closeSync(sourceFd);
+      fs.closeSync(targetFd);
+    }
+  })
+);
+
 test('reports every unmet author-project requirement without returning paths or content', () =>
   withScratch(scratch => {
     const descriptor = projectService.createProjectAt(scratch, '不足项目');
@@ -1143,6 +1204,127 @@ test('preserves a private stage when both non-commit helper reports are unavaila
   })
 );
 
+test('recovers a completed private reservation when the helper stdout and status are lost', () =>
+  withScratch(scratch => {
+    const sourceParent = path.join(scratch, 'source');
+    const destinationParent = path.join(scratch, 'copies');
+    fs.mkdirSync(sourceParent);
+    fs.mkdirSync(destinationParent);
+    const project = buildEligible(sourceParent);
+    const finalTarget = path.join(destinationParent, '预留回执恢复副本');
+    const originalSpawn = childProcess.spawnSync;
+    let reservedStage = null;
+    childProcess.spawnSync = function loseReserveReceipt(command, args, options) {
+      const result = originalSpawn.call(childProcess, command, args, options);
+      const request = JSON.parse(String(options?.input || '{}'));
+      if (isAuthorCopyHelper(command) && request.mode === 'reserve' && result.status === 0 && !reservedStage) {
+        const report = JSON.parse(String(result.stdout));
+        reservedStage = path.join(destinationParent, report.name);
+        return { ...result, status: 1, stdout: '', stderr: '' };
+      }
+      return result;
+    };
+    try {
+      const result = service.createWorkingCopy({
+        rootPath: project.rootPath,
+        destinationParent,
+        copyName: '预留回执恢复副本',
+      });
+      assert.strictEqual(result.ok, true);
+      assert.strictEqual(Object.hasOwn(result, 'reservationRecovered'), false);
+      assert.strictEqual(fs.existsSync(reservedStage), false);
+      assert.strictEqual(
+        JSON.parse(fs.readFileSync(path.join(finalTarget, service.COPY_MANIFEST), 'utf8')).schema,
+        service.COPY_SCHEMA
+      );
+    } finally {
+      childProcess.spawnSync = originalSpawn;
+    }
+  })
+);
+
+test('fails closed and preserves the stage when reserve stdout and its receipt are both unavailable', () =>
+  withScratch(scratch => {
+    const sourceParent = path.join(scratch, 'source');
+    const destinationParent = path.join(scratch, 'copies');
+    fs.mkdirSync(sourceParent);
+    fs.mkdirSync(destinationParent);
+    const project = buildEligible(sourceParent);
+    const originalSpawn = childProcess.spawnSync;
+    let reservedStage = null;
+    childProcess.spawnSync = function loseReserveEvidence(command, args, options) {
+      const result = originalSpawn.call(childProcess, command, args, options);
+      const request = JSON.parse(String(options?.input || '{}'));
+      if (isAuthorCopyHelper(command) && request.mode === 'reserve' && result.status === 0 && !reservedStage) {
+        const report = JSON.parse(String(result.stdout));
+        reservedStage = path.join(destinationParent, report.name);
+        fs.ftruncateSync(options.stdio[5], 0);
+        return { ...result, status: 1, stdout: '', stderr: '' };
+      }
+      return result;
+    };
+    try {
+      assert.throws(
+        () => service.createWorkingCopy({
+          rootPath: project.rootPath,
+          destinationParent,
+          copyName: '预留证据丢失副本',
+        }),
+        error => error.code === 'COPY_RESERVATION_UNCERTAIN' && error.committed !== true
+      );
+      const stage = fs.lstatSync(reservedStage, { bigint: true });
+      assert(stage.isDirectory());
+      assert.strictEqual(Number(stage.mode & 0o777n), 0o700);
+      assert.deepStrictEqual(fs.readdirSync(reservedStage), []);
+      assert.strictEqual(fs.existsSync(path.join(destinationParent, '预留证据丢失副本')), false);
+    } finally {
+      childProcess.spawnSync = originalSpawn;
+    }
+  })
+);
+
+test('never adopts or deletes a replacement after receipt-based reserve recovery', () =>
+  withScratch(scratch => {
+    const sourceParent = path.join(scratch, 'source');
+    const destinationParent = path.join(scratch, 'copies');
+    fs.mkdirSync(sourceParent);
+    fs.mkdirSync(destinationParent);
+    const project = buildEligible(sourceParent);
+    const originalSpawn = childProcess.spawnSync;
+    let reservedStage = null;
+    let originalStage = null;
+    childProcess.spawnSync = function replaceRecoveredReservation(command, args, options) {
+      const result = originalSpawn.call(childProcess, command, args, options);
+      const request = JSON.parse(String(options?.input || '{}'));
+      if (isAuthorCopyHelper(command) && request.mode === 'reserve' && result.status === 0 && !reservedStage) {
+        const report = JSON.parse(String(result.stdout));
+        reservedStage = path.join(destinationParent, report.name);
+        originalStage = `${reservedStage}-original`;
+        fs.renameSync(reservedStage, originalStage);
+        fs.mkdirSync(reservedStage, { mode: 0o700 });
+        return { ...result, status: 1, stdout: '', stderr: '' };
+      }
+      return result;
+    };
+    try {
+      assert.throws(
+        () => service.createWorkingCopy({
+          rootPath: project.rootPath,
+          destinationParent,
+          copyName: '预留换壳恢复副本',
+        }),
+        error => error.code === 'COPY_RESERVATION_UNCERTAIN' &&
+          error.reservationOwnershipUncertain === true && error.committed === false
+      );
+      assert.deepStrictEqual(fs.readdirSync(reservedStage), []);
+      assert.deepStrictEqual(fs.readdirSync(originalStage), []);
+      assert.strictEqual(fs.existsSync(path.join(destinationParent, '预留换壳恢复副本')), false);
+    } finally {
+      childProcess.spawnSync = originalSpawn;
+    }
+  })
+);
+
 test('never adopts a replacement inserted after the native stage reservation', () =>
   withScratch(scratch => {
     const sourceParent = path.join(scratch, 'source');
@@ -1172,7 +1354,8 @@ test('never adopts a replacement inserted after the native stage reservation', (
           destinationParent,
           copyName: '预留换壳副本',
         }),
-        error => error.code === 'COPY_CLEANUP_INCOMPLETE' &&
+        error => error.code === 'COPY_RESERVATION_UNCERTAIN' &&
+          error.reservationOwnershipUncertain === true &&
           error.committed === false
       );
       assert.deepStrictEqual(fs.readdirSync(replacementPath), []);
@@ -1424,4 +1607,4 @@ test('rejects duplicate CLI arguments instead of accepting the last value', () =
   );
 });
 
-console.log(`\n${passed}/42 author acceptance preflight checks passed.`);
+console.log(`\n${passed}/47 author acceptance preflight checks passed.`);
