@@ -37,7 +37,7 @@ const GRAPH_CACHE_BUDGET_MS = 700;
 const GRAPH_INCREMENTAL_BUDGET_MS = 800;
 const GRAPH_INTERACTION_BUDGET_MS = 100;
 const GRAPH_RENDERER_HEAP_BUDGET_BYTES = 150 * 1024 * 1024;
-const EXPECTED_STAGE_COUNT = ONBOARDING_FOCUS ? 2 : 32;
+const EXPECTED_STAGE_COUNT = ONBOARDING_FOCUS ? 2 : 33;
 
 let passed = 0;
 const activeElectronInstances = new Set();
@@ -2663,6 +2663,98 @@ async function run() {
       assert.strictEqual(response.chips.filter(chip => chip.type === 'project_prompt').length, 1);
       assert.strictEqual(response.chips.filter(chip => chip.type === 'file' && chip.text.includes(createdPath)).length, 1);
       await first.client.evaluate(`window.__assistantDock.close()`);
+    });
+
+    await stage('compiles an oversized edit.md by section and discloses used or omitted chapters in Context Inspector', async () => {
+      const editSnapshot = projectService.readFileWithRevision(project.rootPath, 'edit.md');
+      const oversizedEdit = [
+        '# 可选长背景',
+        `E2E_OPTIONAL_OVERFLOW_MUST_BE_OMITTED ${'可选背景资料。'.repeat(1200)}`,
+        '# 项目主旨',
+        'E2E_SECTIONED_PREMISE',
+        '# 范围与非目标',
+        'E2E_SECTIONED_SCOPE',
+        '# 关键实体与不变量',
+        'E2E_SECTIONED_ENTITY',
+        '# 时间与关系约束',
+        'E2E_SECTIONED_TIMELINE',
+        '# 可选尾注',
+        'E2E_SECTIONED_OPTIONAL_TAIL',
+      ].join('\n\n');
+      projectService.atomicWriteFile(project.rootPath, 'edit.md', oversizedEdit, editSnapshot.revision);
+      try {
+        await first.client.evaluate(`(() => {
+          window.__workspace.openFile(${JSON.stringify(createdPath)});
+          document.querySelector('[data-assistant-mode="chat"]').click();
+          document.querySelector('[data-chat-scope="file"]').click();
+          const input = document.getElementById('chat-input');
+          input.value = ${JSON.stringify(electronAiFixture.SECTIONED_CHAT_QUESTION)};
+          input.dispatchEvent(new Event('input', { bubbles: true }));
+          document.getElementById('chat-submit').click();
+        })()`);
+        const inspector = await waitForValue(first.client, `(() => {
+          const reply = [...document.querySelectorAll('#chat-messages .chat-ai')]
+            .find(node => node.textContent.includes(${JSON.stringify(electronAiFixture.SECTIONED_CHAT_RESPONSE)}));
+          if (!reply) return null;
+          document.querySelector('[data-assistant-mode="context"]').click();
+          const rows = [...document.querySelectorAll(
+            '#context-inspector-host .context-inspector__card--project_prompt .context-inspector__section'
+          )].map(node => ({
+            text: node.textContent,
+            className: node.className,
+            tag: node.tagName,
+          }));
+          return rows.length === 6 ? {
+            rows,
+            summary: document.querySelector(
+              '#context-inspector-host .context-inspector__card--project_prompt .context-inspector__section-summary'
+            )?.textContent || '',
+          } : null;
+        })()`, 'the oversized edit.md section ledger in the real Context Inspector');
+        assert.strictEqual(inspector.rows.filter(row => row.className.includes('--used')).length, 5);
+        assert.strictEqual(inspector.rows.filter(row => row.className.includes('--omitted')).length, 1);
+        assert(inspector.rows.find(row => row.text.includes('可选长背景'))?.text.includes('已省略'));
+        assert(inspector.rows.find(row => row.text.includes('项目主旨'))?.text.includes('已使用'));
+        assert(inspector.summary.includes('5/6 章已使用'));
+
+        const clicked = await first.client.evaluate(`(() => {
+          const row = [...document.querySelectorAll(
+            '#context-inspector-host .context-inspector__card--project_prompt .context-inspector__section'
+          )].find(node => node.textContent.includes('项目主旨'));
+          if (!row || row.tagName !== 'BUTTON') return false;
+          row.click();
+          return true;
+        })()`);
+        assert.strictEqual(clicked, true);
+        await waitForValue(first.client, `(() => window.__workspace.state.currentPath === 'edit.md' &&
+          window.getSelection().toString().includes('E2E_SECTIONED_PREMISE'))()`, 'the used edit.md section locator');
+
+        const currentEdit = projectService.readFileWithRevision(project.rootPath, 'edit.md');
+        projectService.atomicWriteFile(
+          project.rootPath,
+          'edit.md',
+          `E2E_SECTIONED_REVISION_DRIFT\n${currentEdit.content}`,
+          currentEdit.revision,
+        );
+        await waitForValue(first.client, `document.getElementById('editor').innerText.includes('E2E_SECTIONED_REVISION_DRIFT')`,
+          'the authoritative edit.md drift before stale section navigation');
+        await first.client.evaluate(`(() => {
+          const row = [...document.querySelectorAll(
+            '#context-inspector-host .context-inspector__card--project_prompt .context-inspector__section'
+          )].find(node => node.textContent.includes('项目主旨'));
+          row?.click();
+        })()`);
+        await waitForValue(first.client,
+          `document.getElementById('save-state').textContent.includes('revision 已过期')`,
+          'the stale edit.md section locator refusing to guess a new offset');
+      } finally {
+        const changed = projectService.readFileWithRevision(project.rootPath, 'edit.md');
+        projectService.atomicWriteFile(project.rootPath, 'edit.md', editSnapshot.content, changed.revision);
+        await first.client.evaluate(`window.__assistantDock.close()`).catch(() => {});
+      }
+      await first.client.evaluate(`window.__workspace.openFile(${JSON.stringify(createdPath)})`);
+      await waitForValue(first.client, `window.__workspace.state.currentPath === ${JSON.stringify(createdPath)}`,
+        'returning from the oversized edit.md Context Inspector fixture');
     });
 
     await stage('clears invalidated Chat preflight chips without letting a late request erase newer actual chips', async () => {

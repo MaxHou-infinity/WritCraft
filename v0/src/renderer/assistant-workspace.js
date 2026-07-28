@@ -102,12 +102,10 @@
 
   async function openLocator(locator) {
     if (!locator?.filePath) return false;
-    const opened = await window.__workspace?.openFile?.(locator.filePath);
-    if (!opened) return false;
-    return window.__workspace?.revealRange?.(
-      locator.offset || 0,
-      Math.max(0, (locator.endOffset || locator.offset || 0) - (locator.offset || 0)),
-    ) || false;
+    return window.__workspace?.revealContextChip?.({
+      revision: locator.revision || null,
+      locator,
+    }) || false;
   }
 
   if (window.WritCraftPlanModeView && planHost) {

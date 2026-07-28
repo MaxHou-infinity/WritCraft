@@ -55,6 +55,11 @@ try {
     });
     assert(currentFile.bytes > 0);
     assert.equal(currentFile.truncated, false);
+    const prompt = result.contextManifest.chips.find(chip => chip.type === 'project_prompt');
+    assert(prompt.sections.length > 0);
+    assert(prompt.sections.every(section => section.status === 'used'));
+    assert.equal(prompt.usedSectionCount, prompt.sectionCount);
+    assert.equal(prompt.omittedSectionCount, 0);
     assert.equal(result.contextManifest.usedBytes, Buffer.byteLength(result.contextText, 'utf8'));
     assert.equal(result.contextManifest.usedChars, result.contextText.length);
     assert.equal(
@@ -146,6 +151,107 @@ try {
     assert.deepEqual(result.chips.map(chip => chip.type), ['scope', 'project_prompt']);
     assert.equal(result.chips.filter(chip => chip.filePath === 'edit.md').length, 1);
     assert.equal(occurrences(result.contextText, '[上下文 · project prompt · edit.md]'), 1);
+  });
+
+  check('超长 edit.md 优先整章保留硬约束并在 Manifest 披露省略章节', () => {
+    const longProject = projectService.createProjectAt(scratch, '章节化项目');
+    const original = projectService.readFileWithRevision(longProject.rootPath, 'edit.md');
+    const longEdit = [
+      '---', 'schema: writcraft.edit/v1', '---', '',
+      '# 项目主旨', '', 'CORE_INTENT 必须完整保留。', '',
+      '## 写作目标', '', `OPTIONAL_GOAL_${'背景资料。'.repeat(900)}`, '',
+      '## 范围与非目标', '', 'CORE_SCOPE 必须完整保留。', '',
+      '## 自定义材料', '', `OPTIONAL_OVERFLOW_${'补充材料。'.repeat(1600)}`, '',
+      '```md', '# 时间与关系约束', 'FAKE_FENCED_HEADING', '```', '',
+      '## 关键实体与不变量', '', 'CORE_ENTITY 必须完整保留。', '',
+      '## 时间与关系约束', '', 'CORE_TIME 必须完整保留。', '',
+    ].join('\n');
+    assert(longEdit.length > resolver.MAX_EDIT_CONTEXT_CHARS);
+    projectService.atomicWriteFile(longProject.rootPath, 'edit.md', longEdit, original.revision);
+
+    const result = resolver.resolveProjectContext({
+      projectService,
+      rootPath: longProject.rootPath,
+      currentFilePath: 'edit.md',
+      scope: 'file',
+      message: '请检查项目规则',
+    });
+    for (const marker of ['CORE_INTENT', 'CORE_SCOPE', 'CORE_ENTITY', 'CORE_TIME']) {
+      assert.match(result.contextText, new RegExp(marker));
+    }
+    assert(!result.contextText.includes('OPTIONAL_OVERFLOW'));
+    assert(result.contextText.length <= resolver.MAX_CONTEXT_CHARS);
+    const prompt = result.contextManifest.chips.find(chip => chip.type === 'project_prompt');
+    assert.equal(prompt.revision, projectService.readFileWithRevision(longProject.rootPath, 'edit.md').revision);
+    assert.equal(prompt.truncated, true);
+    assert(prompt.omittedSectionCount > 0);
+    assert.equal(prompt.usedSectionCount + prompt.omittedSectionCount, prompt.sectionCount);
+    assert(prompt.sections.some(section => section.heading === '项目主旨' && section.status === 'used'));
+    assert(prompt.sections.some(section => section.heading === '自定义材料' && section.status === 'omitted'));
+    assert.equal(prompt.sections.filter(section => section.heading === '时间与关系约束').length, 1);
+    assert(prompt.sections.every(section => section.locator?.filePath === 'edit.md'));
+    assert(result.errors.some(error => error.code === 'PROJECT_PROMPT_SECTIONS_OMITTED'));
+  });
+
+  check('必需 edit.md 章节自身超过预算时稳定阻断且不返回半章', () => {
+    const overflowProject = projectService.createProjectAt(scratch, '硬约束超限项目');
+    const original = projectService.readFileWithRevision(overflowProject.rootPath, 'edit.md');
+    const oversizedRequired = [
+      '# 项目主旨', '', `REQUIRED_OVERFLOW_${'不可删减硬约束。'.repeat(1200)}`, '',
+      '## 范围与非目标', '', '范围完整。', '',
+      '## 关键实体与不变量', '', '实体完整。', '',
+      '## 时间与关系约束', '', '时间完整。', '',
+    ].join('\n');
+    projectService.atomicWriteFile(overflowProject.rootPath, 'edit.md', oversizedRequired, original.revision);
+    assert.throws(() => resolver.resolveProjectContext({
+      projectService,
+      rootPath: overflowProject.rootPath,
+      currentFilePath: 'edit.md',
+      scope: 'file',
+      message: '请检查项目规则',
+    }), error => error?.code === 'PROJECT_PROMPT_REQUIRED_SECTIONS_TOO_LARGE' &&
+      !String(error.message).includes(overflowProject.rootPath));
+  });
+
+  check('edit.md 标题解析忽略围栏并为重复标题生成有界唯一身份', () => {
+    const parsed = resolver.parseEditPromptSections([
+      '# 项目主旨', '第一版。', '',
+      '```md', '## 范围与非目标', '围栏内容。', '```', '',
+      '## 自定义章节', '甲。', '',
+      '## 自定义章节', '乙。',
+    ].join('\n'));
+    assert.deepEqual(parsed.map(section => section.heading), ['项目主旨', '自定义章节', '自定义章节']);
+    assert.equal(new Set(parsed.map(section => section.id)).size, parsed.length);
+    assert(parsed.every(section => section.end > section.start));
+
+    const tooMany = Array.from({ length: resolver.MAX_EDIT_CONTEXT_SECTIONS + 1 }, (_, index) => `## 第${index}章\n`).join('');
+    assert.throws(() => resolver.parseEditPromptSections(tooMany), error => error?.code === 'PROJECT_PROMPT_SECTION_LIMIT');
+    const preambleOverflow = `前言\n${Array.from(
+      { length: resolver.MAX_EDIT_CONTEXT_SECTIONS },
+      (_, index) => `## 第${index}章\n`
+    ).join('')}`;
+    assert.throws(() => resolver.parseEditPromptSections(preambleOverflow),
+      error => error?.code === 'PROJECT_PROMPT_SECTION_LIMIT');
+
+    const falseClose = resolver.parseEditPromptSections([
+      '```md', '```not-a-close', '# 项目主旨', '围栏内示例。', '```',
+      '# 范围与非目标', '真实范围。',
+    ].join('\n'));
+    assert.deepEqual(falseClose.map(section => section.heading), ['文档前言', '范围与非目标']);
+    assert(!falseClose.some(section => section.heading === '项目主旨'));
+
+    const longHeading = `# ${'超长标题'.repeat(100)}`;
+    assert.throws(() => resolver.parseEditPromptSections(longHeading),
+      error => error?.code === 'PROJECT_PROMPT_HEADING_LIMIT');
+
+    const compactManyHeadings = `前言\n${Array.from(
+      { length: resolver.MAX_EDIT_CONTEXT_SECTIONS },
+      (_, index) => `# ${index}\n`
+    ).join('')}`;
+    const compactCompiled = resolver.compileEditPrompt(compactManyHeadings);
+    assert.equal(compactCompiled.content, compactManyHeadings);
+    assert.equal(compactCompiled.sections.length, 1);
+    assert.equal(compactCompiled.sections[0].heading, '完整 edit.md');
   });
 
   check('Main 权威解析联通 chapter/section/folder/source/entity', () => {

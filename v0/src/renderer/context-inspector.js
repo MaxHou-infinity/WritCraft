@@ -70,6 +70,32 @@
       if (chip.heading) card.append(element(document, 'div', 'context-inspector__heading-path', chip.heading));
       if (chip.reason) card.append(element(document, 'p', 'context-inspector__reason', chip.reason));
       card.append(metadataRow(chip));
+      if (chip.sections?.length) {
+        const sections = element(document, 'section', 'context-inspector__sections');
+        sections.setAttribute('aria-label', 'edit.md 本次使用章节');
+        if (chip.sectionSummary) sections.append(element(document, 'div', 'context-inspector__section-summary', chip.sectionSummary));
+        for (const section of chip.sections) {
+          const locatable = section.locator && typeof options.onOpenLocator === 'function';
+          const row = element(document, locatable ? 'button' : 'div',
+            `context-inspector__section context-inspector__section--${section.status}`);
+          if (locatable) {
+            row.type = 'button';
+            row.addEventListener('click', event => {
+              event.stopPropagation();
+              options.onOpenLocator(section.locator);
+            });
+          }
+          const label = element(document, 'span', 'context-inspector__section-label');
+          label.append(
+            element(document, 'span', 'context-inspector__section-status', section.statusLabel),
+            element(document, 'strong', '', section.heading),
+          );
+          row.append(label, element(document, 'span', 'context-inspector__section-bytes', section.bytesLabel));
+          if (section.reason) row.title = section.reason;
+          sections.append(row);
+        }
+        card.append(sections);
+      }
       if (chip.stale) card.append(element(document, 'p', 'context-inspector__warning', '△ 证据已过期，不会猜测新位置'));
       if (chip.truncated) {
         const warning = element(document, 'p', 'context-inspector__warning', chip.truncationReason || '上下文已截断');

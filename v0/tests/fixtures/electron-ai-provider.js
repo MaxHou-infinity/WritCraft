@@ -14,6 +14,8 @@ const ONBOARDING_CHANGED_REQUEST = '用真实 GUI 验证项目卡写入边界';
 const ONBOARDING_NOOP_REQUEST = 'E2E 通过完整十题向导验证 no-op 与零选择授权';
 const CHAT_QUESTION = 'E2E 验证默认文件级上下文';
 const CHAT_RESPONSE = 'E2E Chat 已且仅收到项目 Prompt 与当前文件。';
+const SECTIONED_CHAT_QUESTION = 'E2E 验证超长 edit.md 分区上下文';
+const SECTIONED_CHAT_RESPONSE = 'E2E Chat 已收到超长 edit.md 的必需章节，并省略可选溢出章节。';
 const CHAT_CURRENT_PATH = 'chapters/07-electron-e2e.md';
 const STALE_CHAT_QUESTION = 'E2E 验证失效预检上下文';
 const STALE_CHAT_RESPONSE = 'E2E 失效请求不应显示此响应。';
@@ -173,6 +175,23 @@ function chatAnswer(prompt) {
     throw new Error('E2E_FIXTURE_INVALID_CHAT_CONTEXT');
   }
   return CHAT_RESPONSE;
+}
+
+function sectionedChatAnswer(prompt) {
+  const requiredMarkers = [
+    'E2E_SECTIONED_PREMISE',
+    'E2E_SECTIONED_SCOPE',
+    'E2E_SECTIONED_ENTITY',
+    'E2E_SECTIONED_TIMELINE',
+  ];
+  const count = needle => prompt.split(needle).length - 1;
+  if (requiredMarkers.some(marker => count(marker) !== 1) ||
+      prompt.includes('E2E_OPTIONAL_OVERFLOW_MUST_BE_OMITTED') ||
+      count('[上下文 · project prompt · edit.md]') !== 1 ||
+      count(`[上下文 · file · ${CHAT_CURRENT_PATH}]`) !== 1) {
+    throw new Error('E2E_FIXTURE_INVALID_SECTIONED_CHAT_CONTEXT');
+  }
+  return SECTIONED_CHAT_RESPONSE;
 }
 
 function projectChatAnswer(prompt) {
@@ -492,6 +511,8 @@ function createElectronAiProvider() {
         output = STALE_SELECTION_CHAT_RESPONSE;
       } else if (prompt.includes(`问题：${CHAT_QUESTION}`)) {
         output = chatAnswer(prompt);
+      } else if (prompt.includes(`问题：${SECTIONED_CHAT_QUESTION}`)) {
+        output = sectionedChatAnswer(prompt);
       } else if (prompt.includes(`问题：${PROJECT_CHAT_QUERY}`)) {
         output = projectChatAnswer(prompt);
       } else if (prompt.includes(`问题：${SELECTION_CHAT_QUESTION}`)) {
@@ -532,6 +553,8 @@ module.exports = {
   ONBOARDING_NOOP_REQUEST,
   CHAT_QUESTION,
   CHAT_RESPONSE,
+  SECTIONED_CHAT_QUESTION,
+  SECTIONED_CHAT_RESPONSE,
   CHAT_CURRENT_PATH,
   STALE_CHAT_QUESTION,
   STALE_CHAT_RESPONSE,

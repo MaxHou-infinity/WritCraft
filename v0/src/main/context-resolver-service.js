@@ -12,6 +12,9 @@ const MAX_CONTEXT_BYTES = 32 * 1024;
 const MAX_CONTEXT_FILES = 40;
 const MAX_EDIT_CONTEXT_CHARS = 6000;
 const MAX_EDIT_CONTEXT_BYTES = 18 * 1024;
+const MAX_EDIT_CONTEXT_SECTIONS = 64;
+const MAX_EDIT_HEADING_CHARS = 256;
+const MAX_EDIT_HEADING_BYTES = 1024;
 const MAX_SELECTION_CONTEXT_CHARS = 3000;
 const MAX_SELECTION_CONTEXT_BYTES = 9 * 1024;
 const CONTEXT_SCOPES = Object.freeze(['project', 'file', 'selection']);
@@ -58,6 +61,158 @@ function prefixWithinBytes(value, limit) {
   }
   if (low > 0 && /[\uD800-\uDBFF]/.test(source[low - 1]) && /[\uDC00-\uDFFF]/.test(source[low] || '')) low -= 1;
   return source.slice(0, low);
+}
+
+function normalizedHeading(value) {
+  return String(value || '').normalize('NFKC').trim().replace(/\s+/g, '').replace(/[：:、，,。.!！?？·—_-]/g, '');
+}
+
+const REQUIRED_EDIT_HEADINGS = new Map([
+  ['项目主旨', 0],
+  ['主旨', 0],
+  ['范围与非目标', 1],
+  ['范围和非目标', 1],
+  ['关键实体与不变量', 2],
+  ['关键实体和不变量', 2],
+  ['时间与关系约束', 3],
+  ['时间和关系约束', 3],
+].map(([heading, rank]) => [normalizedHeading(heading), rank]));
+
+function parseEditPromptSections(content) {
+  const lines = [];
+  let offset = 0;
+  for (const raw of String(content || '').split(/(?<=\n)/)) {
+    lines.push({ raw, text: raw.replace(/\r?\n$/, ''), start: offset, end: offset + raw.length });
+    offset += raw.length;
+  }
+  const headings = [];
+  let fence = null;
+  for (let index = 0; index < lines.length; index += 1) {
+    const text = lines[index].text;
+    if (fence) {
+      const closing = text.match(/^\s{0,3}(`{3,}|~{3,})[ \t]*$/);
+      if (closing && closing[1][0] === fence.character && closing[1].length >= fence.length) fence = null;
+      continue;
+    }
+    const opening = text.match(/^\s{0,3}(`{3,}|~{3,})/);
+    if (opening) {
+      fence = { character: opening[1][0], length: opening[1].length };
+      continue;
+    }
+    const heading = text.match(/^\s{0,3}(#{1,6})\s+(.+?)\s*#*\s*$/);
+    if (!heading) continue;
+    const normalized = heading[2].normalize('NFKC').trim();
+    if (normalized.length > MAX_EDIT_HEADING_CHARS ||
+        Buffer.byteLength(normalized, 'utf8') > MAX_EDIT_HEADING_BYTES) {
+      fail('PROJECT_PROMPT_HEADING_LIMIT',
+        `edit.md 标题不能超过 ${MAX_EDIT_HEADING_CHARS} 字符或 ${MAX_EDIT_HEADING_BYTES} 字节`);
+    }
+    headings.push({
+      heading: normalized,
+      level: heading[1].length,
+      start: lines[index].start,
+      line: index + 1,
+    });
+    if (headings.length > MAX_EDIT_CONTEXT_SECTIONS) {
+      fail('PROJECT_PROMPT_SECTION_LIMIT', `edit.md 最多支持 ${MAX_EDIT_CONTEXT_SECTIONS} 个可披露章节`);
+    }
+  }
+
+  const sections = [];
+  if (!headings.length || headings[0].start > 0) {
+    const end = headings[0]?.start ?? content.length;
+    if (content.slice(0, end).trim()) {
+      sections.push({ heading: '文档前言', level: 0, start: 0, end, line: 1, requiredRank: null });
+    }
+  }
+  for (let index = 0; index < headings.length; index += 1) {
+    const heading = headings[index];
+    sections.push({
+      ...heading,
+      end: headings[index + 1]?.start ?? content.length,
+      requiredRank: REQUIRED_EDIT_HEADINGS.get(normalizedHeading(heading.heading)) ?? null,
+    });
+  }
+  if (sections.length > MAX_EDIT_CONTEXT_SECTIONS) {
+    fail('PROJECT_PROMPT_SECTION_LIMIT', `edit.md 最多支持 ${MAX_EDIT_CONTEXT_SECTIONS} 个可披露章节`);
+  }
+  return sections.map((section, index) => ({
+    ...section,
+    id: stableId('ctx_edit_section', `${section.heading}\0${section.level}\0${section.start}\0${index}`),
+    content: content.slice(section.start, section.end),
+  }));
+}
+
+function compileEditPrompt(content) {
+  const source = String(content || '');
+  if (!source.trim()) fail('PROJECT_PROMPT_UNAVAILABLE', '项目 Prompt edit.md 不能为空');
+  const fullFits = source.length <= MAX_EDIT_CONTEXT_CHARS && Buffer.byteLength(source, 'utf8') <= MAX_EDIT_CONTEXT_BYTES;
+  let sections;
+  try {
+    sections = parseEditPromptSections(source);
+  } catch (error) {
+    if (!fullFits || !['PROJECT_PROMPT_SECTION_LIMIT', 'PROJECT_PROMPT_HEADING_LIMIT'].includes(error?.code)) throw error;
+    sections = [{
+      id: stableId('ctx_edit_section', `complete\0${source.length}`),
+      heading: '完整 edit.md',
+      level: 0,
+      start: 0,
+      end: source.length,
+      line: 1,
+      requiredRank: null,
+      content: source,
+      disclosureReason: '短项目卡已完整纳入；章节目录超过逐章披露上限',
+    }];
+  }
+  if (fullFits) {
+    return {
+      content: source,
+      truncated: false,
+      sections: sections.map(section => ({
+        ...section,
+        status: 'used',
+        reason: section.disclosureReason || '完整 edit.md 已纳入',
+        bytes: Buffer.byteLength(section.content, 'utf8'),
+      })),
+    };
+  }
+  if (!sections.length) fail('PROJECT_PROMPT_CONTEXT_TOO_LARGE', '超长 edit.md 需要使用 Markdown 标题划分章节后才能完整选择硬约束');
+
+  const required = sections.filter(section => section.requiredRank !== null)
+    .sort((left, right) => left.requiredRank - right.requiredRank || left.start - right.start);
+  const selectedIds = new Set(required.map(section => section.id));
+  function selectedContent(ids) {
+    return sections.filter(section => ids.has(section.id)).map(section => section.content).filter(Boolean).join('');
+  }
+  let compiled = selectedContent(selectedIds);
+  if (compiled.length > MAX_EDIT_CONTEXT_CHARS || Buffer.byteLength(compiled, 'utf8') > MAX_EDIT_CONTEXT_BYTES) {
+    fail('PROJECT_PROMPT_REQUIRED_SECTIONS_TOO_LARGE', 'edit.md 的必需硬约束章节超过项目 Prompt 预算，未生成部分上下文');
+  }
+  for (const section of sections) {
+    if (selectedIds.has(section.id)) continue;
+    const candidateIds = new Set(selectedIds);
+    candidateIds.add(section.id);
+    const candidate = selectedContent(candidateIds);
+    if (candidate.length > MAX_EDIT_CONTEXT_CHARS || Buffer.byteLength(candidate, 'utf8') > MAX_EDIT_CONTEXT_BYTES) continue;
+    selectedIds.add(section.id);
+    compiled = candidate;
+  }
+  if (!compiled.trim()) fail('PROJECT_PROMPT_CONTEXT_TOO_LARGE', '超长 edit.md 没有可在预算内完整纳入的 Markdown 章节');
+  return {
+    content: compiled,
+    truncated: selectedIds.size < sections.length,
+    sections: sections.map(section => {
+      const used = selectedIds.has(section.id);
+      return {
+        ...section,
+        status: used ? 'used' : 'omitted',
+        reason: used
+          ? section.requiredRank !== null ? '硬约束优先保留' : '按原文顺序完整纳入'
+          : `超过项目 Prompt ${MAX_EDIT_CONTEXT_CHARS} 字符 / ${MAX_EDIT_CONTEXT_BYTES} 字节预算`,
+        bytes: used ? Buffer.byteLength(section.content, 'utf8') : 0,
+      };
+    }),
+  };
 }
 
 function scopeChip(scope) {
@@ -331,6 +486,15 @@ function retrieveProjectSnippets({ projectService, rootPath, files, currentFileP
 
 function chipManifest(chip) {
   const normalized = ensureChipLocator(chip);
+  const sections = Array.isArray(normalized.sections) ? normalized.sections.slice(0, MAX_EDIT_CONTEXT_SECTIONS).map(section => ({
+    id: section.id,
+    heading: section.heading,
+    level: section.level,
+    status: section.status,
+    reason: section.reason,
+    bytes: section.bytes || 0,
+    locator: section.locator || null,
+  })) : undefined;
   return {
     id: normalized.id,
     type: normalized.type,
@@ -350,6 +514,10 @@ function chipManifest(chip) {
     truncated: Boolean(normalized.truncated),
     truncationReason: normalized.truncationReason || null,
     omittedCount: normalized.omittedCount || 0,
+    sectionCount: normalized.sectionCount || 0,
+    usedSectionCount: normalized.usedSectionCount || 0,
+    omittedSectionCount: normalized.omittedSectionCount || 0,
+    sections,
     bytes: normalized.bytes || 0,
   };
 }
@@ -433,16 +601,47 @@ function resolveProjectContext({ projectService, rootPath, message, currentFileP
   }
 
   const edit = currentFilePath === 'edit.md' ? current : projectService.readFileWithRevision(rootPath, 'edit.md');
-  const editContent = edit.content;
-  if (!editContent.trim()) fail('PROJECT_PROMPT_UNAVAILABLE', '项目 Prompt edit.md 不能为空');
-  if (editContent.length > MAX_EDIT_CONTEXT_CHARS || Buffer.byteLength(editContent, 'utf8') > MAX_EDIT_CONTEXT_BYTES) {
-    fail('PROJECT_PROMPT_CONTEXT_TOO_LARGE', `edit.md 必须完整进入模型，不能超过 ${MAX_EDIT_CONTEXT_CHARS} 字符或 ${MAX_EDIT_CONTEXT_BYTES} 字节`);
-  }
+  const compiledEdit = compileEditPrompt(edit.content);
+  const editContent = compiledEdit.content;
+  const editSections = compiledEdit.sections.map(section => ({
+    id: section.id,
+    heading: section.heading,
+    level: section.level,
+    status: section.status,
+    reason: section.reason,
+    bytes: section.bytes,
+    locator: {
+      filePath: 'edit.md',
+      offset: section.start,
+      endOffset: section.end,
+      line: section.line,
+      column: 1,
+      revision: edit.revision,
+    },
+  }));
+  const usedEditSections = editSections.filter(section => section.status === 'used').length;
+  const omittedEditSections = editSections.length - usedEditSections;
   const editChip = {
     id: 'ctx_project_prompt_edit_md', type: 'project_prompt', label: 'edit.md', filePath: 'edit.md',
     revision: edit.revision, locator: { filePath: 'edit.md', offset: 0, endOffset: edit.content.length, line: 1, column: 1 },
-    reason: '项目级 Prompt 是每次项目 AI 请求的固定硬约束', truncated: false, truncationReason: null,
+    reason: compiledEdit.truncated
+      ? '项目级 Prompt 按章节预算编译；硬约束优先且所有已用章节均完整'
+      : '项目级 Prompt 是每次项目 AI 请求的固定硬约束',
+    truncated: compiledEdit.truncated,
+    truncationReason: compiledEdit.truncated ? `有 ${omittedEditSections} 个 edit.md 章节因项目 Prompt 预算未进入本次请求` : null,
+    omittedCount: omittedEditSections,
+    sectionCount: editSections.length,
+    usedSectionCount: usedEditSections,
+    omittedSectionCount: omittedEditSections,
+    sections: editSections,
   };
+  if (omittedEditSections) {
+    parsed.errors.push({
+      code: 'PROJECT_PROMPT_SECTIONS_OMITTED',
+      message: `edit.md 已按章节纳入 ${usedEditSections}/${editSections.length} 个；省略 ${omittedEditSections} 个，详情见 Context Inspector`,
+      token: '', index: -1, omittedCount: omittedEditSections,
+    });
+  }
 
   // edit.md is always represented by the required project_prompt chip. Drop a
   // redundant explicit full-file reference so one authoritative file never
@@ -645,6 +844,9 @@ module.exports = {
   MAX_CONTEXT_FILES,
   MAX_EDIT_CONTEXT_CHARS,
   MAX_EDIT_CONTEXT_BYTES,
+  MAX_EDIT_CONTEXT_SECTIONS,
+  MAX_EDIT_HEADING_CHARS,
+  MAX_EDIT_HEADING_BYTES,
   MAX_SELECTION_CONTEXT_CHARS,
   MAX_SELECTION_CONTEXT_BYTES,
   CONTEXT_SCOPES,
@@ -654,5 +856,7 @@ module.exports = {
   MAX_PROJECT_RETRIEVAL_SNIPPETS,
   MAX_PROJECT_RETRIEVAL_SNIPPET_CHARS,
   ContextResolverError,
+  parseEditPromptSections,
+  compileEditPrompt,
   resolveProjectContext,
 };

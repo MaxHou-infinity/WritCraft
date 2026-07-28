@@ -8,6 +8,7 @@
 
   const MAX_CHIPS = 64;
   const MAX_ERRORS = 50;
+  const MAX_PROMPT_SECTIONS = 64;
   const CHIP_TYPES = new Set(['scope', 'project_prompt', 'file', 'chapter', 'section', 'folder', 'source', 'entity', 'selection', 'neighbor', 'retrieval']);
   const REQUIRED_TYPES = new Set(['scope', 'project_prompt', 'selection']);
 
@@ -29,7 +30,45 @@
   function normalizeChip(chip, index) {
     if (!chip || !CHIP_TYPES.has(chip.type)) return null;
     const id = text(chip.id, 256) || `context-${chip.type}-${index}`;
+    const chipRevision = text(chip.revision, 256) || null;
     const filePaths = Array.isArray(chip.filePaths) ? chip.filePaths.map(path => text(path)).filter(Boolean).slice(0, 40) : [];
+    const sections = chip.type === 'project_prompt' && Array.isArray(chip.sections)
+      ? chip.sections.slice(0, MAX_PROMPT_SECTIONS).map((section, sectionIndex) => {
+        if (!section || typeof section !== 'object') return null;
+        const status = section.status === 'used' ? 'used' : section.status === 'omitted' ? 'omitted' : null;
+        if (!status) return null;
+        const offset = section.locator && typeof section.locator === 'object' ? integer(section.locator.offset) : 0;
+        const endOffset = section.locator && typeof section.locator === 'object'
+          ? Math.max(offset, integer(section.locator.endOffset)) : 0;
+        const locatorRevision = section.locator && typeof section.locator === 'object'
+          ? text(section.locator.revision, 256) || null : null;
+        return {
+          id: text(section.id, 256) || `prompt-section-${sectionIndex}`,
+          heading: text(section.heading) || '未命名章节',
+          level: Math.min(6, integer(section.level)),
+          status,
+          reason: text(section.reason, 1000) || null,
+          bytes: integer(section.bytes),
+          locator: section.locator && typeof section.locator === 'object' &&
+            chipRevision && locatorRevision === chipRevision ? {
+            filePath: text(section.locator.filePath) || null,
+            revision: locatorRevision,
+            line: integer(section.locator.line, 1),
+            column: integer(section.locator.column, 1),
+            offset,
+            endOffset,
+          } : null,
+        };
+      }).filter(Boolean) : [];
+    const sectionCount = Math.min(MAX_PROMPT_SECTIONS, Math.max(sections.length, integer(chip.sectionCount, sections.length)));
+    const usedSectionCount = Math.min(sectionCount, integer(
+      chip.usedSectionCount,
+      sections.filter(section => section.status === 'used').length,
+    ));
+    const omittedSectionCount = Math.min(
+      sectionCount - usedSectionCount,
+      integer(chip.omittedSectionCount, sectionCount - usedSectionCount),
+    );
     return deepFreeze({
       id,
       type: chip.type,
@@ -40,7 +79,7 @@
       folderPath: text(chip.folderPath) || null,
       sourceId: text(chip.sourceId) || null,
       entityId: text(chip.entityId) || null,
-      revision: text(chip.revision, 256) || null,
+      revision: chipRevision,
       locator: chip.locator && typeof chip.locator === 'object' ? deepFreeze({
         filePath: text(chip.locator.filePath) || null,
         line: integer(chip.locator.line, 1),
@@ -55,6 +94,10 @@
       truncated: Boolean(chip.truncated),
       truncationReason: text(chip.truncationReason, 1000) || null,
       omittedCount: integer(chip.omittedCount),
+      sectionCount,
+      usedSectionCount,
+      omittedSectionCount,
+      sections,
       required: REQUIRED_TYPES.has(chip.type),
     });
   }
@@ -171,6 +214,14 @@
         revisionLabel: chip.revision ? chip.revision.slice(0, 10) : '无 revision',
         excluded: excluded.has(chip.id),
         removable: !chip.required,
+        sectionSummary: chip.sections.length
+          ? `${chip.usedSectionCount}/${chip.sectionCount} 章已使用 · ${chip.omittedSectionCount} 章省略`
+          : null,
+        sections: chip.sections.map(section => ({
+          ...section,
+          statusLabel: section.status === 'used' ? '已使用' : '已省略',
+          bytesLabel: section.bytes ? formatBytes(section.bytes) : '未进入请求',
+        })),
       })),
       errors: state.snapshot.errors,
       excludedCount: state.excludedChipIds.length,
@@ -178,7 +229,7 @@
   }
 
   return {
-    MAX_CHIPS, MAX_ERRORS, CHIP_TYPES, REQUIRED_TYPES,
+    MAX_CHIPS, MAX_ERRORS, MAX_PROMPT_SECTIONS, CHIP_TYPES, REQUIRED_TYPES,
     normalizeSnapshot, createState, reduce, replaceSnapshot, requestPolicy, formatBytes, toViewModel,
   };
 });

@@ -30,7 +30,9 @@
 
 > **2026-07-28 0.0Y worker 生命周期与脱敏复盘**：复审所说“await 后可能关闭”在红测中不是温和 reject，而是向已 end 的 child stdin 写入并触发未处理 `ERR_STREAM_WRITE_AFTER_END`。确定性测试分别让 `ready()` 返回前关闭、让 awaited hash hook 暂停后关闭，并直接计数 batch write 与 pending；第三项用私有路径和 mock lstat 证明原始构造异常会泄露路径。修复在每个异步恢复点和最终写入前调用同一存活断言，且让 realpath/lstat 只输出稳定无路径错误。worker **18/18**、Watcher **31/31**、cross-layer **11/11**、Large **6/6**、全量、Electron **32/32**、Persistent **3/3**、package **8/8**、release **7/7** 通过，独立复审 P0/P1/P2=0。教训：异步函数入口检查只能证明“开始时活着”，任何 `await` 都是新的生命周期边界；隐私脱敏也应由最靠近原始异常的模块保证，不能依赖当前调用方恰好会再包装。
 
-> **2026-07-28 0.0Y 后产品能力审计复盘**：版本号与测试数字没有漂移，但“主链签字”被部分文档误写成“完整能力已实现”。源码对照确认三项真实缺口：Chat 只发送本轮问题，没有 Main-owned 最近对话摘要；超长 `edit.md` 会整体 fail closed，没有章节化保留与 Inspector 披露；普通 Markdown 虽有 Main 回收/恢复 service，却没有 preload/Main IPC 和 App 恢复入口。正确做法是把大模块拆成可验证能力逐项标记，不用一个 ✅ 覆盖未接 UI 或未实现的 PRD 子条目。续作顺序现冻结为 `edit.md` section-aware 编译与披露 → Chat 多轮连续性 → 普通 Markdown 回收区恢复 UI；真实作者、付费和发布门禁继续单列。
+> **2026-07-28 0.0Y 后产品能力审计复盘（历史实施前审计）**：版本号与测试数字没有漂移，但“主链签字”被部分文档误写成“完整能力已实现”。源码对照确认三项真实缺口：Chat 只发送本轮问题，没有 Main-owned 最近对话摘要；超长 `edit.md` 会整体 fail closed，没有章节化保留与 Inspector 披露；普通 Markdown 虽有 Main 回收/恢复 service，却没有 preload/Main IPC 和 App 恢复入口。正确做法是把大模块拆成可验证能力逐项标记，不用一个 ✅ 覆盖未接 UI 或未实现的 PRD 子条目。该审计冻结的第一项已由下方 0.0Z 收口；当前顺序只看最新状态文件。
+
+> **2026-07-28 0.0Z 分区项目 Prompt 复盘**：第一轮定向、全量和真实 Electron 33/33 全绿后，独立复审仍发现五个正常路径未覆盖的缺口：Markdown 围栏假关闭会把示例标题当硬约束；Main heading 没有字节上限；章节定位没有 revision 门；`trim()` 破坏整章原始边界；短项目卡会被目录上限误伤。正确做法不是继续堆正常样例，而是把 parser、Manifest 和 locator 当三个独立的不可信边界逐一做对抗输入。修复后 strict fence、256 字符/1024 字节 heading、短文单项 fallback、原始 slice 拼接和 parent-chip revision 等值门禁均进入测试。随后真实 Electron 两次复跑又在两个不同旧阶段各自超时；保留红运行且未修改产品或测试后，最终源码连续两次 33/33，通过时 Plan apply 分别约 237ms/252ms。因故障未在同源码复现，当前不形成阻塞 P2；若再次出现则必须重开并定位 timing 根因，不能用绿重跑抹掉红证据。最终独立代码复审 P0=0/P1=0/P2=0。可复用教训：语法解析器要测试“看似关闭但不合法”的输入；跨 IPC 的嵌套字段必须在 Main 侧有界；任何 offset locator 都必须携带并核验来源 revision。
 
 > **2026-07-28 0.0V watcher 祖先遍历收口复盘（历史；metadata P2 已由 0.0W 关闭）**：只验证最终叶子 fd 不足以发现“祖先换壳后仍暴露同一个 hardlink 叶子”；根因是路径解析权威仍交给可变祖先。实现把扫描时的每级祖先 identity 私存，由第二个 native helper 从绑定项目根 fd 逐段 `openat`、读后重走，并把两个 helper 绑定到同一 source→signed build→App→标准 `unzip` ZIP 证据链。旧 package 单-helper合同先确定性红后修复；首次真实 Electron 又暴露开发态误用 `resourcesPath`，改为仅 packaged (`!process.defaultApp`) 取包内 helper。独立首轮复审发现 malformed helper identity 会从 EventEmitter 逃逸，现已捕获为协议失败；同时补齐扫描根/worker 根 identity 比对和安全 open flags 不可用时显式拒绝。最终 worker **10/10**、Watcher **30/30**、cross-layer **11/11**、Large **6/6**、package **8/8**、release **7/7**、完整 test/verify、Persistent **3/3**、Electron **32/32**，当时独立复审 **P0=0/P1=0/P2=2**。教训是：开发态和打包态资源路径必须各自验证；任何子进程 stdout 都是不可信输入，EventEmitter 内解析必须 catch 后 fail-closed。
 
@@ -129,7 +131,7 @@ T10 housan / Max ─→ 4 份 deliverables      (主人亲自)
 
 ### 历史启动条件（已完成，非当前 Next Action）
 
-以下是 2026-07-14 调研阶段的启动假设，已被实际选型和第十二次收口覆盖：编辑器采用原生 `contenteditable`，正式 PRD 已存在，Plan Mode 可跳过。当前 Next Action 只看 `v0/DEVELOPMENT-STATUS.md`：先完成 `edit.md` section-aware 上下文编译与 Inspector 章节披露，再依次处理 Chat 多轮连续性和普通 Markdown 回收区恢复 UI；`docs/AUTHOR-ACCEPTANCE-V1-CONTRACT.md` 单独约束真实付费 API、真实作者旅程与发布验收。
+以下是 2026-07-14 调研阶段的启动假设，已被实际选型和第十二次收口覆盖：编辑器采用原生 `contenteditable`，正式 PRD 已存在，Plan Mode 可跳过。0.0Z 已签字 `edit.md` section-aware 上下文编译与 Inspector 章节披露；当前 Next Action 只看 `v0/DEVELOPMENT-STATUS.md`：先处理 Chat 多轮连续性，再处理普通 Markdown 回收区恢复 UI。`docs/AUTHOR-ACCEPTANCE-V1-CONTRACT.md` 单独约束真实付费 API、真实作者旅程与发布验收。
 
 - 原 Day 1 技术试验：TipTap + M2.7 + Plan Mode 5 模板（已废止为当前入口）
 - 原 Day 7 前置条件：先有正式 PRD（已完成）
