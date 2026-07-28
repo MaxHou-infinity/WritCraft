@@ -7,6 +7,7 @@ const path = require('path');
 const MAX_BATCH_ITEMS = 5000;
 const MAX_BATCH_BYTES = 64 * 1024 * 1024;
 const MAX_ITEM_BYTES = 5 * 1024 * 1024;
+const MAX_REQUEST_BYTES = 16 * 1024 * 1024;
 const MAX_RESPONSE_BYTES = 4 * 1024 * 1024;
 const MAX_RESPONSE_LINE_BYTES = 2048;
 const DEFAULT_TIMEOUT_MS = 30000;
@@ -97,7 +98,9 @@ function encodeBatch(sequence, items) {
       normalized.reduce((total, item) => total + item.maxBytes, 0) > MAX_BATCH_BYTES) {
     throw workerError('PROJECT_WATCHER_HASH_BUDGET', 'Native hash batch exceeds bounds');
   }
-  const lines = [`B\t${sequence}\t${normalized.length}`];
+  const header = `B\t${sequence}\t${normalized.length}`;
+  let requestBytes = Buffer.byteLength(header) + 1;
+  const lines = [header];
   for (const item of normalized) {
     const fields = [
       'I',
@@ -108,7 +111,16 @@ function encodeBatch(sequence, items) {
       String(item.ancestors.length),
     ];
     for (const ancestor of item.ancestors) fields.push(...identityFields(ancestor));
-    lines.push(fields.join('\t'));
+    const line = fields.join('\t');
+    const lineBytes = Buffer.byteLength(line) + 1;
+    if (lineBytes > MAX_REQUEST_BYTES - requestBytes) {
+      throw workerError(
+        'PROJECT_WATCHER_HASH_BUDGET',
+        'Native hash request metadata exceeds bounds'
+      );
+    }
+    requestBytes += lineBytes;
+    lines.push(line);
   }
   return Object.freeze({
     normalized,
@@ -283,6 +295,14 @@ class ProjectHashWorker {
       pending.resolve(Object.freeze([...pending.results]));
       return;
     }
+    if (fields[0] === 'E' && fields[1] === String(pending.sequence) &&
+        fields[2] === 'ERR' && fields[3] === 'BUDGET' && fields.length === 4) {
+      this.#fail(workerError(
+        'PROJECT_WATCHER_HASH_BUDGET',
+        'Native hash helper rejected request metadata bounds'
+      ));
+      return;
+    }
     this.#fail(workerError('PROJECT_WATCHER_HASH_PROTOCOL', 'Native hash response is malformed'));
   }
 
@@ -354,6 +374,7 @@ module.exports = Object.freeze({
   MAX_BATCH_ITEMS,
   MAX_BATCH_BYTES,
   MAX_ITEM_BYTES,
+  MAX_REQUEST_BYTES,
   createProjectHashWorker,
   encodeBatch,
   exactRootIdentity,

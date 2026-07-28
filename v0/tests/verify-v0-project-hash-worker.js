@@ -10,6 +10,7 @@ const childProcess = require('child_process');
 const { once } = require('events');
 const {
   HELPER_PATH,
+  MAX_REQUEST_BYTES,
   createProjectHashWorker,
   encodeBatch,
 } = require('../src/main/project-hash-worker');
@@ -282,6 +283,34 @@ async function run() {
     }
   });
 
+  await check('maps a native batch-budget terminal to a bounded budget failure', async () => {
+    const scratch = fs.mkdtempSync(path.join(os.tmpdir(), 'writcraft-native-hash-'));
+    const root = path.join(scratch, 'project');
+    const target = path.join(root, 'one.md');
+    const budgetHelper = path.join(scratch, 'budget-helper');
+    fs.mkdirSync(root);
+    fs.writeFileSync(target, 'content');
+    fs.writeFileSync(budgetHelper, [
+      '#!/bin/sh',
+      'IFS= read -r header || exit 1',
+      "printf 'E\\t1\\tERR\\tBUDGET\\n'",
+      'sleep 1',
+      '',
+    ].join('\n'), { mode: 0o755 });
+    const worker = createProjectHashWorker(root, { helperPath: budgetHelper });
+    try {
+      await assert.rejects(
+        worker.hash([item(root, 'one.md')]),
+        error => error?.code === 'PROJECT_WATCHER_HASH_BUDGET'
+      );
+      if (!worker.closed) await once(worker.child, 'close');
+      assert.strictEqual(worker.closed, true);
+    } finally {
+      worker.close();
+      fs.rmSync(scratch, { recursive: true, force: true });
+    }
+  });
+
   await check('rejects invalid paths and aggregate budgets before native work', () => {
     const fakeIdentity = Object.freeze({
       dev: 1n,
@@ -306,8 +335,88 @@ async function run() {
     }]), error => error?.code === 'PROJECT_WATCHER_HASH_PROTOCOL');
   });
 
-  console.log(`\n${passed}/10 native project hash worker checks passed.`);
-  if (passed !== 10) process.exitCode = 1;
+  await check('bounds deep-path request metadata in both JS and the native helper', () => {
+    assert.strictEqual(MAX_REQUEST_BYTES, 16 * 1024 * 1024);
+    const directoryIdentity = Object.freeze({
+      dev: 18446744073709551615n,
+      ino: 18446744073709551615n,
+      size: 0n,
+      mode: 0o40700n,
+      nlink: 18446744073709551615n,
+      mtimeNs: 9223372036854775807n,
+      ctimeNs: 9223372036854775807n,
+    });
+    const leafIdentity = Object.freeze({
+      ...directoryIdentity,
+      mode: 0o100600n,
+    });
+    const relative = Array.from(
+      { length: 128 },
+      (_, index) => `d${String(index).padStart(3, '0')}${'x'.repeat(15)}`
+    ).join('/');
+    const oversizedItem = Object.freeze({
+      relative,
+      maxBytes: 0,
+      identity: leafIdentity,
+      ancestors: Object.freeze(Array.from({ length: 127 }, () => directoryIdentity)),
+    });
+    const identityValues = value => [
+      value.dev,
+      value.ino,
+      value.size,
+      value.mode,
+      value.nlink,
+      value.mtimeNs,
+      value.ctimeNs,
+    ].map(field => String(field));
+    const itemLine = [
+      'I',
+      '77',
+      Buffer.from(relative, 'utf8').toString('hex'),
+      '0',
+      ...identityValues(leafIdentity),
+      '127',
+      ...oversizedItem.ancestors.flatMap(identityValues),
+    ].join('\t');
+    assert(Buffer.byteLength(itemLine) < 32768);
+    const lineBytes = Buffer.byteLength(itemLine) + 1;
+    let count = Math.floor(MAX_REQUEST_BYTES / lineBytes) + 1;
+    while (Buffer.byteLength(`B\t77\t${count}\n`) + (count * lineBytes) <= MAX_REQUEST_BYTES) count += 1;
+    while (count > 1 &&
+        Buffer.byteLength(`B\t77\t${count - 1}\n`) + ((count - 1) * lineBytes) > MAX_REQUEST_BYTES) {
+      count -= 1;
+    }
+    assert(count <= 5000);
+
+    const accepted = encodeBatch(77, Array.from({ length: count - 1 }, () => oversizedItem));
+    assert(Buffer.byteLength(accepted.payload) <= MAX_REQUEST_BYTES);
+    assert.throws(
+      () => encodeBatch(77, Array.from({ length: count }, () => oversizedItem)),
+      error => error?.code === 'PROJECT_WATCHER_HASH_BUDGET'
+    );
+
+    const root = fs.mkdtempSync(path.join(os.tmpdir(), 'writcraft-native-hash-root-'));
+    const rootFd = fs.openSync(root, fs.constants.O_RDONLY);
+    try {
+      const input = `B\t77\t${count}\n${`${itemLine}\n`.repeat(count)}`;
+      assert(Buffer.byteLength(input) > MAX_REQUEST_BYTES);
+      const result = childProcess.spawnSync(HELPER_PATH, [], {
+        input,
+        encoding: 'utf8',
+        maxBuffer: 2 * 1024 * 1024,
+        stdio: ['pipe', 'pipe', 'pipe', rootFd],
+      });
+      assert.strictEqual(result.status, 1);
+      assert.strictEqual(result.stderr, '');
+      assert.strictEqual(result.stdout.trimEnd().split('\n').at(-1), 'E\t77\tERR\tBUDGET');
+    } finally {
+      fs.closeSync(rootFd);
+      fs.rmSync(root, { recursive: true, force: true });
+    }
+  });
+
+  console.log(`\n${passed}/12 native project hash worker checks passed.`);
+  if (passed !== 12) process.exitCode = 1;
 }
 
 run().catch(error => {

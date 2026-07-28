@@ -18,9 +18,10 @@
 //   R<TAB>sequence<TAB>OK<TAB>sha256-hex<TAB>full-leaf-identity
 //   R<TAB>sequence<TAB>ERR<TAB>PATH|IDENTITY|BUDGET|IO
 //   E<TAB>sequence<TAB>OK
-//   E<TAB>sequence<TAB>ERR<TAB>PROTOCOL
+//   E<TAB>sequence<TAB>ERR<TAB>PROTOCOL|BUDGET
 //
 // Any malformed header/item is a protocol failure for the entire batch.  A
+// serialized request above 16 MiB is a batch-level budget failure.  A
 // valid item whose filesystem state races is represented by its own ERR line,
 // allowing Main to mark that candidate unreadable while retaining a sound
 // transport boundary.
@@ -43,6 +44,7 @@
 #define MAX_BATCH_ITEMS 5000U
 #define MAX_BATCH_BYTES (64ULL * 1024ULL * 1024ULL)
 #define MAX_ITEM_BYTES (5ULL * 1024ULL * 1024ULL)
+#define MAX_REQUEST_BYTES (16ULL * 1024ULL * 1024ULL)
 #define HASH_CHUNK_BYTES (64U * 1024U)
 #define MAX_PATH_BYTES 4096U
 #define MAX_COMPONENTS 128U
@@ -477,16 +479,27 @@ int main(void) {
       break;
     }
 
+    uint64_t request_bytes = (uint64_t)line_length + 1U;
     uint64_t batch_bytes = 0U;
-    bool protocol_error = false;
+    bool batch_error = false;
     for (size_t index = 0U; index < count; index += 1U) {
       ReadLineResult read_item = read_protocol_line(line, sizeof(line), &line_length);
-      (void)line_length;
       Item item;
-      if (read_item != READ_LINE || !parse_item(line, batch_sequence, &item) ||
+      if (read_item != READ_LINE) {
+        success = write_batch_end(batch_sequence, "ERR", "PROTOCOL");
+        batch_error = true;
+        break;
+      }
+      if ((uint64_t)line_length + 1U > MAX_REQUEST_BYTES - request_bytes) {
+        success = write_batch_end(batch_sequence, "ERR", "BUDGET");
+        batch_error = true;
+        break;
+      }
+      request_bytes += (uint64_t)line_length + 1U;
+      if (!parse_item(line, batch_sequence, &item) ||
           item.leaf.size > MAX_BATCH_BYTES - batch_bytes) {
         success = write_batch_end(batch_sequence, "ERR", "PROTOCOL");
-        protocol_error = true;
+        batch_error = true;
         break;
       }
       batch_bytes += item.leaf.size;
@@ -497,8 +510,8 @@ int main(void) {
       else success = write_item_error(item.sequence, hash_result_name(result));
       if (!success) break;
     }
-    if (!success || protocol_error) {
-      if (protocol_error) success = false;
+    if (!success || batch_error) {
+      if (batch_error) success = false;
       break;
     }
     success = write_batch_end(batch_sequence, "OK", NULL);
