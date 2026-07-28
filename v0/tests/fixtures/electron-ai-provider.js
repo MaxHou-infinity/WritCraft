@@ -16,6 +16,14 @@ const CHAT_QUESTION = 'E2E 验证默认文件级上下文';
 const CHAT_RESPONSE = 'E2E Chat 已且仅收到项目 Prompt 与当前文件。';
 const SECTIONED_CHAT_QUESTION = 'E2E 验证超长 edit.md 分区上下文';
 const SECTIONED_CHAT_RESPONSE = 'E2E Chat 已收到超长 edit.md 的必需章节，并省略可选溢出章节。';
+const MULTI_TURN_FIRST_QUESTION = 'E2E 多轮第一问：本章的核心矛盾是什么？';
+const MULTI_TURN_FIRST_RESPONSE = 'E2E 多轮第一答：核心矛盾是公开承诺与执行证据之间的落差。';
+const MULTI_TURN_SECOND_QUESTION = 'E2E 多轮第二问：沿用刚才的矛盾给出一个小标题。';
+const MULTI_TURN_SECOND_RESPONSE = 'E2E 多轮第二答：建议小标题为“承诺与证据之间”。';
+const MULTI_TURN_RESET_QUESTION = 'E2E 新对话验证：不要沿用旧摘要。';
+const MULTI_TURN_RESET_RESPONSE = 'E2E 新对话已确认没有沿用旧摘要。';
+const SAME_PROJECT_REOPEN_QUESTION = 'E2E 同项目重开验证：必须建立空白会话。';
+const SAME_PROJECT_REOPEN_RESPONSE = 'E2E 同项目重开已清除旧摘要和在途请求。';
 const CHAT_CURRENT_PATH = 'chapters/07-electron-e2e.md';
 const STALE_CHAT_QUESTION = 'E2E 验证失效预检上下文';
 const STALE_CHAT_RESPONSE = 'E2E 失效请求不应显示此响应。';
@@ -194,6 +202,54 @@ function sectionedChatAnswer(prompt) {
   return SECTIONED_CHAT_RESPONSE;
 }
 
+function firstMultiTurnChatAnswer(prompt) {
+  chatAnswer(prompt);
+  if (prompt.includes('最近对话摘要') ||
+      prompt.includes(MULTI_TURN_FIRST_RESPONSE) ||
+      prompt.includes(MULTI_TURN_SECOND_QUESTION)) {
+    throw new Error('E2E_FIXTURE_MULTI_TURN_FIRST_NOT_EMPTY');
+  }
+  return MULTI_TURN_FIRST_RESPONSE;
+}
+
+function secondMultiTurnChatAnswer(prompt) {
+  chatAnswer(prompt);
+  const count = needle => prompt.split(needle).length - 1;
+  if (count('最近对话摘要（由 Main 有界保存') !== 1 ||
+      count(MULTI_TURN_FIRST_QUESTION) !== 1 ||
+      count(MULTI_TURN_FIRST_RESPONSE) !== 1 ||
+      count(MULTI_TURN_SECOND_QUESTION) !== 1) {
+    throw new Error('E2E_FIXTURE_MULTI_TURN_SUMMARY_INVALID');
+  }
+  return MULTI_TURN_SECOND_RESPONSE;
+}
+
+function resetMultiTurnChatAnswer(prompt) {
+  chatAnswer(prompt);
+  if (prompt.includes('最近对话摘要') ||
+      prompt.includes(MULTI_TURN_FIRST_QUESTION) ||
+      prompt.includes(MULTI_TURN_FIRST_RESPONSE) ||
+      prompt.includes(MULTI_TURN_SECOND_QUESTION) ||
+      prompt.includes(MULTI_TURN_SECOND_RESPONSE)) {
+    throw new Error('E2E_FIXTURE_MULTI_TURN_RESET_FAILED');
+  }
+  return MULTI_TURN_RESET_RESPONSE;
+}
+
+function sameProjectReopenChatAnswer(prompt) {
+  chatAnswer(prompt);
+  for (const forbidden of [
+    '最近对话摘要',
+    MULTI_TURN_RESET_QUESTION,
+    MULTI_TURN_RESET_RESPONSE,
+    STALE_REOPEN_CHAT_QUESTION,
+    STALE_REOPEN_CHAT_RESPONSE,
+  ]) {
+    if (prompt.includes(forbidden)) throw new Error('E2E_FIXTURE_SAME_PROJECT_REOPEN_HISTORY_LEAK');
+  }
+  return SAME_PROJECT_REOPEN_RESPONSE;
+}
+
 function projectChatAnswer(prompt) {
   const required = [
     '[上下文 · scope · project]',
@@ -206,6 +262,8 @@ function projectChatAnswer(prompt) {
   ];
   if (required.some(value => !prompt.includes(value)) ||
       prompt.includes(`[上下文 · file · ${CHAT_CURRENT_PATH}]`) ||
+      prompt.includes(STALE_CHAT_QUESTION) ||
+      prompt.includes(STALE_CHAT_RESPONSE) ||
       !prompt.includes('确定性检索匹配')) {
     throw new Error('E2E_FIXTURE_INVALID_PROJECT_CHAT_CONTEXT');
   }
@@ -513,6 +571,14 @@ function createElectronAiProvider() {
         output = chatAnswer(prompt);
       } else if (prompt.includes(`问题：${SECTIONED_CHAT_QUESTION}`)) {
         output = sectionedChatAnswer(prompt);
+      } else if (prompt.includes(`问题：${MULTI_TURN_FIRST_QUESTION}`)) {
+        output = firstMultiTurnChatAnswer(prompt);
+      } else if (prompt.includes(`问题：${MULTI_TURN_SECOND_QUESTION}`)) {
+        output = secondMultiTurnChatAnswer(prompt);
+      } else if (prompt.includes(`问题：${MULTI_TURN_RESET_QUESTION}`)) {
+        output = resetMultiTurnChatAnswer(prompt);
+      } else if (prompt.includes(`问题：${SAME_PROJECT_REOPEN_QUESTION}`)) {
+        output = sameProjectReopenChatAnswer(prompt);
       } else if (prompt.includes(`问题：${PROJECT_CHAT_QUERY}`)) {
         output = projectChatAnswer(prompt);
       } else if (prompt.includes(`问题：${SELECTION_CHAT_QUESTION}`)) {
@@ -555,6 +621,14 @@ module.exports = {
   CHAT_RESPONSE,
   SECTIONED_CHAT_QUESTION,
   SECTIONED_CHAT_RESPONSE,
+  MULTI_TURN_FIRST_QUESTION,
+  MULTI_TURN_FIRST_RESPONSE,
+  MULTI_TURN_SECOND_QUESTION,
+  MULTI_TURN_SECOND_RESPONSE,
+  MULTI_TURN_RESET_QUESTION,
+  MULTI_TURN_RESET_RESPONSE,
+  SAME_PROJECT_REOPEN_QUESTION,
+  SAME_PROJECT_REOPEN_RESPONSE,
   CHAT_CURRENT_PATH,
   STALE_CHAT_QUESTION,
   STALE_CHAT_RESPONSE,

@@ -129,6 +129,23 @@ check('project prompt 章节 locator 必须携带与父 Chip 完全一致的 rev
   assert.equal(sections[2].locator, null);
 });
 
+check('最近对话只从 Main 顶层元数据生成固定披露卡，不接收摘要正文或排除操作', () => {
+  const state = State.createState({
+    scope: 'file',
+    conversation: { includedTurnCount: 2, totalTurnCount: 4, bytes: 860, text: '不得进入 Renderer' },
+    chips: [{ id: 'scope-file', type: 'scope', scope: 'file', label: '文件作用域' }],
+  }, []);
+  const view = State.toViewModel(state);
+  const conversation = view.chips[0];
+  assert.equal(conversation.type, 'conversation');
+  assert.equal(conversation.label, '最近对话 · 2 轮');
+  assert.equal(conversation.required, true);
+  assert.equal(conversation.removable, false);
+  assert.equal(conversation.bytes, 860);
+  assert(!JSON.stringify(state).includes('不得进入 Renderer'));
+  assert.strictEqual(State.reduce(state, { type: 'exclude', chipId: conversation.id }), state);
+});
+
 check('右侧书签组件不使用 innerHTML，且仅回传 excludedChipIds policy', () => {
   const base = path.join(__dirname, '..', 'src', 'renderer');
   const component = fs.readFileSync(path.join(base, 'context-inspector.js'), 'utf8');

@@ -55,7 +55,9 @@
         const lock = element(document, 'span', 'context-inspector__required', '固定');
         lock.title = chip.type === 'selection'
           ? '当前精确选段是选区作用域的固定上下文，不能在此移除'
-          : '作用域与项目提示由 Main 自动加入，不能在此移除';
+          : chip.type === 'conversation'
+            ? '最近对话由 Main 维护；如需清空，请在 Chat 中新建对话'
+            : '作用域与项目提示由 Main 自动加入，不能在此移除';
         head.append(lock);
       } else if (interactive) {
         const button = element(document, 'button', 'context-inspector__toggle', chip.excluded ? '恢复' : '移除');

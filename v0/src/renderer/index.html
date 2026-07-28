@@ -471,6 +471,9 @@
     .chat-header { height: 42px; padding: 0 13px; border-bottom: 1px solid var(--line); display: flex; align-items: center; gap: 8px; color: var(--theme-deep); }
     .chat-header .title { font-size: 12px; font-weight: 600; }
     #chat-context-label { flex: 1; font-size: 9px; color: var(--ink-soft); background: #ece7df; padding: 4px 7px; border-radius: 4px; text-align: center; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+    #chat-conversation-status { flex: none; color: var(--ink-soft); font-size: 8px; white-space: nowrap; }
+    #chat-new-conversation { flex: none; border: 1px solid #d7cfc2; border-radius: 4px; background: #f7f4ef; color: var(--theme-deep); padding: 4px 6px; font-size: 8px; cursor: pointer; }
+    #chat-new-conversation:focus-visible { outline: 2px solid var(--theme); outline-offset: 1px; }
     .chat-scope-picker { display: grid; grid-template-columns: repeat(3, minmax(0, 1fr)); gap: 4px; padding: 8px 10px 0; }
     .chat-scope-button { border: 1px solid #d7cfc2; border-radius: 5px; background: #f3efe8; color: var(--ink-soft); padding: 6px 4px; font-size: 9px; cursor: pointer; }
     .chat-scope-button[aria-pressed="true"] { border-color: var(--theme); background: #e6eee7; color: var(--theme-deep); font-weight: 650; }
@@ -835,7 +838,7 @@
         </nav>
 
       <section id="chat-panel" class="assistant-page" data-assistant-panel="chat" role="tabpanel" aria-label="AI 写作助手" hidden>
-        <div class="chat-header"><span class="title">✦ AI 写作助手</span><span id="chat-context-label">📄 当前文件</span><button id="chat-close" title="关闭">×</button></div>
+        <div class="chat-header"><span class="title">✦ AI 写作助手</span><span id="chat-context-label">📄 当前文件</span><span id="chat-conversation-status" aria-live="polite">新对话</span><button id="chat-new-conversation" type="button" title="清空 Main 中的最近对话摘要">新对话</button><button id="chat-close" title="关闭">×</button></div>
         <div id="chat-scope-picker" class="chat-scope-picker" role="group" aria-label="对话作用域">
           <button class="chat-scope-button" type="button" data-chat-scope="project" aria-pressed="false">项目</button>
           <button class="chat-scope-button" type="button" data-chat-scope="file" aria-pressed="true">文件</button>

@@ -13,6 +13,8 @@
   const CHAT_CONTEXT_LABEL = document.getElementById('chat-context-label');
   const CHAT_CONTEXT_CHIPS = document.getElementById('chat-context-chips');
   const CHAT_SCOPE_BUTTONS = [...document.querySelectorAll('[data-chat-scope]')];
+  const CHAT_CONVERSATION_STATUS = document.getElementById('chat-conversation-status');
+  const CHAT_NEW_CONVERSATION = document.getElementById('chat-new-conversation');
   const state = window.__rewriteState;
   const htmlSanitizer = window.WritCraftHtmlSanitizer;
   const chatContextState = window.WritCraftChatContextState;
@@ -1063,6 +1065,77 @@
     return div;
   }
 
+  function resetConversationInspector() {
+    window.__contextInspectorView?.update?.({
+      scope: chatScope,
+      currentFilePath: window.__workspace?.getCurrentPath?.() || null,
+      budgetChars: 0,
+      budgetBytes: 0,
+      usedChars: 0,
+      usedBytes: 0,
+      chips: [],
+    }, []);
+  }
+
+  function resetConversationUI(message = '新对话已开始。Main 不会继续使用上一段对话。') {
+    CHAT_MESSAGES.replaceChildren();
+    appendChatMsg('ai', message, false);
+    if (CHAT_CONVERSATION_STATUS) CHAT_CONVERSATION_STATUS.textContent = '新对话';
+    renderContextChips([]);
+    resetConversationInspector();
+  }
+
+  function publishConversationState(conversation) {
+    if (!CHAT_CONVERSATION_STATUS || conversation?.schema !== 'writcraft.chat-conversation-state/v1') return false;
+    const turnCount = Number.isSafeInteger(conversation.turnCount) && conversation.turnCount >= 0
+      ? Math.min(6, conversation.turnCount) : 0;
+    CHAT_CONVERSATION_STATUS.textContent = turnCount ? `已保留 ${turnCount} 轮` : '新对话';
+    return true;
+  }
+
+  function rebaseConversationUI(reason, currentUserMessage) {
+    if (!['project_changed', 'chat_reopened', 'context_changed', 'expired'].includes(reason) ||
+        !currentUserMessage) return false;
+    const notice = document.createElement('div');
+    notice.className = 'chat-msg chat-ai chat-conversation-reset';
+    notice.setAttribute('role', 'status');
+    notice.textContent = reason === 'context_changed'
+      ? 'AI: 项目内容已变化，Main 已从本轮开始使用新的对话上下文。'
+      : 'AI: 先前对话已失效，Main 已从本轮开始建立新对话。';
+    CHAT_MESSAGES.replaceChildren(notice, currentUserMessage);
+    return true;
+  }
+
+  async function startNewConversation() {
+    const projectInstanceId = window.__workspace?.state?.project?.instanceId || null;
+    if (!projectInstanceId || !window.writCraft?.chatConversation?.reset) {
+      setStatus('⚠ 新对话服务未连接', true);
+      return false;
+    }
+    const requestToken = ++chatRequestSequence;
+    window.__workspace?.supersedeChatRequest?.(requestToken);
+    clearPreflightContextChips();
+    if (CHAT_NEW_CONVERSATION) CHAT_NEW_CONVERSATION.disabled = true;
+    let result;
+    try {
+      result = await window.writCraft.chatConversation.reset(projectInstanceId);
+    } catch (error) {
+      result = { ok: false, message: error.message };
+    } finally {
+      if (CHAT_NEW_CONVERSATION) CHAT_NEW_CONVERSATION.disabled = false;
+    }
+    if (requestToken !== chatRequestSequence ||
+        window.__workspace?.state?.project?.instanceId !== projectInstanceId) return false;
+    if (!result?.ok) {
+      appendChatMsg('ai', `新对话未能建立：${result?.message || result?.error || '未知错误'}`, false);
+      return false;
+    }
+    resetConversationUI();
+    publishConversationState(result.conversation);
+    CHAT_INPUT.focus();
+    return true;
+  }
+
   function manifestChips(contextManifest) {
     if (!contextManifest) return [];
     if (Array.isArray(contextManifest)) return contextManifest.map(item => ({
@@ -1073,7 +1146,19 @@
       revision: item.revision || null,
       locator: { filePath: item.path, offset: 0, line: 1, column: 1 },
     }));
-    return Array.isArray(contextManifest.chips) ? contextManifest.chips : [];
+    const chips = Array.isArray(contextManifest.chips) ? [...contextManifest.chips] : [];
+    const conversation = contextManifest.conversation;
+    if (conversation && Number.isSafeInteger(conversation.includedTurnCount) &&
+        conversation.includedTurnCount > 0) {
+      chips.unshift({
+        id: 'ctx_conversation_recent',
+        type: 'conversation',
+        label: `最近对话 · ${Math.min(6, conversation.includedTurnCount)} 轮`,
+        bytes: Number.isSafeInteger(conversation.bytes) ? conversation.bytes : 0,
+        reason: 'Main 有界保存并在本轮实际使用',
+      });
+    }
+    return chips;
   }
 
   function bindResponseContext(message, chips) {
@@ -1120,6 +1205,25 @@
     const requestToken = ++chatRequestSequence;
     window.__workspace?.supersedeChatRequest?.(requestToken);
     clearPreflightContextChips();
+    const projectInstanceId = window.__workspace?.state?.project?.instanceId || null;
+    if (projectInstanceId) {
+      if (!window.writCraft?.chatConversation?.cancelPending) {
+        appendChatMsg('ai', '对话会话服务未连接', false);
+        return;
+      }
+      let canceled;
+      try {
+        canceled = await window.writCraft.chatConversation.cancelPending(projectInstanceId);
+      } catch (error) {
+        canceled = { ok: false, message: error.message };
+      }
+      if (requestToken !== chatRequestSequence ||
+          window.__workspace?.state?.project?.instanceId !== projectInstanceId) return;
+      if (!canceled?.ok) {
+        appendChatMsg('ai', `对话请求未能建立：${canceled?.message || canceled?.error || '未知错误'}`, false);
+        return;
+      }
+    }
     if (window.__workspace?.state?.project && !window.__workspace?.canUseAI?.()) {
       appendChatMsg('ai', '项目 Prompt 缺失或当前文件存在磁盘冲突。请先恢复 edit.md 或处理冲突，再继续对话。', false);
       return;
@@ -1239,9 +1343,10 @@
     }
     if (!result.ok) {
       clearPreflightContextChips(requestToken);
-      appendChatMsg('ai', '调用失败：' + result.error, false);
+      appendChatMsg('ai', '调用失败：' + (result.message || result.error || '未知错误'), false);
     }
     else {
+      rebaseConversationUI(result.conversation?.resetReason, userMessageNode);
       window.__contextInspectorView?.update?.(result.contextManifest, result.contextManifest?.errors || []);
       // Preflight chips are only a composer preview. Once Main responds, its
       // manifest is the sole authority for what actually reached the model.
@@ -1249,6 +1354,7 @@
       renderContextChips(actualChips, { requestToken, phase: 'actual' });
       const response = appendChatMsg('ai', result.text, true);
       bindResponseContext(response, actualChips);
+      publishConversationState(result.conversation);
     }
   }
 
@@ -1315,7 +1421,26 @@
     }
   });
 
-  document.addEventListener('writcraft:chat-context-invalidated', clearStalePreflightContextChips);
+  document.addEventListener('writcraft:chat-context-invalidated', event => {
+    clearStalePreflightContextChips();
+    const requestToken = ++chatRequestSequence;
+    window.__workspace?.supersedeChatRequest?.(requestToken);
+    if (CHAT_CONVERSATION_STATUS) {
+      CHAT_CONVERSATION_STATUS.textContent = event?.detail?.reason?.startsWith('external')
+        ? '外部变化 · 新上下文'
+        : '内容变化 · 新上下文';
+    }
+    renderContextChips([]);
+    // Keep the prior response Inspector visible as historical provenance.
+    // Its locators remain revision-gated by workspace.js and will fail closed
+    // after disk drift. Only an explicit New Chat clears that evidence.
+  });
+  document.addEventListener('writcraft:project-entered', () => {
+    const requestToken = ++chatRequestSequence;
+    window.__workspace?.supersedeChatRequest?.(requestToken);
+    resetConversationUI('打开项目后，我会优先读取 edit.md，再从当前项目建立新对话。');
+  });
+  CHAT_NEW_CONVERSATION?.addEventListener('click', () => { void startNewConversation(); });
 
   document.addEventListener('click', event => {
     const anchor = event.target && event.target.closest ? event.target.closest('a') : null;

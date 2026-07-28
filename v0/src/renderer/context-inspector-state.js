@@ -6,11 +6,13 @@
 })(typeof globalThis !== 'undefined' ? globalThis : this, function () {
   'use strict';
 
-  const MAX_CHIPS = 64;
+  // 64 Main context chips plus one synthetic, non-removable conversation
+  // disclosure derived from the bounded top-level manifest metadata.
+  const MAX_CHIPS = 65;
   const MAX_ERRORS = 50;
   const MAX_PROMPT_SECTIONS = 64;
-  const CHIP_TYPES = new Set(['scope', 'project_prompt', 'file', 'chapter', 'section', 'folder', 'source', 'entity', 'selection', 'neighbor', 'retrieval']);
-  const REQUIRED_TYPES = new Set(['scope', 'project_prompt', 'selection']);
+  const CHIP_TYPES = new Set(['scope', 'project_prompt', 'conversation', 'file', 'chapter', 'section', 'folder', 'source', 'entity', 'selection', 'neighbor', 'retrieval']);
+  const REQUIRED_TYPES = new Set(['scope', 'project_prompt', 'conversation', 'selection']);
 
   function text(value, limit = 512) {
     return typeof value === 'string' ? value.slice(0, limit) : '';
@@ -98,6 +100,8 @@
       usedSectionCount,
       omittedSectionCount,
       sections,
+      includedTurnCount: integer(chip.includedTurnCount),
+      totalTurnCount: integer(chip.totalTurnCount),
       required: REQUIRED_TYPES.has(chip.type),
     });
   }
@@ -117,7 +121,26 @@
     const source = manifest && typeof manifest === 'object' && !Array.isArray(manifest) ? manifest : {};
     const seen = new Set();
     const chips = [];
-    for (const [index, item] of (Array.isArray(source.chips) ? source.chips : []).slice(0, MAX_CHIPS).entries()) {
+    if (source.conversation && typeof source.conversation === 'object' &&
+        integer(source.conversation.includedTurnCount) > 0) {
+      const includedTurnCount = Math.min(6, integer(source.conversation.includedTurnCount));
+      const totalTurnCount = Math.max(includedTurnCount, Math.min(6, integer(source.conversation.totalTurnCount)));
+      const conversationChip = normalizeChip({
+        id: 'ctx_conversation_recent',
+        type: 'conversation',
+        label: `最近对话 · ${includedTurnCount} 轮`,
+        reason: `Main 有界保存并在本轮实际使用；当前会话共保留 ${totalTurnCount} 轮`,
+        bytes: integer(source.conversation.bytes),
+        includedTurnCount,
+        totalTurnCount,
+      }, 0);
+      if (conversationChip) {
+        seen.add(conversationChip.id);
+        chips.push(conversationChip);
+      }
+    }
+    const sourceChipLimit = Math.max(0, MAX_CHIPS - chips.length);
+    for (const [index, item] of (Array.isArray(source.chips) ? source.chips : []).slice(0, sourceChipLimit).entries()) {
       const chip = normalizeChip(item, index);
       if (!chip || seen.has(chip.id)) continue;
       seen.add(chip.id);
@@ -192,7 +215,8 @@
   function typeLabel(type) {
     return ({
       project_prompt: '项目提示', file: '文件', chapter: '章节', section: '段落', folder: '文件夹',
-      scope: '作用域', source: '来源', entity: '实体', selection: '选段', neighbor: '邻段', retrieval: '检索片段',
+      scope: '作用域', conversation: '最近对话', source: '来源', entity: '实体',
+      selection: '选段', neighbor: '邻段', retrieval: '检索片段',
     })[type] || type;
   }
 

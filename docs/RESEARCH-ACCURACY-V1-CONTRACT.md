@@ -1,6 +1,6 @@
 # WritCraft V0 · Research Accuracy v1
 
-> Status: **signed; persistent-watcher regression closed, final independent review P0=0/P1=0/P2=0**. Transaction ordering, watcher fail-closed behavior, commit-boundary authority, exact-project degraded gates, same-root recovery and Renderer recorded-but-locked semantics passed independent review. As historical focused evidence for this contract, full Node/verify exited successfully, the standard controlled forced Electron E2E completed **30/30**, and the real Main/IPC persistent-restart-failure zero-side-effect harness completed **3/3**; the current project total is 33/33 in `v0/DEVELOPMENT-STATUS.md`.
+> Status: **signed; persistent-watcher regression closed, final independent review P0=0/P1=0/P2=0**. Transaction ordering, watcher fail-closed behavior, commit-boundary authority, exact-project degraded gates, same-root recovery and Renderer recorded-but-locked semantics passed independent review. As historical focused evidence for this contract, full Node/verify exited successfully, the standard controlled forced Electron E2E completed **30/30**, and the real Main/IPC persistent-restart-failure zero-side-effect harness completed **3/3**; the current project total is 34/34 in `v0/DEVELOPMENT-STATUS.md`.
 
 ## 1. User journey
 

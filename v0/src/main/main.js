@@ -63,6 +63,7 @@ const inlineRewriteCapabilityStoreService = require('./inline-rewrite-capability
 const inlineRewriteApplyServiceModule = require('./inline-rewrite-apply-service');
 const inlineRewriteMutationGuardService = require('./inline-rewrite-mutation-guard');
 const chatContextRequestService = require('./chat-context-request-service');
+const chatConversationService = require('./chat-conversation-service');
 const diagnosticExportService = require('./diagnostic-export-service');
 const diagnosticExportHandlerService = require('./diagnostic-export-handler');
 
@@ -206,6 +207,7 @@ const activeAiRequests = new Set();
 const ownMarkdownWatcherStates = new Map();
 const deferredWatcherPayloadsByRoot = new Map();
 const internalMutationDepthByRoot = new Map();
+const chatConversationStore = chatConversationService.createChatConversationStore();
 let lastContextResponse = null;
 const RENDERER_ENTRY = path.join(__dirname, '..', 'renderer', 'index.html');
 const TRUSTED_RENDERER_URL = pathToFileURL(RENDERER_ENTRY).href;
@@ -427,6 +429,8 @@ function finalizeOnboardingBatchCommit(result, operations) {
 
 function advanceAiContextGeneration(options = {}) {
   abortActiveAiRequests();
+  const ownerId = currentChatConversationOwnerId();
+  if (ownerId) chatConversationStore.invalidateOwner(ownerId, 'context_changed');
   projectMutationGeneration += 1;
   lastContextResponse = null;
   pendingPlanRecords.clear();
@@ -669,6 +673,8 @@ function setCurrentProject(project) {
     projectWatcherHealth.needsRecovery(project, Boolean(currentProjectWatcher));
   if (changedProject) {
     abortActiveAiRequests();
+    const chatOwnerId = currentChatConversationOwnerId();
+    if (chatOwnerId) chatConversationStore.invalidateOwner(chatOwnerId, 'project_changed');
     if (mainWindow && !mainWindow.isDestroyed()) {
       inlineRewriteStore.clearOwner(`browserwindow:${mainWindow.id}`);
     }
@@ -921,6 +927,48 @@ function assertTrustedSender(event) {
   }
 }
 
+function chatConversationOwnerId(event) {
+  return event?.sender && Number.isSafeInteger(event.sender.id)
+    ? `webcontents:${event.sender.id}`
+    : null;
+}
+
+function currentChatConversationOwnerId() {
+  if (!mainWindow || mainWindow.isDestroyed() || !mainWindow.webContents ||
+      !Number.isSafeInteger(mainWindow.webContents.id)) return null;
+  return `webcontents:${mainWindow.webContents.id}`;
+}
+
+function chatConversationBinding(event, project = requireCurrentProject()) {
+  const ownerId = chatConversationOwnerId(event);
+  if (!ownerId) {
+    throw new chatConversationService.ChatConversationError(
+      'INVALID_CHAT_CONVERSATION_BINDING',
+      'Chat 会话来源无效'
+    );
+  }
+  return {
+    ownerId,
+    navigationEpoch: rendererNavigationEpoch,
+    projectInstanceId: project.instanceId,
+    rootPath: project.rootPath,
+    contextGeneration: projectMutationGeneration,
+  };
+}
+
+function chatConversationFailure(error) {
+  const code = error instanceof chatConversationService.ChatConversationError
+    ? error.code
+    : 'CHAT_CONVERSATION_FAILED';
+  return {
+    ok: false,
+    error: code,
+    message: code === 'CHAT_CONVERSATION_STALE'
+      ? '对话会话已由更新请求取代，请继续使用最新回复'
+      : '最近对话摘要不可用，请新建对话后重试',
+  };
+}
+
 function matchesAiProjectOrigin(projectInstanceId) {
   if (!currentProject) return projectInstanceId === null;
   return typeof projectInstanceId === 'string' && projectInstanceId === currentProject.instanceId;
@@ -976,16 +1024,19 @@ function createWindow() {
     if (!isMainFrame) return;
     researchHandoffStore.clearOwner(rendererOwnerId, rendererNavigationEpoch);
     inlineRewriteStore.clearOwner(inlineRewriteOwnerId, rendererNavigationEpoch);
+    chatConversationStore.invalidateOwner(rendererOwnerId, 'chat_reopened');
     advanceRendererNavigationEpoch();
   });
   mainWindow.webContents.on('render-process-gone', () => {
     researchHandoffStore.clearOwner(rendererOwnerId);
     inlineRewriteStore.clearOwner(inlineRewriteOwnerId);
+    chatConversationStore.invalidateOwner(rendererOwnerId, 'chat_reopened');
     advanceRendererNavigationEpoch();
   });
   mainWindow.webContents.on('destroyed', () => {
     researchHandoffStore.clearOwner(rendererOwnerId);
     inlineRewriteStore.clearOwner(inlineRewriteOwnerId);
+    chatConversationStore.invalidateOwner(rendererOwnerId, 'chat_reopened');
     advanceRendererNavigationEpoch();
   });
   mainWindow.webContents.on('will-navigate', (event, url) => {
@@ -1355,10 +1406,18 @@ function openProjectRoot(rootPath) {
   }
   const promptMissing = preview.status === 'missing';
   const project = projectService.openProject(rootPath);
+  const reopenedSameProject = Boolean(currentProject &&
+    currentProject.rootPath === project.rootPath &&
+    currentProject.instanceId === project.instanceId);
   const tree = projectService.listTree(project.rootPath);
   const promptFrontMatter = promptMissing
     ? projectService.inspectEditFrontMatter('')
     : projectService.readFileWithRevision(project.rootPath, projectService.EDIT_FILE).frontMatter;
+  if (reopenedSameProject) {
+    abortActiveAiRequests();
+    const chatOwnerId = currentChatConversationOwnerId();
+    if (chatOwnerId) chatConversationStore.invalidateOwner(chatOwnerId, 'chat_reopened');
+  }
   setCurrentProject(project);
   rememberRecentProject(project);
   return {
@@ -1592,6 +1651,7 @@ ipcMain.handle('writcraft:chat', async (event, projectInstanceId, userMessage, p
   if (contextRequest && contextRequest.message !== undefined && contextRequest.message !== userMessage) {
     return { ok: false, error: 'INVALID_CONTEXT_REQUEST', message: '上下文问题必须与对话问题一致' };
   }
+  const originalUserMessage = userMessage;
   let resolvedContext = null;
   if (currentProject) {
     try {
@@ -1627,25 +1687,95 @@ ipcMain.handle('writcraft:chat', async (event, projectInstanceId, userMessage, p
   const systemContext = boundedContext.text
     ? `当前项目背景：\n${boundedContext.text}\n\n请基于此回答用户的写作相关问题。`
     : '你是中文写作助手，专门帮助用户规划、改进、润色文章。请用简洁、专业、温暖的语气回答。';
-  const result = await runAiRequest(projectInstanceId, signal => callLLM(
-    [
-      { role: 'user', content: `${systemContext}\n\n问题：${userMessage}` },
-    ],
-    'MiniMax-M3',
-    1024,
-    signal
-  ));
-  if (!isAiProjectOriginCurrent(origin)) return staleAiProjectResult();
+  let conversationLease = null;
+  if (currentProject) {
+    try {
+      conversationLease = chatConversationStore.begin(
+        chatConversationBinding(event, currentProject),
+        originalUserMessage
+      );
+    } catch (error) {
+      return chatConversationFailure(error);
+    }
+  }
+  const conversationContext = conversationLease?.summary?.text
+    ? [
+      '最近对话摘要（由 Main 有界保存，仅用于保持当前会话连续；当前 edit.md、当前文件和本轮问题优先）：',
+      conversationLease.summary.text,
+    ].join('\n')
+    : '';
+  const prompt = [systemContext, conversationContext, `问题：${userMessage}`].filter(Boolean).join('\n\n');
+  let result;
+  try {
+    result = await runAiRequest(projectInstanceId, signal => callLLM(
+      [{ role: 'user', content: prompt }],
+      'MiniMax-M3',
+      1024,
+      signal
+    ), conversationLease?.signal || null);
+  } catch (error) {
+    if (conversationLease) chatConversationStore.finish(conversationLease);
+    throw error;
+  }
+  if (!isAiProjectOriginCurrent(origin)) {
+    if (conversationLease) chatConversationStore.finish(conversationLease);
+    return staleAiProjectResult();
+  }
+  let conversation = null;
+  if (conversationLease) {
+    if (result?.ok === true && typeof result.text === 'string') {
+      try {
+        conversation = chatConversationStore.commit(conversationLease, result.text);
+      } catch (error) {
+        return chatConversationFailure(error);
+      }
+    } else {
+      chatConversationStore.finish(conversationLease);
+    }
+  }
+  const actualManifest = resolvedContext
+    ? chatConversationService.attachSummaryToManifest({
+      ...resolvedContext.contextManifest,
+      errors: resolvedContext.errors,
+    }, conversationLease?.summary)
+    : chatConversationService.attachSummaryToManifest(boundedContext.manifest, conversationLease?.summary);
   if (resolvedContext && currentProject) {
-    lastContextResponse = { rootPath: currentProject.rootPath, manifest: resolvedContext.contextManifest };
+    lastContextResponse = { rootPath: currentProject.rootPath, manifest: actualManifest };
   }
   return {
     ...result,
-    contextManifest: resolvedContext ? {
-      ...resolvedContext.contextManifest,
-      errors: resolvedContext.errors,
-    } : boundedContext.manifest,
+    contextManifest: actualManifest,
+    ...(conversation ? { conversation } : {}),
   };
+});
+
+ipcMain.handle('writcraft:chat:reset', async (event, projectInstanceId) => {
+  assertTrustedSender(event);
+  if (!matchesAiProjectOrigin(projectInstanceId) || !currentProject) return staleAiProjectResult();
+  try {
+    chatConversationStore.reset(chatConversationBinding(event, currentProject));
+    return {
+      ok: true,
+      conversation: {
+        schema: chatConversationService.PUBLIC_STATE_SCHEMA,
+        turnCount: 0,
+        resetReason: 'user_reset',
+      },
+    };
+  } catch (error) {
+    return chatConversationFailure(error);
+  }
+});
+
+ipcMain.handle('writcraft:chat:cancel-pending', async (event, projectInstanceId) => {
+  assertTrustedSender(event);
+  if (!matchesAiProjectOrigin(projectInstanceId) || !currentProject) return staleAiProjectResult();
+  try {
+    chatConversationStore.cancelPending(chatConversationBinding(event, currentProject));
+    return { ok: true };
+  } catch (error) {
+    return chatConversationFailure(error);
+  }
 });
 
 ipcMain.handle('writcraft:project:propose-plan', projectPlanHandler.createProposePlanHandler({

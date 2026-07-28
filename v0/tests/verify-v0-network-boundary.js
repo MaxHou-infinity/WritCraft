@@ -192,7 +192,20 @@ test('every project AI generation handler rejects a foreign instance before mode
   assert(handoff.indexOf('callLLM(') < handoff.indexOf('isAiProjectOriginCurrent(origin)'));
   assert(handoff.indexOf('isAiProjectOriginCurrent(origin)') < handoff.indexOf('finalizePlanTaskHandoff({'));
   assert.match(main, /abortActiveAiRequests\(\)[\s\S]{0,500}request\.controller\.abort\(\)/);
-  assert.match(main, /function advanceAiContextGeneration\(options = \{\}\) \{\s*abortActiveAiRequests\(\);\s*projectMutationGeneration \+= 1;\s*lastContextResponse = null;\s*pendingPlanRecords\.clear\(\);\s*invalidatePendingOnboardingReviews\(options\.preserveOnboardingChangeSetId \|\| null\);\s*\}/);
+  const advanceStart = main.indexOf('function advanceAiContextGeneration(options = {})');
+  const advanceEnd = main.indexOf('\n}', advanceStart);
+  const advance = main.slice(advanceStart, advanceEnd);
+  for (const operation of [
+    'abortActiveAiRequests();',
+    "chatConversationStore.invalidateOwner(ownerId, 'context_changed')",
+    'projectMutationGeneration += 1;',
+    'lastContextResponse = null;',
+    'pendingPlanRecords.clear();',
+    'invalidatePendingOnboardingReviews(options.preserveOnboardingChangeSetId || null);',
+  ]) assert(advance.includes(operation), `AI generation advance is missing ${operation}`);
+  assert(advance.indexOf('abortActiveAiRequests();') < advance.indexOf('projectMutationGeneration += 1;'));
+  assert(advance.indexOf("chatConversationStore.invalidateOwner(ownerId, 'context_changed')") <
+    advance.indexOf('projectMutationGeneration += 1;'));
   assert.match(main, /function invalidateProjectDerivedState\(options = \{\}\) \{[\s\S]{0,300}advanceAiContextGeneration\(\{ preserveOnboardingChangeSetId: preserveChangeSetId \}\)/);
   const callMessages = main.slice(main.indexOf('minimaxTextService.callMessages({'), main.indexOf('});', main.indexOf('minimaxTextService.callMessages({')) + 3);
   for (const field of ['apiKey', 'messages', 'model', 'maxTokens', 'signal', 'fetchImpl: electronAiFixture?.textFetch']) {
@@ -223,6 +236,7 @@ test('authoritative project mutations abort in-flight AI and advance the generat
   assert.match(main, /internalMutationDepthByRoot/);
   assert.match(main, /function assertInlineRewriteMutationAvailable\(project\)[\s\S]{0,300}assertProjectWatcherAvailable\(project\)/);
   assert.match(main, /async function runAiRequest\(projectInstanceId[\s\S]{0,260}assertProjectWatcherAvailable\(currentProject\)/);
+  assert.match(handler('writcraft:chat:cancel-pending'), /assertTrustedSender\(event\)[\s\S]*matchesAiProjectOrigin\(projectInstanceId\)[\s\S]*chatConversationStore\.cancelPending\(chatConversationBinding\(event, currentProject\)\)/);
   assert.match(main, /function startProjectWatcher\(project\)[\s\S]{0,900}projectWatcherHealth\.clear\(project\)[\s\S]{0,180}projectWatcherHealth\.markDegraded\(project\)/);
   assert.match(main, /function restartProjectWatcher\(project\)[\s\S]{0,600}PROJECT_WATCHER_UNAVAILABLE/);
   const setCurrentProject = main.slice(main.indexOf('function setCurrentProject(project)'), main.indexOf('function invalidateProjectDerivedState'));

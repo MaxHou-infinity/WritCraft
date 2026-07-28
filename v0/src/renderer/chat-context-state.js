@@ -77,6 +77,7 @@
     if (!chip) return '上下文';
     if (chip.type === 'scope') return chip.scope === 'project' ? '◎ 项目' : chip.scope === 'selection' ? '◎ 选区' : '◎ 文件';
     if (chip.type === 'project_prompt') return '✦ edit.md';
+    if (chip.type === 'conversation') return `↻ ${chip.label || '最近对话'}`;
     if (chip.type === 'folder') return `🗂 ${chip.folderPath}`;
     if (chip.type === 'entity') return `◈ ${chip.label}`;
     if (chip.type === 'source') return `⌘ ${chip.label}`;

@@ -140,8 +140,13 @@ contextBridge.exposeInMainWorld('writCraft', {
   clearRewriteReconciliation: (projectInstanceId, payload) =>
     ipcRenderer.invoke('writcraft:rewrite:reconciliation-clear', projectInstanceId, payload),
 
-  // Day 3: ⌘L 全局对话（userMessage + projectContext → M3 → 回答）
+  // Chat 正文和最近轮次均由 Main 持有；Renderer 只提交本轮问题与
+  // 结构化 Context request，并可显式要求清空当前 Main 会话。
   chat: (projectInstanceId, userMessage, projectContext, contextRequest) => ipcRenderer.invoke('writcraft:chat', projectInstanceId, userMessage, projectContext, contextRequest),
+  chatConversation: Object.freeze({
+    reset: (projectInstanceId) => ipcRenderer.invoke('writcraft:chat:reset', projectInstanceId),
+    cancelPending: (projectInstanceId) => ipcRenderer.invoke('writcraft:chat:cancel-pending', projectInstanceId),
+  }),
 
   // Project-scoped filesystem. Root paths are owned by the main process; each
   // method accepts only the minimum data needed for its operation.

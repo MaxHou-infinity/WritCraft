@@ -1,6 +1,6 @@
 # 笔触 · WritCraft — 产品需求与价值说明
 
-> 文档版本：v3.9 | 2026-07-28（0.0Z 分区项目 Prompt 收口）
+> 文档版本：v4.0 | 2026-07-28（0.0AA Main-owned Chat 多轮连续性）
 > 发起方：Max Hou
 > 状态：**V0 候选原型，未完成、未发布**
 > 权威边界：产品规格看 `docs/WRITCRAFT-PRD-V3.md`；工程事实、测试证据与唯一 TODO 看 `v0/DEVELOPMENT-STATUS.md`。本文件只解释目标用户、产品价值与当前范围，不得据此重开历史任务。
@@ -44,28 +44,30 @@ V0 聚焦一类主用户：正在撰写方法论书籍、专业报告或结构�
 
 ## 五、当前工程状态
 
-当前源码基线为 **0.0Z（提交前工作树）**：
+当前源码基线为 **0.0AA（提交前工作树）**：
 
+- Chat Conversation **8/8**
 - Context Resolver **26/26**
-- Context Inspector **8/8**
-- Chat **11/11**
+- Context Inspector **9/9**
+- Chat Context **12/12**
 - Context Policy **10/10**
+- Network **15/15**
+- Workspace **10/10**
 - 完整 `npm test` 与非沙箱 Electron-enabled `npm run verify` exit 0
 - Persistent Main/IPC **3/3**
-- 最终源码强制真实 Electron 连续两次 **33/33**
+- 最终源码强制真实 Electron 连续两次 **34/34**
 - package **8/8**、release **7/7**
-- 0.0Z 独立代码复审 **P0=0/P1=0/P2=0**
+- 0.0AA 独立代码复审 **P0=0/P1=0/P2=0**
 
 这些数字证明当前本地技术链的对应边界，不代表真实作者价值、真实付费图片或正式发布已经完成。现有 App/ZIP 仅用于本地证据，禁止分发。
 
 ## 六、已确认的本地产品缺口
 
-按 2026-07-28 PRD→源码审计，0.0Z 已关闭 `edit.md` 章节化上下文与 Inspector 披露；仍有两项不能写成“已完成”：
+按 2026-07-28 PRD→源码审计，0.0Z 已关闭 `edit.md` 章节化上下文与 Inspector 披露，0.0AA 已关闭 Main-owned Chat 最近对话、多轮连续性、可见重置和同项目重开隔离；仍有一项不能写成“已完成”：
 
-1. **Chat 多轮连续性**：当前每次只发送本轮问题和当次 Context；最近对话摘要尚未由 Main 持有并绑定项目/会话。
-2. **普通 Markdown 回收区 UI**：Main service 已有回收清单和恢复能力，但 App 尚无可见列表与单项恢复入口。
+1. **普通 Markdown 回收区 UI**：Main service 已有回收清单和恢复能力，但 App 尚无可见列表与单项恢复入口。
 
-严格顺序是：先完成第 1 项并独立签字，再做第 2 项。不得用已关闭的 watcher、安全或历史测试任务替代这些产品缺口。
+下一本地任务只做这一项并独立签字。不得用已关闭的 Chat、Prompt、watcher、安全或历史测试任务替代这个产品缺口。
 
 ## 七、V0 完成门禁
 

@@ -159,6 +159,17 @@ check('openRecent 重新校验持久化路径且不暴露 rootPath', () => {
     mainSource.indexOf("ipcMain.handle('writcraft:rewrite'")
   );
   assert.ok(openHelper.includes('projectService.openProject(rootPath)'));
+  assert.ok(openHelper.includes('reopenedSameProject'));
+  const listIndex = openHelper.indexOf('projectService.listTree(project.rootPath)');
+  const promptIndex = openHelper.indexOf('projectService.readFileWithRevision(project.rootPath, projectService.EDIT_FILE)');
+  const abortIndex = openHelper.indexOf('abortActiveAiRequests();');
+  const invalidateIndex = openHelper.indexOf("chatConversationStore.invalidateOwner(chatOwnerId, 'chat_reopened')");
+  const setIndex = openHelper.indexOf('setCurrentProject(project)');
+  for (const index of [listIndex, promptIndex, abortIndex, invalidateIndex, setIndex]) assert.ok(index >= 0);
+  assert.ok(listIndex < abortIndex);
+  assert.ok(promptIndex < abortIndex);
+  assert.ok(abortIndex < invalidateIndex);
+  assert.ok(invalidateIndex < setIndex);
   assert.ok(openHelper.indexOf('projectService.openProject(rootPath)') < openHelper.indexOf('setCurrentProject(project)'));
   assert.ok(openHelper.includes('project: publicProject(project)'));
   const explicitOpenHandler = mainSource.slice(

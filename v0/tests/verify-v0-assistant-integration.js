@@ -70,7 +70,8 @@ check('Plan→Changes 只上送不可编辑标识，并由 Main provenance 覆�
 
 check('Context 排除策略由 Main 缓存的权威 Manifest 建立', () => {
   assert.match(main, /contextPolicyService\.createExclusionPolicy\(lastContextResponse\.manifest/);
-  assert.match(main, /lastContextResponse = \{ rootPath: currentProject\.rootPath, manifest: resolvedContext\.contextManifest \}/);
+  assert.match(main, /const actualManifest = resolvedContext[\s\S]*attachSummaryToManifest/);
+  assert.match(main, /lastContextResponse = \{ rootPath: currentProject\.rootPath, manifest: actualManifest \}/);
   assert.match(main, /policy: contextPolicy/);
 });
 

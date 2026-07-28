@@ -1,8 +1,8 @@
 # 笔触 · WritCraft · 一个月 V0 路线图
 
-> 文档版本：2026-07-28（v3.3，0.0Z 超长项目 Prompt 分区）
+> 文档版本：2026-07-28（v3.4，0.0AA Main-owned Chat 多轮连续性）
 > 状态：**V0 续作中，完整产品未完成**；产品范围以 `docs/WRITCRAFT-PRD-V3.md` 为准  
-> 2026-07-28 续作交接：当前工程基线为 **0.0Z**。Chat/Context 已把超长 `edit.md` 改为按 ATX 标题整章编译，优先保留四类项目硬约束，并在 Inspector 披露已用/省略章节和 revision-safe 原文定位。当前 Context Resolver **26/26**、Inspector **8/8**、Chat **11/11**、Policy **10/10**、package **8/8**、release **7/7**、完整 test/verify、Persistent **3/3** 与最终源码真实 Electron 连续两次 **33/33** 通过；独立复审 **P0=0/P1=0/P2=0**。下一本地批是 Chat 多轮连续性，之后才是普通 Markdown 回收区恢复 UI。
+> 2026-07-28 续作交接：当前工程基线为 **0.0AA**。Chat/Context 保留 0.0Z 的超长 `edit.md` 按 ATX 标题整章编译与 Inspector 披露，并新增 Main-owned 最近对话、多轮连续性、可见重置、新请求抢占和同项目重开隔离。当前 Conversation **8/8**、Context Resolver **26/26**、Inspector **9/9**、Chat Context **12/12**、Policy **10/10**、Network **15/15**、Workspace **10/10**、package **8/8**、release **7/7**、完整 test/verify、Persistent **3/3** 与最终源码真实 Electron 连续两次 **34/34** 通过；独立复审 **P0=0/P1=0/P2=0**。下一本地任务只做普通 Markdown 回收区恢复 UI。
 > 范围：Month 1（4 周 × 7 天 = 28 天）
 > 治理说明：第一至第八节保留原 28 天计划、早期模型/TipTap 假设和历史验收目标，仅供追溯，**不是当前 TODO 或实现合同**；当前执行顺序只看第九节与 `v0/DEVELOPMENT-STATUS.md`。
 
@@ -169,4 +169,4 @@
 
 ## 九、 下一步
 
-2026-07-28 0.0Z 已完成并独立签字 `edit.md` section-aware 上下文编译与 Inspector 章节披露，不得从 0.0T–0.0Y 的历史 TODO 重开已签字任务。按 `v0/DEVELOPMENT-STATUS.md`，下一步只实现 Chat 最近对话摘要与多轮连续性；独立签字后再补普通 Markdown 回收区恢复 UI。只有作者提供合格项目和完整 `sk-api-`，才执行真实付费图片、2000+ 字/5+ 章作者旅程和私有价值证据；其后基于最新源码重建并进入签名/公证/Gatekeeper 复审。
+2026-07-28 0.0AA 已完成并独立签字 Main-owned Chat 最近对话与多轮连续性，0.0Z 的 `edit.md` section-aware 编译与 Inspector 章节披露继续有效；不得从 0.0T–0.0Z 的历史 TODO 重开已签字任务。按 `v0/DEVELOPMENT-STATUS.md`，下一步只实现普通 Markdown 回收区可见列表与单项恢复 UI。只有作者提供合格项目和完整 `sk-api-`，才执行真实付费图片、2000+ 字/5+ 章作者旅程和私有价值证据；其后基于最新源码重建并进入签名/公证/Gatekeeper 复审。

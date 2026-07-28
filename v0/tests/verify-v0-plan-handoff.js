@@ -530,7 +530,23 @@ async function run() {
   staleAiProjectResult,
   projectFailure,
 }));`));
-    assert.match(main, /function advanceAiContextGeneration\(options = \{\}\) \{\s*abortActiveAiRequests\(\);\s*projectMutationGeneration \+= 1;\s*lastContextResponse = null;\s*pendingPlanRecords\.clear\(\);\s*invalidatePendingOnboardingReviews\(options\.preserveOnboardingChangeSetId \|\| null\);\s*\}/);
+    const generationStart = main.indexOf('function advanceAiContextGeneration(options = {}) {');
+    const generationEnd = main.indexOf('\nfunction rememberOwnMarkdownState', generationStart);
+    const generation = main.slice(generationStart, generationEnd);
+    const generationSteps = [
+      'abortActiveAiRequests();',
+      "chatConversationStore.invalidateOwner(ownerId, 'context_changed');",
+      'projectMutationGeneration += 1;',
+      'lastContextResponse = null;',
+      'pendingPlanRecords.clear();',
+      'invalidatePendingOnboardingReviews(options.preserveOnboardingChangeSetId || null);',
+    ];
+    let previousGenerationStep = -1;
+    for (const step of generationSteps) {
+      const stepIndex = generation.indexOf(step);
+      assert(stepIndex > previousGenerationStep, `generation invalidation step is missing or out of order: ${step}`);
+      previousGenerationStep = stepIndex;
+    }
     const setCurrentProjectStart = main.indexOf('function setCurrentProject(project) {');
     const setCurrentProjectEnd = main.indexOf('\nfunction invalidateProjectDerivedState', setCurrentProjectStart);
     assert(main.slice(setCurrentProjectStart, setCurrentProjectEnd).includes('pendingPlanRecords.clear()'));

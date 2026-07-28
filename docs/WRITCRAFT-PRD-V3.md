@@ -6,7 +6,7 @@
 > 适用范围：V0 起的桌面写作 IDE  
 > 优先级：若本文件与旧版 PRD、路线图或原型行为冲突，以本文件为准；工程实现以 `docs/PHASE-A-IMPLEMENTATION.md` 为准。
 
-> **实现状态注记（2026-07-28，0.0Z）**：本文仍是产品权威规格，**完整 PRD 尚未实现**。超长 `edit.md` 的章节化保留与 Inspector 披露已接入 Chat/Context：Main 按 ATX 标题整章选择，优先保留项目主旨、范围、关键实体和时间/关系约束；必需章节自身超限则稳定阻断，右侧逐章展示已使用/已省略并以 revision 门禁定位原文。Context Resolver **26/26**、Inspector **8/8**、Chat **11/11**、Policy **10/10**、完整 test/verify、Persistent **3/3**、最终源码真实 Electron 连续两次 **33/33**、package **8/8** 与 release **7/7** 通过；独立复审 **P0=0/P1=0/P2=0**。当前本地缺口剩余 Chat 最近对话摘要/多轮连续性、普通 Markdown 回收区恢复 UI；其他 AI 模式尚未统一采用本编译器。
+> **实现状态注记（2026-07-28，0.0AA）**：本文仍是产品权威规格，**完整 PRD 尚未实现**。0.0Z 的超长 `edit.md` 章节化编译与 Inspector 披露保持签字；0.0AA 新增 Main-owned 最近对话，最多保留 6 个已完成轮次，绑定 owner/navigation/project/root/generation，并提供可见“新对话”、新提交抢占和同项目重开隔离。Chat Conversation **8/8**、Chat Context **12/12**、Resolver **26/26**、Inspector **9/9**、Policy **10/10**、Network **15/15**、Workspace **10/10**、完整 test/verify、Persistent **3/3**、最终源码真实 Electron 连续两次 **34/34**、package **8/8** 与 release **7/7** 通过；独立复审 **P0=0/P1=0/P2=0**。当前唯一剩余本地缺口是普通 Markdown 回收区恢复 UI；其他 AI 模式尚未统一采用 `edit.md` 分区编译器。
 
 > **完成定义**：任何“V0 完成”声明必须同时满足 §10.1–§10.4、全量自动回归、真实 Electron E2E 和独立复审。局部 suite 通过、本地 ad-hoc App 或历史 ZIP 均不能单独构成完成证据。
 
@@ -398,7 +398,7 @@ Issue 类型首批支持：
 
 ### 10.3 Phase C：一致性星图
 
-本节的动态旅程、零写入边界、可访问性、最小窗口和大型图谱性能门禁由 `docs/GRAPH-ACCEPTANCE-V1-CONTRACT.md` 细化。产品契约于 2026-07-22 签字，2026-07-23 性能批源码完整 test/verify 与强制 Electron 连续两轮 26/26 通过，可见帧性能复审 P0/P1/P2=0。后续 Graph 韧性批又关闭完整语义权威、不可变快照、异步所有权与 Unicode quote 边界；当前 0.0Z 基线完整 verify 通过、总链强制 Electron **33/33**。
+本节的动态旅程、零写入边界、可访问性、最小窗口和大型图谱性能门禁由 `docs/GRAPH-ACCEPTANCE-V1-CONTRACT.md` 细化。产品契约于 2026-07-22 签字，2026-07-23 性能批源码完整 test/verify 与强制 Electron 连续两轮 26/26 通过，可见帧性能复审 P0/P1/P2=0。后续 Graph 韧性批又关闭完整语义权威、不可变快照、异步所有权与 Unicode quote 边界；当前 0.0AA 基线完整 verify 通过、总链强制 Electron **34/34**。
 
 1. 能从至少三个项目文件增量生成统一节点、关系、证据和问题。
 2. 默认显示当前文件子图，可切换全项目并按类型、文件和问题筛选。

@@ -37,7 +37,7 @@ const GRAPH_CACHE_BUDGET_MS = 700;
 const GRAPH_INCREMENTAL_BUDGET_MS = 800;
 const GRAPH_INTERACTION_BUDGET_MS = 100;
 const GRAPH_RENDERER_HEAP_BUDGET_BYTES = 150 * 1024 * 1024;
-const EXPECTED_STAGE_COUNT = ONBOARDING_FOCUS ? 2 : 33;
+const EXPECTED_STAGE_COUNT = ONBOARDING_FOCUS ? 2 : 34;
 
 let passed = 0;
 const activeElectronInstances = new Set();
@@ -2485,12 +2485,29 @@ async function run() {
       const drifted = projectService.readFileWithRevision(project.rootPath, issuePath);
       projectService.atomicWriteFile(project.rootPath, issuePath, original.content, drifted.revision);
       await first.client.evaluate(`document.getElementById('graph-refresh').click()`);
-      await waitForValue(first.client, `(() => {
-        const card = [...document.querySelectorAll('.issue-card')]
-          .find(node => node.textContent.includes('时间先后关系形成闭环'));
-        const button = card?.querySelector('.issue-suggest-fix');
-        return card && button && !button.disabled && card.dataset.stale !== 'true' && !card.classList.contains('is-stale');
-      })()`, 'the restored evidence receiving a fresh repair binding');
+      try {
+        await waitForValue(first.client, `(() => {
+          const card = [...document.querySelectorAll('.issue-card')]
+            .find(node => node.textContent.includes('时间先后关系形成闭环'));
+          const button = card?.querySelector('.issue-suggest-fix');
+          return card && button && !button.disabled && card.dataset.stale !== 'true' && !card.classList.contains('is-stale');
+        })()`, 'the restored evidence receiving a fresh repair binding');
+      } catch (error) {
+        const snapshot = await first.client.evaluate(`(() => {
+          const card = [...document.querySelectorAll('.issue-card')]
+            .find(node => node.textContent.includes('时间先后关系形成闭环'));
+          const button = card?.querySelector('.issue-suggest-fix');
+          return {
+            graphSummary: document.getElementById('graph-summary')?.textContent || '',
+            cardText: card?.textContent || '',
+            staleDataset: card?.dataset?.stale || null,
+            staleClass: Boolean(card?.classList?.contains('is-stale')),
+            buttonFound: Boolean(button),
+            buttonDisabled: button?.disabled ?? null,
+          };
+        })()`).catch(snapshotError => ({ snapshotError: snapshotError.message }));
+        throw new Error(`${error.message}; Graph restore snapshot: ${JSON.stringify(snapshot)}`);
+      }
       assert.strictEqual(projectService.readFile(project.rootPath, issuePath), original.content);
       assert.strictEqual(fs.existsSync(historyPath) ? fs.readFileSync(historyPath, 'utf8') : null, historyBefore);
     });
@@ -2665,6 +2682,125 @@ async function run() {
       await first.client.evaluate(`window.__assistantDock.close()`);
     });
 
+    await stage('keeps a Main-owned recent conversation across turns and clears it through the visible new-chat control', async () => {
+      await first.client.evaluate(`(() => {
+        document.querySelector('[data-assistant-mode="chat"]').click();
+        document.querySelector('[data-chat-scope="file"]').click();
+        document.getElementById('chat-new-conversation').click();
+      })()`);
+      await waitForValue(first.client, `(() => {
+        const text = document.getElementById('chat-messages').textContent;
+        return text.includes('新对话已开始') && !text.includes(${JSON.stringify(electronAiFixture.CHAT_RESPONSE)});
+      })()`, 'the visible Main-owned new conversation reset');
+
+      await first.client.evaluate(`(() => {
+        const input = document.getElementById('chat-input');
+        input.value = ${JSON.stringify(electronAiFixture.MULTI_TURN_FIRST_QUESTION)};
+        input.dispatchEvent(new Event('input', { bubbles: true }));
+        document.getElementById('chat-submit').click();
+      })()`);
+      await waitForValue(first.client, `(() => {
+        const response = document.getElementById('chat-messages').textContent;
+        return response.includes(${JSON.stringify(electronAiFixture.MULTI_TURN_FIRST_RESPONSE)}) &&
+          document.getElementById('chat-conversation-status').textContent === '已保留 1 轮';
+      })()`, 'the first committed Main conversation turn');
+
+      await first.client.evaluate(`(() => {
+        const input = document.getElementById('chat-input');
+        input.value = ${JSON.stringify(electronAiFixture.MULTI_TURN_SECOND_QUESTION)};
+        input.dispatchEvent(new Event('input', { bubbles: true }));
+        document.getElementById('chat-submit').click();
+      })()`);
+      const second = await waitForValue(first.client, `(() => {
+        const reply = [...document.querySelectorAll('#chat-messages .chat-ai')]
+          .find(node => node.textContent.includes(${JSON.stringify(electronAiFixture.MULTI_TURN_SECOND_RESPONSE)}));
+        if (!reply || document.getElementById('chat-conversation-status').textContent !== '已保留 2 轮') return null;
+        return {
+          types: [...reply.querySelectorAll('.chat-response-context .context-chip')].map(node => node.dataset.type),
+          oldQuestionCount: document.getElementById('chat-messages').textContent
+            .split(${JSON.stringify(electronAiFixture.MULTI_TURN_FIRST_QUESTION)}).length - 1,
+        };
+      })()`, 'the second turn using the bounded Main summary');
+      assert.deepStrictEqual(second.types, ['conversation', 'scope', 'project_prompt', 'file']);
+      assert.strictEqual(second.oldQuestionCount, 1, 'Renderer displays one old question and never receives a hidden duplicate');
+
+      const inspector = await first.client.evaluate(`(() => {
+        document.querySelector('[data-assistant-mode="context"]').click();
+        const card = document.querySelector('#context-inspector-host .context-inspector__card--conversation');
+        return card ? {
+          text: card.textContent,
+          removable: Boolean(card.querySelector('.context-inspector__toggle')),
+        } : null;
+      })()`);
+      assert(inspector?.text.includes('最近对话 · 1 轮'), JSON.stringify(inspector));
+      assert.strictEqual(inspector.removable, false);
+
+      await first.client.evaluate(`(() => {
+        document.querySelector('[data-assistant-mode="chat"]').click();
+        document.getElementById('chat-new-conversation').click();
+      })()`);
+      await waitForValue(first.client, `(() => {
+        const text = document.getElementById('chat-messages').textContent;
+        return text.includes('新对话已开始') &&
+          !text.includes(${JSON.stringify(electronAiFixture.MULTI_TURN_FIRST_RESPONSE)}) &&
+          !text.includes(${JSON.stringify(electronAiFixture.MULTI_TURN_SECOND_RESPONSE)}) &&
+          document.getElementById('chat-conversation-status').textContent === '新对话';
+      })()`, 'the second visible new conversation reset');
+
+      await first.client.evaluate(`(() => {
+        const input = document.getElementById('chat-input');
+        input.value = ${JSON.stringify(electronAiFixture.MULTI_TURN_RESET_QUESTION)};
+        input.dispatchEvent(new Event('input', { bubbles: true }));
+        document.getElementById('chat-submit').click();
+      })()`);
+      const resetResponse = await waitForValue(first.client, `(() => {
+        const reply = [...document.querySelectorAll('#chat-messages .chat-ai')]
+          .find(node => node.textContent.includes(${JSON.stringify(electronAiFixture.MULTI_TURN_RESET_RESPONSE)}));
+        return reply ? [...reply.querySelectorAll('.chat-response-context .context-chip')].map(node => node.dataset.type) : null;
+      })()`, 'the post-reset turn without prior summary');
+      assert.deepStrictEqual(resetResponse, ['scope', 'project_prompt', 'file']);
+
+      await first.client.evaluate(`(() => {
+        const input = document.getElementById('chat-input');
+        input.value = ${JSON.stringify(electronAiFixture.STALE_REOPEN_CHAT_QUESTION)};
+        input.dispatchEvent(new Event('input', { bubbles: true }));
+        document.getElementById('chat-submit').click();
+      })()`);
+      await waitForValue(first.client, `(() => {
+        const types = [...document.querySelectorAll('#chat-context-chips .context-chip')]
+          .map(node => node.dataset.type);
+        return types.includes('scope') && types.includes('project_prompt') && types.includes('file');
+      })()`, 'the same-project reopen pending Chat request');
+      const activeInstanceId = await first.client.evaluate(`window.__workspace.state.project.instanceId`);
+      const reopened = await first.client.evaluate(`window.writCraft.project.openRecent()`);
+      assert.strictEqual(reopened?.ok, true, JSON.stringify(reopened));
+      assert.strictEqual(reopened?.project?.instanceId, activeInstanceId);
+      await first.client.evaluate(`document.dispatchEvent(new CustomEvent('writcraft:project-entered'))`);
+      await waitForValue(first.client, `(() => {
+        const text = document.getElementById('chat-messages').textContent;
+        return text.includes('打开项目后') &&
+          !text.includes(${JSON.stringify(electronAiFixture.MULTI_TURN_RESET_RESPONSE)});
+      })()`, 'the same-project reopen clearing visible Chat');
+
+      await first.client.evaluate(`(() => {
+        const input = document.getElementById('chat-input');
+        input.value = ${JSON.stringify(electronAiFixture.SAME_PROJECT_REOPEN_QUESTION)};
+        input.dispatchEvent(new Event('input', { bubbles: true }));
+        document.getElementById('chat-submit').click();
+      })()`);
+      const reopenedResponse = await waitForValue(first.client, `(() => {
+        const reply = [...document.querySelectorAll('#chat-messages .chat-ai')]
+          .find(node => node.textContent.includes(${JSON.stringify(electronAiFixture.SAME_PROJECT_REOPEN_RESPONSE)}));
+        if (!reply || document.getElementById('chat-conversation-status').textContent !== '已保留 1 轮') return null;
+        return [...reply.querySelectorAll('.chat-response-context .context-chip')].map(node => node.dataset.type);
+      })()`, 'the same-project reopen starting an empty Main conversation');
+      assert.deepStrictEqual(reopenedResponse, ['scope', 'project_prompt', 'file']);
+      await delay(900);
+      assert.strictEqual(await first.client.evaluate(`(() => [...document.querySelectorAll('#chat-messages .chat-ai')]
+        .filter(node => node.textContent.includes(${JSON.stringify(electronAiFixture.STALE_REOPEN_CHAT_RESPONSE)})).length)()`), 0);
+      await first.client.evaluate(`window.__assistantDock.close()`);
+    });
+
     await stage('compiles an oversized edit.md by section and discloses used or omitted chapters in Context Inspector', async () => {
       const editSnapshot = projectService.readFileWithRevision(project.rootPath, 'edit.md');
       const oversizedEdit = [
@@ -2752,6 +2888,8 @@ async function run() {
         projectService.atomicWriteFile(project.rootPath, 'edit.md', editSnapshot.content, changed.revision);
         await first.client.evaluate(`window.__assistantDock.close()`).catch(() => {});
       }
+      const restoredPromptFlush = await first.client.evaluate(`window.__workspace.flushExternalChanges()`);
+      assert.strictEqual(restoredPromptFlush?.ok, true, JSON.stringify(restoredPromptFlush));
       await first.client.evaluate(`window.__workspace.openFile(${JSON.stringify(createdPath)})`);
       await waitForValue(first.client, `window.__workspace.state.currentPath === ${JSON.stringify(createdPath)}`,
         'returning from the oversized edit.md Context Inspector fixture');
@@ -2768,14 +2906,26 @@ async function run() {
         input.dispatchEvent(new Event('input', { bubbles: true }));
         document.getElementById('chat-submit').click();
       })()`);
-      const preflightTypes = await waitForValue(first.client, `(() => {
-        const chips = [...document.querySelectorAll('#chat-context-chips .context-chip')];
-        const types = chips.map(node => node.dataset.type);
-        const replacedPreviousActual = chips.every(node => node.dataset.e2ePreviousActual !== 'true');
-        return replacedPreviousActual && types.includes('scope') && types.includes('project_prompt') && types.includes('file')
-          ? types
-          : null;
-      })()`, 'the delayed Chat preflight chips');
+      let preflightTypes;
+      try {
+        preflightTypes = await waitForValue(first.client, `(() => {
+          const chips = [...document.querySelectorAll('#chat-context-chips .context-chip')];
+          const types = chips.map(node => node.dataset.type);
+          const replacedPreviousActual = chips.every(node => node.dataset.e2ePreviousActual !== 'true');
+          return replacedPreviousActual && types.includes('scope') && types.includes('project_prompt') && types.includes('file')
+            ? types
+            : null;
+        })()`, 'the delayed Chat preflight chips');
+      } catch (error) {
+        const snapshot = await first.client.evaluate(`(() => ({
+          messages: [...document.querySelectorAll('#chat-messages .chat-msg')].map(node => node.textContent),
+          topTypes: [...document.querySelectorAll('#chat-context-chips .context-chip')].map(node => node.dataset.type),
+          conversationStatus: document.getElementById('chat-conversation-status')?.textContent || '',
+          canUseAI: window.__workspace.canUseAI(),
+          currentPath: window.__workspace.state.currentPath,
+        }))()`).catch(snapshotError => ({ snapshotError: snapshotError.message }));
+        throw new Error(`${error.message}; delayed Chat snapshot: ${JSON.stringify(snapshot)}`);
+      }
       assert.deepStrictEqual(preflightTypes, ['scope', 'project_prompt', 'file']);
 
       const clearedImmediately = await first.client.evaluate(`(() => {
@@ -2790,14 +2940,30 @@ async function run() {
         input.dispatchEvent(new Event('input', { bubbles: true }));
         document.getElementById('chat-submit').click();
       })()`);
-      const newerActual = await waitForValue(first.client, `(() => {
-        const reply = [...document.querySelectorAll('#chat-messages .chat-ai')]
-          .find(node => node.textContent.includes(${JSON.stringify(electronAiFixture.PROJECT_CHAT_RESPONSE)}));
-        if (!reply) return null;
-        const types = [...document.querySelectorAll('#chat-context-chips .context-chip')]
-          .map(node => node.dataset.type);
-        return types.includes('retrieval') ? types : null;
-      })()`, 'the newer project Chat actual chips');
+      let newerActual;
+      try {
+        newerActual = await waitForValue(first.client, `(() => {
+          const reply = [...document.querySelectorAll('#chat-messages .chat-ai')]
+            .find(node => node.textContent.includes(${JSON.stringify(electronAiFixture.PROJECT_CHAT_RESPONSE)}));
+          if (!reply) return null;
+          const types = [...document.querySelectorAll('#chat-context-chips .context-chip')]
+            .map(node => node.dataset.type);
+          return types.includes('retrieval') ? types : null;
+        })()`, 'the newer project Chat actual chips');
+      } catch (error) {
+        const snapshot = await first.client.evaluate(`(() => ({
+          messages: [...document.querySelectorAll('#chat-messages .chat-msg')].map(node => ({
+            role: node.classList.contains('chat-user') ? 'user' : 'ai',
+            text: node.textContent,
+            canceled: node.dataset.requestCanceled || null,
+          })),
+          topTypes: [...document.querySelectorAll('#chat-context-chips .context-chip')]
+            .map(node => node.dataset.type),
+          conversationStatus: document.getElementById('chat-conversation-status')?.textContent || '',
+          saveState: document.getElementById('save-state')?.textContent || '',
+        }))()`).catch(snapshotError => ({ snapshotError: snapshotError.message }));
+        throw new Error(`${error.message}; Chat snapshot: ${JSON.stringify(snapshot)}`);
+      }
       assert(newerActual.includes('scope'));
       assert(newerActual.includes('project_prompt'));
       assert(newerActual.includes('retrieval'));
@@ -3081,7 +3247,7 @@ async function run() {
         };
       })()`, 'the selection-scoped Chat response');
       assert.strictEqual(response.scopePressed, 'true');
-      assert.deepStrictEqual(response.types, ['scope', 'project_prompt', 'selection', 'neighbor', 'neighbor']);
+      assert.deepStrictEqual(response.types, ['conversation', 'scope', 'project_prompt', 'selection', 'neighbor', 'neighbor']);
       assert(response.tags.every(tag => tag === 'BUTTON'));
 
       const expectedNeighbors = [electronAiFixture.REWRITE_BEFORE, electronAiFixture.REWRITE_AFTER];

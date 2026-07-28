@@ -146,6 +146,36 @@ check('Editor 回复上下文创建 button 并将点击交给 workspace 的 fail
   assert.match(workspace, /未猜测新段落位置/);
 });
 
+check('Main-owned 最近对话通过窄 IPC、会话 lease、Manifest 与可见新对话入口接通', () => {
+  const base = path.join(__dirname, '..', 'src');
+  const main = fs.readFileSync(path.join(base, 'main', 'main.js'), 'utf8');
+  const preload = fs.readFileSync(path.join(base, 'main', 'preload.js'), 'utf8');
+  const editor = fs.readFileSync(path.join(base, 'renderer', 'editor.js'), 'utf8');
+  const html = fs.readFileSync(path.join(base, 'renderer', 'index.html'), 'utf8');
+  const handlerStart = main.indexOf("ipcMain.handle('writcraft:chat'");
+  const handlerEnd = main.indexOf("ipcMain.handle('writcraft:chat:reset'", handlerStart);
+  const handler = main.slice(handlerStart, handlerEnd);
+  assert(handler.indexOf('chatConversationStore.begin(') < handler.indexOf('runAiRequest('));
+  assert(handler.indexOf('isAiProjectOriginCurrent(origin)') < handler.indexOf('chatConversationStore.commit('));
+  assert.match(handler, /attachSummaryToManifest/);
+  assert.match(handler, /conversationLease\?\.signal/);
+  assert.match(preload, /chatConversation: Object\.freeze\(\{[\s\S]*reset: \(projectInstanceId\) => ipcRenderer\.invoke\('writcraft:chat:reset'[\s\S]*cancelPending: \(projectInstanceId\) => ipcRenderer\.invoke\('writcraft:chat:cancel-pending'/);
+  assert.match(editor, /startNewConversation[\s\S]*chatConversation\.reset\(projectInstanceId\)/);
+  const doChat = editor.slice(editor.indexOf('async function doChat(userMessage) {'), editor.indexOf("\n  EDITOR_EL.contentEditable"));
+  assert(doChat.indexOf('chatConversation.cancelPending(projectInstanceId)') <
+    doChat.indexOf('prepareChatRequestGuard(chatIntent)'));
+  assert.match(doChat, /result\.message \|\| result\.error \|\| '未知错误'/);
+  assert.match(editor, /contextManifest\.conversation/);
+  const invalidation = editor.slice(
+    editor.indexOf("document.addEventListener('writcraft:chat-context-invalidated'"),
+    editor.indexOf("document.addEventListener('writcraft:project-entered'"),
+  );
+  assert.doesNotMatch(invalidation, /resetConversationInspector/);
+  assert.match(editor, /resetConversationUI[\s\S]*resetConversationInspector\(\)/);
+  assert.match(html, /id="chat-conversation-status"/);
+  assert.match(html, /id="chat-new-conversation"/);
+});
+
 function deferred() {
   let resolve;
   let reject;
@@ -353,7 +383,9 @@ check('Editor/Workspace 把同一 token guard 贯穿 preflight、模型边界与
   assert.match(editor, /captureChatRequestIntent\?\.\(requestToken, contextRequest\)/);
   assert(editor.indexOf('captureChatRequestIntent?.(requestToken, contextRequest)') < editor.indexOf('await prepareChatRequestGuard(chatIntent)'));
   assert.match(editor, /resolveContextSelections\?\.\(contextRequest, chatGuard\)/);
-  assert(editor.indexOf('if (stopIfStale()) return;\n    let result;') < editor.indexOf('await window.writCraft.chat'));
+  const modelCall = editor.indexOf('await window.writCraft.chat(');
+  assert(editor.lastIndexOf('if (stopIfStale()) return;', modelCall) < modelCall);
+  assert(editor.lastIndexOf('if (stopIfStale()) return;', modelCall) >= 0);
   assert.match(editor, /markChatRequestCanceled\(userMessageNode/);
   assert.match(editor, /if \(chatContextState\.isAuthoritativeCancellation\?\.\(result\)\)[\s\S]*markChatRequestCanceled/);
   assert.doesNotMatch(editor, /contextRequest && chatContextState\.isAuthoritativeCancellation/);
@@ -371,6 +403,6 @@ checkAsync('预保存 intent、后发请求、文件切换与选段变化会在�
   await verifyConcurrentLifecycle();
 })
   .then(() => {
-    assert.strictEqual(passed, 11);
-    if (!process.exitCode) console.log(`\n✅ Chat context ${passed}/11 全过`);
+    assert.strictEqual(passed, 12);
+    if (!process.exitCode) console.log(`\n✅ Chat context ${passed}/12 全过`);
   });
