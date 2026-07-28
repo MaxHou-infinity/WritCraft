@@ -1,11 +1,11 @@
 # 笔触 · WritCraft — 产品需求与价值说明
 
-> 文档版本：v3.4 | 2026-07-28（0.0T Plan 写入终态时序收口）
+> 文档版本：v3.5 | 2026-07-28（0.0W native hash 请求预算签收）
 > 发起方：Max Hou
 > 输入依据：T1–T9 全流程调研，含 T7 综合分析（25KB）/ T8 魔鬼质询（17KB）/ T9 战略路线（16KB）
 > 状态：产品背景与商业假设已定；**V0 仍在开发，未完成、未发布**
 
-> 实施说明：本文件描述产品价值、原始研究与商业假设；功能验收以 `docs/WRITCRAFT-PRD-V3.md` 为准，当前事实与 TODO 只以 `v0/DEVELOPMENT-STATUS.md` 为准。0.0T 已关闭 Plan 写入后终态错误依赖重复 refresh 的 timing P2：挂起式回归和分阶段 E2E 均已签收，本地及独立复审共三次 **32/32**，本批 **P0=0/P1=0/P2=0**。0.0S reserve/build、Author **47/47**、离线 **15/15**、package **8/8**、release **7/7**、完整 test/verify 与 persistent **3/3** 保持有效。当前 ad-hoc App/ZIP 已按源码重建，但没有真实作者、完整 `sk-api-`、付费质量/费用/价值指标、Developer ID、公证或 Gatekeeper，禁止分发；祖先 `openat` 与 `mkdirat→openat` 微窗口仍开放。
+> 实施说明：本文件描述产品价值、原始研究与商业假设；功能验收以 `docs/WRITCRAFT-PRD-V3.md` 为准，当前事实与 TODO 只以 `v0/DEVELOPMENT-STATUS.md` 为准。2026-07-28 的当前工程基线为 **0.0W**：项目根 fd 以下的逐段 `openat` 已完成，native hash 请求又加入 JS/C 一致的 16 MiB 增量上限；worker **12/12**、Watcher **30/30**、cross-layer **11/11**、Large **6/6**、Author **48/48**、离线 API **15/15**、package **8/8**、release **7/7**、完整 test/verify、Persistent **3/3** 与真实 Electron **32/32** 通过，最终复审 **P0=0/P1=0/P2=1**。唯一 watcher P2 是初始项目根路径打开仍解析项目外层祖先；0.0U 的同 UID 0700 空目录 residual 是已明确接受的另一事务边界，不得重新写成待关闭的 `mkdirat→openat` 缺口。当前 ad-hoc App/ZIP 已按源码重建，但没有真实作者、完整 `sk-api-`、付费质量/费用/价值指标、Developer ID、公证或 Gatekeeper，仍禁止分发。
 
 ---
 
@@ -635,6 +635,6 @@ Plan Mode 完成率 ≥ 50%（创建了大纲的用户中，完成 >80% 章节�
 
 ---
 
-*文档版本：v3.0 | WritCraft 笔触产品需求与价值说明 | 2026-07-27*
+*文档版本：v3.5 | WritCraft 笔触产品需求与价值说明 | 2026-07-28（0.0W）*
 *依据：T1–T9 全流程调研输出 | T7 综合分析 × T8 魔鬼质询 × T9 战略路线*
 *本文档为 Max 独立发起之产品需求文档，与其他项目 PRD 隔离*
