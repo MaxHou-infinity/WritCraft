@@ -1,10 +1,10 @@
 # 笔触 · WritCraft · V0 开发状态与续作入口
 
 > 最后更新：2026-07-29（Asia/Shanghai，0.0AL · 0.1.1 Developer Preview 发版）
-> 当前状态：**所有者已明确授权发布 `writ-craft@0.1.1` 到 npm `preview`，并在 GitHub 创建 `v0.1.1` prerelease。候选已将 manifest 与 shrinkwrap 提升到 0.1.1，包含 0.0AH–0.0AK 的项目卡、滚动、Changes 审阅、活动栏和统一工作区导航修复；当前仍处于发布前门禁，不得在 registry 与 GitHub 反查成功前写成“已公开”。上一公开包仍为不可变的 `0.1.0`。**
-> 发布判断：**0.1.1 本地候选已完成版本、自动化、双架构安装、包清单和独立复审，当前只等待把 exact candidate commit 发布到 npm `preview` 与 GitHub `v0.1.1` prerelease，并完成公网反查。上一版 `0.1.0` 的 `latest/preview` 平台约束仅作为历史事实保留；不得 unpublish、发布占位版本或把本次 prerelease 写成稳定版。**
-> 下一阶段门禁：**立即顺序为：提交并锁定 0.1.1 候选 → npm `preview` 发布与公网 tarball 安装验证 → 推送 exact tag → 创建 GitHub prerelease → 更新 registry/GitHub/文档/Nowledge 终态。只有这些完成后，下一产品门禁才重新回到合格真实作者项目验收：`edit.md`、5+ 个 `chapters/` 章节、2000+ 可见中文字符和至少 1 个来源文件。**
-> 当前源码证据：**0.1.1 候选已通过完整 Node/安全 `verify`、npm Preview 10/10、local installed 2/2、npm10/arm64 2/2、npm11/x64 2/2、Persistent Main/IPC 3/3、生产依赖 0 vulnerabilities 和连续两轮真实 Electron 37/37；tarball 119 文件、571,985 bytes、shasum `d370c500666e25cfb373852deafa21b232d2bc18`。发布前 registry 仍是不可变的 `writ-craft@0.1.0`；只有发布与公网反查完成后才能更新本句。**
+> 当前状态：**`writ-craft@0.1.1` 已从 exact candidate `c65981e` 发布到 npm `preview`；registry 时间 `2026-07-29T14:30:16.176Z`，shasum `d370c500666e25cfb373852deafa21b232d2bc18` 与本地候选一致。公网隔离安装/启动/退出为 2/2。annotated tag `v0.1.1` 指向同一提交，GitHub prerelease 已公开：`https://github.com/MaxHou-infinity/WritCraft/releases/tag/v0.1.1`。**
+> 发布判断：**0.1.1 Developer Preview 已完成版本、自动化、双架构安装、独立复审、npm 发布、公网安装和 GitHub prerelease。registry 标签保持 `preview: 0.1.1`、`latest: 0.1.0`，因此本次没有把 Preview 冒充稳定版，也没有执行 unpublish、占位发布或上传未签名 App/ZIP。**
+> 下一阶段门禁：**发布链关闭后，下一产品门禁回到合格真实作者项目验收：`edit.md`、5+ 个 `chapters/` 章节、2000+ 可见中文字符和至少 1 个来源文件。现有显式候选仍不满足合同结构；不得把 npm/GitHub 发布替代作者质量与采纳证据。**
+> 当前源码证据：**0.1.1 通过完整 Node/安全 `verify`、npm Preview 10/10、local installed 2/2、npm10/arm64 2/2、npm11/x64 2/2、Persistent Main/IPC 3/3、生产依赖 0 vulnerabilities 和连续两轮真实 Electron 37/37；tarball 119 文件、571,985 bytes、shasum `d370c500666e25cfb373852deafa21b232d2bc18`，公网反查完全一致。**
 > 0.0AA 历史保留红灯：**首轮真实 Electron 暴露 Inspector 在上下文失效时被清空、旧 5-chip 断言和项目 Chat 等待诊断；完整 test 又暴露 Plan 测试把 generation 函数正文写死。独立复审发现新请求预检窗口可提交不可见旧轮、同项目重开 UI/Main 串话、失败重开提前清会话及两项测试/错误文案缺口，均转为生产边界和回归后关闭。真实 Electron 曾连续两次在旧 Graph 恢复阶段超时；加入只读失败快照后该阶段连续四次通过，未改 Graph 产品逻辑，按重复同源证据关闭 timing P2。另一次 Chat preflight 红灯证明测试在恢复 `edit.md` 后未等待权威 watcher barrier；改为生产 `flushExternalChanges()` 收敛，而未放宽 Chat guard。该里程碑所有红运行保留，最终源码连续两次 34/34；后续 0.0AB 当时推进到 35/35，当前总链只看本文顶部当前里程碑。**
 > Graph 历史签字基线：**性能修复前的既有源码曾完整 `npm test`、Electron-enabled `npm run verify`、强制真实 Electron 26/26 exit 0；Graph Filter 15/15、Workbench 14/14、dynamic 5/5、Large 5/5、Watcher 15/15、Network 11/11、Intelligence 17/17，第二轮复审 P0=0/P1=0/P2=2。该数字只保留为历史过程；0.0AB 后来推进到 35/35，当前总链只看顶部当前里程碑。**
 > Graph 动态边界：**300 文件/1279 节点 cold-to-interactive、cache/incremental、筛选/内存/布局、AX/键鼠、三类纠错、stale/Issue→Changes、failure live、重启与项目隔离均进入真实 Electron；正文/History/ledger 的零写入门禁通过。**  
@@ -17,7 +17,7 @@
 > Diagnostic Export 契约：`../docs/DIAGNOSTIC-EXPORT-V1-CONTRACT.md`（2026-07-26 已实现并完成自动化产品链签收）
 > Image Review 契约：`../docs/IMAGE-REVIEW-V1-CONTRACT.md`（2026-07-27 Trash 扩展已签字，待真实付费/作者验收）
 > Markdown Trash 契约：`../docs/MARKDOWN-TRASH-V1-CONTRACT.md`（2026-07-28 0.0AB 已实现并独立签收）
-> npm Developer Preview 契约：`../docs/NPM-DEVELOPER-PREVIEW-V1-CONTRACT.md`（2026-07-29 已公开发布、公网 `@preview` 2/2 与首包 `latest` 约束均已独立签收）
+> npm Developer Preview 契约：`../docs/NPM-DEVELOPER-PREVIEW-V1-CONTRACT.md`（0.1.1 已公开到 `preview`，公网安装 2/2；`latest` 仍为 0.1.0）
 > 用户安装与首次使用：`../docs/GETTING-STARTED.md`
 > 公开产品路线图：`../docs/ROADMAP.md`
 
@@ -27,7 +27,7 @@ Chat 的三级 scope/context、Main-owned 多轮连续性、Chapter、Onboarding
 
 1. 读本文、`package.json`、当前源码文件与 `git log -1 --stat`；本地 Git 历史从 2026-07-26 V0 基线开始，不得据此臆测更早的开发过程。
 2. **Diagnostic Export v1、Research Accuracy v1、committed-warning、Graph 三项韧性缺口、Changes/History durable recovery、Image Review v1 与 Image Trash 本地链均已完整签收，不再重开这些协议。**
-3. 0.0AB 已完成普通 Markdown 项目回收区；0.0AC 的 npm Preview/Coding Plan 图片改造已在提交 `71571b8` 与权威 Nowledge 记忆中收口。恢复顺序必须是：核对 Git HEAD 与顶部证据 → 完成公开发布外部门禁或合格作者项目门禁。不得重开已关闭的回收区、Chat、Prompt 或 watcher 安全链。
+3. 0.0AB 已完成普通 Markdown 项目回收区；0.0AC 的 npm Preview/Coding Plan 图片改造已在提交 `71571b8` 与权威 Nowledge 记忆中收口，0.1.1 的 npm/GitHub 发布链也已关闭。恢复顺序必须是：核对 Git HEAD 与顶部证据 → 只推进合格作者项目门禁。不得重开已关闭的发布、回收区、Chat、Prompt 或 watcher 安全链。
 4. 不重写已经签字的 Onboarding v2 service、capability store、batch、Main/preload 与 Renderer 契约；Main 动态 admission、single-flight 和 Renderer 生命周期 authority 清理均已关闭。
 5. 每批合入后重跑定向测试；阶段完成时再运行完整 `npm test`、`npm run verify` 与 `WRITCRAFT_E2E_FORCE=1 npm run e2e:electron`，保存当次证据。
 6. 真实 API 只使用用户显式配置的 Key；记录延迟、限流、超时、故障和费用，不记录 Key、Prompt、模型原文或正文。Key 前缀只表示凭据/计费类型，不能代替官方能力与现场门禁。首发按 npm Developer Preview 合同执行；独立 App 发布才需要 Developer ID、公证与 Gatekeeper。
@@ -39,6 +39,8 @@ Chat 的三级 scope/context、Main-owned 多轮连续性、Chapter、Onboarding
 - **发布前状态**：npm `houxyue` 与 GitHub `MaxHou-infinity` 登录有效；发布前 registry 只有 `0.1.0`，`preview/latest` 均指向它，GitHub 尚无 Release。必须在同一候选上完成完整 test/verify、强制真实 Electron、Persistent、npm Preview、installed、audit 与 tarball 检查，再提交、打标签和发布。
 - **候选自动化证据**：完整 Node/安全 `verify` 与 npm Preview **10/10** 通过；local installed **2/2**、官方 Node 22.22.3/npm 10.9.8 arm64 **2/2**、Node 24.18.0/npm 11.16.0 x64 **2/2**、Persistent Main/IPC **3/3**，联网 `npm audit --omit=dev` 为 **0 vulnerabilities**。`npm pack --dry-run --json` 为 **119 files / 571,985 bytes / 2,621,733 unpacked / shasum `d370c500666e25cfb373852deafa21b232d2bc18`**。
 - **真实 Electron 红绿记录**：首次 `verify:full` 在完成 selection Chat 后因 CDP `Runtime.evaluate` 单次超时中止；原样复跑 37/37。下一轮又在 Graph Issue History 撤销等待超时，和 0.0AK 既有时序点一致。加入只读诊断、不放宽 15 秒门槛后，同一候选连续两轮 **37/37**，Graph 撤销分别为 **165ms / 172ms**，证明正常产品边界远低于阈值；两次红灯仍保留，不被最终绿灯删除。
+- **npm 发布与公网证明**：首轮浏览器通行密钥认证返回页面错误；第二次 Touch ID 完成时 CLI auth token 已过期，`done?authId` 返回 E404。立即只读反查确认 `0.1.1` 仍不存在。使用新 authId 与新 IP 重新认证后，CLI 返回 `+ writ-craft@0.1.1`；registry shasum/integrity 与候选一致，`preview: 0.1.1`、`latest: 0.1.0`，公网隔离安装 **2/2**。
+- **GitHub Release**：candidate `c65981e` 与 annotated tag `v0.1.1` 已推送；GitHub Release 使用仓库内用户版说明创建为 prerelease、`latest=false`，未上传本地 ad-hoc App/ZIP。公开地址：`https://github.com/MaxHou-infinity/WritCraft/releases/tag/v0.1.1`。
 
 ### 0.0AK 2026-07-29 工作区导航与活动栏 UX 收口
 
@@ -581,9 +583,9 @@ Onboarding v2 已取代上述“容错解析完整 `editContent` + 部分创建�
 | AI metrics | 🟡 | 真实 GUI 已验证项目内记录、聚合与落盘；项目切换隔离有专项动态证据，仍待真实作者样本 |
 | Research / A–D 溯源 | 🟡 | Main-owned Research→Changes v1 与 committed-warning 异常边界已签字；A–D 非事实背书，仍待真实作者准确率样本 |
 | image-01 插图 | 🟡 | Coding Plan 真实合成调用、解码尺寸/比例和零正文插入已通过；安全审阅/废纸篓链保持签字，仍待真实作者质量、采纳、费用/限流样本 |
-| 6→7 章 Electron E2E | 🟡 | 0.1.1 候选连续两轮真实 Electron 37/37；本地稳定性通过，仍待合格真实作者项目 |
+| 6→7 章 Electron E2E | 🟡 | 0.1.1 发布候选连续两轮真实 Electron 37/37；本地稳定性通过，仍待合格真实作者项目 |
 | 10 名作者内测与 Continue 指标 | ⬜ | 尚无真实样本，不得做 Go/No-Go 结论 |
-| npm Developer Preview | 🟡 | `0.1.1` 本地候选已签字，registry 仍为 `0.1.0`；待 npm `preview`、公网安装与 GitHub `v0.1.1` prerelease 反查后关闭 |
+| npm Developer Preview | ✅ | `preview: 0.1.1`、`latest: 0.1.0`；公网 shasum 匹配、隔离安装 2/2，exact GitHub `v0.1.1` prerelease 已公开 |
 | 独立 macOS App 发布 | ⬜ | 当前不是首发路线；若未来启用，仍需 Developer ID、hardened runtime、公证和 Gatekeeper |
 
 ## 4. 后续 TODO（严格顺序）
@@ -750,6 +752,7 @@ WRITCRAFT_REAL_API_ACCEPTANCE=1 WRITCRAFT_REAL_API_SCOPE=image WRITCRAFT_REAL_AP
 - [x] 临发布时 `npm whoami` 已验证为 `houxyue`，`npm audit --omit=dev` 为 0 vulnerabilities，`writ-craft` 只读查询当时为 E404；当前已公开 `0.1.0`，本条仅保留发布前门禁证据。
 - [x] 0.0AD P1 修复后的最终完整主链、三路独立复审、候选 Git 提交 `3390a86` 与 Nowledge 权威记忆同步已完成；临发布仍需重新核验名称与再次 audit。
 - [x] 用户已显式授权并完成浏览器认证发布；`preview: 0.1.0`、公开 shasum、公网/本地隔离验收各 2/2、合同/测试、提交 `b48e294`、Nowledge 与两路独立终审 P0/P1/P2=0 已关闭。首包同时存在 registry 强制的 `latest: 0.1.0`，不执行 unpublish 或占位发布。
+- [x] 0.1.1 补丁已从 exact candidate `c65981e` 发布到 npm `preview`；公网 shasum 匹配、隔离安装 2/2，annotated tag 与 GitHub prerelease 指向同一候选。`latest` 有意保留 0.1.0，未上传未签名 App/ZIP。
 - [ ] 若未来转向独立 macOS App，再完成干净账户 Finder 启动、Developer ID、hardened runtime、时间戳、公证、staple 与 Gatekeeper。
 
 ## 5. 下次不要做

@@ -104,7 +104,7 @@ MiniMax API Key 只应在应用设置中配置。不要把 Key 写进项目文�
 
 - 目前仅支持 macOS arm64 / x64，通过终端启动。
 - 尚未提供 Apple Developer ID 签名与公证的 `.app` 安装包。
-- 本仓库已签字的源码候选为 `writ-craft@0.1.1`；发布完成前 registry 仍是 `0.1.0`。安装时请始终显式使用 `@preview`。
+- 当前公开 Preview 为 `writ-craft@0.1.1`；安装时请始终显式使用 `@preview`。`latest` 仍保留为上一稳定指针 `0.1.0`，不代表本次 prerelease。
 - 重要文稿请保留独立备份；正式生产使用尚未开放。
 - 源码公开可见，**不等于开源授权**。评估、复制和使用边界以 [专有评估许可证](LICENSE) 为准。
 

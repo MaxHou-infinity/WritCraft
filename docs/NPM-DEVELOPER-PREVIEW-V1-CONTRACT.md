@@ -1,6 +1,6 @@
 # WritCraft V0 · npm Developer Preview v1
 
-> Status: `writ-craft@0.1.0` was published on 2026-07-29 after browser authentication. The owner has now explicitly authorized a `0.1.1` patch release carrying the 0.0AH–0.0AK author-feedback fixes. The exact candidate has passed npm Preview 10/10, local installed 2/2, npm10/arm64 and npm11/x64 installed 2/2 each, Persistent 3/3, production audit at zero vulnerabilities, and two consecutive real-Electron 37/37 runs after retained timing red evidence. It must not be called public until registry verification succeeds. The first-package registry object currently exposes `latest: 0.1.0` and `preview: 0.1.0`; the next publication remains an explicit Developer Preview, not a stable-release sign-off.
+> Status: `writ-craft@0.1.1` was published to the explicit npm `preview` tag on 2026-07-29 from candidate commit `c65981e`; registry shasum `d370c500666e25cfb373852deafa21b232d2bc18` exactly matches the signed candidate. Public-registry install/start/exit cleanup passed 2/2. Git tag `v0.1.1` points to the same candidate and its GitHub Release is a prerelease, not latest. Registry tags are intentionally split: `preview: 0.1.1`, `latest: 0.1.0`.
 
 ## Distribution boundary
 

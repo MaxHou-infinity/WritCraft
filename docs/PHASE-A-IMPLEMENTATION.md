@@ -8,7 +8,7 @@
 
 > **历史工程交接（2026-07-29，0.0AC npm Developer Preview 本地签字收口）**：0.0AC 新增 macOS CLI、窄 npm 包、Node `>=22.12.0`、npm 10/11 fail-closed、Electron `43.2.0`、Main 观测 `did-finish-load` 后的 CLI readiness IPC 和零网络 `--check`；同时让 `sk-cp-` 图片能力进入 provider 现场门禁。该 readiness 只证明页面加载完成，不单独证明全部 workspace/bootstrap 逻辑成功。该批历史证据为 Persistent **3/3**、npm Preview **10/10**、installed **2/2**、真实 Electron **35/35**；当前候选只看下条。
 > **下一阶段合同**：`docs/AUTHOR-ACCEPTANCE-V1-CONTRACT.md` 已冻结，明确付费网络门禁、允许记录的隐私安全证据、真实长文旅程与发布前签字顺序。
-> **当前实现停点**：0.0AL / `writ-craft@0.1.1` 本地候选已签字，收录 0.0AH–0.0AK 的作者反馈修复；npm10/arm64、npm11/x64、Persistent **3/3** 与连续两轮真实 Electron **37/37** 已通过。registry 在外部发布前仍是 `0.1.0`；当前任务是发布 exact candidate 到 npm `preview` 和 GitHub `v0.1.1` prerelease，并完成公网反查。精确红绿记录见 `v0/DEVELOPMENT-STATUS.md`。
+> **当前实现停点**：0.0AL / `writ-craft@0.1.1` 已从 candidate `c65981e` 发布到 npm `preview`，公网 shasum 一致且隔离安装 **2/2**；同一 exact tag 的 GitHub `v0.1.1` prerelease 已创建。`latest` 仍为上一稳定指针 `0.1.0`。下一产品门禁回到符合合同的隔离真实作者项目验收；精确红绿与发布记录见 `v0/DEVELOPMENT-STATUS.md`。
 
 ## 1. 阶段目标
 
