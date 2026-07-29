@@ -1,6 +1,6 @@
 # WritCraft V0 · npm Developer Preview v1
 
-> Status: the 0.0AD proprietary-evaluation candidate was signed locally on 2026-07-29 after implementation, full regression, real-Electron, installed-tarball verification, three independent reviews with P0/P1/P2=0, and documentation/Git/Nowledge closeout. Candidate commit `3390a86`; tarball shasum `a9cb1c4c02639dda213fec3922a204337a8291f9`. The first authorized `npm publish --tag preview` reached the registry but failed with `E403` because publish 2FA or a bypass-2FA granular token is required; a subsequent version lookup remained `E404`, so no public package or dist-tag was created. Any OTP or token must be entered or configured only on the owner's machine and must never be sent to Codex or written to the repository, logs, chat, or Nowledge.
+> Status: `writ-craft@0.1.0` was published on 2026-07-29 after browser authentication. The public registry shasum is `a9cb1c4c02639dda213fec3922a204337a8291f9`, exactly matching signed candidate commit `3390a86`; explicit `writ-craft@preview` public-tarball install/start/exit cleanup passed 2/2. The first-package registry object also requires `latest: 0.1.0`; authenticated removal returned `E400`. Both tags identify the same proprietary evaluation Preview, not a stable-release sign-off.
 
 ## Distribution boundary
 
@@ -24,14 +24,25 @@ The package requires macOS 12 or later, Node.js `>=22.12.0`, and npm 10 or 11. T
 - The CLI fails closed below macOS 12 and when environment variables can replace the Electron runtime, platform, architecture, version, or checksum authority.
 - The package must include executable universal author-copy, project-hash, and Markdown-trash helpers.
 - On 2026-07-29 the owner selected `WritCraft Proprietary Evaluation License 1.0`; the manifest uses `SEE LICENSE IN LICENSE`. It grants personal or internal evaluation, including bounded access by an organization's authorized evaluators, and prohibits production use, commercial delivery, hosted service, resale, and external redistribution. `THIRD_PARTY_NOTICES.md` preserves licenses for vendored browser bundles; npm-installed dependencies retain the licenses and notices shipped in their own packages.
-- A read-only registry query on 2026-07-29 returned `E404` for `writ-craft`, so no public package was visible at that moment. This is not a reservation and may race with another publisher. `npm whoami` succeeded as `houxyue`; no credential or token is recorded. Publishing remains an external write and requires explicit authorization bound to the final candidate.
+- Before publication, a read-only registry query returned `E404` for
+  `writ-craft`; that was historical preflight evidence, not a reservation.
+  The authenticated owner later published the exact signed candidate. No
+  credential or token was recorded.
 
 ## Version and rollback
 
 npm versions are immutable. Every candidate must use a new version and publish
-only to the `preview` dist-tag; the manifest fixes this with
-`publishConfig.tag=preview`. Never overwrite a version or publish this V0 to
-`latest`.
+with the explicit `preview` dist-tag; the manifest fixes this with
+`publishConfig.tag=preview`. The public registry package object requires at
+least one `latest` entry, so the first and only version may also be exposed as
+`latest` even when publication explicitly used `preview`. This registry alias
+does not confer stable status: documentation and acceptance must use
+`writ-craft@preview`, and a future stable release requires a new independently
+signed version.
+
+The 0.0AF closeout did not unpublish `0.1.0` or publish a placeholder version
+to manipulate `latest`. Those destructive substitutes must not be used to hide
+the registry-required alias.
 
 To roll back, move `preview` to the last independently signed version with
 `npm dist-tag add writ-craft@<known-good-version> preview`, verify

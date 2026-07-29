@@ -1,9 +1,9 @@
 # 笔触 · WritCraft（写作 IDE）
 
-> 状态：**V0 候选原型；0.0AD 专有评估许可 npm Developer Preview 候选已签字，P0/P1/P2=0；用户已授权发布，但首次发布被 npm 账户 2FA 门禁以 E403 阻断，确认尚未公开发布** · 发起方：Max
-> 当前开发真相与唯一续作入口：[`v0/DEVELOPMENT-STATUS.md`](v0/DEVELOPMENT-STATUS.md)。Coding Plan Key 已通过一次合成 `image-01` 能力/解码门禁；这不等于作者质量、费用或采纳验收。现有 App/ZIP 仍不可分发，npm 包也尚未发布。
+> 状态：**V0 npm Developer Preview 已公开发布；`writ-craft@preview` 的公网隔离安装、真实 Renderer 启动、退出与清理 2/2 通过，发布与文档两路终审 P0/P1/P2=0；待 Git/Nowledge 收口** · 发起方：Max
+> 当前开发真相与唯一续作入口：[`v0/DEVELOPMENT-STATUS.md`](v0/DEVELOPMENT-STATUS.md)。Coding Plan Key 已通过一次合成 `image-01` 能力/解码门禁；这不等于作者质量、费用或采纳验收。现有 App/ZIP 仍不可分发；公开 npm 包是专有评估 Preview。
 > 下一阶段验收边界：[`docs/AUTHOR-ACCEPTANCE-V1-CONTRACT.md`](docs/AUTHOR-ACCEPTANCE-V1-CONTRACT.md) 已冻结；真实调用、作者内容与发布证据必须遵守其中的隐私和付费门禁。
-> 当前停点：0.0AD 使用 `WritCraft Proprietary Evaluation License 1.0`，npm 身份为 `houxyue`，候选提交 `3390a86`，shasum `a9cb1c4c02639dda213fec3922a204337a8291f9`。2026-07-29 的 `npm publish --tag preview` 因缺少发布 2FA OTP 或 bypass-2FA granular token 返回 E403；随后 registry 查询仍为 E404。所有者需在本机完成认证发布；OTP/token 只在本机输入或配置，绝不发送给 Codex，也不写入仓库、日志、聊天或 Nowledge。成功后再做公网 `npx` 与合格真实作者项目验收。
+> 当前停点：`writ-craft@0.1.0` 已公开，registry shasum `a9cb1c4c02639dda213fec3922a204337a8291f9` 与签字候选一致，`preview: 0.1.0`；公网 tarball 验收 2/2。npm 首包对象必须保留一个 `latest`，所以 registry 同时显示 `latest: 0.1.0`，认证删除返回 E400；两者指向同一 Preview，不代表稳定版。推荐安装仍为 `npx writ-craft@preview`。本次未执行高风险 unpublish，也未发布占位版本；以后不得用这两种方式掩盖该 registry alias。
 
 ## 2026-07-28 当前复核快照
 

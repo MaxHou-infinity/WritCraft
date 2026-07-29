@@ -12,6 +12,27 @@ const packageJson = require(path.join(root, 'package.json'));
 const timeoutMs = 45_000;
 const npmVersionProbe = childProcess.spawnSync('npm', ['--version'], { encoding: 'utf8' });
 const localNpmVersion = npmVersionProbe.status === 0 ? npmVersionProbe.stdout.trim() : '';
+const publicPackageSpec = String(
+  process.env.WRITCRAFT_NPM_PREVIEW_PACKAGE_SPEC || ''
+).trim();
+const expectedPublicShasum = String(
+  process.env.WRITCRAFT_NPM_PREVIEW_EXPECTED_SHASUM || ''
+).trim();
+const publicRegistry = 'https://registry.npmjs.org/';
+const expectedPublicPackageSpec = `${packageJson.name}@preview`;
+
+assert.strictEqual(
+  Boolean(publicPackageSpec),
+  Boolean(expectedPublicShasum),
+  'PUBLIC_SPEC_AND_SHASUM_MUST_BE_PAIRED'
+);
+if (publicPackageSpec) {
+  assert.strictEqual(
+    publicPackageSpec,
+    expectedPublicPackageSpec,
+    'PUBLIC_PACKAGE_SPEC_MUST_BE_EXACT_PREVIEW'
+  );
+}
 
 function run(command, args, options = {}) {
   return childProcess.spawnSync(command, args, {
@@ -38,8 +59,10 @@ function safeEnvironment(home) {
     ELECTRON_GET_NO_PROGRESS: '1',
     electron_config_cache: path.join(os.homedir(), 'Library', 'Caches', 'electron'),
     npm_config_cache: path.join(os.homedir(), '.npm'),
+    npm_config_registry: publicRegistry,
     npm_config_user_agent: `npm/${localNpmVersion} node/v${process.versions.node} darwin ${process.arch}`,
   };
+  delete env.NPM_CONFIG_REGISTRY;
   for (const key of Object.keys(env)) {
     if (key.startsWith('WRITCRAFT_E2E_')) delete env[key];
   }
@@ -258,13 +281,52 @@ async function main() {
     const defaultProfile = path.join(home, 'Library', 'Application Support', 'WritCraft');
     assert.strictEqual(fs.existsSync(defaultProfile), false);
 
-    const packed = run('npm', ['pack', '--json', '--pack-destination', temporary], {
+    const packArgs = ['pack'];
+    const publicPackCache = path.join(temporary, 'public-pack-cache');
+    if (publicPackageSpec) {
+      fs.mkdirSync(publicPackCache, { mode: 0o700 });
+      packArgs.push(
+        publicPackageSpec,
+        '--ignore-scripts',
+        `--registry=${publicRegistry}`,
+        `--cache=${publicPackCache}`,
+        '--offline=false',
+        '--prefer-offline=false'
+      );
+    }
+    packArgs.push('--json', '--pack-destination', temporary);
+    const packEnvironment = {
+      ...process.env,
+      npm_config_loglevel: 'silent',
+    };
+    delete packEnvironment.npm_config_registry;
+    delete packEnvironment.NPM_CONFIG_REGISTRY;
+    delete packEnvironment.npm_config_cache;
+    delete packEnvironment.NPM_CONFIG_CACHE;
+    delete packEnvironment.npm_config_offline;
+    delete packEnvironment.NPM_CONFIG_OFFLINE;
+    delete packEnvironment.npm_config_prefer_offline;
+    delete packEnvironment.NPM_CONFIG_PREFER_OFFLINE;
+    const packed = run('npm', packArgs, {
       cwd: root,
-      env: { ...process.env, npm_config_loglevel: 'silent' },
+      env: packEnvironment,
     });
     assert.strictEqual(packed.status, 0, 'PACK_FAILED');
     const packReport = JSON.parse(packed.stdout);
     assert(Array.isArray(packReport) && packReport.length === 1);
+    if (publicPackageSpec) {
+      assert.strictEqual(
+        packReport[0].id,
+        `${packageJson.name}@${packageJson.version}`,
+        'PUBLIC_PACKAGE_ID_MISMATCH'
+      );
+      assert(expectedPublicShasum, 'PUBLIC_SHASUM_REQUIRED');
+      assert.strictEqual(
+        packReport[0].shasum,
+        expectedPublicShasum,
+        'PUBLIC_TARBALL_SHASUM_MISMATCH'
+      );
+    }
     const tarball = path.join(temporary, packReport[0].filename);
 
     const installed = run('npm', [
@@ -351,7 +413,11 @@ async function main() {
     console.log('\nWritCraft installed npm preview smoke verification');
     console.log('  ✓ early harness failure removes its whole process group');
     console.log('  ✓ tarball installed offline, acquired Electron from verified cache, observed did-finish-load through Main IPC, and exited through CLI signal forwarding');
-    console.log('\n2/2 installed npm preview smoke checks passed; isolated profile, no manuscript opened.\n');
+    console.log(
+      `\n2/2 installed npm preview smoke checks passed; ` +
+      `${publicPackageSpec ? 'public registry tarball' : 'local candidate tarball'}, ` +
+      `isolated profile, no manuscript opened.\n`
+    );
   } finally {
     if (cliProcessGroup) {
       try { process.kill(-cliProcessGroup, 'SIGKILL'); } catch (_) {}
