@@ -1,6 +1,6 @@
 # 笔触 · WritCraft（写作 IDE）
 
-> 状态：**V0 npm Developer Preview 已公开发布；`writ-craft@preview` 的公网隔离安装、真实 Renderer 启动、退出与清理 2/2 通过，发布与文档两路终审 P0/P1/P2=0；待 Git/Nowledge 收口** · 发起方：Max
+> 状态：**V0 npm Developer Preview 已公开发布并完成 0.0AF 收口；`writ-craft@preview` 的公网隔离安装、真实 Renderer 启动、退出与清理 2/2 通过，发布与文档两路终审 P0/P1/P2=0，Git/Nowledge 已同步** · 发起方：Max
 > 当前开发真相与唯一续作入口：[`v0/DEVELOPMENT-STATUS.md`](v0/DEVELOPMENT-STATUS.md)。Coding Plan Key 已通过一次合成 `image-01` 能力/解码门禁；这不等于作者质量、费用或采纳验收。现有 App/ZIP 仍不可分发；公开 npm 包是专有评估 Preview。
 > 下一阶段验收边界：[`docs/AUTHOR-ACCEPTANCE-V1-CONTRACT.md`](docs/AUTHOR-ACCEPTANCE-V1-CONTRACT.md) 已冻结；真实调用、作者内容与发布证据必须遵守其中的隐私和付费门禁。
 > 当前停点：`writ-craft@0.1.0` 已公开，registry shasum `a9cb1c4c02639dda213fec3922a204337a8291f9` 与签字候选一致，`preview: 0.1.0`；公网 tarball 验收 2/2。npm 首包对象必须保留一个 `latest`，所以 registry 同时显示 `latest: 0.1.0`，认证删除返回 E400；两者指向同一 Preview，不代表稳定版。推荐安装仍为 `npx writ-craft@preview`。本次未执行高风险 unpublish，也未发布占位版本；以后不得用这两种方式掩盖该 registry alias。
