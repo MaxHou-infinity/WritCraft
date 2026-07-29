@@ -2,9 +2,9 @@
 
 ## Project Structure & Module Organization
 
-Product and engineering references live at the repository root: `README.md`, `docs/WRITCRAFT-PRD-V3.md`, and `docs/PHASE-A-IMPLEMENTATION.md`. Treat `v0/DEVELOPMENT-STATUS.md` as the current execution ledger and read it before changing code.
+Product and engineering references live at the repository root: `README.md`, `docs/WRITCRAFT-PRD-V3.md`, `docs/ROADMAP.md`, and `docs/PHASE-A-IMPLEMENTATION.md`. Treat `docs/ROADMAP.md` as the only authority for target-version order and scope, and `v0/DEVELOPMENT-STATUS.md` as the current execution ledger. Read both before changing code.
 
-The Electron application is under `v0/`. Main-process services and the narrow preload bridge live in `v0/src/main/`; UI, state machines, CSS, and vendored browser assets live in `v0/src/renderer/`. Standalone verification scripts are in `v0/tests/`, fixtures in `v0/tests/fixtures/`, and packaging utilities in `v0/scripts/`. Research inputs and product deliverables remain in `raw/` and `deliverables/`; do not mix them into runtime code.
+The Electron application is under `v0/`. Main-process services and the narrow preload bridge live in `v0/src/main/`; UI, state machines, CSS, and vendored browser assets live in `v0/src/renderer/`. Standalone verification scripts are in `v0/tests/`, fixtures in `v0/tests/fixtures/`, and packaging utilities in `v0/scripts/`. Research inputs and historical product deliverables remain in `raw/` and `deliverables/`; do not mix them into runtime code or use them to dispatch current work.
 
 ## Build, Test, and Development Commands
 
@@ -23,9 +23,9 @@ Run commands from `v0/`:
 
 Real API checks require explicit gates; never enable them casually or log keys, prompts, or document content.
 
-The initial distribution route is the macOS npm Developer Preview in `docs/NPM-DEVELOPER-PREVIEW-V1-CONTRACT.md`. Do not publish to a registry without explicit authorization. Treat the package name as provisional until ownership is verified.
+The initial distribution route is the macOS npm Developer Preview in `docs/NPM-DEVELOPER-PREVIEW-V1-CONTRACT.md`. `writ-craft@0.1.1` is already public under npm `preview`; `latest` intentionally remains `0.1.0`. Do not publish another version, move a dist-tag, or create a GitHub Release without explicit authorization.
 
-Do not infer a validated platform matrix from manifest declarations or universal helper slices. Record the exact Node/npm/architecture used by installed-tarball evidence; npm 10 and x64 remain open until their public CLI reaches the same Main-observed page-load IPC and clean-exit contract. That IPC proves `did-finish-load`, not every workspace/bootstrap behavior.
+Do not infer a validated platform matrix from manifest declarations or universal helper slices. Record the exact Node/npm/architecture used by installed-tarball evidence. The 0.1.1 candidate closed Node 22/npm 10 arm64 and Node 24/npm 11 x64 at 2/2 each; future candidates must repeat their own applicable matrix. Main-observed page-load IPC proves `did-finish-load`, not every workspace/bootstrap behavior.
 
 ## Coding Style & Naming Conventions
 
@@ -49,7 +49,7 @@ Security precision belongs in a private authority record, not by silently changi
 
 ## Documentation Discipline
 
-Before resuming work, read `v0/DEVELOPMENT-STATUS.md`, the relevant contract in `docs/`, and `v0/package.json`; source and current test evidence override historical snapshots. In the same change set as every completed feature, review, or verification result, update the status ledger and any affected contract/README/roadmap. Mark old figures as **historical focused evidence** with scope and date—never present them as the current total. Do not begin a follow-up fix from an old TODO until the status ledger confirms it remains open.
+Before resuming work, read `docs/ROADMAP.md`, `v0/DEVELOPMENT-STATUS.md`, the relevant contract in `docs/`, and `v0/package.json`; source and current test evidence override historical snapshots. Work only inside the single current target version declared by the roadmap. New ideas go to its candidate pool unless they are P0/P1, data-safety issues, or required by the current version's acceptance. In the same change set as every completed feature, review, or verification result, update the status ledger and any affected contract/README/roadmap. Mark old figures as **historical focused evidence** with scope and date—never present them as the current total. Do not begin a follow-up fix from an old TODO until the status ledger confirms it remains open.
 
 Do not use one green row or “module complete” sentence for a composite experience when any required sub-capability is absent. Split status by user-visible boundary—for example single-turn Chat versus conversation continuity, conflict recovery versus trash restore UI, and `edit.md` onboarding versus section-aware context compilation. A Main service without preload/IPC/Renderer access is not an App feature.
 

@@ -1,10 +1,10 @@
-# 笔触 · WritCraft · 一个月 V0 路线图
+# 笔触 · WritCraft · 一个月 V0 路线图（历史归档）
 
 > 文档版本：2026-07-28（v3.4，0.0AA Main-owned Chat 多轮连续性）
-> 状态：**V0 续作中，完整产品未完成**；产品范围以 `docs/WRITCRAFT-PRD-V3.md` 为准  
-> 2026-07-28 续作交接：当前工程基线为 **0.0AA**。Chat/Context 保留 0.0Z 的超长 `edit.md` 按 ATX 标题整章编译与 Inspector 披露，并新增 Main-owned 最近对话、多轮连续性、可见重置、新请求抢占和同项目重开隔离。当前 Conversation **8/8**、Context Resolver **26/26**、Inspector **9/9**、Chat Context **12/12**、Policy **10/10**、Network **15/15**、Workspace **10/10**、package **8/8**、release **7/7**、完整 test/verify、Persistent **3/3** 与最终源码真实 Electron 连续两次 **34/34** 通过；独立复审 **P0=0/P1=0/P2=0**。下一本地任务只做普通 Markdown 回收区恢复 UI。
+> 状态：**历史归档，不得作为当前排期、TODO、版本映射或续作入口。**
+> 归档说明：本文件保存 2026-07 的早期 28 天计划与当时证据。当前版本顺序与目标范围只看 `docs/ROADMAP.md`；当前工程事实只看 `v0/DEVELOPMENT-STATUS.md`。文中 0.0AA、34/34、“下一任务为回收区”等描述均为历史快照，已被 0.1.1 发布和 RM-1.0 路线图取代。
 > 范围：Month 1（4 周 × 7 天 = 28 天）
-> 治理说明：第一至第八节保留原 28 天计划、早期模型/TipTap 假设和历史验收目标，仅供追溯，**不是当前 TODO 或实现合同**；当前执行顺序只看第九节与 `v0/DEVELOPMENT-STATUS.md`。
+> 治理说明：全文（包括第九节）只保留原 28 天计划、早期模型/TipTap 假设和历史验收目标，**不是当前 TODO 或实现合同**；当前执行只看 `docs/ROADMAP.md` 与 `v0/DEVELOPMENT-STATUS.md`。
 
 ---
 

@@ -1,6 +1,6 @@
 # Graph Extended Acceptance v1 Contract
 
-> Status: **product contract, performance revalidation, and Graph resilience fully signed as of 2026-07-26**. As historical focused evidence for this contract, the resilience source passed full `npm test`, Electron-enabled `npm run verify`, forced real-Electron 28/28, directed Graph suites, and independent review P0/P1/P2=0. The current project total is 34/34; see `v0/DEVELOPMENT-STATUS.md`.
+> Status: **product contract, performance revalidation, and Graph resilience fully signed as of 2026-07-26**. As historical focused evidence for this contract, the resilience source passed full `npm test`, Electron-enabled `npm run verify`, forced real-Electron 28/28, directed Graph suites, and independent review P0/P1/P2=0. Project-wide current totals live only in `v0/DEVELOPMENT-STATUS.md`. A real author project later exposed `INVALID_CACHE`; diagnosis and a user-understandable rebuild/recovery terminal are open under `RM-1.0 / 0.1.2` and are not closed by synthetic Graph evidence.
 > Graph schema: `writcraft.graph/v2`
 
 ## 1. Product truth and write boundary

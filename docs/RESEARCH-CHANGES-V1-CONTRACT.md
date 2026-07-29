@@ -1,6 +1,6 @@
 # Research → Changes v1 Contract
 
-> Status: product chain and committed-warning boundary signed, P0 = 0 / P1 = 0 / P2 = 0. The forced Electron 20/20 result below is historical focused evidence, including reject-only and a true late-open A→B race; it is not the current project-wide total. The current final source passed Electron-enabled `npm run verify`, controlled forced Electron **34/34**, and the production Research apply transaction remains signed. Authoritative current status is `v0/DEVELOPMENT-STATUS.md`.
+> Status: product chain and committed-warning boundary signed, P0 = 0 / P1 = 0 / P2 = 0. The forced Electron 20/20 result below is historical focused evidence, including reject-only and a true late-open A→B race; it is not the current project-wide total. The production Research apply transaction remains signed; project-wide current totals and restart order live only in `v0/DEVELOPMENT-STATUS.md`.
 > Schema: `writcraft.research-handoff/v1`
 
 ## 1. Product journey

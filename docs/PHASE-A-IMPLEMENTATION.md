@@ -9,6 +9,7 @@
 > **历史工程交接（2026-07-29，0.0AC npm Developer Preview 本地签字收口）**：0.0AC 新增 macOS CLI、窄 npm 包、Node `>=22.12.0`、npm 10/11 fail-closed、Electron `43.2.0`、Main 观测 `did-finish-load` 后的 CLI readiness IPC 和零网络 `--check`；同时让 `sk-cp-` 图片能力进入 provider 现场门禁。该 readiness 只证明页面加载完成，不单独证明全部 workspace/bootstrap 逻辑成功。该批历史证据为 Persistent **3/3**、npm Preview **10/10**、installed **2/2**、真实 Electron **35/35**；当前候选只看下条。
 > **下一阶段合同**：`docs/AUTHOR-ACCEPTANCE-V1-CONTRACT.md` 已冻结，明确付费网络门禁、允许记录的隐私安全证据、真实长文旅程与发布前签字顺序。
 > **当前实现停点**：0.0AL / `writ-craft@0.1.1` 已从 candidate `c65981e` 发布到 npm `preview`，公网 shasum 一致且隔离安装 **2/2**；同一 exact tag 的 GitHub `v0.1.1` prerelease 已创建。`latest` 仍为上一稳定指针 `0.1.0`。下一产品门禁回到符合合同的隔离真实作者项目验收；精确红绿与发布记录见 `v0/DEVELOPMENT-STATUS.md`。
+> **路线图入口**：Phase A 已是工程地基，不再负责后续版本排期。当前唯一目标是 `docs/ROADMAP.md` 的 `RM-1.0 / writ-craft@0.1.2` 真实作者可用性闭环。
 
 ## 1. 阶段目标
 
@@ -395,7 +396,7 @@ Main 为当前窗口保存不可伪造的 project session，不允许 renderer �
 - [x] renderer sandbox、context isolation 和窄 preload API 保持开启。
 - [x] Phase A 地基、当前 Chat/Chapter 源码的单元/IPC 集成和强制真实 Electron 验收通过；失败证据不被静态 verify 掩盖。
 
-> 历史证据边界（0.0AC 发布候选）：该批源码通过完整 test/verify、Persistent **3/3**、npm Preview **10/10**、installed **2/2**、同源码连续两轮真实 Electron **35/35** 和一次真实 Coding Plan 合成图片门禁；实现复审 P0/P1 已清零。registry 随后的公开发布与当前 0.0AK 源码证据见文首；真实作者质量/采纳仍未关闭。
+> 历史证据边界（0.0AC 发布候选）：该批源码通过完整 test/verify、Persistent **3/3**、npm Preview **10/10**、installed **2/2**、同源码连续两轮真实 Electron **35/35** 和一次真实 Coding Plan 合成图片门禁；实现复审 P0/P1 已清零。registry 随后的公开发布与 0.0AL / 0.1.1 当前证据见文首；真实作者质量/采纳仍未关闭。
 
 Phase A 只有在全部清单有可复现证据时才算完成；“页面看起来像工作区”或“测试只检查元素存在”都不构成验收。
 

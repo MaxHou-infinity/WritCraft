@@ -1,15 +1,16 @@
 # 笔触 · WritCraft · V0 开发状态与续作入口
 
-> 最后更新：2026-07-29（Asia/Shanghai，0.0AL · 0.1.1 Developer Preview 发版）
+> 最后更新：2026-07-29（Asia/Shanghai，0.0AM · RM-1.0 目标模式路线图冻结）
 > 当前状态：**`writ-craft@0.1.1` 已从 exact candidate `c65981e` 发布到 npm `preview`；registry 时间 `2026-07-29T14:30:16.176Z`，shasum `d370c500666e25cfb373852deafa21b232d2bc18` 与本地候选一致。公网隔离安装/启动/退出为 2/2。annotated tag `v0.1.1` 指向同一提交，GitHub prerelease 已公开：`https://github.com/MaxHou-infinity/WritCraft/releases/tag/v0.1.1`。**
 > 发布判断：**0.1.1 Developer Preview 已完成版本、自动化、双架构安装、独立复审、npm 发布、公网安装和 GitHub prerelease。registry 标签保持 `preview: 0.1.1`、`latest: 0.1.0`，因此本次没有把 Preview 冒充稳定版，也没有执行 unpublish、占位发布或上传未签名 App/ZIP。**
-> 下一阶段门禁：**发布链关闭后，下一产品门禁回到合格真实作者项目验收：`edit.md`、5+ 个 `chapters/` 章节、2000+ 可见中文字符和至少 1 个来源文件。现有显式候选仍不满足合同结构；不得把 npm/GitHub 发布替代作者质量与采纳证据。**
+> 当前目标版本：**`docs/ROADMAP.md` 的 `RM-1.0 / writ-craft@0.1.2` 真实作者可用性闭环。必须使用 `edit.md`、5+ 个 `chapters/` 章节、2000+ 可见中文字符和至少 1 个来源文件的作者隔离副本，完成五段旅程，并关闭现场 `Graph INVALID_CACHE` 的诊断/恢复终态。0.1.2 签字前不得插入驾驶舱、新 AI 模式或其他后续版本功能。**
 > 当前源码证据：**0.1.1 通过完整 Node/安全 `verify`、npm Preview 10/10、local installed 2/2、npm10/arm64 2/2、npm11/x64 2/2、Persistent Main/IPC 3/3、生产依赖 0 vulnerabilities 和连续两轮真实 Electron 37/37；tarball 119 文件、571,985 bytes、shasum `d370c500666e25cfb373852deafa21b232d2bc18`，公网反查完全一致。**
 > 0.0AA 历史保留红灯：**首轮真实 Electron 暴露 Inspector 在上下文失效时被清空、旧 5-chip 断言和项目 Chat 等待诊断；完整 test 又暴露 Plan 测试把 generation 函数正文写死。独立复审发现新请求预检窗口可提交不可见旧轮、同项目重开 UI/Main 串话、失败重开提前清会话及两项测试/错误文案缺口，均转为生产边界和回归后关闭。真实 Electron 曾连续两次在旧 Graph 恢复阶段超时；加入只读失败快照后该阶段连续四次通过，未改 Graph 产品逻辑，按重复同源证据关闭 timing P2。另一次 Chat preflight 红灯证明测试在恢复 `edit.md` 后未等待权威 watcher barrier；改为生产 `flushExternalChanges()` 收敛，而未放宽 Chat guard。该里程碑所有红运行保留，最终源码连续两次 34/34；后续 0.0AB 当时推进到 35/35，当前总链只看本文顶部当前里程碑。**
 > Graph 历史签字基线：**性能修复前的既有源码曾完整 `npm test`、Electron-enabled `npm run verify`、强制真实 Electron 26/26 exit 0；Graph Filter 15/15、Workbench 14/14、dynamic 5/5、Large 5/5、Watcher 15/15、Network 11/11、Intelligence 17/17，第二轮复审 P0=0/P1=0/P2=2。该数字只保留为历史过程；0.0AB 后来推进到 35/35，当前总链只看顶部当前里程碑。**
 > Graph 动态边界：**300 文件/1279 节点 cold-to-interactive、cache/incremental、筛选/内存/布局、AX/键鼠、三类纠错、stale/Issue→Changes、failure live、重启与项目隔离均进入真实 Electron；正文/History/ledger 的零写入门禁通过。**  
 > Graph 保留 P2：**200% 仍采用 CDP DeviceMetrics 等价模拟，未调用 Electron `setZoomFactor(2)`；pan/zoom 以 Long Task observer 为性能证据，空数组也会通过，但 transform 的真实变化已有断言。这两项不阻塞签字，后续不得误记为已关闭。**  
 > 产品权威规格：`../docs/WRITCRAFT-PRD-V3.md`  
+> 产品开发路线图：`../docs/ROADMAP.md`（`RM-1.0`；当前目标产品版本 `0.1.2`）
 > Phase A 工程契约：`../docs/PHASE-A-IMPLEMENTATION.md`
 > 真实作者验收契约：`../docs/AUTHOR-ACCEPTANCE-V1-CONTRACT.md`（已冻结；0.0U 不改变真实作者门禁）
 > Changes/History 恢复契约：`../docs/CHANGES-HISTORY-RECOVERY-V1-CONTRACT.md`（2026-07-26 已冻结并完成全链签收）
@@ -19,18 +20,24 @@
 > Markdown Trash 契约：`../docs/MARKDOWN-TRASH-V1-CONTRACT.md`（2026-07-28 0.0AB 已实现并独立签收）
 > npm Developer Preview 契约：`../docs/NPM-DEVELOPER-PREVIEW-V1-CONTRACT.md`（0.1.1 已公开到 `preview`，公网安装 2/2；`latest` 仍为 0.1.0）
 > 用户安装与首次使用：`../docs/GETTING-STARTED.md`
-> 公开产品路线图：`../docs/ROADMAP.md`
 
 ## 0. 续作口令
 
 Chat 的三级 scope/context、Main-owned 多轮连续性、Chapter、Onboarding v2、Research→Changes、Inline Rewrite 与 Plan Strict 已经签字。下一轮不要重写这些协议，也不要分发现有 `release/` 产物。
 
-1. 读本文、`package.json`、当前源码文件与 `git log -1 --stat`；本地 Git 历史从 2026-07-26 V0 基线开始，不得据此臆测更早的开发过程。
+1. 先读 `../docs/ROADMAP.md` 的当前目标，再读本文、`package.json`、对应合同、当前源码文件与 `git log -1 --stat`；本地 Git 历史从 2026-07-26 V0 基线开始，不得据此臆测更早的开发过程。
 2. **Diagnostic Export v1、Research Accuracy v1、committed-warning、Graph 三项韧性缺口、Changes/History durable recovery、Image Review v1 与 Image Trash 本地链均已完整签收，不再重开这些协议。**
-3. 0.0AB 已完成普通 Markdown 项目回收区；0.0AC 的 npm Preview/Coding Plan 图片改造已在提交 `71571b8` 与权威 Nowledge 记忆中收口，0.1.1 的 npm/GitHub 发布链也已关闭。恢复顺序必须是：核对 Git HEAD 与顶部证据 → 只推进合格作者项目门禁。不得重开已关闭的发布、回收区、Chat、Prompt 或 watcher 安全链。
+3. 0.0AB 已完成普通 Markdown 项目回收区；0.0AC 的 npm Preview/Coding Plan 图片改造已在提交 `71571b8` 与权威 Nowledge 记忆中收口，0.1.1 的 npm/GitHub 发布链也已关闭。恢复顺序必须是：核对 Git HEAD 与顶部证据 → 只推进 `RM-1.0 / 0.1.2`。不得重开已关闭的发布、回收区、Chat、Prompt 或 watcher 安全链。
 4. 不重写已经签字的 Onboarding v2 service、capability store、batch、Main/preload 与 Renderer 契约；Main 动态 admission、single-flight 和 Renderer 生命周期 authority 清理均已关闭。
 5. 每批合入后重跑定向测试；阶段完成时再运行完整 `npm test`、`npm run verify` 与 `WRITCRAFT_E2E_FORCE=1 npm run e2e:electron`，保存当次证据。
 6. 真实 API 只使用用户显式配置的 Key；记录延迟、限流、超时、故障和费用，不记录 Key、Prompt、模型原文或正文。Key 前缀只表示凭据/计费类型，不能代替官方能力与现场门禁。首发按 npm Developer Preview 合同执行；独立 App 发布才需要 Developer ID、公证与 Gatekeeper。
+
+### 0.0AM 2026-07-29 · RM-1.0 目标模式路线图冻结
+
+- **权威顺序**：`../docs/ROADMAP.md` 已升级为 `RM-1.0`，成为版本顺序、当前目标、范围/非目标和发版门禁的唯一权威；PRD 继续定义产品契约，本文只记录当前事实和红灯，旧 `deliverables/` 一个月路线图已归档。
+- **版本解耦**：路线图使用 `RM-*`，npm/GitHub 产品使用 SemVer，禁止把路线图 `RM-1.0` 当成产品 `1.0.0`。0.1.1 是已发布冻结基线；当前唯一目标为 0.1.2。
+- **当前范围**：只完成合格真实作者隔离旅程、`Graph INVALID_CACHE` 根因与产品恢复终态、验收发现的 P0/P1 及私有内容无关指标。驾驶舱、大纲/快速打开、统一 AI 任务中心、`@` 上下文、导出/快照、Pro 与 Team 均按后续版本排队。
+- **发版纪律**：0.1.2 必须完成合同、真实作者、完整回归、真实 Electron、独立复审、文档/Git/Nowledge 同步并另获发布授权；不得移动 0.1.1 标签或 npm `latest`。
 
 ### 0.0AL 2026-07-29 · 0.1.1 Developer Preview 发版
 
@@ -50,7 +57,7 @@ Chat 的三级 scope/context、Main-owned 多轮连续性、Chapter、Onboarding
 - **回归设计**：新增 `verify-v0-workspace-navigation.js` **5/5**，并把“来源→图谱→来源→图谱→搜索→文件、唯一激活态、图谱无旧侧栏、项目菜单折叠”加入真实 Electron。首次把该旅程放在冷 Graph 之前，正确导致旧冷构建断言红灯；测试随后移到全部 Graph 契约之后，避免测试前置条件互相污染。
 - **完整证据与保留红灯**：Workspace **21/21**、Graph dynamic **15/15**、Sources race **5/5**、`npm test` exit 0、非沙箱 `npm run verify` exit 0、最终精确源码真实 Electron **37/37**、Persistent Main/IPC **3/3**。沙箱 `verify` 的 DOM Electron `code=null` 经非沙箱原样重跑转绿；真实 Electron 另保留一次旧 Plan 等待超时和一次 Graph Issue History 撤销超时，后续同源码分别为 219–341ms 与全链 37/37，不据单次绿灯删除时序事实。
 - **作者项目现场复验与独立待诊断项**：提交后在用户显式项目中实际点击“来源→图谱→文件”，三个视图均正确切换，图谱期间旧来源侧栏不存在；这直接关闭本轮导航反馈。该项目的图谱分析同时返回稳定码 `INVALID_CACHE`，界面显示“文件系统操作失败”。Graph 自动化与真实 Electron 合成旅程仍通过，因此它被登记为独立缓存/项目现场诊断项，**本轮不宣称已修复图谱分析**，也不以删除作者缓存或改写项目内容掩盖。
-- **边界**：本轮没有修改 Main 文件权限、AI capability、写盘/History 契约或真实作者项目内容，也没有真实 API/付费图片调用。公开 npm `0.1.0` 不会自动获得本轮修复；下一次分发必须使用新版本和独立发布授权。
+- **当时边界（已由 0.1.1 发布关闭）**：本轮没有修改 Main 文件权限、AI capability、写盘/History 契约或真实作者项目内容，也没有真实 API/付费图片调用。当时公开的 0.1.0 不含本轮修复；这些修复随后已进入 0.1.1。
 
 ### 0.0AJ 2026-07-29 Changes 审阅与长等待反馈修复
 
@@ -67,7 +74,7 @@ Chat 的三级 scope/context、Main-owned 多轮连续性、Chapter、Onboarding
 - **操作层级**：底部状态占据独立整行；有建议时“跳过文件创建 / 创建所选文件”等高等宽且使用短动词，勾选说明明确“选择不等于创建”。AI 返回零建议时隐藏创建按钮，只保留“完成项目卡”，仍通过 discard route 释放 exact confirmation token，不制造重复动作。
 - **验证证据**：Workspace **21/21**、Onboarding Renderer dynamic **26/26**、项目卡 UI **12/12**，完整 `npm test` exit 0。真实 Electron 首轮因测试仍要求旧 `edit.md` 文案在新零建议页面超时；第二轮 36 个行为阶段全部通过后，固定期望仍为 35 而在最终计数红灯。测试改为新用户契约并把新增长文滚动阶段计入固定总数后，最终完整真实 Electron **36/36**。两条红运行均保留，未修改产品权限或放宽性能阈值。
 - **最终回归与界面复核**：Electron-enabled `npm run verify` exit 0。作者项目 App 重新启动后，macOS Accessibility 树确认左栏存在可切换的“打开项目卡”项目级图标、文件顶部只保留 `edit.md` 状态与 AI 入口；实际截图确认项目卡已离开顶部工具栏，长文滚动条仍在。项目卡第二阶段由真实 Electron 自动化验证，不在作者项目中额外发起付费 AI 请求。
-- **收口结果**：已在提交 `175b794` 推送 GitHub，并同步 Nowledge；仍不属于 npm 上不可变的 `0.1.0`。
+- **当时收口结果（已由 0.1.1 发布关闭）**：提交 `175b794` 已推送 GitHub并同步 Nowledge；当时尚未进入 npm 0.1.0，随后已随 0.1.1 发布。
 
 ### 0.0AH 2026-07-29 项目卡反馈与中央编辑器滚动修复
 
@@ -76,8 +83,8 @@ Chat 的三级 scope/context、Main-owned 多轮连续性、Chapter、Onboarding
 - **等待体验**：提交后展示“项目卡已提交 → 整理内容并检查建议 → 进入修改预览”三段真实边界、按秒等待时间和“请勿重复提交”；按钮禁用为“AI 整理中”。未使用定时轮播伪装不可观测的模型内部步骤，`prefers-reduced-motion` 下关闭脉冲动画。
 - **失败体验**：受保护/非法/冲突建议统一解释为“AI 的新文件建议包含不适合创建的位置”，明确本次没有修改项目文件、本页填写内容仍保留，并给出“重新整理 edit.md”。不再显示 JSON、内部目录分类、Main 错误码或技术消息；“本页保留”不冒充跨重启持久化。
 - **编辑器滚动根因与修复**：`.editor-scroll` 原本虽有 `overflow:auto`，但上层 `.work-area` / `.editor-column` 缺少 `min-height:0` 与受限高度，Grid 的最小内容高度会被长文撑出 `100vh` 后由根页面裁掉。现将高度链锁在 viewport 内，编辑器使用独立 `overflow-y:scroll`、稳定 gutter 与可见 11px 滚动轨道，正文最小高度改为容器 `100%`；顶部文件栏和底部状态栏不随正文滚走。
-- **验证证据（该批当时状态）**：UI **12/12**、Onboarding service **22/22**、Renderer dynamic **26/26**、Workspace **20/20**、Persistent Watcher Main/IPC **3/3**、完整 `npm test` exit 0；真实 Electron 项目卡红/绿过程按上条记录保留。新增真实 Electron 160 段长文阶段已连续三次通过，证明独立 `scrollHeight`、500px+ `scrollTop`、8px+ scrollbar gutter、body/document 零滚动与底部状态栏留在 viewport。三次全旅程均在该滚动专项通过后，才分别出现既有 Graph timing 红灯：增量构建 867.5ms > 800ms、筛选 114.8ms/112.1ms > 100ms，以及文件筛选 115.1ms / 搜索 111.7ms > 100ms；因此该批当时源码的 `npm run verify:full` **不是全绿**。这些红灯不得被绿色重试抹除；后续当前总链只看本文顶部 0.0AK，不回滚本次滚动修复，也不为通过测试而放宽门槛。
-- **验收边界**：本轮是显式候选上的现场缺口修复，不把不合格项目写成正式真实作者验收。公开 npm `0.1.0` 是不可变旧包；如需向 npm 用户分发本修复，必须另行版本升级、候选验收和显式发布授权。
+- **验证证据（该批当时状态）**：UI **12/12**、Onboarding service **22/22**、Renderer dynamic **26/26**、Workspace **20/20**、Persistent Watcher Main/IPC **3/3**、完整 `npm test` exit 0；真实 Electron 项目卡红/绿过程按上条记录保留。新增真实 Electron 160 段长文阶段已连续三次通过，证明独立 `scrollHeight`、500px+ `scrollTop`、8px+ scrollbar gutter、body/document 零滚动与底部状态栏留在 viewport。三次全旅程均在该滚动专项通过后，才分别出现既有 Graph timing 红灯：增量构建 867.5ms > 800ms、筛选 114.8ms/112.1ms > 100ms，以及文件筛选 115.1ms / 搜索 111.7ms > 100ms；因此该批当时源码的 `npm run verify:full` **不是全绿**。这些红灯不得被绿色重试抹除；后续当前总链只看本文顶部当前里程碑，不回滚本次滚动修复，也不为通过测试而放宽门槛。
+- **验收边界（分发已由 0.1.1 关闭）**：本轮是显式候选上的现场缺口修复，不把不合格项目写成正式真实作者验收；功能随后已进入 0.1.1，但真实作者验收仍开放。
 
 ### 0.0AG 2026-07-29 GitHub 公开仓库上线
 
@@ -101,7 +108,7 @@ Chat 的三级 scope/context、Main-owned 多轮连续性、Chapter、Onboarding
 - **已取得授权**：用户明确授权发布 `writ-craft@0.1.0` 到 npm `preview`。
 - **临发布复核**：Git HEAD `4c9bd51`、工作树干净、`npm whoami=houxyue`、包名 E404、生产依赖审计 0 vulnerabilities；dry-run 仍为 119 文件、566,536 bytes packed、2,597,021 bytes unpacked、shasum `a9cb1c4c02639dda213fec3922a204337a8291f9`。
 - **保留红灯**：`npm publish --tag preview` 到达 npm registry 后返回 `E403`，要求发布 2FA OTP 或启用 bypass 2FA 的 granular token。紧接着只读查询 `writ-craft@0.1.0` 仍为 E404，证明本次没有创建版本或 dist-tag。
-- **恢复结果**：所有者随后通过 npm 浏览器认证完成发布；OTP/token 未发送或记录。本节只保留首次 E403→E404 红灯，当前发布事实以顶部 0.0AF 为准。
+- **恢复结果**：所有者随后通过 npm 浏览器认证完成发布；OTP/token 未发送或记录。本节只保留首次 E403→E404 红灯，当前发布事实以本文顶部当前里程碑为准。
 
 ### 0.0AD 2026-07-29 专有评估许可发布候选（已签字）
 
@@ -111,7 +118,7 @@ Chat 的三级 scope/context、Main-owned 多轮连续性、Chapter、Onboarding
 - **候选证据**：P1 修复后定向 10/10；npm 10/arm64 与 npm 11/x64 各 2/2；最终 `npm test` 与非沙箱 `npm run verify:full` 均 exit 0，真实 Electron 35/35、Persistent 3/3。独立复审已在自动化之后另行完成，未用绿色测试代替签字。
 - **最终独立复审**：许可证、npm 包候选和文档一致性三路均为 **P0=0/P1=0/P2=0，可以进入 Git/Nowledge 收口**。文档线曾阻断合同提前签字及写死旧里程碑指针，修复后再次只读确认清零。
 - **包体**：当前 dry-run 为 119 文件、566,536 bytes packed、2,597,021 bytes unpacked、shasum `a9cb1c4c02639dda213fec3922a204337a8291f9`。任何后续修改都会使该哈希失效。
-- **0.0AD 当时的收口与剩余边界（已由顶部 0.0AF 取代）**：候选提交 `3390a86`；Nowledge 权威记忆 `e435dd78-2352-46fa-8299-2da2507d0361` 已更新并反查。当时合同禁止主动发布 `latest`；0.0AF 记录了 npm 首包对象强制生成同版本 alias 的外部约束。
+- **0.0AD 当时的收口与剩余边界（已被后续发布取代）**：候选提交 `3390a86`；Nowledge 权威记忆 `e435dd78-2352-46fa-8299-2da2507d0361` 已更新并反查。当时合同禁止主动发布 `latest`；后续发布记录了 npm 首包对象强制生成同版本 alias 的外部约束。
 
 ### 0.0AC 2026-07-29 npm Developer Preview 与 Coding Plan 图片能力（本地候选已签字）
 
@@ -201,7 +208,7 @@ Chat 的三级 scope/context、Main-owned 多轮连续性、Chapter、Onboarding
 - **修复**：只有 `authoritativeReloaded === true` 时，普通、残余、Research residual-unavailable 与 Onboarding/edit.md 成功分支跳过重复 tree/current/history；当前文件不是 `edit.md` 时仍显式打开它。`false/undefined`、不可信响应和恢复失败继续走旧 fail-closed 刷新/锁定路径。
 - **可观测性**：真实 Electron 先单独点击并断言唯一 hunk 已接受、按钮可用，再单独应用。超时诊断仅记录 accept/apply 阶段、耗时、UI 布尔/计数/文本长度及磁盘 bytes/SHA-256，不记录正文、Diff、绝对路径、Prompt 或凭据。
 - **验证与复审**：新增普通、Research residual-unavailable、Onboarding 当前非 `edit.md` 三条重复-refresh 挂起回归；Renderer dynamic **25/25**。完整 `npm test`、沙箱外 `npm run verify`、Persistent **3/3** 通过；本地两次和独立复审一次真实 Electron 均 **32/32**，Plan apply 分别约 **205ms、224ms、1078ms**。独立复审最终 **P0=0/P1=0/P2=0**，本轮 timing P2 关闭。
-- **当时剩余边界**：0.0T 当时仍列两个本地安全 P2（纯 Node 祖先逐段 `openat`、native `mkdirat→openat/fstat` 微窗口）及外部门禁；native reserve 项后来由 0.0U 关闭可观察副作用并明确接受 residual，祖先项现已由顶部 0.0V 关闭到“已绑定项目根以下”的范围。不能把任一批写成 V0/发布完成。
+- **当时剩余边界**：0.0T 当时仍列两个本地安全 P2（纯 Node 祖先逐段 `openat`、native `mkdirat→openat/fstat` 微窗口）及外部门禁；native reserve 项后来由 0.0U 关闭可观察副作用并明确接受 residual，祖先项随后由 0.0V 关闭到“已绑定项目根以下”的范围。不能把任一历史批写成完整 V0。
 
 ### 0.0S 2026-07-28 reserve receipt / build-attestation（历史；第三轮独立复审签收）
 
@@ -392,10 +399,10 @@ Chat 的三级 scope/context、Main-owned 多轮连续性、Chapter、Onboarding
 
 ### 0.0 文档同步门禁（2026-07-22 第十二次收口后固化）
 
-- **唯一当前真相**：当次磁盘源码与可复现命令结果优先；本文记录当前结论、风险和下一步。合同记录对应产品链的冻结边界；README/路线图/PDCA 只作产品概览或历史背景。
+- **职责分离**：当次磁盘源码与可复现命令结果优先；本文记录当前结论、风险和下一步；合同记录对应产品链的冻结边界；`docs/ROADMAP.md` 唯一负责版本顺序、当前目标与范围/非目标。README 只作产品概览，PDCA 与 `deliverables/` 只作历史背景。
 - **每批必做**：任何功能完成、缺陷关闭、独立复审或全量验证，在开始下一项开发前，同步更新本文及受影响的合同、README 和路线图；未更新的旧 TODO 不得继续执行。
 - **历史数字标注**：20/20、21/21、26/26、28/28 等局部或旧源码数字必须说明日期和覆盖范围，且明确“非当前项目总链”；当前总链只能引用本文顶部的实际执行边界。
-- **续作检查**：恢复任务先读本文、相关合同和 `package.json`，再运行最小能验证当前判断的命令；若文档与源码/命令冲突，先修文档或状态结论，禁止以旧文档扩展修复范围。
+- **续作检查**：恢复任务先读 `docs/ROADMAP.md`、本文、相关合同和 `package.json`，再运行最小能验证当前判断的命令；若文档与源码/命令冲突，先修文档或状态结论，禁止以旧文档扩展修复范围。
 - **该历史批审计结果（2026-07-27 0.0N 最终复核）**：README、PRD、Phase A、作者验收合同、Image Review 专项合同、`AGENTS.md` 与本文当时已按 Trash 签字同步；产品总链提升为 **32/32**，0.0M 的 31/31 降为历史基线。其后 0.0O 技术候选已完成六轮复审并签字，当前门禁见本文顶部。
 
 ### 0.1 Research Accuracy v1 最终签字（2026-07-22）
@@ -561,7 +568,7 @@ Onboarding v2 已取代上述“容错解析完整 `editContent` + 部分创建�
 
 第十一次收口最终签字：同一 Onboarding review 现在用共享 `releasePromise` 合并并发丢弃与项目切换，成功后禁止二次消费、失败后允许安全重试；提交后刷新/confirmation transition 异常会用原项目和 exact token 显式清理，清理失败则阻断新向导与切项直至重试成功，同时原 operation 仍诚实记录 `accepted`。Onboarding dynamic **22/22**、Metrics Renderer **18/18**、Workspace **19/19**、UI **11/11**；最终源码 `npm test`、Electron-enabled `npm run verify` 均 exit 0，强制真实 Electron **26/26**，第三轮独立复审 **P0=0/P1=0/P2=0，可签字**。非阻断后续增强：可增加“首次 review capability release 失败、第二次成功”的独立动态用例，但不重开本轮主链。
 
-准确结论是“Chat 单轮 scope/context、Main-owned 最近对话、超长项目卡分区披露、普通 Markdown 项目回收区与 Chapter 主链已经签字；Onboarding v2 自动化产品链与人工 App 三项体验均已签字”。不准确的结论是“fixture 人工签字等于真实 API/作者价值或发布签字”、“完整 PRD 的外部验收已完成”或“已可发布”。0.0AB 当时的 App/ZIP 只与该批源码一致且仅是本地证据；当前发布事实见顶部当前里程碑。
+准确结论是“Chat 单轮 scope/context、Main-owned 最近对话、超长项目卡分区披露、普通 Markdown 项目回收区与 Chapter 主链已经签字；Onboarding v2 自动化产品链与人工 App 三项体验均已签字；0.1.1 Developer Preview 已公开”。不准确的结论是“fixture 人工签字等于真实 API/作者价值”、“0.1.1 已发布等于完整 V0、稳定版或真实作者验收完成”。0.0AB 当时的 App/ZIP 只与该批源码一致且仅是本地证据；当前发布事实见顶部当前里程碑。
 
 ## 3. 当前产品能力矩阵
 
@@ -589,6 +596,15 @@ Onboarding v2 已取代上述“容错解析完整 `editContent` + 部分创建�
 | 独立 macOS App 发布 | ⬜ | 当前不是首发路线；若未来启用，仍需 Developer ID、hardened runtime、公证和 Gatekeeper |
 
 ## 4. 后续 TODO（严格顺序）
+
+### RM-1.0 / 0.1.2：当前唯一目标
+
+- [ ] 由作者显式指定满足合同的真实项目，完成只读预检与隔离副本；证明原始快照不变。
+- [ ] 在隔离副本完成项目卡、Inline/Chapter/Plan、Research、image-01、Graph/恢复五段真实旅程。
+- [ ] 复现并诊断作者项目 `Graph INVALID_CACHE`；提供不删除作者数据、不手工清缓存的可理解诊断、重建或恢复终态。
+- [ ] 收集内容无关的 Inline 接受率、Plan 采用、Research 匹配判断、图片评分/采纳和耗时样本。
+- [ ] 只修复验收中发现的 P0/P1 与决定阻断发版的 P2；不得插入 `0.2.0+` 功能。
+- [ ] 完成完整回归、连续真实 Electron、独立复审、文档/Git/Nowledge 同步，并在另获授权后发布 0.1.2 Preview。
 
 ### P1：能力审计后的本地产品缺口
 

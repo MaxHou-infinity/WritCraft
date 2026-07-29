@@ -4,7 +4,7 @@
 > 日期：2026-07-15  
 > 状态：当前产品权威规格（Authoritative）  
 > 适用范围：V0 起的桌面写作 IDE  
-> 优先级：若本文件与旧版 PRD、路线图或原型行为冲突，以本文件为准；工程实现以 `docs/PHASE-A-IMPLEMENTATION.md` 为准。
+> 优先级：本文定义产品契约；`docs/ROADMAP.md` 定义唯一版本顺序与当前目标范围；工程事实以源码和 `v0/DEVELOPMENT-STATUS.md` 为准，具体实现以对应技术规格/合同为准。
 
 > **实现状态注记（2026-07-29，0.0AL / 0.1.1 已发布）**：本文仍是产品权威规格，**完整 PRD 尚未完成合格真实作者验收**。0.1.1 已把 0.0AH–0.0AK 的项目卡、滚动、Changes 审阅、活动栏和统一工作区导航修复发布到 npm `preview` 与 GitHub prerelease；公网 tarball shasum 匹配、隔离安装 **2/2**。`latest` 仍为 0.1.0，不把本次 Preview 冒充稳定版。Developer ID/公证仅在未来独立 App 路线需要；真实作者质量/采纳和其他 AI 模式统一采用 `edit.md` 分区编译器仍未关闭。
 
@@ -423,9 +423,10 @@ Issue 类型首批支持：
 ## 11. 文档治理
 
 - 本文定义“做什么、为什么做、用户如何验收”。
-- `docs/PHASE-A-IMPLEMENTATION.md` 定义第一阶段“如何安全实现”。
-- `docs/AUTHOR-ACCEPTANCE-V1-CONTRACT.md` 定义真实 API、真实作者、隐私指标和发布前人工旅程的证据边界。
-- `deliverables/笔触 · WritCraft — 一个月 V0 路线图.md` 负责排期，但不得覆盖本文的产品契约。
+- `docs/ROADMAP.md` 是版本顺序、当前目标、范围/非目标与发版门禁的唯一权威。
+- `docs/PHASE-A-IMPLEMENTATION.md` 定义第一阶段“如何安全实现”；后续版本按路线图另立必要合同。
+- `docs/AUTHOR-ACCEPTANCE-V1-CONTRACT.md` 定义真实 API、真实作者、隐私指标和人工旅程的证据边界。
+- `deliverables/` 已整体归档，只用于追溯早期调研、价值叙事和计划，不得派发当前任务；归档边界见 `deliverables/README.md`。
 - `v0/DEVELOPMENT-STATUS.md` 只记录已验证事实、当前风险与下一步，不得把计划写成已完成。
-- 文档读取优先级固定为：当次源码与可复现命令结果 → `v0/DEVELOPMENT-STATUS.md` → 对应 `docs/*-CONTRACT.md` → 本文 → 历史路线图、PDCA 和调研交付。冲突时较低层级文档必须标为历史或立即更正。
+- 文档读取优先级固定为：当次源码与可复现命令结果 → `v0/DEVELOPMENT-STATUS.md`（当前事实）→ 对应 `docs/*-CONTRACT.md`（验收边界）→ 本文（产品契约）→ `docs/ROADMAP.md`（版本顺序与范围）。它们职责不同，不用一个文件覆盖另一个；历史路线图、PDCA 和调研交付不得作为当前指令。
 - 任何重大需求变化需先更新本文，再更新实施计划、测试和状态；任何已完成实现、独立复审或全量验证，必须在同一工作批次更新状态台账和受影响的合同/README/路线图。未同步文档不得作为下一轮技术决策依据。

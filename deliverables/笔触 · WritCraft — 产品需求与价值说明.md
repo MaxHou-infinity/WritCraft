@@ -2,8 +2,8 @@
 
 > 文档版本：v4.0 | 2026-07-28（0.0AA Main-owned Chat 多轮连续性）
 > 发起方：Max Hou
-> 状态：**V0 候选原型，未完成、未发布**
-> 权威边界：产品规格看 `docs/WRITCRAFT-PRD-V3.md`；工程事实、测试证据与唯一 TODO 看 `v0/DEVELOPMENT-STATUS.md`。本文件只解释目标用户、产品价值与当前范围，不得据此重开历史任务。
+> 状态：**历史归档，不得作为当前产品状态、版本计划或续作入口。**
+> 归档说明：本文保留 0.0AA 时点的产品价值叙事，正文中的“未发布”、旧测试总数、图片 Key 前缀和相邻用户场景均可能已过期。当前产品契约看 `docs/WRITCRAFT-PRD-V3.md`，版本顺序看 `docs/ROADMAP.md`，工程事实看 `v0/DEVELOPMENT-STATUS.md`；归档索引见本目录 `README.md`。
 
 ## 一、产品定义
 
