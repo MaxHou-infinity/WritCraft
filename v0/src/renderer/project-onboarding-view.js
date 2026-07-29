@@ -50,6 +50,8 @@
     let busy = false;
     let feedback = '';
     let generationFailed = false;
+    let generationStartedAt = 0;
+    let progressTimer = null;
     let destroyed = false;
     const focusBeforeOpen = document.activeElement;
     const inerted = [];
@@ -128,9 +130,77 @@
       if (live) live.textContent = feedback;
     }
 
-    function recoverableGenerationMessage(message) {
-      const reason = String(message || 'AI 没有整理出可识别的项目提案').replace(/[。；\s]+$/, '');
-      return `${reason}。项目卡答案已保留，可以重新整理；不会自动修复或猜测 AI JSON。`;
+    function recoverableGenerationMessage(failure) {
+      const code = failure?.error || failure?.code || '';
+      if (['RESERVED_SUGGESTION_PATH', 'INVALID_SUGGESTION_PATH',
+        'DUPLICATE_SUGGESTION_PATH', 'SUGGESTION_PATH_CONFLICT'].includes(code)) {
+        return 'AI 的新文件建议包含不适合创建的位置，因此笔触已停止，本次没有修改任何项目文件。你在本页填写的内容仍保留；点击“重新整理 edit.md”即可再试。';
+      }
+      if (STRUCTURED_OUTPUT_ERROR_SET.has(code)) {
+        return 'AI 返回的整理结果不完整，因此笔触已停止，本次没有修改任何项目文件。你在本页填写的内容仍保留；点击“重新整理 edit.md”即可再试。';
+      }
+      if (code === 'ONBOARDING_DEPENDENCY_STALE') {
+        return '整理期间项目内容发生了变化。为避免覆盖你的新内容，笔触已停止且没有修改文件；请检查项目后重新整理。';
+      }
+      return 'AI 暂时没有完成整理，本次没有修改任何项目文件。你在本页填写的内容仍保留，可以稍后重新整理。';
+    }
+
+    function generationElapsedSeconds() {
+      return Math.max(0, Math.floor((Date.now() - generationStartedAt) / 1000));
+    }
+
+    function generationProgressText() {
+      return `AI 正在整理与安全检查 · 已等待 ${generationElapsedSeconds()} 秒`;
+    }
+
+    function refreshGenerationProgress() {
+      if (!busy || destroyed) return;
+      const elapsed = host.querySelector('.onboarding-progress-time');
+      if (elapsed) elapsed.textContent = `已等待 ${generationElapsedSeconds()} 秒`;
+      const live = host.querySelector('.onboarding-live');
+      if (live) live.textContent = generationProgressText();
+    }
+
+    function stopGenerationProgress() {
+      if (progressTimer !== null) {
+        root.clearInterval(progressTimer);
+        progressTimer = null;
+      }
+    }
+
+    function startGenerationProgress() {
+      stopGenerationProgress();
+      generationStartedAt = Date.now();
+      feedback = generationProgressText();
+      progressTimer = root.setInterval(refreshGenerationProgress, 1000);
+    }
+
+    function renderGenerationProgress(body) {
+      const progress = element(document, 'div', 'onboarding-progress');
+      progress.setAttribute('role', 'status');
+      progress.setAttribute('aria-label', '项目说明整理进度');
+      const heading = element(document, 'div', 'onboarding-progress-heading');
+      heading.append(
+        element(document, 'span', 'onboarding-progress-pulse'),
+        element(document, 'strong', '', 'AI 正在整理项目说明'),
+        element(document, 'span', 'onboarding-progress-time', `已等待 ${generationElapsedSeconds()} 秒`)
+      );
+      const steps = element(document, 'ol', 'onboarding-progress-steps');
+      [
+        ['complete', '项目卡已提交'],
+        ['active', '整理内容并检查建议'],
+        ['pending', '进入修改预览'],
+      ].forEach(([status, label]) => {
+        const item = element(document, 'li', '', label);
+        item.dataset.state = status;
+        steps.appendChild(item);
+      });
+      progress.append(
+        heading,
+        steps,
+        element(document, 'p', 'onboarding-progress-note', '笔触仍在工作，请勿重复提交。你填写的内容已经保留。')
+      );
+      body.appendChild(progress);
     }
 
     function recordOnboardingMetric(outcome, attempt) {
@@ -248,6 +318,7 @@
         list.appendChild(item);
       }
       body.appendChild(list);
+      if (busy) renderGenerationProgress(body);
       const actions = element(document, 'div', 'onboarding-actions');
       actions.appendChild(button('返回补充', 'onboarding-button onboarding-button-quiet', () => {
         feedback = '';
@@ -255,7 +326,7 @@
         render();
       }, busy));
       const generateLabel = busy
-        ? '正在整理…'
+        ? 'AI 整理中'
         : generationFailed ? '重新整理 edit.md' : '生成 edit.md 提案';
       actions.appendChild(button(generateLabel, 'onboarding-button onboarding-button-primary', async () => {
         if (busy) return;
@@ -276,23 +347,26 @@
           });
           if (!request.answers.length) throw new Error('至少回答一个项目建立问题');
           busy = true;
+          startGenerationProgress();
           render();
           const result = await options.onGenerate?.(request, stateApi.createSession(session), Object.freeze({ ...attempt }));
           if (destroyed) return;
+          stopGenerationProgress();
           busy = false;
           generationFailed = result?.ok === false;
           recordOnboardingMetric(generationFailed ? onboardingFailureOutcome(result) : 'generated', attempt);
           announce(generationFailed
-            ? recoverableGenerationMessage(result.message)
+            ? recoverableGenerationMessage(result)
             : '项目提案已进入 Changes，请检查后再应用');
           if (!generationFailed) options.onComplete?.(result);
           if (!destroyed) render();
         } catch (error) {
           if (destroyed) return;
+          stopGenerationProgress();
           busy = false;
           generationFailed = true;
           recordOnboardingMetric(onboardingFailureOutcome(error), attempt);
-          announce(recoverableGenerationMessage(error.message || '项目提案生成失败'));
+          announce(recoverableGenerationMessage(error));
           render();
         }
       }, busy));
@@ -336,6 +410,7 @@
       destroy() {
         if (destroyed) return;
         destroyed = true;
+        stopGenerationProgress();
         host.removeEventListener('keydown', onKeydown);
         host.replaceChildren();
         host.classList.remove('project-onboarding');

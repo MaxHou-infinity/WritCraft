@@ -227,6 +227,8 @@ Main 为当前窗口保存不可伪造的 project session，不允许 renderer �
 
 `workspace.json` 保存：schema、活动相对路径、固定标签列表、每个文件的光标/滚动位置、面板尺寸和上次正常关闭时间。写入也应原子化，解析失败时使用默认布局并保留损坏文件用于诊断。
 
+中央工作区的 Grid 高度链必须逐层使用 `min-height: 0` 和受限剩余高度，页面根保持不滚动；`.editor-scroll` 独占纵向滚动、保留可见 scrollbar gutter，`editor` 的最小高度相对该容器而不是 `100vh` 推算。真实 Electron 必须用超出一屏的长文证明 `scrollHeight > clientHeight`、`scrollTop` 可推进、body/document 保持 0，且底部状态栏仍在 viewport 内。
+
 ## 8. `edit.md` 加载与 AI 接入
 
 - 创建项目时从 PRD V3 模板生成 `edit.md`，exclusive create 防止覆盖。
@@ -241,10 +243,12 @@ Main 为当前窗口保存不可伪造的 project session，不允许 renderer �
 > 本节的 Renderer 31/31 与强制真实 Electron 20/20 是 Onboarding 的**历史专项签字证据**，不是当前项目总链；生产 Handler 11/11、Main/preload 14/14、Node/verify 与强制 Electron 28/28 也是 Graph 韧性修改前的最近完整基线。Renderer、fixture/API/Electron 与 Main single-flight/lifecycle 独立复审均为 P0/P1/P2=0。当前源码 Graph 复跑边界见文首；Onboarding 人工体验仍不能替代真实 API、真实作者或发布验收。
 
 - 模型输出采用 strict exact-key schema，只允许 `summary`、固定 QUESTION_ID 对应的 `sections` 与最多 12 条 `fileSuggestions(path/title/reason)`；必须同时验证 `end_turn`、字符数和 UTF-8 字节上限，不接受 JSON 修复、围栏、外围文本或文件正文。
+- 模型 Prompt 必须逐项声明 `fileSuggestions.path` 的生产禁区：`edit.md` 大小写变体、隐藏路径、`.writcraft/**`、`references/**`、`sources/**`、绝对路径和已有路径；没有安全建议时返回空数组。Main 的独立校验仍是最终权威，Prompt 约束不能替代 fail-closed。
 - Main 是 `edit.md` 合并与初始文件模板的唯一权威：按固定章节映射合并 `writcraft.edit/v1`，保留合法 Front Matter、未覆盖的用户内容和自定义章节；建议文件内容只能由 Main 生成空白 Markdown 模板。
 - 文件建议必须拒绝 `edit.md`、`.writcraft/**`、`references/**`、`sources/**`、隐藏/绝对/重复/已有路径，并在模型返回后、授权前和应用时复核项目 instance 与目标 revision。
 - 有实际 `edit.md` Diff 时，只有绑定精确提案的一次性 capability 被完整应用后才能继续创建文件；no-op 使用独立 onboarding token。拒绝、丢弃、residual、过期、项目切换或 revision 变化均使授权失效。
 - 用户查看最终 Diff 和文件清单后必须二次确认。批量创建先全量预检，再暂存和提交；任一失败都回滚为零个用户可见的新文件，不沿用旧 v1 的部分创建续跑语义。
+- Renderer 只展示能够证明的进度：请求已提交、AI 整理与 Main 安全检查正在进行、成功后进入 Changes，并按秒显示等待时间；不把定时轮播文案冒充模型内部阶段。失败按稳定错误码映射为作者可执行说明，明确磁盘零修改与本页回答保留，不回显 JSON、内部路径分类或 Main 技术消息，也不把内存态保留误称为持久化保存。
 
 ## 9. 现有原型迁移
 

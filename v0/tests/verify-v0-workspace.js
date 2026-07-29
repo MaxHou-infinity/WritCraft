@@ -136,6 +136,13 @@ check('工作区恢复标签、光标和滚动位置', () => {
   assert.ok(workspace.includes('scrollTop'));
   assert.ok(workspace.includes('bridge.openRecent()'));
 });
+check('中央编辑区拥有受约束且始终可见的纵向滚动边界', () => {
+  assert.ok(html.includes('.work-area { min-width: 0; min-height: 0; height: 100%; overflow: hidden;'));
+  assert.ok(html.includes('.editor-column { min-width: 0; min-height: 0; height: 100%; overflow: hidden;'));
+  assert.ok(html.includes('min-height: 0; overflow-x: hidden; overflow-y: scroll; scrollbar-gutter: stable;'));
+  assert.ok(html.includes('.editor-scroll::-webkit-scrollbar-thumb'));
+  assert.ok(html.includes('width: min(760px, calc(100% - 72px)); min-height: 100%;'));
+});
 check('外部变化先比较权威 revision，再自动重载或进入冲突恢复', () => {
   assert.ok(workspace.includes('bridge?.onExternalChange'));
   assert.ok(workspace.includes('await bridge.readFile(path)'));

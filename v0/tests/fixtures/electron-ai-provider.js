@@ -157,7 +157,10 @@ function onboardingRequestKind(prompt, callNumber) {
   if (answers.length !== 1 || answers[0][1] !== 'premise' || answers[0][2] !== '内容主旨' ||
       projectPrompts.length !== 1 || (prompt.match(/<\/project-file>/g) || []).length !== 1 ||
       existingPaths.length !== 1 || (prompt.match(/<\/existing-project-paths>/g) || []).length !== 1 ||
-      !prompt.includes('严禁返回完整 edit.md、editContent、文件 content、Front Matter、初稿或任何文件正文。')) {
+      !prompt.includes('严禁返回完整 edit.md、editContent、文件 content、Front Matter、初稿或任何文件正文。') ||
+      !prompt.includes('严禁 edit.md（含大小写变体）') ||
+      !prompt.includes('.writcraft/**、references/**、sources/**') ||
+      !prompt.includes('如果没有安全建议，必须返回空数组')) {
     throw new Error('E2E_FIXTURE_INVALID_ONBOARDING_V2_PROMPT');
   }
   const answer = answers[0][3];
@@ -517,6 +520,7 @@ function createElectronAiProvider() {
         if (request.max_tokens !== 4096) throw new Error('E2E_FIXTURE_INVALID_ONBOARDING_V2_MAX_TOKENS');
         onboardingCalls += 1;
         const onboardingKind = onboardingRequestKind(prompt, onboardingCalls);
+        if (onboardingCalls === 1) await new Promise(resolve => setTimeout(resolve, 1400));
         output = onboardingCalls === 1
           ? '{ malformed project proposal'
           : JSON.stringify(onboardingProposal(onboardingCalls >= 3, {

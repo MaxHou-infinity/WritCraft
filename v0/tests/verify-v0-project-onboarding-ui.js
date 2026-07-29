@@ -44,6 +44,14 @@ check('provides live status and focuses the active writing field', () => {
   assert(source.includes("setAttribute('aria-live', 'polite')"));
   assert(source.includes('textarea.focus()'));
 });
+check('shows truthful staged generation progress with elapsed time', () => {
+  for (const marker of [
+    'AI 正在整理项目说明', '项目卡已提交', '整理内容并检查建议',
+    '进入修改预览', '已等待', '请勿重复提交',
+  ]) assert(source.includes(marker));
+  assert(source.includes('setInterval(refreshGenerationProgress, 1000)'));
+  assert(source.includes('stopGenerationProgress()'));
+});
 check('can be dismissed without generating through a close button or Escape', () => {
   assert(source.includes("close.setAttribute('aria-label', '关闭项目卡')"));
   assert(source.includes("event.key === 'Escape'"));
@@ -57,7 +65,9 @@ check('submits only normalized state answers through the injected callback', () 
 });
 check('keeps answers after failure and exposes an explicit retry action', () => {
   assert(source.includes("generationFailed ? '重新整理 edit.md'"));
-  assert(source.includes('项目卡答案已保留，可以重新整理'));
+  assert(source.includes('你在本页填写的内容仍保留'));
+  assert(source.includes('本次没有修改任何项目文件'));
+  assert(!source.includes('不会自动修复或猜测 AI JSON'));
   assert(!source.includes('session = stateApi.createSession()'));
 });
 check('behaves as an accessible modal with trapped focus and restored background', () => {
@@ -72,4 +82,4 @@ check('contains no network, filesystem or preload access of its own', () => {
   for (const forbidden of ['fetch(', 'XMLHttpRequest', "require('fs')", 'window.writCraft']) assert(!source.includes(forbidden));
 });
 
-console.log(`\n${passed}/11 project-onboarding UI checks passed.`);
+console.log(`\n${passed}/12 project-onboarding UI checks passed.`);

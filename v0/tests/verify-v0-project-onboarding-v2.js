@@ -368,6 +368,9 @@ async function run() {
       assert.strictEqual(captured.modelName, service.MODEL);
       assert.strictEqual(captured.maxTokens, service.MAX_TOKENS);
       assert(captured.messages[0].content.includes('严禁返回完整 edit.md'));
+      assert(captured.messages[0].content.includes('严禁 edit.md（含大小写变体）'));
+      assert(captured.messages[0].content.includes('.writcraft/**、references/**、sources/**'));
+      assert(captured.messages[0].content.includes('如果没有安全建议，必须返回空数组'));
     } finally { cleanup(project); }
   });
 

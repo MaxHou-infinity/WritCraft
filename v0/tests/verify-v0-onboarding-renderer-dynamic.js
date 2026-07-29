@@ -392,7 +392,14 @@ function extractFunction(source, name) {
         status: 'review', currentIndex: 9,
         answers: { structure: '三章', premise: '核心命题' }, skipped: [],
       },
-      onGenerate: async request => { received = request; return { ok: false, message: '受控失败' }; },
+      onGenerate: async request => {
+        received = request;
+        return {
+          ok: false,
+          error: 'RESERVED_SUGGESTION_PATH',
+          message: '初始文件不得写入项目 Prompt、内部目录或只读来源目录',
+        };
+      },
     });
     assert.strictEqual(host.getAttribute('role'), 'dialog');
     assert.strictEqual(host.getAttribute('aria-modal'), 'true');
@@ -406,11 +413,56 @@ function extractFunction(source, name) {
     assert.deepStrictEqual(JSON.parse(JSON.stringify(received.answers)), [
       { id: 'premise', text: '核心命题' }, { id: 'structure', text: '三章' },
     ]);
-    assert(allText(host).includes('不会自动修复或猜测 AI JSON'));
+    assert(allText(host).includes('AI 的新文件建议包含不适合创建的位置'));
+    assert(allText(host).includes('本次没有修改任何项目文件'));
+    assert(!allText(host).includes('JSON'));
+    assert(!allText(host).includes('内部目录'));
     controller.destroy();
     global.requestAnimationFrame = originalAnimationFrame;
     assert(!underlay.hasAttribute('inert'));
     assert.strictEqual(document.activeElement, underlay);
+  });
+
+  await test('project card exposes live truthful progress while generation is unsettled', async () => {
+    const document = new FakeDocument();
+    const host = document.createElement('section');
+    document.root.append(host);
+    const originalAnimationFrame = global.requestAnimationFrame;
+    const originalSetInterval = global.setInterval;
+    const originalClearInterval = global.clearInterval;
+    const originalDateNow = Date.now;
+    let progressTick = null;
+    let now = 1000;
+    global.requestAnimationFrame = callback => callback();
+    global.setInterval = callback => { progressTick = callback; return 7; };
+    global.clearInterval = () => { progressTick = null; };
+    Date.now = () => now;
+    let resolveGeneration;
+    const deferred = new Promise(resolve => { resolveGeneration = resolve; });
+    const controller = onboardingView.mount(host, {
+      stateApi: onboardingState,
+      session: { status: 'review', currentIndex: 9, answers: { premise: '核心命题' }, skipped: [] },
+      onGenerate: () => deferred,
+    });
+    const generationClick = findByText(host, '生成 edit.md 提案').click();
+    await Promise.resolve();
+    assert(allText(host).includes('AI 正在整理项目说明'));
+    assert(allText(host).includes('项目卡已提交'));
+    assert(allText(host).includes('整理内容并检查建议'));
+    assert(allText(host).includes('进入修改预览'));
+    assert(allText(host).includes('已等待 0 秒'));
+    assert(allText(host).includes('请勿重复提交'));
+    assert.strictEqual(findByText(host, 'AI 整理中').disabled, true);
+    now = 3100;
+    progressTick();
+    assert(allText(host).includes('已等待 2 秒'));
+    resolveGeneration({ ok: true });
+    await generationClick;
+    controller.destroy();
+    global.requestAnimationFrame = originalAnimationFrame;
+    global.setInterval = originalSetInterval;
+    global.clearInterval = originalClearInterval;
+    Date.now = originalDateNow;
   });
 
   await test('project card dynamically records structured_failed→retried→generated without answer content', async () => {

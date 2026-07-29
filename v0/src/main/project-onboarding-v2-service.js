@@ -681,6 +681,7 @@ function modelMessages(edit, request, treeEntries) {
     '只返回一个严格 JSON 对象，顶层精确为 summary、sections、fileSuggestions；不得包含围栏、外围文本或其他字段。',
     'sections 项精确为 {"id":"QUESTION_ID","content":"栏目正文"}，id 只能来自用户本次回答；content 不得包含 Markdown 标题。',
     'fileSuggestions 最多 12 项，每项精确为 {"path":"安全相对 Markdown 路径","title":"标题","reason":"理由"}。',
+    'fileSuggestions.path 只能指向尚不存在的普通 Markdown 文稿文件。严禁 edit.md（含大小写变体）、任何以 . 开头的路径或目录、.writcraft/**、references/**、sources/**、绝对路径和下方已存在路径；如果没有安全建议，必须返回空数组。',
     '严禁返回完整 edit.md、editContent、文件 content、Front Matter、初稿或任何文件正文。',
     `栏目 ID 与固定标题映射：${JSON.stringify(TEMPLATE_ORDER.map(id => ({ id, heading: SECTION_BY_ID.get(id).heading })))}`,
     '',

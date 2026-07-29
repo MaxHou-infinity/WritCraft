@@ -1,7 +1,7 @@
 # 笔触 · WritCraft · V0 开发状态与续作入口
 
-> 最后更新：2026-07-29（Asia/Shanghai，0.0AG GitHub 公开仓库上线）
-> 当前状态：**V0 Developer Preview 已公开发布并完成 0.0AF 全链收口；0.0AG 已建立公开 GitHub 仓库 [`MaxHou-infinity/WritCraft`](https://github.com/MaxHou-infinity/WritCraft)，本地 `main` 跟踪 `origin/main`。npm registry 上 `writ-craft@0.1.0` 的 shasum 为 `a9cb1c4c02639dda213fec3922a204337a8291f9`，与签字候选完全一致；`preview: 0.1.0`。公网/本地隔离安装与真实 Electron 启停各 2/2，两路独立终审 P0=0/P1=0/P2=0；GitHub 用户向首页、品牌图、上手指南、公开路线图、根许可证、安全与参与说明的实现提交为 `ce63eb1`。提交文档不能自指其最终哈希，精确当前 HEAD 以 `git rev-parse --short HEAD` 和 Nowledge 权威记忆 `e435dd78-2352-46fa-8299-2da2507d0361` 的反查结果为准。**
+> 最后更新：2026-07-29（Asia/Shanghai，0.0AH 项目卡反馈与中央编辑器滚动修复）
+> 当前状态：**V0 Developer Preview 已公开发布并完成 0.0AF 全链收口；0.0AG 已建立公开 GitHub 仓库 [`MaxHou-infinity/WritCraft`](https://github.com/MaxHou-infinity/WritCraft)，本地 `main` 跟踪 `origin/main`。0.0AH 根据作者现场反馈修正两项基础体验：项目卡显示真实三段进度与已等待时间、阻止重复提交、把安全拦截解释为“未修改文件 + 本页回答仍保留 + 如何重试”，并在模型 Prompt 中明确禁止建议 `edit.md`、内部/来源/已有路径；中央编辑器补齐 Grid 高度约束与始终可见的独立纵向滚动条。Main fail-closed 边界保持不变。npm registry 上 `writ-craft@0.1.0` 的 shasum 为 `a9cb1c4c02639dda213fec3922a204337a8291f9`，与原签字候选完全一致；`preview: 0.1.0`。该已发布版本不可覆盖，0.0AH 源码修复尚未发布为新 npm 版本。公网/本地隔离安装与真实 Electron 启停各 2/2，两路独立终审 P0=0/P1=0/P2=0；GitHub 用户向首页、品牌图、上手指南、公开路线图、根许可证、安全与参与说明的实现提交为 `ce63eb1`。提交文档不能自指其最终哈希，精确当前 HEAD 以 `git rev-parse --short HEAD` 和 Nowledge 权威记忆 `e435dd78-2352-46fa-8299-2da2507d0361` 的反查结果为准。**
 > 发布判断：**公开 npm 发布与 `@preview` 验收已完成。首包发布后 registry 同时要求存在 `latest: 0.1.0`；经浏览器认证执行 `npm dist-tag rm writ-craft latest` 仍返回 E400。npm registry 的公开对象契约要求 `dist-tags` 至少包含 `latest`，因此该标签不能在只有一个版本时删除。这是原“绝不发布 latest”合同未覆盖的外部平台约束，不得用 unpublish 或占位版本冒险掩盖。**
 > 下一阶段门禁：**0.0AF 已完成测试、合同、文档、Git、Nowledge 与两路独立终审，P0=0/P1=0/P2=0；不要重开 npm 发布、修改 tag、unpublish 或发布占位版本。`latest` 只是 registry 强制指向同一专有评估 Preview，所有推荐安装仍使用 `npx writ-craft@preview`。下一阶段进入合格真实作者项目验收：`edit.md`、5+ 章、2000+ 可见中文字符和 `references/`；当前显式候选不合格且未创建副本。**
 > 当前候选证据：**许可证 P1 修复后的 `npm run verify:npm-preview` 10/10；官方 Node 22.22.3/npm 10.9.8 arm64 与 Node 24.18.0/npm 11.16.0 x64 fresh-tarball 矩阵各 2/2；最终 `npm test` exit 0、非沙箱 `npm run verify:full` exit 0、真实 Electron 35/35、Persistent Main/IPC 3/3。临发布时 `npm audit --omit=dev` 为 0 vulnerabilities（prod 15、optional 13、total 27），`npm whoami` 为 `houxyue`，包名查询当时为 E404；当前 registry 已公开 `writ-craft@0.1.0`，shasum `a9cb1c4c02639dda213fec3922a204337a8291f9`。候选 tarball 为 119 文件、566,536 bytes packed、2,597,021 bytes unpacked。历史 x64 首轮 PATH 缺 `/usr/sbin` 的 `sysctl` 红灯和 0.0AC Graph `[51,52,52,101] ms` 性能红灯均保留。**
@@ -31,6 +31,16 @@ Chat 的三级 scope/context、Main-owned 多轮连续性、Chapter、Onboarding
 4. 不重写已经签字的 Onboarding v2 service、capability store、batch、Main/preload 与 Renderer 契约；Main 动态 admission、single-flight 和 Renderer 生命周期 authority 清理均已关闭。
 5. 每批合入后重跑定向测试；阶段完成时再运行完整 `npm test`、`npm run verify` 与 `WRITCRAFT_E2E_FORCE=1 npm run e2e:electron`，保存当次证据。
 6. 真实 API 只使用用户显式配置的 Key；记录延迟、限流、超时、故障和费用，不记录 Key、Prompt、模型原文或正文。Key 前缀只表示凭据/计费类型，不能代替官方能力与现场门禁。首发按 npm Developer Preview 合同执行；独立 App 发布才需要 Developer ID、公证与 Gatekeeper。
+
+### 0.0AH 2026-07-29 项目卡反馈与中央编辑器滚动修复
+
+- **现场根因**：作者在“写作项目 test”提交项目卡后，Main 记录稳定码 `RESERVED_SUGGESTION_PATH`。模型返回了不允许作为初始文件创建的位置；Main 正确停止并保持磁盘零修改，但旧 Prompt 只写“安全相对路径”，没有逐项列明禁区，Renderer 又直接展示“项目 Prompt / 内部目录 / AI JSON”等工程语言。
+- **生成源头修复**：Onboarding v2 模型 Prompt 现在显式禁止 `edit.md` 大小写变体、隐藏路径、`.writcraft/**`、`references/**`、`sources/**`、绝对路径和已有路径，并要求无安全建议时返回空数组。Main 的独立路径校验没有放宽，Prompt 约束只减少无效模型结果，不替代 fail-closed。
+- **等待体验**：提交后展示“项目卡已提交 → 整理内容并检查建议 → 进入修改预览”三段真实边界、按秒等待时间和“请勿重复提交”；按钮禁用为“AI 整理中”。未使用定时轮播伪装不可观测的模型内部步骤，`prefers-reduced-motion` 下关闭脉冲动画。
+- **失败体验**：受保护/非法/冲突建议统一解释为“AI 的新文件建议包含不适合创建的位置”，明确本次没有修改项目文件、本页填写内容仍保留，并给出“重新整理 edit.md”。不再显示 JSON、内部目录分类、Main 错误码或技术消息；“本页保留”不冒充跨重启持久化。
+- **编辑器滚动根因与修复**：`.editor-scroll` 原本虽有 `overflow:auto`，但上层 `.work-area` / `.editor-column` 缺少 `min-height:0` 与受限高度，Grid 的最小内容高度会被长文撑出 `100vh` 后由根页面裁掉。现将高度链锁在 viewport 内，编辑器使用独立 `overflow-y:scroll`、稳定 gutter 与可见 11px 滚动轨道，正文最小高度改为容器 `100%`；顶部文件栏和底部状态栏不随正文滚走。
+- **验证证据**：UI **12/12**、Onboarding service **22/22**、Renderer dynamic **26/26**、Workspace **20/20**、Persistent Watcher Main/IPC **3/3**、完整 `npm test` exit 0；真实 Electron 项目卡红/绿过程按上条记录保留。新增真实 Electron 160 段长文阶段已连续三次通过，证明独立 `scrollHeight`、500px+ `scrollTop`、8px+ scrollbar gutter、body/document 零滚动与底部状态栏留在 viewport。三次全旅程均在该滚动专项通过后，才分别出现既有 Graph timing 红灯：增量构建 867.5ms > 800ms、筛选 114.8ms/112.1ms > 100ms，以及文件筛选 115.1ms / 搜索 111.7ms > 100ms；因此当前源码的 `npm run verify:full` **不是全绿**。这些红灯不得被绿色重试抹除，作为独立 Graph timing P2 留待下一批定位，不回滚本次滚动修复，也不为通过测试而放宽门槛。
+- **验收边界**：本轮是显式候选上的现场缺口修复，不把不合格项目写成正式真实作者验收。公开 npm `0.1.0` 是不可变旧包；如需向 npm 用户分发本修复，必须另行版本升级、候选验收和显式发布授权。
 
 ### 0.0AG 2026-07-29 GitHub 公开仓库上线
 
@@ -565,7 +575,7 @@ Onboarding v2 已取代上述“容错解析完整 `editContent` + 部分创建�
 - [x] Onboarding v2 Main/preload 定向契约：当前集成 **14/14**，覆盖 project switch/discard/residual/stale、post-commit token mint failure、batch commit 后 bookkeeping/tree refresh 失败仍保持 `ok: true` 与权威 `files`、独立 confirm/discard IPC，以及后续 watcher flush 边界。后续只需随总链做 Electron/回归，不重写契约。
 - [x] **Renderer committed warning**：保留“磁盘已提交”真相，展示权威文件路径、Main 状态刷新异常、需重开项目及不要重复确认；动态对抗测试通过。
 - [x] **Renderer 双授权 all-settled 回收**：`discardChanges` 同步或异步失败时仍执行 `discardOnboardingConfirmation`。
-- [x] **验证主链接入**：dynamic 在 `verify` 恰好一次、`preverify` 零次；Renderer state/UI 为 8/8、11/11，dynamic 当前为 25/25。
+- [x] **验证主链接入**：dynamic 在 `verify` 恰好一次、`preverify` 零次；Renderer state/UI 为 8/8、12/12，dynamic 当前为 26/26。
 - [x] **向导销毁后的异步焦点**：所有 rAF focus 回调执行时复核 `destroyed`；deferred `onGenerate → destroy → resolve` 已证明不调用 `onComplete`、不重渲染、不夺焦点。
 - [x] Onboarding v2 fixture/API/Electron：完整 `npm test` 与沙箱外 `npm run verify` exit 0；**20/20** 是该链历史专项 Electron 证据，0.0AB 当时总链为 **35/35**，当前见顶部当前里程碑。它证明 malformed 保留答案且不自动修复、第一次确认只更新 `edit.md`、第二次确认才原子创建 Main 模板、冲突零部分写入且 token 终止。
 - [x] **当前源码 App 三项人工复验**：隔离六章 fixture 中，Malformed JSON 后回答保留并可重试；第一次接受真实写入磁盘 `edit.md` 且第二阶段前初始文件零创建；合法 `edit.md` 顶部不显示“需修复”。

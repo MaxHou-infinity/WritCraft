@@ -640,6 +640,43 @@ async function run() {
       assert.strictEqual(coldProject.currentPath, 'edit.md');
     });
 
+    await stage('keeps long manuscript content inside a visible, keyboard-owned editor scrollbar', async () => {
+      const scrollProof = await first.client.evaluate(`(() => {
+        const editor = document.getElementById('editor');
+        const scroller = document.querySelector('.editor-scroll');
+        const status = document.querySelector('.status-bar');
+        const original = editor.textContent;
+        editor.textContent = Array.from({ length: 160 }, (_, index) =>
+          \`第 \${index + 1} 段 · 这是用于验证中央编辑区纵向滚动边界的长文内容。\`
+        ).join('\\n\\n');
+        scroller.scrollTop = scroller.scrollHeight;
+        const statusRect = status.getBoundingClientRect();
+        const proof = {
+          overflowY: getComputedStyle(scroller).overflowY,
+          clientHeight: scroller.clientHeight,
+          scrollHeight: scroller.scrollHeight,
+          scrollTop: scroller.scrollTop,
+          scrollbarGutter: scroller.offsetWidth - scroller.clientWidth,
+          bodyScrollTop: document.body.scrollTop,
+          documentScrollTop: document.documentElement.scrollTop,
+          statusTop: statusRect.top,
+          statusBottom: statusRect.bottom,
+          viewportHeight: innerHeight,
+        };
+        editor.textContent = original;
+        scroller.scrollTop = 0;
+        return proof;
+      })()`);
+      assert.strictEqual(scrollProof.overflowY, 'scroll');
+      assert(scrollProof.clientHeight > 0);
+      assert(scrollProof.scrollHeight > scrollProof.clientHeight + 500);
+      assert(scrollProof.scrollTop > 500);
+      assert(scrollProof.scrollbarGutter >= 8, 'editor must reserve a visible scrollbar gutter');
+      assert.strictEqual(scrollProof.bodyScrollTop, 0);
+      assert.strictEqual(scrollProof.documentScrollTop, 0);
+      assert(scrollProof.statusTop >= 0 && scrollProof.statusBottom <= scrollProof.viewportHeight + 1);
+    });
+
     await stage('keeps Onboarding v2 strict, separates edit.md apply from one-time atomic initial-file confirmation', async () => {
       const beforeDisk = projectService.readFile(project.rootPath, 'edit.md');
       const firstPath = path.join(project.rootPath, 'onboarding-a.md');
@@ -655,12 +692,26 @@ async function run() {
           .find(node => node.textContent.includes('生成 edit.md 提案'));
         button.click();
       })()`);
+      const visibleProgress = await waitForValue(first.client, `(() => {
+        const progress = document.querySelector('.onboarding-progress');
+        const elapsed = document.querySelector('.onboarding-progress-time')?.textContent || '';
+        const primary = [...document.querySelectorAll('.onboarding-button-primary')]
+          .find(node => node.textContent.includes('AI 整理中'));
+        if (!progress || !elapsed.startsWith('已等待 ') || !primary?.disabled) return null;
+        return progress.textContent;
+      })()`, 'truthful project-card generation progress');
+      assert(visibleProgress.includes('项目卡已提交'));
+      assert(visibleProgress.includes('整理内容并检查建议'));
+      assert(visibleProgress.includes('进入修改预览'));
+      assert(visibleProgress.includes('请勿重复提交'));
       const recoverable = await waitForValue(first.client, `(() => {
         const button = [...document.querySelectorAll('.onboarding-button-primary')]
           .find(node => node.textContent.includes('重新整理 edit.md'));
         const answer = document.querySelector('.onboarding-review-answer')?.textContent || '';
         const live = document.querySelector('.onboarding-live')?.textContent || '';
-        return button && answer.includes('真实 GUI') && live.includes('保留')
+        return button && answer.includes('真实 GUI') &&
+          live.includes('本次没有修改任何项目文件') && live.includes('本页填写的内容仍保留') &&
+          !live.includes('JSON') && !live.includes('内部目录')
           ? { answer, live, changesMode: window.__assistantDock.getMode() === 'changes' }
           : null;
       })()`, 'strict malformed project-card failure without automatic repair');
