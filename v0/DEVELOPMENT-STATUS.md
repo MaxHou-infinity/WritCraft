@@ -1,10 +1,10 @@
 # 笔触 · WritCraft · V0 开发状态与续作入口
 
-> 最后更新：2026-07-29（Asia/Shanghai，0.0AC npm Developer Preview 本地候选已签字）
-> 当前状态：**V0 候选原型。第一阶段“本地 npm Developer Preview 候选签字”已完成：0.0AC 的实现、完整回归、真实 Electron、隔离安装、P1 修复、三路独立终审、文档、Git 与 Nowledge Mem 均已收口，最终 P0=0/P1=0/P2=0。代码/测试/合同提交为 `71571b8`，同一条 Nowledge 权威记忆 `e435dd78-2352-46fa-8299-2da2507d0361` 已更新并反查。尚未推送 GitHub，也尚未公开发布 npm。**
-> 发布判断：**仍未公开发布。现有 ad-hoc App/ZIP 继续只是本地证据；npm 包名、目标账户、许可证选择、显式发布授权、npm 10/x64 安装矩阵和发布后 `npx` 复验均未关闭。Developer ID/公证不阻断 npm 路线，但未来分发独立 App 时仍必须完成。**
-> 下一阶段门禁：**第二阶段公开发布前，必须先完成 npm 10/arm64 与 npm 11/x64 矩阵、许可证选择、包名复查、目标账户登录、再次 audit，并取得用户显式 publish 授权；任一矩阵未完成或失败均禁止发布。第三阶段仍需符合 `edit.md`、5+ 章、2000+ 可见中文字符和 `references/` 的真实作者项目；当前显式候选不合格且未创建副本。2026-07-28 的 E404 与 ENEEDAUTH 分别不代表占名和账户就绪。**
-> 当前候选证据：**最终源码 `npm test` exit 0；非沙箱 `npm run verify` exit 0；真实 DOM sanitizer 13/13；Persistent Main/IPC 3/3；npm Preview 10/10；隔离安装真实 CLI/Renderer 2/2；`npm audit --omit=dev` 为 0 vulnerabilities（prod 15、optional 13、total 27）。最新 tarball 119 文件、564,758 bytes packed、2,593,844 bytes unpacked。真实 Electron 首轮在 Graph 交互性能出现 `[51,52,52,101] ms` 红灯，未放宽 100 ms 阈值；同一源码随后连续两轮完整 35/35，红灯保留为已分类调度波动。真实 Coding Plan `image-01` 合成门禁成功：JPEG 1280×720、269,177 bytes、19,333 ms、零正文插入。**
+> 最后更新：2026-07-29（Asia/Shanghai，0.0AC npm Developer Preview 双运行时矩阵已补证）
+> 当前状态：**V0 候选原型。第一阶段“本地 npm Developer Preview 候选签字”已完成：0.0AC 的实现、完整回归、真实 Electron、隔离安装、P1 修复、三路独立终审、文档、Git 与 Nowledge Mem 均已收口，最终 P0=0/P1=0/P2=0。第二阶段的 npm 10/arm64 与 npm 11/x64 fresh-tarball 矩阵已在同一源码上各 2/2 通过。代码/测试/合同提交为 `71571b8`，同一条 Nowledge 权威记忆 `e435dd78-2352-46fa-8299-2da2507d0361` 持续作为交接入口。尚未推送 GitHub，也尚未公开发布 npm。**
+> 发布判断：**仍未公开发布。现有 ad-hoc App/ZIP 继续只是本地证据；双运行时矩阵已经关闭，但 npm 包名尚未占用、目标账户未登录、许可证选择与显式发布授权仍未关闭，发布后 `npx` 复验也尚未发生。Developer ID/公证不阻断 npm 路线，但未来分发独立 App 时仍必须完成。**
+> 下一阶段门禁：**公开发布前只剩：确认专有评估或开源许可证、登录目标 npm 账户、临发布再次复查包名并执行 `npm audit --omit=dev`、取得用户显式 publish 授权。2026-07-29 的只读检查仍为 `writ-craft` E404 与 `npm whoami` ENEEDAUTH；E404 不代表占名，ENEEDAUTH 不代表账户就绪。发布后必须在全新目录完成公网 `npx writ-craft@preview` 隔离验收。第三阶段仍需符合 `edit.md`、5+ 章、2000+ 可见中文字符和 `references/` 的真实作者项目；当前显式候选不合格且未创建副本。**
+> 当前候选证据：**最终源码 `npm test` exit 0；非沙箱 `npm run verify` exit 0；真实 DOM sanitizer 13/13；Persistent Main/IPC 3/3；npm Preview 10/10；既有 npm 11/arm64 installed 2/2；新增官方 Node 22.22.3/npm 10.9.8 arm64 与 Node 24.18.0/npm 11.16.0 x64 矩阵各 2/2。2026-07-29 即时 `npm audit --omit=dev` 为 0 vulnerabilities（prod 15、optional 13、total 27）。最新 tarball 仍为 119 文件、564,758 bytes packed、2,593,844 bytes unpacked、shasum `ceca163826dc95c292d509092421e4cb07c653af`。x64 首轮因隔离 PATH 缺 `/usr/sbin` 导致 Electron 下载器找不到 `sysctl`，产品未进入 Renderer；仅补回标准 macOS PATH 后同源码 2/2，通过记录不覆盖该环境红灯。真实 Electron 另有一次 Graph `[51,52,52,101] ms` 性能红灯，同一源码随后连续两轮完整 35/35。真实 Coding Plan `image-01` 合成门禁成功：JPEG 1280×720、269,177 bytes、19,333 ms、零正文插入。**
 > 0.0AA 历史保留红灯：**首轮真实 Electron 暴露 Inspector 在上下文失效时被清空、旧 5-chip 断言和项目 Chat 等待诊断；完整 test 又暴露 Plan 测试把 generation 函数正文写死。独立复审发现新请求预检窗口可提交不可见旧轮、同项目重开 UI/Main 串话、失败重开提前清会话及两项测试/错误文案缺口，均转为生产边界和回归后关闭。真实 Electron 曾连续两次在旧 Graph 恢复阶段超时；加入只读失败快照后该阶段连续四次通过，未改 Graph 产品逻辑，按重复同源证据关闭 timing P2。另一次 Chat preflight 红灯证明测试在恢复 `edit.md` 后未等待权威 watcher barrier；改为生产 `flushExternalChanges()` 收敛，而未放宽 Chat guard。该里程碑所有红运行保留，最终源码连续两次 34/34；后续 0.0AB 当时推进到 35/35，当前总链只看本文顶部 0.0AC。**
 > Graph 历史签字基线：**性能修复前的既有源码曾完整 `npm test`、Electron-enabled `npm run verify`、强制真实 Electron 26/26 exit 0；Graph Filter 15/15、Workbench 14/14、dynamic 5/5、Large 5/5、Watcher 15/15、Network 11/11、Intelligence 17/17，第二轮复审 P0=0/P1=0/P2=2。该数字只保留为历史过程；0.0AB 后来推进到 35/35，当前总链只看顶部 0.0AC。**
 > Graph 动态边界：**300 文件/1279 节点 cold-to-interactive、cache/incremental、筛选/内存/布局、AX/键鼠、三类纠错、stale/Issue→Changes、failure live、重启与项目隔离均进入真实 Electron；正文/History/ledger 的零写入门禁通过。**  
@@ -17,7 +17,7 @@
 > Diagnostic Export 契约：`../docs/DIAGNOSTIC-EXPORT-V1-CONTRACT.md`（2026-07-26 已实现并完成自动化产品链签收）
 > Image Review 契约：`../docs/IMAGE-REVIEW-V1-CONTRACT.md`（2026-07-27 Trash 扩展已签字，待真实付费/作者验收）
 > Markdown Trash 契约：`../docs/MARKDOWN-TRASH-V1-CONTRACT.md`（2026-07-28 0.0AB 已实现并独立签收）
-> npm Developer Preview 契约：`../docs/NPM-DEVELOPER-PREVIEW-V1-CONTRACT.md`（2026-07-29 0.0AC 本地候选已签字；registry 与矩阵门禁开放）
+> npm Developer Preview 契约：`../docs/NPM-DEVELOPER-PREVIEW-V1-CONTRACT.md`（2026-07-29 0.0AC 本地候选已签字，双运行时矩阵已补证；registry/许可证/授权门禁开放）
 
 ## 0. 续作口令
 
@@ -33,14 +33,14 @@ Chat 的三级 scope/context、Main-owned 多轮连续性、Chapter、Onboarding
 ### 0.0AC 2026-07-29 npm Developer Preview 与 Coding Plan 图片能力（本地候选已签字）
 
 - **用户结果**：可通过 npm 包中的 `writcraft` 命令启动笔触；`--help`、`--version` 和 `--check` 不启动 Electron、不联网。首次真实启动仅在缺失时取得官方 Electron 运行时。
-- **包边界**：发布白名单只含 CLI、生产 Main/Renderer、三个 universal helper、README、rights-reserved LICENSE、THIRD_PARTY_NOTICES、manifest 和 shrinkwrap；排除 tests、fixtures、release、状态文档、`.env` 与用户数据。Node `>=22.12.0`、npm 10/11、Electron `43.2.0` 均 fail-closed；manifest/universal helper 声明 arm64/x64，但当前 installed Renderer 实测仅 npm 11/arm64，npm 10/x64 仍是发布前矩阵门禁。
+- **包边界**：发布白名单只含 CLI、生产 Main/Renderer、三个 universal helper、README、rights-reserved LICENSE、THIRD_PARTY_NOTICES、manifest 和 shrinkwrap；排除 tests、fixtures、release、状态文档、`.env` 与用户数据。Node `>=22.12.0`、npm 10/11、Electron `43.2.0` 均 fail-closed；manifest/universal helper 声明 arm64/x64。2026-07-29 已用官方 Node 22.22.3/npm 10.9.8 arm64 与 Node 24.18.0/npm 11.16.0 x64 关闭发布前 installed Renderer 矩阵。
 - **启动与配置边界**：公开 CLI 等待 Main 在 `did-finish-load` 后发出的 exact IPC，并转发 SIGINT/SIGTERM/SIGHUP；该信号证明页面 load 完成，不单独证明全部 workspace/bootstrap 成功，完整应用行为仍由 35/35 真实 Electron 覆盖。测试证明早期失败和正常退出都会清理整个子进程组。`--profile` 必须位于 HOME 内，CLI/Main 双重验证 canonical 祖先、uid、POSIX mode 与 macOS allow ACL；同 UID 已运行进程属于明确接受的账户内残余。
 - **图片能力纠错**：生产端点改为中国站 `api.minimaxi.com`；本地不再把 `sk-cp-` 判为图片不可用。`sk-cp-`/`sk-api-` 都进入真实 provider 门禁，2056 明确解释为套餐资源/每日额度限制。
 - **真实门禁**：用户已保存的 Coding Plan Key 用合成提示词成功调用一次 `image-01`，得到 1280×720 JPEG，19,333 ms，269,177 bytes；生成物在验收清理阶段删除，未插入正文。这只关闭“能否调用/解码”的门禁，不关闭作者质量评分、采纳、费用或限流样本。
 - **作者项目预检**：显式候选只读预检失败：无 `edit.md`、0 个 `chapters/` 文件、0 个按合同统计的可见中文字符、无 `references/`。源目录未修改，也未创建隔离副本。
-- **验证**：npm Preview **10/10**、installed **2/2**、Graph dynamic **15/15**、Persistent **3/3**、最终 `npm test` 与非沙箱 `npm run verify` exit 0；Graph dynamic 明确锁定 persist→Main watcher barrier→build，并证明 barrier 失败时 build 零调用。真实 Electron 在一次 101 ms 性能红灯后，同一源码连续两轮 **35/35**。联网 `npm audit --omit=dev` 为 0 vulnerabilities。沙箱内 installed harness 因进程快照权限返回 `PROCESS_SNAPSHOT_FAILED`，完全相同命令在获准非沙箱 GUI/进程环境通过 2/2，按环境边界保留红/绿证据。
+- **验证**：npm Preview **10/10**、既有 installed **2/2**、新增 npm 10/arm64 **2/2** 与 npm 11/x64 **2/2**、Graph dynamic **15/15**、Persistent **3/3**、最终 `npm test` 与非沙箱 `npm run verify` exit 0；Graph dynamic 明确锁定 persist→Main watcher barrier→build，并证明 barrier 失败时 build 零调用。真实 Electron 在一次 101 ms 性能红灯后，同一源码连续两轮 **35/35**。2026-07-29 联网 `npm audit --omit=dev` 仍为 0 vulnerabilities，tarball 哈希保持 `ceca163826dc95c292d509092421e4cb07c653af`。沙箱内 installed harness 因进程快照权限返回 `PROCESS_SNAPSHOT_FAILED`，完全相同命令在获准非沙箱 GUI/进程环境通过 2/2；x64 首轮另因测试 PATH 缺 `/usr/sbin` 返回 `sysctl: command not found`，只补回标准系统 PATH 后同源码通过，均按环境边界保留红/绿证据。
 - **独立复审**：首轮代码/包复审发现文件 mode、profile 祖先/ACL、CLI 信号、Renderer readiness 四项 P1，合同复审另发现 npm 10/11 fail-closed、audit 与文档/清理缺口；全部转为生产边界和回归。最终代码、发布合同和文档一致性三路独立复审均为 **P0=0/P1=0/P2=0，可以完成本地候选签字**。
-- **开放门禁**：registry 当时未发现同名包，但终端未登录、名称未保留、许可证选择未确认、npm 10/x64 未实测、preview tag 未发布，真实作者项目也不合格。不得把本段写成公开发布或 V0 可用性验收完成。
+- **开放门禁**：2026-07-29 registry 仍未发现同名包，但终端未登录、名称未保留、许可证选择未确认、显式 publish 授权未取得、preview tag 未发布，真实作者项目也不合格。双运行时矩阵已关闭，但不得把本段写成公开发布或 V0 可用性验收完成。
 
 ### 0.0AB 2026-07-28 普通 Markdown 项目回收区
 
@@ -502,7 +502,7 @@ Onboarding v2 已取代上述“容错解析完整 `editContent` + 部分创建�
 | image-01 插图 | 🟡 | Coding Plan 真实合成调用、解码尺寸/比例和零正文插入已通过；安全审阅/废纸篓链保持签字，仍待真实作者质量、采纳、费用/限流样本 |
 | 6→7 章 Electron E2E | 🟡 | 0.0AC 当前源码真实 Electron 35/35；本地稳定性通过，仍待合格真实作者项目 |
 | 10 名作者内测与 Continue 指标 | ⬜ | 尚无真实样本，不得做 Go/No-Go 结论 |
-| npm Developer Preview | 🟡 | 本地候选实现、全量、真实 Electron、10/10 package、installed 2/2、三路独立终审、Git 与 Nowledge 已完成；公开发布另受许可证、npm10/x64、包名/账户和显式授权门禁 |
+| npm Developer Preview | 🟡 | 本地候选实现、全量、真实 Electron、10/10 package、npm 10/arm64 与 npm 11/x64 各 2/2、三路独立终审已完成；公开发布仍受许可证、包名/账户、显式授权与发布后公网 `npx` 门禁 |
 | 独立 macOS App 发布 | ⬜ | 当前不是首发路线；若未来启用，仍需 Developer ID、hardened runtime、公证和 Gatekeeper |
 
 ## 4. 后续 TODO（严格顺序）
@@ -665,8 +665,8 @@ WRITCRAFT_REAL_API_ACCEPTANCE=1 WRITCRAFT_REAL_API_SCOPE=image WRITCRAFT_REAL_AP
 
 - [x] 建立 npm Developer Preview CLI、发布白名单、rights-reserved `UNLICENSED` 候选、精确 Electron 运行时依赖和独立 tarball 安装验证；合同见 `../docs/NPM-DEVELOPER-PREVIEW-V1-CONTRACT.md`。公开 npm 前仍需所有者确认专有评估许可或开源选择。
 - [x] 对 0.0AC 完成代码、发布合同与文档一致性三路独立终审，最终 P0/P1/P2=0；代码/测试/合同提交 `71571b8`，同一条 Nowledge 权威记忆已更新并反查。
-- [ ] 在 npm 10/arm64 与 npm 11/x64 完成 fresh-tarball `--check`、Main-observed page-load IPC、退出与清理矩阵；未完成或任一失败时禁止公开发布 preview tag。
-- [ ] 当前 `writ-craft` 只读查询为 E404、`npm whoami` 为 ENEEDAUTH；需登录目标账户、发布前重新核验名称，并再次执行 `npm audit --omit=dev`。
+- [x] 在 npm 10/arm64 与 npm 11/x64 完成 fresh-tarball `--check`、Main-observed page-load IPC、退出与清理矩阵，各 **2/2**。x64 首轮测试 PATH 缺 `/usr/sbin` 的环境红灯已保留；补回标准 PATH 后同源码通过。
+- [ ] 2026-07-29 `writ-craft` 只读查询仍为 E404、`npm whoami` 仍为 ENEEDAUTH；本轮 `npm audit --omit=dev` 为 0 vulnerabilities。仍需登录目标账户，并在获得发布授权后的临发布窗口重新核验名称与再次 audit。
 - [ ] 经显式授权后只发布 preview tag，并从全新目录执行真实 `npx` 安装/启动验收；发布前轮换任何曾暴露的 MiniMax Key。
 - [ ] 若未来转向独立 macOS App，再完成干净账户 Finder 启动、Developer ID、hardened runtime、时间戳、公证、staple 与 Gatekeeper。
 

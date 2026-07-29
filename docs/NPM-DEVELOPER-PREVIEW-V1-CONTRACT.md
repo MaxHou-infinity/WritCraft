@@ -13,7 +13,7 @@ npx writ-craft@preview
 npx writ-craft@preview --check
 ```
 
-The package requires macOS 12 or later, Node.js `>=22.12.0`, and npm 10 or 11. The manifest and universal native helpers admit `darwin` on `arm64` and `x64`, and every direct runtime dependency is pinned exactly. The current installed-Renderer evidence is npm 11 on arm64 only; npm 10 and x64 remain an explicit pre-publication matrix gate and must not be described as already exercised. `--help`, `--version`, and `--check` must never launch Electron or access the network. A real launch may obtain the checksum-verified Electron runtime from cache or the configured download source if it is not already present. `--profile <absolute-directory>` selects an existing owner-private profile under the current home directory for isolated acceptance or deliberate profile separation.
+The package requires macOS 12 or later, Node.js `>=22.12.0`, and npm 10 or 11. The manifest and universal native helpers admit `darwin` on `arm64` and `x64`, and every direct runtime dependency is pinned exactly. On 2026-07-29 the fresh-tarball installed-Renderer matrix passed on official Node 22.22.3/npm 10.9.8 arm64 and Node 24.18.0/npm 11.16.0 x64, 2/2 checks per combination. This evidence closes the pre-publication runtime matrix only; it is not registry publication or post-publication `npx` evidence. `--help`, `--version`, and `--check` must never launch Electron or access the network. A real launch may obtain the checksum-verified Electron runtime from cache or the configured download source if it is not already present. `--profile <absolute-directory>` selects an existing owner-private profile under the current home directory for isolated acceptance or deliberate profile separation.
 
 ## Package invariants
 
@@ -24,7 +24,7 @@ The package requires macOS 12 or later, Node.js `>=22.12.0`, and npm 10 or 11. T
 - The CLI fails closed below macOS 12 and when environment variables can replace the Electron runtime, platform, architecture, version, or checksum authority.
 - The package must include executable universal author-copy, project-hash, and Markdown-trash helpers.
 - WritCraft is currently `UNLICENSED` and rights-reserved. `THIRD_PARTY_NOTICES.md` preserves the licenses of vendored browser bundles. Before public publication, the owner must explicitly confirm whether WritCraft remains proprietary or adopts an open-source license.
-- A read-only registry query on 2026-07-28 returned `E404` for `writ-craft`, so no public package was visible at that moment. This is not a reservation and may race with another publisher. Publishing is an external write and requires explicit authorization.
+- A read-only registry query on 2026-07-29 returned `E404` for `writ-craft`, so no public package was visible at that moment. This is not a reservation and may race with another publisher. `npm whoami` returned `ENEEDAUTH`; the target account is not authenticated. Publishing is an external write and requires explicit authorization.
 
 ## Version and rollback
 
