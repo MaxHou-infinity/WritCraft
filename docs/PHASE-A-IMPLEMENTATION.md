@@ -6,9 +6,9 @@
 > 产品依据：`docs/WRITCRAFT-PRD-V3.md`  
 > 范围：把现有单文档 Electron 原型升级为安全、可恢复的本地多文件项目工作区。
 
-> **工程交接（2026-07-29，0.0AC npm Developer Preview 本地签字收口）**：0.0AC 新增 macOS CLI、窄 npm 包、Node `>=22.12.0`、npm 10/11 fail-closed、Electron `43.2.0`、Main 观测 `did-finish-load` 后的 CLI readiness IPC 和零网络 `--check`；同时让 `sk-cp-` 图片能力进入 provider 现场门禁。该 readiness 只证明页面加载完成，不单独证明全部 workspace/bootstrap 逻辑成功。完整 test/verify、Persistent **3/3**、npm Preview **10/10**、installed **2/2**、同源码连续两轮真实 Electron **35/35** 与真实合成图片调用通过；实现复审 P0/P1 已清零，registry、许可证、npm10/x64 和真实作者门禁仍开放。
+> **历史工程交接（2026-07-29，0.0AC npm Developer Preview 本地签字收口）**：0.0AC 新增 macOS CLI、窄 npm 包、Node `>=22.12.0`、npm 10/11 fail-closed、Electron `43.2.0`、Main 观测 `did-finish-load` 后的 CLI readiness IPC 和零网络 `--check`；同时让 `sk-cp-` 图片能力进入 provider 现场门禁。该 readiness 只证明页面加载完成，不单独证明全部 workspace/bootstrap 逻辑成功。该批历史证据为 Persistent **3/3**、npm Preview **10/10**、installed **2/2**、真实 Electron **35/35**；当前候选只看下条。
 > **下一阶段合同**：`docs/AUTHOR-ACCEPTANCE-V1-CONTRACT.md` 已冻结，明确付费网络门禁、允许记录的隐私安全证据、真实长文旅程与发布前签字顺序。
-> **当前实现停点**：npm Developer Preview 已公开发布；当前作者现场反馈推进至 0.0AK 工作区导航与活动栏 UX 收口。文件、搜索、来源和图谱现在由一个 Renderer 路由统一拥有；图谱占据完整工作区，“新建项目 / 打开项目”收纳进项目标题菜单。当前源码真实 Electron **37/37**、Persistent Main/IPC **3/3**，精确红绿记录见 `v0/DEVELOPMENT-STATUS.md`。下一产品门禁仍是符合合同的隔离真实作者项目验收；后续分发这些修复必须使用新版本、完整候选签字和显式发布授权。不得从历史 TODO 重开回收区、Chat、Prompt 或 watcher 安全链。
+> **当前实现停点**：0.0AL / `writ-craft@0.1.1` 本地候选已签字，收录 0.0AH–0.0AK 的作者反馈修复；npm10/arm64、npm11/x64、Persistent **3/3** 与连续两轮真实 Electron **37/37** 已通过。registry 在外部发布前仍是 `0.1.0`；当前任务是发布 exact candidate 到 npm `preview` 和 GitHub `v0.1.1` prerelease，并完成公网反查。精确红绿记录见 `v0/DEVELOPMENT-STATUS.md`。
 
 ## 1. 阶段目标
 

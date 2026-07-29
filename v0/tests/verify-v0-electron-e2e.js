@@ -2764,15 +2764,37 @@ async function run() {
         'Graph Issue apply must never modify edit.md');
 
       const undoCount = await first.client.evaluate(`document.querySelectorAll('.history-card .history-undo').length`);
+      const undoStartedAt = Date.now();
       await first.client.evaluate(`(() => {
         window.confirm = () => true;
         document.querySelector('.history-card .history-undo').click();
       })()`);
-      await waitForValue(first.client, `(() => {
-        const remaining = document.querySelectorAll('.history-card .history-undo').length;
-        return document.getElementById('changes-status').textContent.includes('已撤销 1 个文件') &&
-          remaining === ${undoCount - 1};
-      })()`, 'undoing the Graph Issue repair through real Change History');
+      try {
+        await waitForValue(first.client, `(() => {
+          const remaining = document.querySelectorAll('.history-card .history-undo').length;
+          return document.getElementById('changes-status').textContent.includes('已撤销 1 个文件') &&
+            remaining === ${undoCount - 1};
+        })()`, 'undoing the Graph Issue repair through real Change History');
+      } catch (error) {
+        const runtime = await first.client.evaluate(`(() => ({
+          status: document.getElementById('changes-status')?.textContent || '',
+          undoCount: document.querySelectorAll('.history-card .history-undo').length,
+          recoveryBlocked: Boolean(window.__workspace?.state?.recoveryBlocked),
+        }))()`).catch(() => null);
+        let diskRestored = null;
+        try {
+          diskRestored = projectService.readFile(project.rootPath, issuePath) === beforeDisk;
+        } catch (_) {
+          diskRestored = 'read_failed';
+        }
+        error.message += `; diagnostic=${JSON.stringify({
+          elapsedMs: Date.now() - undoStartedAt,
+          diskRestored,
+          runtime,
+        })}`;
+        throw error;
+      }
+      console.log(`    Graph Issue undo timing: ${Date.now() - undoStartedAt}ms`);
       assert.strictEqual(projectService.readFile(project.rootPath, issuePath), beforeDisk);
       assert.strictEqual(projectService.readFile(project.rootPath, 'edit.md'), editBefore);
       await first.client.evaluate(`window.__assistantDock.close()`);
