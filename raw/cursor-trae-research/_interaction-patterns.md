@@ -496,6 +496,6 @@
 
 ---
 
-*文件路径：`/Users/maxhou/Desktop/Max 项目-2026/监控中枢/editor/raw/cursor-trae-research/_interaction-patterns.md`*
+*文件路径：`<repository-root>/raw/cursor-trae-research/_interaction-patterns.md`*
 *字数：约 8,500 字*
 *最后更新：2026-07-14*

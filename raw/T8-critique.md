@@ -11,7 +11,7 @@
 ## 绝对路径核对
 
 ```
-✅ /Users/maxhou/Desktop/Max 项目-2026/监控中枢/editor/raw/T8-critique.md
+✅ <repository-root>/raw/T8-critique.md
 ```
 
 ---
@@ -195,10 +195,10 @@
 ## 六、验证命令
 
 ```bash
-ls -la "/Users/maxhou/Desktop/Max 项目-2026/监控中枢/editor/raw/T8-critique.md"
-wc -c "/Users/maxhou/Desktop/Max 项目-2026/监控中枢/editor/raw/T8-critique.md"
-grep -c "质疑" "/Users/maxhou/Desktop/Max 项目-2026/监控中枢/editor/raw/T8-critique.md"
-grep -c "N1\|N2\|N3\|N4\|N5" "/Users/maxhou/Desktop/Max 项目-2026/监控中枢/editor/raw/T8-critique.md"
+ls -la "<repository-root>/raw/T8-critique.md"
+wc -c "<repository-root>/raw/T8-critique.md"
+grep -c "质疑" "<repository-root>/raw/T8-critique.md"
+grep -c "N1\|N2\|N3\|N4\|N5" "<repository-root>/raw/T8-critique.md"
 ```
 
 ---

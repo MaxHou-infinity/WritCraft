@@ -1,6 +1,6 @@
 # 笔触 · WritCraft · V0 调研 · PDCA 复盘（项目本地）
 
-> 项目本地目录：`/Users/maxhou/Desktop/Max 项目-2026/监控中枢/editor/`
+> 项目目录：`<repository-root>/`
 > Wiki 同步：`~/Library/Mobile Documents/iCloud~md~obsidian/.../wiki/projects/writ-craft/`
 > 完整复盘见 Nowledge Mem `writcraft-v0-pdca-2026-07-14`
 
@@ -72,7 +72,7 @@ T10 housan / Max ─→ 4 份 deliverables      (主人亲自)
 
 1. **houdah** 在 25 分钟内完成 6 张调研卡（⚠️ 太快 → Pitfall H 风险）
 2. **owner** 立即跑 12 项 verify，发现 Trae / Windsurf 缺失（task done 但文件不在预期路径）
-3. **owner** 用 `find /Users/maxhou/Desktop -name "X.md"` 搜**整个桌面**——发现 5 个错路径目录（"中枢"被读成"中枯/中栏/中枝/中柾/中枱"）
+3. **owner** 用受控范围的文件检索确认目标文件——发现 5 个错路径目录（"中枢"被读成"中枯/中栏/中枝/中柾/中枱"）
 4. **owner** mv 错路径到 `_back/`，再触发 REWORK 重做
 5. **housan** 在 T10 unblock 后**自我激励创建 3 张子卡**（看到 brief 4 份 deliverables 自己分解任务）
 6. **owner** archive worker 自我激励的 3 张子卡（保留我手动版本）

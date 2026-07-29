@@ -409,9 +409,9 @@
 ## 写后验证
 
 ```bash
-ls -la "/Users/maxhou/Desktop/Max 项目-2026/监控中枢/editor/raw/cursor-trae-research/trae-analysis.md"
-wc -c "/Users/maxhou/Desktop/Max 项目-2026/监控中枢/editor/raw/cursor-trae-research/trae-analysis.md"
-grep -c "证据等级" "/Users/maxhou/Desktop/Max 项目-2026/监控中枢/editor/raw/cursor-trae-research/trae-analysis.md"
+ls -la "<repository-root>/raw/cursor-trae-research/trae-analysis.md"
+wc -c "<repository-root>/raw/cursor-trae-research/trae-analysis.md"
+grep -c "证据等级" "<repository-root>/raw/cursor-trae-research/trae-analysis.md"
 ```
 
 ---

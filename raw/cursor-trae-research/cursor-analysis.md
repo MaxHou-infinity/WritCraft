@@ -350,9 +350,9 @@ Composer 2 技术报告（2026-03）[B]：
 ## 写后验证
 
 ```bash
-ls -la "/Users/maxhou/Desktop/Max 项目-2026/监控中枢/editor/raw/cursor-trae-research/cursor-analysis.md"
-wc -c "/Users/maxhou/Desktop/Max 项目-2026/监控中枢/editor/raw/cursor-trae-research/cursor-analysis.md"
-grep -c "证据等级" "/Users/maxhou/Desktop/Max 项目-2026/监控中枢/editor/raw/cursor-trae-research/cursor-analysis.md"
+ls -la "<repository-root>/raw/cursor-trae-research/cursor-analysis.md"
+wc -c "<repository-root>/raw/cursor-trae-research/cursor-analysis.md"
+grep -c "证据等级" "<repository-root>/raw/cursor-trae-research/cursor-analysis.md"
 ```
 
 ---

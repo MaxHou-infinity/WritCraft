@@ -1,111 +1,136 @@
-# 笔触 · WritCraft（写作 IDE）
+<div align="center">
+  <img src="docs/assets/writcraft-hero.svg" alt="笔触 WritCraft：让 AI 进入写作现场，但不替你成为作者" width="100%">
 
-> 状态：**V0 npm Developer Preview 已公开发布并完成 0.0AF 收口；`writ-craft@preview` 的公网隔离安装、真实 Renderer 启动、退出与清理 2/2 通过，发布与文档两路终审 P0/P1/P2=0，Git/Nowledge 已同步** · 发起方：Max
-> 当前开发真相与唯一续作入口：[`v0/DEVELOPMENT-STATUS.md`](v0/DEVELOPMENT-STATUS.md)。Coding Plan Key 已通过一次合成 `image-01` 能力/解码门禁；这不等于作者质量、费用或采纳验收。现有 App/ZIP 仍不可分发；公开 npm 包是专有评估 Preview。
-> 下一阶段验收边界：[`docs/AUTHOR-ACCEPTANCE-V1-CONTRACT.md`](docs/AUTHOR-ACCEPTANCE-V1-CONTRACT.md) 已冻结；真实调用、作者内容与发布证据必须遵守其中的隐私和付费门禁。
-> 当前停点：`writ-craft@0.1.0` 已公开，registry shasum `a9cb1c4c02639dda213fec3922a204337a8291f9` 与签字候选一致，`preview: 0.1.0`；公网 tarball 验收 2/2。npm 首包对象必须保留一个 `latest`，所以 registry 同时显示 `latest: 0.1.0`，认证删除返回 E400；两者指向同一 Preview，不代表稳定版。推荐安装仍为 `npx writ-craft@preview`。本次未执行高风险 unpublish，也未发布占位版本；以后不得用这两种方式掩盖该 registry alias。
+  # 笔触 · WritCraft
 
-## 2026-07-28 当前复核快照
+  **为专业长文作者打造的 Cursor 式 AI 写作 IDE**
 
-> Research Accuracy v1 签收时完成事务顺序、watcher degraded 门禁与 Renderer recorded-but-locked 语义；该历史批次的完整 Node/verify 与强制 Electron 26/26 已通过。当前最终 Graph 韧性源码的完整边界以本节下方和状态台账为准。
+  让 AI 读懂整个项目、协助每一个段落，同时把每一次修改的决定权留给你。
 
-> Graph 性能复验没有用单次重试绿灯覆盖失败：索引、布局、baseline 所有权、元素重挂、scene detach 与 dispatch-only 计时缺口均已进入根因修复和回归。该历史性能专项门禁等待两帧并读取实际 CSS 可见状态与 SVG 布局；同一源码无中间修改连续两次全链均为 **26/26**。后续 0.0AB 曾将项目总链推进到 35/35；当前证据只看状态台账顶部当前里程碑。
+  [快速开始](#三分钟开始写作) · [完整指南](docs/GETTING-STARTED.md) · [产品路线图](docs/ROADMAP.md) · [报告问题](https://github.com/MaxHou-infinity/WritCraft/issues)
+</div>
 
-- 项目 / 文件 / 段落三级工作区、`edit.md` Onboarding/落盘与分区 Prompt、Inline Diff、localized ChangeSet/撤销、Main-owned Chat 最近对话、来源/脚注、草稿/冲突恢复、普通 Markdown 项目回收区、Cursor 式标签和一致性图谱均已接入。首发路线已转为 npm Developer Preview；独立 App 的 Developer ID/公证不再阻断 npm 路线。
-- 普通 Changes、Plan→Changes 与 Graph 的本轮结构性修复已完成独立复审；模型不再回传整篇 after，而由 Main 验证局部锚点、依赖和 stopReason 后构造修改。
-- Chat 已实现 project/file/selection 三种明确作用域、selection 必选、精确选区邻段、受限项目检索、正文 H1 Source locator 和 request/phase-owned Inspector/Chips。0.0AA 新增 Main-owned 最近对话：最多 6 轮、双预算、项目/导航/generation 绑定、可见新对话与同项目重开清理；摘要正文不返回 Renderer，Inspector 只披露轮数和大小。
-- `edit.md` 生成、审阅和确认落盘已签字；Chat/Context 的超预算项目卡现在按 ATX 标题整章选择，四类硬约束优先。Inspector 显示本次使用/省略、原因、字节与 revision-safe 原文定位；短项目卡保持全文语义，恶意标题或必需章节超限会稳定阻断。
-- Chapter 已实现严格计划→逐块生成→Main 本地组装→整文件审阅，并把 project/target/instruction/context/pending 绑定到完整异步生命周期；no-op/provenance/result/capability 分类与确认式回收已动态固化，最终独立复审 P0/P1/P2=0。
-- Onboarding v2 已签字：service **22/22**、capability **15/15**、all-or-nothing batch **22/22**；生产 Handler **11/11**、Main/preload **14/14**；Renderer state/UI 为 **8/8、11/11**，当前 dynamic 已随 0.0T 扩展为 **25/25**。Main single-flight 保证同项目并发只调用一次模型；Renderer epoch 与生命周期清理同时关闭 await→mint、mint→IPC delivery 两侧孤儿 authority 窗口。最终独立复审 P0/P1/P2=0。
-- Author Evidence Metrics v1 保持签字；image 生成耗时/结果仍走八字段隐私事件，评分、三类终态和可选费用走独立私有 Image Review 证据。
-- 真实作者验收预检/工作副本技术候选已签字：资格和复制来自同一权威快照；源、目标父目录和私有 stage 绑定 inode；清单在私有 stage 内提交 readiness，最终源复核后通过 parent-fd 相对 `renameatx_np(RENAME_EXCL)` 原子发布。匿名 0600 回执 fd 使 reserve stdout/status 丢失仍能恢复精确 stage；0.0U 进一步保证可观测异常替身在所有权证明前不会被修改或采纳。Author **48/48**、真实 API 离线合同 **15/15**。
-- Research 已形成 Main-owned 的 Claim / Source / Boundary → 专用 Changes → History/undo 闭环；Renderer 只传 card ID 与目标范围，A–D 只是用户提供的来源元数据声明，不是 WritCraft 的事实背书。
-- Research apply 已收敛为 Main 实际复用的生产事务；动态 11/11 以真实磁盘和 History 证明提交后的 stale、TTL、residual、tree 与状态迁移故障不会误报普通失败、泄漏 capability 或诱导重复确认。最终独立二审 P0/P1/P2=0。
-- Research Accuracy 已签字：加入显式“主张匹配/不匹配”作者判断和私有聚合；判断提交前重验 exact authority，watcher 持续不可用会锁住项目 AI/写入，证据提交后变化会保留历史样本但锁定旧卡片。
-- `image-01` 已实现安全落盘、解码尺寸/比例证明、必填 1–5 分、可选费用、插入/保留/可恢复废纸篓和项目聚合；Coding Plan Key 的真实合成调用已成功。能力由套餐/额度现场决定，不按 `sk-cp-`/`sk-api-` 前缀臆断；真实作者质量、采纳和费用样本仍开放。
-- Diagnostic Export v1 已接入设置页：作者先看到可能导出的完整 JSON，正文、Prompt、模型回答、Key、项目/文件名与路径均被排除；Renderer 只能回传一次性 token，Main 负责原生保存和不可覆盖写入。Service **13/13**、Handler **10/10**、Renderer **7/7**、Network boundary **15/15**，真实 Electron 已覆盖可见预览和隐私 sentinel。
-- Inline 当前源码隔离 App 已完成人工预览零写入、拒绝、重载、接受、History 与 Safe Undo；Plan 生成已强制 `end_turn`、单文本块、strict JSON、错误脱敏与目标/Prompt 资源上限，独立复审 P0=0/P1=0。
-- 0.0AC 当前源码已通过 `npm test`、非沙箱 `npm run verify`、Persistent **3/3**、npm Preview **10/10**、npm 10/arm64 与 npm 11/x64 installed 各 **2/2**，以及同源码连续两轮真实 Electron **35/35**；2026-07-29 联网生产依赖审计仍为 0 vulnerabilities。x64 首轮因测试 PATH 缺 `/usr/sbin` 未进入 Renderer，补回标准 PATH 后同源码通过，该红灯保留。代码/合同/文档三路独立终审 P0/P1/P2=0，提交为 `71571b8`，Nowledge 权威记忆持续同步；超长 Prompt 分区能力仍只接入 Chat/Context。
-- 0.0AD 已把历史 `UNLICENSED` 候选替换为专有评估许可，明确组织授权评估者、生产/商业/托管/再分发限制和 npm 第三方依赖许可边界；测试逐字锁定 tarball 内 LICENSE、manifest 与 shrinkwrap。首轮 P1 已修复，修复后全链及三路独立终审均通过。
-- Main 网络边界已固定文本/图片官方主机，加入 renderer HTTP(S)/WS(S) 双层断网、上下文 IPC 上限、owner abort、mutation generation、内部 revision/父目录回声隔离、零 POST retry、拒绝重定向、诊断 token-only 导出和错误脱敏；当前 network boundary **15/15**。
-- Graph 扩展已动态覆盖 300 文件/1279 节点、cold-to-interactive、stale/三类作者纠错、failure live、键盘/AX、布局、性能、重启与 A→B；缓存完整语义权威、Renderer 不可变快照、同/跨项目异步所有权及 Unicode quote 边界已关闭，最终独立复审 P0=0/P1=0/P2=0。
-- 2026-07-26 已建立本地 Git `main` 基线；后续改动必须通过提交保留可审计差异。该基线不追溯此前历史，阶段事实仍以 `v0/DEVELOPMENT-STATUS.md` 和当次可复现测试证据为准。
+> [!IMPORTANT]
+> 当前为 **macOS Developer Preview**，采用专有评估许可证。它适合体验和反馈，尚不是面向生产环境的正式版本。请先备份重要文稿。
 
-## 一句话定义
+## 写长文，不该在五个工具之间来回奔波
 
-为"专业长文写作者"打造的 **Cursor 式 AI 写作 IDE**——结构化大纲 / 逐句悬浮修改 / 深度研究内联 / 多模态插图 / 结论溯源 / 计划模式 / 跨章引用，全部在一个界面完成。
+写一本书、一份研究报告或一篇方法论长文，需要同时管理结构、上下文、事实、人物关系和大量修订。普通 AI 对话很快忘记前文，传统编辑器又不理解你的写作意图。
 
-## 核心问题
+笔触把 Cursor 的项目式 AI 协作带进写作现场：
 
-专业作者（写书 / 律师辩护状 / 医生综述 / 咨询报告 / 管理学方法论）当前写"结构化长文"时被迫在 4-5 个工具间切换：
+- **项目级**：用 `edit.md` 固化主旨、读者、边界与大纲，让 AI 始终理解整部作品。
+- **文件级**：在章节之间切换、检索和跨文件修订，不再反复复制上下文。
+- **段落级**：选中原文即可改写，逐项审阅差异，接受或拒绝都清清楚楚。
+- **一致性图谱**：追踪人物、概念、变量、关系与时间，提前发现冲突、遗漏和漂移。
+- **研究与溯源**：把来源、主张和适用边界留在写作流程里，而不是散落在浏览器标签页中。
+- **本地 Markdown**：作品仍是你熟悉的文件，方便备份、迁移和版本管理。
 
-1. **写作工具**（Notion / 飞书 / Scrivener）：支持排版，但 AI 浅
-2. **对话式 AI**（ChatGPT / Claude / Gemini）：输出好，但写完一段就重置上下文
-3. **研究工具**（浏览器 + 学术数据库）：可深度，但跳出 IDE
-4. **代码 IDE**（Cursor / Trae）：交互体验最好，但**只懂代码，不懂结构化长文**
-5. **图片 / 图表工具**（Midjourney / 即梦 / MiniMax 生图）：质量高，但生成后还要手动插
-
-**没有**一个产品同时解决这 5 个工具的"长文写作专属需求"——这是空白市场。
-
-## 你的 5 个硬要求（从 Max 主人原话提取）
-
-1. **大程度参考 Cursor or Trae 的交互方式**——AI 内联、悬浮 diff、跨文件跳转、Composer 多文件编辑
-2. **文档格式需要兼具写作排版、图片插入、图标插入的功能**——长文排版 + inline image + icon set
-3. **内嵌 AI 功能，支持多模态和基座模型产品栈**——LLM 文本 + 图像生成 + 文档理解 + 后续可接 TTS/视频
-4. **先以 MiniMax 模型入手**（主要因为有现成的生图产品）—— 文本+图像 同源厂商，对齐调用接口
-5. **需要有 plan mode**——用户先做写作框架、主旨、立意的规划
-
-## 非目标（V0 不做）
-
-- ❌ 多人实时协作（Notion / 飞书已饱和，差异化不足）
-- ❌ 出版商对接（V2 才做）
-- ❌ 移动端 App（V1 之后考虑）
-- ❌ 移动端 AI 语音转写 / TTS（V2 才做）
-- ❌ 多语言切换（先专注中文，V2 国际化）
-
-## 证据等级
-
-- **A**：官方文档 / 官方帮助 / 官方开源 / 官方数据
-- **B**：作者访谈 / 开源仓库 / 头部评测
-- **C**：媒体报道 / 第三方测评 / 社区 Issue
-- **D**：未验证推断
-
-## 核心产品原则
-
-1. **项目意图先于写作**——`edit.md` 定义项目主旨、目标与结构；Plan Mode 是可跳过的辅助入口，不强制所有作者先列大纲
-2. **逐句可控**——AI 重写永远用 diff 呈现，用户接受/拒绝明确
-3. **结论溯源**——每条 AI 输出标注"结论 / 来源 / 边界"（沿用 Max-AI 结论溯源规范）
-4. **研究内联**——不跳出 IDE 完成研究、引用、生成图像
-5. **多模态原生**——文本、图像、表格、引用、脚注、批注为同一等公民
-6. **数据可迁移**——Markdown + JSON 双格式 export，不锁文件格式
-
-## 调研路径（10 张 Kanban 卡 + 1 张 PRD）
-
-```
-T0 (houwu) · 调研计划分解 + 时间线
-T1 (houdah) · Cursor / Trae / Windsurf 深度调研（交互 + 架构 + 收费 + 局限）
-T2 (houdah) · 写作 SOP 与方法论调研（短篇 / 长篇 / 方法论 / 学术 4 类文体）
-T3 (houdah) · 知名作家工作流调研（Stephen King 写作工具包 / 纳博科夫卡片法 / 麦基故事学）
-T4 (houdah) · 写作软件竞品横评（Scrivener / Notion / Lex / Ulysses / Milanote / iA Writer）
-T5 (houdah) · MiniMax 模型产品栈调研（M-2.7 / 图像 / 视频 / 语音 / 文档）
-T6 (houdah) · 多模态 AI 编辑器设计模式研究（Monaco / TipTap / ProseMirror / Lexical）
-T7 (houda)  · 综合分析（5 维评分 + 置信度 + 痛点-功能映射）
-T8 (houliu) · 魔鬼质询（10 项 + 修正清单 + 金句）
-T9 (houwu)  · V0 / V1 / V2 路线 + 退出条件
-T10 (housan) · 完整 PRD + 价值说明 + 一个月 V0 路线 + HTML 报告
+```mermaid
+flowchart LR
+    A["edit.md<br/>写作意图"] --> B["项目上下文"]
+    C["章节与资料"] --> B
+    B --> D["AI 计划 / 对话 / 改写"]
+    D --> E["差异审阅"]
+    E --> F["由作者确认写入"]
+    F --> G["关系与时间一致性检查"]
+    G --> B
 ```
 
-## 输出物
+## 三分钟开始写作
 
-- `deliverables/笔触 · WritCraft — 产品需求与价值说明.md`
-- `deliverables/笔触 · WritCraft — 四维度能力矩阵.csv`
-- `deliverables/笔触 · WritCraft — 一个月 V0 路线图.md`
-- `deliverables/笔触 · WritCraft — 产品定义与价值报告.html`
-- 11 份 raw 调研报告 + 4 份综合分析
+### 1. 准备运行环境
 
-## PDCA 复盘纪律
+- macOS 12 或更高版本
+- Node.js 22.12 或更高版本
+- npm 10 或 npm 11
 
-- 每个 Kanban 卡跑前先 read brief，跑后 grep + wc verify
-- 12 项 checklist 必过（HTML 报告）
-- 重要更正写进 `raw/_source-log.md §重要更正`
-- 失败 / 偏离必明确记录到 PDCA，不掩盖
+### 2. 启动笔触
+
+```bash
+npx writ-craft@preview
+```
+
+想先确认环境而不启动应用：
+
+```bash
+npx writ-craft@preview --check
+```
+
+### 3. 打开或创建写作项目
+
+推荐从这个简单结构开始：
+
+```text
+我的写作项目/
+├── edit.md             # 主旨、目标读者、写作边界与结构
+├── chapters/
+│   ├── 01-开篇.md
+│   └── 02-核心观点.md
+└── references/         # 资料与引用
+```
+
+第一次使用时，先打开 `edit.md`，把“为什么写、写给谁、要讲清什么”告诉笔触。随后进入章节，通过项目对话、Plan、段落改写和一致性图谱推进作品。
+
+更完整的首次启动、MiniMax 配置、推荐工作流和排错方法，请阅读 [《从安装到第一篇作品》](docs/GETTING-STARTED.md)。
+
+## AI 帮你保持清醒，而不是替你下笔
+
+笔触坚持三个原则：
+
+1. **先看计划，再改正文**：复杂任务先形成可审阅方案。
+2. **修改必须可见**：AI 变更通过差异界面呈现，不静默覆盖作品。
+3. **作者拥有最终决定权**：关键写入、来源判断和一致性结论都由作者确认。
+
+MiniMax API Key 只应在应用设置中配置。不要把 Key 写进项目文件、终端命令、GitHub Issue 或诊断截图。AI 请求会产生第三方服务费用，具体能力与额度以服务商账号为准。
+
+## 现在能做什么
+
+| 写作环节 | 当前能力 |
+| --- | --- |
+| 项目启动 | `edit.md` 引导、项目卡、章节批量创建 |
+| 日常写作 | 项目/文件/选区对话、段落改写、Plan → Changes |
+| 修订控制 | 差异审阅、历史记录、安全撤销、冲突恢复 |
+| 长文理解 | 跨文件上下文、章节检索、来源与脚注 |
+| 一致性 | 人物/概念/变量/时间关系图谱与问题回到正文 |
+| 多模态 | MiniMax 图片生成、评分、插入与可恢复回收 |
+| 隐私诊断 | 先预览、再导出的脱敏诊断信息 |
+
+## Preview 边界
+
+- 目前仅支持 macOS arm64 / x64，通过终端启动。
+- 尚未提供 Apple Developer ID 签名与公证的 `.app` 安装包。
+- 当前公开包为 `writ-craft@0.1.0`；请始终显式使用 `@preview`。
+- 重要文稿请保留独立备份；正式生产使用尚未开放。
+- 源码公开可见，**不等于开源授权**。评估、复制和使用边界以 [专有评估许可证](LICENSE) 为准。
+
+## 从 Preview 到可持续产品
+
+笔触将沿着“真实作者可用 → 更稳定的个人创作工具 → 可持续的专业服务”推进。未来计划提供付费的 Pro 能力，例如更强的长文上下文、专业研究工作流、模型与费用管理，以及面向团队的协作与治理功能。
+
+我们不会用付费功能削弱一个基本承诺：**你的作品归你，AI 的修改必须可见，作者始终拥有最后决定权。**
+
+查看 [公开路线图](docs/ROADMAP.md)，了解当前阶段、未来付费方向和不会越过的产品边界。
+
+## 参与笔触
+
+- 遇到问题：提交 [Bug Report](https://github.com/MaxHou-infinity/WritCraft/issues/new)
+- 有产品建议：发起 [Feature Request](https://github.com/MaxHou-infinity/WritCraft/issues/new)
+- 涉及安全或隐私：请先阅读 [安全报告说明](SECURITY.md)，不要公开披露凭证或文稿
+- 希望贡献：请阅读 [参与指南](CONTRIBUTING.md)
+
+开发进度、验证证据和下一门禁记录在 [`v0/DEVELOPMENT-STATUS.md`](v0/DEVELOPMENT-STATUS.md)。内部工程材料不代表稳定版承诺。
+
+## License
+
+Copyright © 2026 Max Hou. All rights reserved.
+
+WritCraft 当前依据 [WritCraft Proprietary Evaluation License 1.0](LICENSE) 提供。允许个人或组织内部评估；生产、商业交付、托管、转售、再分发和未经授权的衍生开发均受限制。第三方组件保留各自许可证。
+
+---
+
+<div align="center">
+  <strong>好作品不是一次生成出来的。它来自清晰的意图、持续的修订，以及作者不肯让渡的判断。</strong>
+  <br><br>
+  如果你也相信 AI 应该放大作者，而不是取代作者，欢迎关注笔触的下一次进化。
+</div>

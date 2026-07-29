@@ -11,7 +11,7 @@
 ## 绝对路径核对
 
 ```
-✅ /Users/maxhou/Desktop/Max 项目-2026/监控中枢/editor/raw/T9-strategy.md
+✅ <repository-root>/raw/T9-strategy.md
 ```
 
 ---
