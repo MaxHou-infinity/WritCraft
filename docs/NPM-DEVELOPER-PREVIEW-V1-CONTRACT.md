@@ -1,6 +1,6 @@
 # WritCraft V0 · npm Developer Preview v1
 
-> Status: local sign-off candidate on 2026-07-29; implementation, full regression, real-Electron, and installed-tarball verification passed. Public registry publication and the external acceptance gates below remain open.
+> Status: local candidate signed on 2026-07-29 with P0/P1/P2=0; implementation, full regression, real-Electron, installed-tarball verification, documentation, Git, and Nowledge closeout completed. Public registry publication and the external acceptance gates below remain open.
 
 ## Distribution boundary
 

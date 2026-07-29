@@ -1,6 +1,6 @@
 # 笔触 · WritCraft（写作 IDE）
 
-> 状态：**V0 候选原型；0.0AC npm Developer Preview/Coding Plan 图片能力已完成实现、全量验证及代码/合同/文档三路独立终审，最终 P0/P1/P2=0；正在完成 Git/Nowledge 收口，尚未公开发布** · 发起方：Max
+> 状态：**V0 候选原型；第一阶段 0.0AC 本地 npm Developer Preview 候选已签字：实现、全量验证、三路独立终审、Git 与 Nowledge Mem 均已收口，最终 P0/P1/P2=0；尚未推送 GitHub 或公开发布 npm** · 发起方：Max
 > 当前开发真相与唯一续作入口：[`v0/DEVELOPMENT-STATUS.md`](v0/DEVELOPMENT-STATUS.md)。Coding Plan Key 已通过一次合成 `image-01` 能力/解码门禁；这不等于作者质量、费用或采纳验收。现有 App/ZIP 仍不可分发，npm 包也尚未发布。
 > 下一阶段验收边界：[`docs/AUTHOR-ACCEPTANCE-V1-CONTRACT.md`](docs/AUTHOR-ACCEPTANCE-V1-CONTRACT.md) 已冻结；真实调用、作者内容与发布证据必须遵守其中的隐私和付费门禁。
 > 当前停点：0.0AC 提供 macOS `writcraft` CLI、窄发布白名单、Node `>=22.12.0`、npm 10/11 fail-closed 边界和精确 Electron `43.2.0`。当前源码 `npm test`、非沙箱 `npm run verify`、Persistent **3/3**、npm Preview **10/10**、隔离安装真实 CLI/Renderer **2/2** 通过；真实 Electron 一次 101 ms 性能红灯后同源码连续两轮 **35/35**。npm 10/x64、许可证、包名/账户、显式发布授权和合格真实作者项目仍是开放门禁。
@@ -25,7 +25,7 @@
 - `image-01` 已实现安全落盘、解码尺寸/比例证明、必填 1–5 分、可选费用、插入/保留/可恢复废纸篓和项目聚合；Coding Plan Key 的真实合成调用已成功。能力由套餐/额度现场决定，不按 `sk-cp-`/`sk-api-` 前缀臆断；真实作者质量、采纳和费用样本仍开放。
 - Diagnostic Export v1 已接入设置页：作者先看到可能导出的完整 JSON，正文、Prompt、模型回答、Key、项目/文件名与路径均被排除；Renderer 只能回传一次性 token，Main 负责原生保存和不可覆盖写入。Service **13/13**、Handler **10/10**、Renderer **7/7**、Network boundary **15/15**，真实 Electron 已覆盖可见预览和隐私 sentinel。
 - Inline 当前源码隔离 App 已完成人工预览零写入、拒绝、重载、接受、History 与 Safe Undo；Plan 生成已强制 `end_turn`、单文本块、strict JSON、错误脱敏与目标/Prompt 资源上限，独立复审 P0=0/P1=0。
-- 0.0AC 当前源码已通过 `npm test`、非沙箱 `npm run verify`、Persistent **3/3**、npm Preview **10/10**、installed **2/2** 与同源码连续两轮真实 Electron **35/35**；联网生产依赖审计为 0 vulnerabilities。代码/合同/文档三路独立终审 P0/P1/P2=0，当前只做 Git/Nowledge 收口；超长 Prompt 分区能力仍只接入 Chat/Context。
+- 0.0AC 当前源码已通过 `npm test`、非沙箱 `npm run verify`、Persistent **3/3**、npm Preview **10/10**、installed **2/2** 与同源码连续两轮真实 Electron **35/35**；联网生产依赖审计为 0 vulnerabilities。代码/合同/文档三路独立终审 P0/P1/P2=0，提交为 `71571b8`，Nowledge 权威记忆已同步；超长 Prompt 分区能力仍只接入 Chat/Context。
 - Main 网络边界已固定文本/图片官方主机，加入 renderer HTTP(S)/WS(S) 双层断网、上下文 IPC 上限、owner abort、mutation generation、内部 revision/父目录回声隔离、零 POST retry、拒绝重定向、诊断 token-only 导出和错误脱敏；当前 network boundary **15/15**。
 - Graph 扩展已动态覆盖 300 文件/1279 节点、cold-to-interactive、stale/三类作者纠错、failure live、键盘/AX、布局、性能、重启与 A→B；缓存完整语义权威、Renderer 不可变快照、同/跨项目异步所有权及 Unicode quote 边界已关闭，最终独立复审 P0=0/P1=0/P2=0。
 - 2026-07-26 已建立本地 Git `main` 基线；后续改动必须通过提交保留可审计差异。该基线不追溯此前历史，阶段事实仍以 `v0/DEVELOPMENT-STATUS.md` 和当次可复现测试证据为准。
