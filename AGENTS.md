@@ -111,4 +111,4 @@ Never erase a red integration run with a green retry. Record both, inspect the f
 
 Local Git history begins with the 2026-07-26 V0 baseline, so it does not describe earlier development conventions. Use concise imperative commits, for example `fix(onboarding): preserve committed state`. Keep source, tests, and affected documentation in the same commit. PRs should explain user impact, authority/state-machine changes, tests run, and remaining risks; include screenshots for UI changes and never attach secrets or stale release artifacts.
 
-This repository currently has no Git remote. A local commit or merge does not mean GitHub upload or deployment.
+The public GitHub remote is `https://github.com/MaxHou-infinity/WritCraft.git`, with local `main` tracking `origin/main`. A local commit or merge is still not public until its exact commit is pushed and verified on GitHub. Never change repository visibility, rewrite public history, publish a release, or push credentials/artifacts without explicit authorization.
