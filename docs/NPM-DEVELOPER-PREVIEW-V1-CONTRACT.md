@@ -1,6 +1,6 @@
 # WritCraft V0 · npm Developer Preview v1
 
-> Status: `writ-craft@0.1.0` was published on 2026-07-29 after browser authentication. The public registry shasum is `a9cb1c4c02639dda213fec3922a204337a8291f9`, exactly matching signed candidate commit `3390a86`; explicit `writ-craft@preview` public-tarball install/start/exit cleanup passed 2/2. Public-verifier and closeout changes are committed as `b48e294`, with independent P0/P1/P2=0. The first-package registry object also requires `latest: 0.1.0`; authenticated removal returned `E400`. Both tags identify the same proprietary evaluation Preview, not a stable-release sign-off.
+> Status: `writ-craft@0.1.0` was published on 2026-07-29 after browser authentication. The public registry shasum is `a9cb1c4c02639dda213fec3922a204337a8291f9`, exactly matching signed candidate commit `3390a86`; explicit `writ-craft@preview` public-tarball install/start/exit cleanup passed 2/2. Public-verifier and contract changes are committed as `b48e294`; final documentation closeout is `92e38d9`, with independent P0/P1/P2=0 and Nowledge synchronized to that HEAD. The first-package registry object also requires `latest: 0.1.0`; authenticated removal returned `E400`. Both tags identify the same proprietary evaluation Preview, not a stable-release sign-off.
 
 ## Distribution boundary
 
