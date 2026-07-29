@@ -1,8 +1,80 @@
+WritCraft Proprietary Evaluation License
+Version 1.0, 2026-07-29
+
 Copyright (c) 2026 Max Hou. All rights reserved.
 
-No license is granted to copy, modify, distribute, sublicense, sell, or create
-derivative works from WritCraft except under a separate written agreement from
-the copyright holder.
+By downloading, installing, copying, or using WritCraft (the "Software"), you
+agree to this license. If you do not agree, do not use the Software.
 
-Third-party components remain available under their respective licenses. See
-THIRD_PARTY_NOTICES.md.
+1. Evaluation Grant
+
+Subject to this license, the copyright holder grants you a limited,
+non-exclusive, non-transferable, non-sublicensable, royalty-free license to
+install and use the Software solely for personal evaluation or internal
+evaluation within your organization. You may make only the copies reasonably
+necessary for that evaluation and for backup.
+
+If you accept this license on behalf of an organization, that organization is
+the licensee. It may allow its employees and individual contractors
+("Authorized Evaluators") to use the Software solely on its behalf for
+internal evaluation. The organization is responsible for their compliance,
+and each Authorized Evaluator must be bound by written obligations at least as
+protective as this license.
+
+2. Restrictions
+
+You may not use the Software for production, paid services, commercial
+delivery, or safety-critical purposes.
+
+Except for access by Authorized Evaluators under Section 1, you may not sell,
+rent, lease, sublicense, publish, redistribute, or otherwise make the Software
+available to another person or organization.
+
+You may not modify the Software, create derivative works, or reverse engineer,
+decompile, or disassemble it, except to the limited extent such a restriction
+is prohibited by applicable law.
+
+You may not provide the Software or its functionality as a hosted or managed
+service.
+
+You may not remove or alter copyright, license, trademark, or other
+proprietary notices.
+
+You may not bypass technical restrictions or access controls in the Software.
+
+3. Ownership
+
+The Software is licensed, not sold. The copyright holder retains all right,
+title, and interest in the Software. No trademark or patent rights are granted.
+
+4. Third-Party Components
+
+Third-party components are licensed under their own terms, including those
+identified in THIRD_PARTY_NOTICES.md. Dependencies installed through npm
+retain the licenses and notices shipped in their own packages. This license
+does not replace or restrict those terms.
+
+5. Preview Software and Data
+
+The Software is a preview and may contain defects, change without notice, or
+stop being available. You are responsible for backups and for reviewing the
+terms and privacy practices of any third-party AI service you configure.
+
+6. Termination
+
+This license terminates automatically if you breach its terms. On termination,
+you must stop using the Software and delete all copies under your control.
+Sections 2 through 7 survive termination.
+
+7. Disclaimer and Limitation of Liability
+
+TO THE MAXIMUM EXTENT PERMITTED BY APPLICABLE LAW, THE SOFTWARE IS PROVIDED
+"AS IS" AND WITHOUT WARRANTIES OF ANY KIND, EXPRESS OR IMPLIED, INCLUDING
+MERCHANTABILITY, FITNESS FOR A PARTICULAR PURPOSE, TITLE, AND
+NON-INFRINGEMENT. THE COPYRIGHT HOLDER WILL NOT BE LIABLE FOR ANY INDIRECT,
+INCIDENTAL, SPECIAL, CONSEQUENTIAL, OR PUNITIVE DAMAGES, OR FOR LOSS OF DATA,
+PROFITS, OR BUSINESS. TOTAL LIABILITY ARISING FROM THE SOFTWARE WILL NOT
+EXCEED THE AMOUNT YOU PAID, IF ANY, FOR THIS LICENSE.
+
+For rights beyond evaluation, obtain a separate written agreement from the
+copyright holder.

@@ -1,6 +1,6 @@
 # WritCraft V0 · npm Developer Preview v1
 
-> Status: local candidate signed on 2026-07-29 with P0/P1/P2=0; implementation, full regression, real-Electron, installed-tarball verification, documentation, Git, and Nowledge closeout completed. Public registry publication and the external acceptance gates below remain open.
+> Status: the 0.0AD proprietary-evaluation candidate has completed implementation, full regression, real-Electron, installed-tarball verification, and three independent reviews with P0/P1/P2=0. Documentation/Git/Nowledge closeout must finish before candidate sign-off. Public registry publication and the external acceptance gates below remain open.
 
 ## Distribution boundary
 
@@ -23,8 +23,8 @@ The package requires macOS 12 or later, Node.js `>=22.12.0`, and npm 10 or 11. T
 - The CLI accepts no forwarded Chromium switches. Its only path input is `--profile`: the leaf must already exist as a normal directory under the current home directory, belong to the current user, deny group/world access, reject permissive macOS ACLs, and have a canonical, current-user-owned, non-group/world-writable ancestor chain before Main independently revalidates it. A process already running as the same user remains inside the accepted local-account threat boundary.
 - The CLI fails closed below macOS 12 and when environment variables can replace the Electron runtime, platform, architecture, version, or checksum authority.
 - The package must include executable universal author-copy, project-hash, and Markdown-trash helpers.
-- WritCraft is currently `UNLICENSED` and rights-reserved. `THIRD_PARTY_NOTICES.md` preserves the licenses of vendored browser bundles. Before public publication, the owner must explicitly confirm whether WritCraft remains proprietary or adopts an open-source license.
-- A read-only registry query on 2026-07-29 returned `E404` for `writ-craft`, so no public package was visible at that moment. This is not a reservation and may race with another publisher. `npm whoami` returned `ENEEDAUTH`; the target account is not authenticated. Publishing is an external write and requires explicit authorization.
+- On 2026-07-29 the owner selected `WritCraft Proprietary Evaluation License 1.0`; the manifest uses `SEE LICENSE IN LICENSE`. It grants personal or internal evaluation, including bounded access by an organization's authorized evaluators, and prohibits production use, commercial delivery, hosted service, resale, and external redistribution. `THIRD_PARTY_NOTICES.md` preserves licenses for vendored browser bundles; npm-installed dependencies retain the licenses and notices shipped in their own packages.
+- A read-only registry query on 2026-07-29 returned `E404` for `writ-craft`, so no public package was visible at that moment. This is not a reservation and may race with another publisher. `npm whoami` succeeded as `houxyue`; no credential or token is recorded. Publishing remains an external write and requires explicit authorization bound to the final candidate.
 
 ## Version and rollback
 

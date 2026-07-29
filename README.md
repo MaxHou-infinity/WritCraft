@@ -1,15 +1,15 @@
 # 笔触 · WritCraft（写作 IDE）
 
-> 状态：**V0 候选原型；第一阶段 0.0AC 本地 npm Developer Preview 候选已签字：实现、全量验证、三路独立终审、Git 与 Nowledge Mem 均已收口，最终 P0/P1/P2=0；尚未推送 GitHub 或公开发布 npm** · 发起方：Max
+> 状态：**V0 候选原型；0.0AC 本地 npm Developer Preview 已签字，0.0AD 已落地专有评估许可并验证 npm 账户，三路独立终审 P0/P1/P2=0，正在完成 Git/Nowledge 收口；尚未推送 GitHub 或公开发布 npm** · 发起方：Max
 > 当前开发真相与唯一续作入口：[`v0/DEVELOPMENT-STATUS.md`](v0/DEVELOPMENT-STATUS.md)。Coding Plan Key 已通过一次合成 `image-01` 能力/解码门禁；这不等于作者质量、费用或采纳验收。现有 App/ZIP 仍不可分发，npm 包也尚未发布。
 > 下一阶段验收边界：[`docs/AUTHOR-ACCEPTANCE-V1-CONTRACT.md`](docs/AUTHOR-ACCEPTANCE-V1-CONTRACT.md) 已冻结；真实调用、作者内容与发布证据必须遵守其中的隐私和付费门禁。
-> 当前停点：0.0AC 提供 macOS `writcraft` CLI、窄发布白名单、Node `>=22.12.0`、npm 10/11 fail-closed 边界和精确 Electron `43.2.0`。当前源码 `npm test`、非沙箱 `npm run verify`、Persistent **3/3**、npm Preview **10/10**、npm 10/arm64 与 npm 11/x64 fresh-tarball installed 各 **2/2** 通过；真实 Electron 一次 101 ms 性能红灯后同源码连续两轮 **35/35**。许可证、包名占用/账户登录、显式发布授权、发布后公网 `npx` 和合格真实作者项目仍是开放门禁。
+> 当前停点：0.0AD 使用 `WritCraft Proprietary Evaluation License 1.0`，npm 身份已验证为 `houxyue`；npm Preview **10/10**、npm 10/arm64 与 npm 11/x64 fresh-tarball installed 各 **2/2**，P1 修复后的最终 `npm test`、`npm run verify:full`、真实 Electron **35/35** 与 Persistent **3/3** 已通过，三路独立终审 P0/P1/P2=0。仅待 Git/Nowledge 收口。当前候选 shasum 为 `a9cb1c4c02639dda213fec3922a204337a8291f9`；显式发布授权、发布后公网 `npx` 和合格真实作者项目仍是开放门禁。
 
 ## 2026-07-28 当前复核快照
 
 > Research Accuracy v1 签收时完成事务顺序、watcher degraded 门禁与 Renderer recorded-but-locked 语义；该历史批次的完整 Node/verify 与强制 Electron 26/26 已通过。当前最终 Graph 韧性源码的完整边界以本节下方和状态台账为准。
 
-> Graph 性能复验没有用单次重试绿灯覆盖失败：索引、布局、baseline 所有权、元素重挂、scene detach 与 dispatch-only 计时缺口均已进入根因修复和回归。该历史性能专项门禁等待两帧并读取实际 CSS 可见状态与 SVG 布局；同一源码无中间修改连续两次全链均为 **26/26**。后续 0.0AB 曾将项目总链推进到 35/35；当前证据只看状态台账顶部 0.0AC。
+> Graph 性能复验没有用单次重试绿灯覆盖失败：索引、布局、baseline 所有权、元素重挂、scene detach 与 dispatch-only 计时缺口均已进入根因修复和回归。该历史性能专项门禁等待两帧并读取实际 CSS 可见状态与 SVG 布局；同一源码无中间修改连续两次全链均为 **26/26**。后续 0.0AB 曾将项目总链推进到 35/35；当前证据只看状态台账顶部当前里程碑。
 
 - 项目 / 文件 / 段落三级工作区、`edit.md` Onboarding/落盘与分区 Prompt、Inline Diff、localized ChangeSet/撤销、Main-owned Chat 最近对话、来源/脚注、草稿/冲突恢复、普通 Markdown 项目回收区、Cursor 式标签和一致性图谱均已接入。首发路线已转为 npm Developer Preview；独立 App 的 Developer ID/公证不再阻断 npm 路线。
 - 普通 Changes、Plan→Changes 与 Graph 的本轮结构性修复已完成独立复审；模型不再回传整篇 after，而由 Main 验证局部锚点、依赖和 stopReason 后构造修改。
@@ -26,6 +26,7 @@
 - Diagnostic Export v1 已接入设置页：作者先看到可能导出的完整 JSON，正文、Prompt、模型回答、Key、项目/文件名与路径均被排除；Renderer 只能回传一次性 token，Main 负责原生保存和不可覆盖写入。Service **13/13**、Handler **10/10**、Renderer **7/7**、Network boundary **15/15**，真实 Electron 已覆盖可见预览和隐私 sentinel。
 - Inline 当前源码隔离 App 已完成人工预览零写入、拒绝、重载、接受、History 与 Safe Undo；Plan 生成已强制 `end_turn`、单文本块、strict JSON、错误脱敏与目标/Prompt 资源上限，独立复审 P0=0/P1=0。
 - 0.0AC 当前源码已通过 `npm test`、非沙箱 `npm run verify`、Persistent **3/3**、npm Preview **10/10**、npm 10/arm64 与 npm 11/x64 installed 各 **2/2**，以及同源码连续两轮真实 Electron **35/35**；2026-07-29 联网生产依赖审计仍为 0 vulnerabilities。x64 首轮因测试 PATH 缺 `/usr/sbin` 未进入 Renderer，补回标准 PATH 后同源码通过，该红灯保留。代码/合同/文档三路独立终审 P0/P1/P2=0，提交为 `71571b8`，Nowledge 权威记忆持续同步；超长 Prompt 分区能力仍只接入 Chat/Context。
+- 0.0AD 已把历史 `UNLICENSED` 候选替换为专有评估许可，明确组织授权评估者、生产/商业/托管/再分发限制和 npm 第三方依赖许可边界；测试逐字锁定 tarball 内 LICENSE、manifest 与 shrinkwrap。首轮 P1 已修复，修复后全链及三路独立终审均通过。
 - Main 网络边界已固定文本/图片官方主机，加入 renderer HTTP(S)/WS(S) 双层断网、上下文 IPC 上限、owner abort、mutation generation、内部 revision/父目录回声隔离、零 POST retry、拒绝重定向、诊断 token-only 导出和错误脱敏；当前 network boundary **15/15**。
 - Graph 扩展已动态覆盖 300 文件/1279 节点、cold-to-interactive、stale/三类作者纠错、failure live、键盘/AX、布局、性能、重启与 A→B；缓存完整语义权威、Renderer 不可变快照、同/跨项目异步所有权及 Unicode quote 边界已关闭，最终独立复审 P0=0/P1=0/P2=0。
 - 2026-07-26 已建立本地 Git `main` 基线；后续改动必须通过提交保留可审计差异。该基线不追溯此前历史，阶段事实仍以 `v0/DEVELOPMENT-STATUS.md` 和当次可复现测试证据为准。

@@ -9,6 +9,7 @@ const path = require('path');
 
 const root = path.resolve(__dirname, '..');
 const packageJson = JSON.parse(fs.readFileSync(path.join(root, 'package.json'), 'utf8'));
+const shrinkwrapJson = JSON.parse(fs.readFileSync(path.join(root, 'npm-shrinkwrap.json'), 'utf8'));
 const cli = path.join(root, 'bin', 'writcraft.js');
 const cliModule = require(cli);
 const EXPECTED_CHECKS = 10;
@@ -66,7 +67,10 @@ test('publishes an explicit preview-tagged macOS 12+ CLI with exact runtime depe
     'pdfjs-dist': '5.4.149',
   });
   assert.strictEqual(packageJson.devDependencies, undefined);
-  assert.strictEqual(packageJson.license, 'UNLICENSED');
+  assert.strictEqual(packageJson.license, 'SEE LICENSE IN LICENSE');
+  assert.strictEqual(shrinkwrapJson.packages[''].name, packageJson.name);
+  assert.strictEqual(shrinkwrapJson.packages[''].version, packageJson.version);
+  assert.strictEqual(shrinkwrapJson.packages[''].license, packageJson.license);
 });
 
 test('uses a narrow publish allowlist that excludes tests, releases and secrets', () => {
@@ -266,8 +270,7 @@ test('actual npm tarball has the shrinkwrap, notices, safe paths and executable 
     }
   }
 
-  const shrinkwrap = JSON.parse(fs.readFileSync(path.join(root, 'npm-shrinkwrap.json'), 'utf8'));
-  const installScriptPackages = Object.entries(shrinkwrap.packages)
+  const installScriptPackages = Object.entries(shrinkwrapJson.packages)
     .filter(([, record]) => record && record.hasInstallScript === true)
     .map(([packagePath]) => packagePath);
   assert.deepStrictEqual(installScriptPackages, []);
@@ -288,6 +291,7 @@ test('actual npm tarball has the shrinkwrap, notices, safe paths and executable 
     const actual = JSON.parse(packed.stdout);
     assert(Array.isArray(actual) && actual.length === 1);
     const tarball = path.join(scratch, actual[0].filename);
+    const extractedFiles = new Map();
     for (const file of actual[0].files) {
       const extracted = childProcess.spawnSync(
         '/usr/bin/tar',
@@ -295,11 +299,22 @@ test('actual npm tarball has the shrinkwrap, notices, safe paths and executable 
         { encoding: null, maxBuffer: 10 * 1024 * 1024, timeout: 10_000 }
       );
       assert.strictEqual(extracted.status, 0, file.path);
+      extractedFiles.set(file.path, extracted.stdout);
       const text = extracted.stdout.toString('utf8');
       assert(!text.includes('/Users/maxhou'), file.path);
       assert(!text.includes('/var/folders/df/'), file.path);
       assert(!/sk-(?:api|cp)-[A-Za-z0-9_-]{32,}/.test(text), file.path);
     }
+    for (const relative of ['LICENSE', 'package.json', 'npm-shrinkwrap.json']) {
+      assert(
+        extractedFiles.get(relative).equals(fs.readFileSync(path.join(root, relative))),
+        `${relative} differs inside tarball`
+      );
+    }
+    const packedManifest = JSON.parse(extractedFiles.get('package.json').toString('utf8'));
+    const packedShrinkwrap = JSON.parse(extractedFiles.get('npm-shrinkwrap.json').toString('utf8'));
+    assert.strictEqual(packedManifest.license, 'SEE LICENSE IN LICENSE');
+    assert.strictEqual(packedShrinkwrap.packages[''].license, packedManifest.license);
   } finally {
     fs.rmSync(scratch, { recursive: true, force: true });
   }
@@ -312,7 +327,28 @@ test('npm preview documentation states tagged install, macOS and rights boundari
   assert(readme.includes('macOS 12'));
   assert(readme.includes('--profile'));
   assert(readme.includes('image-01'));
-  assert(fs.readFileSync(path.join(root, 'LICENSE'), 'utf8').includes('All rights reserved'));
+  const license = fs.readFileSync(path.join(root, 'LICENSE'), 'utf8');
+  const normalizedLicense = license.replace(/\s+/g, ' ').trim();
+  assert(license.includes('WritCraft Proprietary Evaluation License'));
+  assert(normalizedLicense.includes(
+    'If you accept this license on behalf of an organization, that organization is the licensee.'
+  ));
+  assert(normalizedLicense.includes(
+    'You may not use the Software for production, paid services, commercial delivery, or safety-critical purposes.'
+  ));
+  assert(normalizedLicense.includes(
+    'Except for access by Authorized Evaluators under Section 1, you may not sell, rent, lease, sublicense, publish, redistribute, or otherwise make the Software available to another person or organization.'
+  ));
+  assert(normalizedLicense.includes(
+    'You may not provide the Software or its functionality as a hosted or managed service.'
+  ));
+  assert(normalizedLicense.includes(
+    'Dependencies installed through npm retain the licenses and notices shipped in their own packages.'
+  ));
+  assert(license.includes('THIRD_PARTY_NOTICES.md'));
+  assert(license.includes('AS IS'));
+  assert(readme.includes('禁止生产、商业交付、托管服务、转售和对外再分发'));
+  assert(readme.includes('Electron、pdfjs-dist 和其他 npm 依赖保留各自包内许可证与声明'));
   const notices = fs.readFileSync(path.join(root, 'THIRD_PARTY_NOTICES.md'), 'utf8');
   assert(notices.includes('jsdiff 9.0.0'));
   assert(notices.includes('Marked 18.0.6'));

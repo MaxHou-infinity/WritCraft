@@ -68,7 +68,7 @@
     "minimax"
   ],
   "author": "Max Hou",
-  "license": "UNLICENSED",
+  "license": "SEE LICENSE IN LICENSE",
   "dependencies": {
     "diff": "9.0.0",
     "electron": "43.2.0",

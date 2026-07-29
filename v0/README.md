@@ -35,10 +35,13 @@ npx writ-craft@preview --profile "$HOME/WritCraft-Preview-Profile"
 
 ## 预览边界
 
-- 清单和 universal helpers 面向 macOS arm64/x64；当前真实安装并启动 Renderer 的证据仅覆盖 npm 11/arm64，npm 10 与 x64 仍需发布前矩阵验收。
+- 清单和 universal helpers 面向 macOS arm64/x64；发布前 fresh-tarball
+  矩阵已覆盖 npm 10/arm64 与 npm 11/x64。
 - `--profile` 必须位于当前用户 HOME 内，且路径祖先、目录权限和 macOS ACL 都通过双重校验；同一账户下已运行进程仍属于接受的本地信任边界。
-- 当前应用代码保留所有权；公开 npm 可见性不等于获得复制、修改或再发布许可。
-- 内嵌的 jsdiff 与 Marked 继续遵循 `THIRD_PARTY_NOTICES.md` 中的原许可。
+- WritCraft 按 `WritCraft Proprietary Evaluation License 1.0` 提供，只允许
+  个人或组织内部授权评估；禁止生产、商业交付、托管服务、转售和对外再分发。
+- 内嵌的 jsdiff 与 Marked 遵循 `THIRD_PARTY_NOTICES.md` 中的原许可；
+  Electron、pdfjs-dist 和其他 npm 依赖保留各自包内许可证与声明。
 - 通过终端启动，不提供已签名的 `WritCraft.app`。
 - 不保证适合非技术用户或生产分发。
 - 发现问题时请先使用应用内的隐私安全诊断导出。
