@@ -175,6 +175,12 @@ function findByText(node, text) {
   return null;
 }
 
+function acceptFirstReviewItem(node) {
+  const control = findByText(node, '接受') || findByText(node, '本文件全接受');
+  assert(control, 'review accept control missing');
+  return control.click();
+}
+
 function reviewStateApi() {
   const clone = state => ({ review: state.review, decisions: { ...state.decisions } });
   return {
@@ -527,7 +533,7 @@ function extractFunction(source, name) {
     });
     assert.strictEqual(harness.window.__changesView.acceptProposal(changedProposal()).ok, true);
     assert(allText(harness.document.getElementById('changes-preview')).includes('提交 edit.md 不会创建文件'));
-    await findByText(harness.document.getElementById('changes-preview'), '全部接受').click();
+    await acceptFirstReviewItem(harness.document.getElementById('changes-preview'));
     await harness.document.getElementById('changes-apply').click();
     assert.strictEqual(harness.calls.apply, 1);
     assert.strictEqual(harness.calls.confirm, 0, 'first-stage apply must never create files');
@@ -544,7 +550,7 @@ function extractFunction(source, name) {
       refreshNever: true,
     });
     assert.strictEqual(harness.window.__changesView.acceptProposal(ordinaryProposal()).ok, true);
-    await findByText(harness.document.getElementById('changes-preview'), '全部接受').click();
+    await acceptFirstReviewItem(harness.document.getElementById('changes-preview'));
     const applying = harness.document.getElementById('changes-apply').click();
     const settled = await Promise.race([
       applying.then(() => 'settled'),
@@ -569,7 +575,7 @@ function extractFunction(source, name) {
     });
     const proposal = { ...ordinaryProposal(), proposalKind: 'research_card' };
     assert.strictEqual(harness.window.__changesView.acceptProposal(proposal).ok, true);
-    await findByText(harness.document.getElementById('changes-preview'), '全部接受').click();
+    await acceptFirstReviewItem(harness.document.getElementById('changes-preview'));
     const historyBeforeApply = harness.calls.history;
     const applying = harness.document.getElementById('changes-apply').click();
     const settled = await Promise.race([
@@ -594,7 +600,7 @@ function extractFunction(source, name) {
       refreshNever: true,
     });
     assert.strictEqual(harness.window.__changesView.acceptProposal(changedProposal()).ok, true);
-    await findByText(harness.document.getElementById('changes-preview'), '全部接受').click();
+    await acceptFirstReviewItem(harness.document.getElementById('changes-preview'));
     const historyBeforeApply = harness.calls.history;
     const applying = harness.document.getElementById('changes-apply').click();
     const settled = await Promise.race([
@@ -618,7 +624,7 @@ function extractFunction(source, name) {
     assert.strictEqual(harness.window.__changesView.acceptProposal(changedProposal(), {
       onboardingAttempt: { operationId, startedAt: Date.now() - 10 },
     }).ok, true);
-    await findByText(harness.document.getElementById('changes-preview'), '全部接受').click();
+    await acceptFirstReviewItem(harness.document.getElementById('changes-preview'));
     await harness.document.getElementById('changes-apply').click();
     assert.equal(harness.calls.metrics.length, 0, 'edit decision stays deferred while confirmation is live');
     assert.strictEqual(await harness.window.__changesView.discardPending(), true);
@@ -636,7 +642,7 @@ function extractFunction(source, name) {
     harness.window.__changesView.acceptProposal(changedProposal(), {
       onboardingAttempt: { operationId, startedAt: Date.now() - 10 },
     });
-    await findByText(harness.document.getElementById('changes-preview'), '全部接受').click();
+    await acceptFirstReviewItem(harness.document.getElementById('changes-preview'));
     await harness.document.getElementById('changes-apply').click();
     harness.document.dispatchEvent({ type: 'writcraft:file-lifecycle-changed', detail: { kind: 'trash' } });
     await Promise.resolve();
@@ -739,7 +745,7 @@ function extractFunction(source, name) {
     harness.window.__changesView.acceptProposal(changedProposal(), {
       onboardingAttempt: { operationId, startedAt: Date.now() - 10 },
     });
-    await findByText(harness.document.getElementById('changes-preview'), '全部接受').click();
+    await acceptFirstReviewItem(harness.document.getElementById('changes-preview'));
     await harness.document.getElementById('changes-apply').click();
     assert.deepStrictEqual(harness.calls.metrics.map(item => [item.event.operationId, item.event.outcome]), [
       [operationId, 'accepted'],
@@ -765,7 +771,7 @@ function extractFunction(source, name) {
     harness.window.__changesView.acceptProposal(changedProposal(), {
       onboardingAttempt: { operationId, startedAt: Date.now() - 10 },
     });
-    await findByText(harness.document.getElementById('changes-preview'), '全部接受').click();
+    await acceptFirstReviewItem(harness.document.getElementById('changes-preview'));
     await harness.document.getElementById('changes-apply').click();
     assert.strictEqual(harness.calls.discardConfirmation, 1);
     assert.deepStrictEqual(harness.calls.discardArgs, [
@@ -797,7 +803,7 @@ function extractFunction(source, name) {
     harness.window.__changesView.acceptProposal(changedProposal(), {
       onboardingAttempt: { operationId, startedAt: Date.now() - 10 },
     });
-    await findByText(harness.document.getElementById('changes-preview'), '全部接受').click();
+    await acceptFirstReviewItem(harness.document.getElementById('changes-preview'));
     await harness.document.getElementById('changes-apply').click();
     assert.deepStrictEqual(harness.calls.metrics.map(item => [item.event.operationId, item.event.outcome]), [
       [operationId, 'accepted'],
@@ -890,7 +896,7 @@ function extractFunction(source, name) {
       },
     });
     harness.window.__changesView.acceptProposal(changedProposal());
-    await findByText(harness.document.getElementById('changes-preview'), '全部接受').click();
+    await acceptFirstReviewItem(harness.document.getElementById('changes-preview'));
     await harness.document.getElementById('changes-apply').click();
     const text = allText(harness.document.getElementById('changes-preview'));
     assert(text.includes('edit.md 已安全写入磁盘'));

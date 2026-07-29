@@ -448,6 +448,14 @@
     #changes-propose, #changes-chapter, #changes-apply { border: 0; border-radius: 5px; background: var(--theme); color: #fff; padding: 7px 10px; cursor: pointer; }
     #changes-chapter { background: #7056a8; }
     #changes-preview { flex: 1; overflow: auto; padding: 9px; }
+    .changes-generation-progress { min-height: 150px; display: flex; align-items: center; justify-content: center; gap: 12px; padding: 24px 18px; border: 1px solid #d9cdea; border-radius: 8px; background: linear-gradient(145deg, #fbf9fe, #f3eefb); color: var(--ink); }
+    .changes-generation-progress__indicator { width: 22px; height: 22px; flex: 0 0 auto; border: 3px solid #d9cdea; border-top-color: #7056a8; border-radius: 50%; animation: changes-spin .9s linear infinite; }
+    .changes-generation-progress div { display: grid; gap: 5px; }
+    .changes-generation-progress strong { font-size: 11px; }
+    .changes-generation-progress p { margin: 0; color: var(--ink-soft); font-size: 9px; line-height: 1.5; }
+    .changes-generation-progress small { color: #7056a8; font-size: 8px; font-variant-numeric: tabular-nums; }
+    .changes-generation-error { padding: 14px; border: 1px solid #d9aaa4; border-left: 4px solid #a3473e; border-radius: 7px; background: #fff3f1; color: #7d3832; font-size: 10px; line-height: 1.55; }
+    @keyframes changes-spin { to { transform: rotate(360deg); } }
     .changes-commit-notice { margin: 9px 9px 0; padding: 9px 10px; border: 1px solid color-mix(in srgb, var(--theme) 42%, var(--line)); border-left: 3px solid var(--theme); border-radius: 5px; background: color-mix(in srgb, var(--theme) 8%, var(--paper)); color: var(--ink); }
     .changes-commit-notice strong { display: block; margin-bottom: 2px; font-size: 10px; }
     .changes-commit-notice span { display: block; color: var(--ink-soft); font-size: 9px; line-height: 1.45; }
@@ -462,20 +470,24 @@
     .changes-recovery-actions button[data-action="keep_after"] { border-color: #6e9279; color: #315f40; }
     .changes-recovery-actions button:disabled { cursor: wait; opacity: .55; }
     .change-file { margin-bottom: 8px; border: 1px solid #ddd5ca; border-radius: 7px; overflow: hidden; background: #fff; }
-    .change-file-head { display: flex; align-items: center; gap: 7px; padding: 9px; color: var(--ink); font-size: 10px; }
+    .change-file-head { display: flex; flex-wrap: wrap; align-items: center; gap: 7px; padding: 9px; color: var(--ink); font-size: 10px; }
     .change-file-head strong { flex: 1; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
     .change-policy { flex: 0 0 auto; border: 1px solid #d8d0c4; border-radius: 999px; padding: 2px 6px; color: var(--ink-soft); font-size: 8px; }
     .change-file-actions, .change-hunk-actions { display: flex; align-items: center; gap: 4px; }
-    .change-file-actions { flex: 0 0 auto; }
+    .change-file-actions { flex: 0 0 auto; flex-wrap: wrap; justify-content: flex-end; }
     .change-decision { border: 1px solid #d8d0c4; border-radius: 4px; background: #f8f5ef; color: var(--ink-soft); padding: 3px 5px; font-size: 8px; cursor: pointer; }
     .change-decision--accepted[aria-pressed="true"] { border-color: #86aa91; background: #e7f2e9; color: #2d6840; }
     .change-decision--rejected[aria-pressed="true"] { border-color: #c8958e; background: #f7e9e6; color: #943f37; }
+    .change-decision:disabled[aria-pressed="true"] { cursor: default; opacity: 1; font-weight: 700; }
     .change-file p { margin: 0; padding: 0 9px 9px; color: var(--ink-soft); font-size: 9px; }
     .change-hunk-card { border-top: 1px solid #ebe5dc; }
     .change-hunk-card.is-accepted { box-shadow: inset 3px 0 #79a887; }
     .change-hunk-card.is-rejected { opacity: .68; box-shadow: inset 3px 0 #be7c74; }
     .change-hunk-actions { justify-content: flex-end; padding: 6px 9px; background: #fbfaf8; }
     .change-hunk-actions > span { margin-right: auto; color: var(--ink-soft); font-size: 8px; }
+    .change-hunk-result { display: flex; align-items: center; justify-content: space-between; gap: 8px; padding: 9px; background: #f7faf7; color: #356443; font-size: 9px; }
+    .change-hunk-card.is-rejected .change-hunk-result { background: #fbf5f4; color: #86423c; }
+    .change-hunk-result button { flex: 0 0 auto; border: 1px solid currentColor; border-radius: 5px; background: #fff; color: inherit; padding: 4px 7px; font-size: 8px; cursor: pointer; }
     .change-hunk { margin: 0; max-height: 220px; overflow: auto; padding: 9px; border-top: 1px solid #ebe5dc; background: #f7f6f3; font: 9px/1.5 "SF Mono", monospace; white-space: pre-wrap; }
     .change-line-meta { color: #857f76; }
     .change-line-context { color: #5e5a55; }

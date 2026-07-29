@@ -50,6 +50,8 @@
   let historyUndoInFlight = false;
   let recoveryBlocked = false;
   let recoveryActionInFlight = false;
+  let generationProgressTimer = null;
+  const expandedReviewHunks = new Set();
   let onboardingMetricSettlement = null;
   let unsettledOnboardingMetric = null;
   let unsettledOnboardingConfirmationRelease = null;
@@ -144,6 +146,7 @@
     const projectInstanceId = window.__workspace?.state?.project?.instanceId || null;
     const discardId = pending?.id || null;
     proposalTransactions?.invalidate();
+    stopGenerationProgress();
     pending = null;
     activeIssueRequest = null;
     instruction.value = '';
@@ -343,6 +346,7 @@
       return { ok: false, message: '无变更结果不符合安全契约' };
     }
 
+    stopGenerationProgress();
     pending = null;
     if (mode === 'plan') activePlanRequest = null;
     if (mode === 'issue') activeIssueRequest = null;
@@ -497,9 +501,52 @@
   function setStatus(text, error = false) {
     status.textContent = text;
     status.style.color = error ? '#a3473e' : '';
+    if (error && panel?.dataset.generationState === 'active') {
+      stopGenerationProgress();
+      preview.replaceChildren(Object.assign(document.createElement('div'), {
+        className: 'changes-generation-error',
+        textContent: `本次没有生成可审阅内容：${text}`,
+      }));
+    }
   }
 
-  function setBusy(busy) {
+  function stopGenerationProgress() {
+    if (generationProgressTimer) clearInterval(generationProgressTimer);
+    generationProgressTimer = null;
+    if (panel) delete panel.dataset.generationState;
+  }
+
+  function startGenerationProgress(title, detail) {
+    stopGenerationProgress();
+    const card = document.createElement('section');
+    card.className = 'changes-generation-progress';
+    card.setAttribute('role', 'status');
+    card.setAttribute('aria-live', 'polite');
+    const indicator = document.createElement('span');
+    indicator.className = 'changes-generation-progress__indicator';
+    indicator.setAttribute('aria-hidden', 'true');
+    const copy = document.createElement('div');
+    const heading = document.createElement('strong');
+    heading.textContent = title;
+    const message = document.createElement('p');
+    message.textContent = detail;
+    const elapsed = document.createElement('small');
+    const startedAt = Date.now();
+    const updateElapsed = () => {
+      const seconds = Math.max(0, Math.floor((Date.now() - startedAt) / 1000));
+      elapsed.textContent = seconds < 10
+        ? '正在准备项目上下文…'
+        : `AI 正在处理，已等待 ${seconds} 秒。可以继续等待，请不要重复提交。`;
+    };
+    updateElapsed();
+    generationProgressTimer = setInterval(updateElapsed, 1000);
+    copy.append(heading, message, elapsed);
+    card.append(indicator, copy);
+    preview.replaceChildren(card);
+    if (panel) panel.dataset.generationState = 'active';
+  }
+
+  function setBusy(busy, owner = 'general') {
     const controlsBusy = Boolean(busy || recoveryBlocked);
     proposeButton.disabled = controlsBusy;
     chapterButton.disabled = controlsBusy;
@@ -512,11 +559,12 @@
     historyList.querySelectorAll('.history-undo').forEach(control => {
       control.disabled = controlsBusy || historyUndoInFlight;
     });
-    proposeButton.textContent = busy ? '处理中…'
+    proposeButton.textContent = busy && owner !== 'chapter' ? '处理中…'
       : activeResearchRequest ? activeResearchRequest.phase === 'review' ? 'Research 提案待审阅' : '依据核对卡生成 Diff'
         : activePlanRequest ? '重新生成此 Plan 任务'
         : activeIssueRequest ? '重新生成此星图问题'
           : normalScopePlan ? '确认范围并生成 Diff' : '跨文件修改';
+    chapterButton.textContent = busy && owner === 'chapter' ? '生成中…' : '生成当前章节';
     contextPicker?.setAttribute('aria-busy', String(controlsBusy));
     targetPicker?.setAttribute('aria-busy', String(controlsBusy));
     if (controlsBusy) contextList?.querySelectorAll('input[type="checkbox"]').forEach(input => { input.disabled = true; });
@@ -594,6 +642,7 @@
     const active = proposalTransactions?.getActive?.();
     if (!active || !['normal', 'chapter'].includes(active.mode)) return false;
     proposalTransactions.invalidate();
+    stopGenerationProgress();
     setBusy(false);
     if (active.mode === 'chapter') chapterButton.textContent = '生成当前章节';
     if (message) setStatus(message);
@@ -815,12 +864,16 @@
     return pre;
   }
 
-  function decisionButton(label, decision, onClick) {
+  function decisionButton(label, decision, onClick, active = false) {
     const button = document.createElement('button');
     button.type = 'button';
     button.className = `change-decision change-decision--${decision}`;
-    button.textContent = label;
-    button.disabled = reviewCommitInFlight;
+    button.textContent = active
+      ? decision === 'accepted' ? '已接受'
+        : decision === 'rejected' ? '已拒绝' : '未决定'
+      : label;
+    button.setAttribute('aria-pressed', String(active));
+    button.disabled = reviewCommitInFlight || active;
     button.addEventListener('click', onClick);
     return button;
   }
@@ -837,7 +890,17 @@
       (counts.accepted === 0 && counts.rejected === 0);
   }
 
+  function setReviewDecisionStatus(message) {
+    const counts = window.WritCraftChangesReviewState?.counts?.(pending?.reviewState);
+    if (pending?.requireCompleteDecision === true && counts?.pending) {
+      setStatus(`${message} 请先处理全部修改块；还剩 ${counts.pending} 项，完成前不能写入。`);
+      return;
+    }
+    setStatus(message);
+  }
+
   function renderPendingReview() {
+    stopGenerationProgress();
     const existingOnboardingInputs = [...preview.querySelectorAll('[data-onboarding-path]')];
     const selectedOnboardingPaths = existingOnboardingInputs.length
       ? new Set(existingOnboardingInputs.filter(input => input.checked).map(input => input.dataset.onboardingPath))
@@ -854,14 +917,20 @@
       name.textContent = file.path;
       const policy = document.createElement('span');
       policy.className = 'change-policy';
-      policy.textContent = file.selectionPolicy === 'file' ? '整文件决策' : '逐块审阅';
+      policy.textContent = `${file.hunks.length} 项修改`;
       const bulk = document.createElement('div');
       bulk.className = 'change-file-actions';
-      for (const [label, decision] of [['全部接受', 'accepted'], ['全部拒绝', 'rejected'], ['重置', 'pending']]) {
-        bulk.appendChild(decisionButton(label, decision, () => {
-          pending.reviewState = State.updateFile(pending.reviewState, file.path, decision);
-          renderPendingReview();
-        }));
+      if (file.hunks.length > 1) {
+        const fileDecisions = file.hunks.map(hunk => pending.reviewState.decisions[hunk.id]);
+        for (const [label, decision] of [['本文件全接受', 'accepted'], ['本文件全拒绝', 'rejected'], ['清除本文件决定', 'pending']]) {
+          const active = fileDecisions.every(value => value === decision);
+          bulk.appendChild(decisionButton(label, decision, () => {
+            pending.reviewState = State.updateFile(pending.reviewState, file.path, decision);
+            file.hunks.forEach(hunk => expandedReviewHunks.delete(hunk.id));
+            renderPendingReview();
+            setReviewDecisionStatus(`已${decision === 'accepted' ? '接受' : decision === 'rejected' ? '拒绝' : '清除'}本文件 ${file.hunks.length} 项修改；尚未写入项目文件。`);
+          }, active));
+        }
       }
       head.append(name, policy, bulk);
       const summary = document.createElement('p');
@@ -875,13 +944,34 @@
         toolbar.className = 'change-hunk-actions';
         const location = document.createElement('span');
         location.textContent = `原文 ${hunk.oldStart} 行 → 新文 ${hunk.newStart} 行 · ${decision === 'pending' ? '待决定' : decision === 'accepted' ? '已接受' : '已拒绝'}`;
-        toolbar.appendChild(location);
-        for (const [label, next] of [['接受', 'accepted'], ['拒绝', 'rejected'], ['重置', 'pending']]) {
-          const action = decisionButton(label, next, () => {
-            pending.reviewState = State.update(pending.reviewState, hunk.id, next);
+        if (decision !== 'pending' && !expandedReviewHunks.has(hunk.id)) {
+          const result = document.createElement('div');
+          result.className = 'change-hunk-result';
+          const resultCopy = document.createElement('span');
+          resultCopy.textContent = decision === 'accepted'
+            ? '已选择接受 · 尚未写入'
+            : '已选择拒绝 · 文件不会采用此项修改';
+          const revise = document.createElement('button');
+          revise.type = 'button';
+          revise.textContent = '修改决定';
+          revise.disabled = reviewCommitInFlight;
+          revise.addEventListener('click', () => {
+            expandedReviewHunks.add(hunk.id);
             renderPendingReview();
           });
-          action.setAttribute('aria-pressed', String(decision === next));
+          result.append(resultCopy, revise);
+          hunkCard.appendChild(result);
+          card.appendChild(hunkCard);
+          continue;
+        }
+        toolbar.appendChild(location);
+        for (const [label, next] of [['接受', 'accepted'], ['拒绝', 'rejected'], ['清除决定', 'pending']]) {
+          const action = decisionButton(label, next, () => {
+            pending.reviewState = State.update(pending.reviewState, hunk.id, next);
+            expandedReviewHunks.delete(hunk.id);
+            renderPendingReview();
+            setReviewDecisionStatus(`已${next === 'accepted' ? '接受' : next === 'rejected' ? '拒绝' : '清除'}这项修改；尚未写入项目文件。`);
+          }, decision === next);
           toolbar.appendChild(action);
         }
         hunkCard.append(toolbar, diffBlock(hunk));
@@ -898,21 +988,23 @@
       : '⇄ Project Changes';
     if (commitNotice) commitNotice.hidden = !isEditPromptProposal;
     if (isOnboardingProposal) showCommitNotice(
-      '第一阶段 · edit.md 修改待确认',
-      '当前仅审阅 edit.md。下方勾选只会保留到下一阶段；提交 edit.md 不会创建任何初始文件。'
+      '第一阶段 · 先选择，再写入',
+      '“接受 / 拒绝”只记录你的选择；点击底部“确认决定并更新 edit.md”后，才会真正写入文件。初始文件仍需下一步单独确认。'
     );
     if (panel) {
       if (isOnboardingProposal) panel.dataset.onboardingPhase = 'review';
       else delete panel.dataset.onboardingPhase;
     }
-    applyButton.textContent = isEditPromptProposal ? '提交 edit.md 审阅决定' : '提交审阅决定';
+    applyButton.textContent = isEditPromptProposal ? '确认决定并更新 edit.md' : '确认决定并写入文件';
     applyButton.hidden = counts.total === 0;
     discardButton.hidden = false;
     syncApplyButton();
     setStatus(counts.total
       ? pending.requireCompleteDecision && counts.pending
         ? `图谱问题修复需完整决策：已接受 ${counts.accepted} · 已拒绝 ${counts.rejected} · 待决定 ${counts.pending}；请先处理全部修改块`
-        : `已接受 ${counts.accepted} · 已拒绝 ${counts.rejected} · 待决定 ${counts.pending}`
+        : counts.pending
+          ? `还需决定 ${counts.pending} 项；当前选择尚未写入文件`
+          : `审阅选择已完成：接受 ${counts.accepted} 项、拒绝 ${counts.rejected} 项；请在下方确认写入`
       : 'AI 未提出需要修改的文件');
   }
 
@@ -957,6 +1049,7 @@
       return false;
     }
     if (metric) metric.reviewStartedAt = Date.now();
+    expandedReviewHunks.clear();
     pending = {
       id: reviewState.review.changeSetId,
       reviewState,
@@ -1219,6 +1312,10 @@
     if (!accepted) return;
     historyUndoInFlight = true;
     setBusy(true);
+    startGenerationProgress(
+      '正在生成跨文件修改',
+      '笔触正在读取已确认范围和项目 Prompt，并生成可逐项审阅的 Diff。'
+    );
     setStatus('正在检查版本并安全撤销…');
     try {
       const saved = await window.__workspace.persistCurrent(true);
@@ -1574,10 +1671,13 @@
         contextPaths: [...selectedContextPaths],
       },
     });
-    setBusy(true);
-    chapterButton.textContent = '生成中…';
+    setBusy(true, 'chapter');
     const contextLabel = contextPaths.length ? `，并参考 ${contextPaths.length} 个文件` : '';
     setStatus(`正在依据 edit.md${contextLabel} 生成 ${targetPath} 的完整提案…`);
+    startGenerationProgress(
+      `正在生成 ${targetPath}`,
+      `笔触正在依据 edit.md${contextLabel}组织完整章节；完成后会进入逐项审阅，不会自动写入。`
+    );
     try {
       const saved = await window.__workspace.persistCurrent(true);
       if (!window.WritCraftChangesProposalTransaction.isChapterCurrent(
@@ -1654,8 +1754,10 @@
         chapterSession,
         window.__workspace?.state?.project?.instanceId || null
       );
-      if (finish.releaseBusy) setBusy(false);
-      if (finish.resetButton) chapterButton.textContent = '生成当前章节';
+      if (finish.releaseBusy) {
+        stopGenerationProgress();
+        setBusy(false);
+      }
     }
   }
 
@@ -2171,6 +2273,7 @@
     activeIssueRequest = null;
     activeResearchRequest = null;
     normalScopePlan = null;
+    stopGenerationProgress();
     selectedTargetPaths = [];
     targetSelectionTouched = false;
     instruction.value = '';

@@ -732,14 +732,14 @@ async function run() {
       const previewState = await waitForValue(first.client, `(() => {
         const notice = document.getElementById('changes-commit-notice');
         const apply = document.getElementById('changes-apply');
-        if (window.__assistantDock.getMode() !== 'changes' || notice.hidden || !apply.textContent.includes('提交 edit.md 审阅决定')) return null;
+        if (window.__assistantDock.getMode() !== 'changes' || notice.hidden || !apply.textContent.includes('确认决定并更新 edit.md')) return null;
         const suggestions = [...document.querySelectorAll('[data-onboarding-path]')]
           .map(node => ({ path: node.dataset.onboardingPath, checked: node.checked }));
         return suggestions.length === 2 ? { notice: notice.textContent, apply: apply.textContent, suggestions } : null;
       })()`, 'review-only Onboarding v2 edit.md ChangeSet');
-      assert(previewState.notice.includes('edit.md 修改待确认'));
-      assert(previewState.notice.includes('提交 edit.md 不会创建任何初始文件'));
-      assert(previewState.apply.includes('提交 edit.md 审阅决定'));
+      assert(previewState.notice.includes('先选择，再写入'));
+      assert(previewState.notice.includes('才会真正写入文件'));
+      assert(previewState.apply.includes('确认决定并更新 edit.md'));
       assert.deepStrictEqual(previewState.suggestions.map(item => item.path), ['onboarding-a.md', 'onboarding-b.md']);
       assert(previewState.suggestions.every(item => item.checked));
       assert.strictEqual(projectService.readFile(project.rootPath, 'edit.md'), beforeDisk);
@@ -747,7 +747,7 @@ async function run() {
       assert.strictEqual(fs.existsSync(secondPath), false);
 
       await first.client.evaluate(`(() => {
-        document.querySelector('.change-file-actions .change-decision--accepted').click();
+        document.querySelector('.change-hunk-card .change-decision--accepted, .change-file-actions .change-decision--accepted').click();
         document.getElementById('changes-apply').click();
       })()`);
       const editApplied = await waitForValue(first.client, `(() => {
@@ -817,13 +817,13 @@ async function run() {
         const apply = document.getElementById('changes-apply');
         const suggestions = [...document.querySelectorAll('[data-onboarding-path]:checked')];
         return window.__assistantDock.getMode() === 'changes' &&
-          apply?.textContent.includes('提交 edit.md 审阅决定') && suggestions.length === 2;
+          apply?.textContent.includes('确认决定并更新 edit.md') && suggestions.length === 2;
       })()`, 'fresh Onboarding v2 proposal and token after conflict');
       assert.strictEqual(fs.existsSync(firstPath), false);
       assert.strictEqual(fs.existsSync(secondPath), false);
 
       await first.client.evaluate(`(() => {
-        document.querySelector('.change-file-actions .change-decision--accepted').click();
+        document.querySelector('.change-hunk-card .change-decision--accepted, .change-file-actions .change-decision--accepted').click();
         document.getElementById('changes-apply').click();
       })()`);
       try {
@@ -1052,11 +1052,11 @@ async function run() {
       await waitForValue(first.client, `(() => {
         const notice = document.getElementById('changes-commit-notice');
         return window.__assistantDock.getMode() === 'changes' && !notice.hidden &&
-          document.getElementById('changes-apply').textContent.includes('提交 edit.md 审阅决定');
+          document.getElementById('changes-apply').textContent.includes('确认决定并更新 edit.md');
       })()`, 'reviewed Front Matter repair proposal');
       assert(projectService.readFile(project.rootPath, 'edit.md').includes('schema: writcraft.edit/v0'));
       await first.client.evaluate(`(() => {
-        document.querySelector('.change-file-actions .change-decision--accepted').click();
+        document.querySelector('.change-hunk-card .change-decision--accepted, .change-file-actions .change-decision--accepted').click();
         document.getElementById('changes-apply').click();
       })()`);
       try {
@@ -1300,7 +1300,7 @@ async function run() {
       })()`);
       const review = await waitForValue(first.client, `(() => {
         const file = document.querySelector('.change-file');
-        const accept = document.querySelector('.change-file-actions .change-decision--accepted');
+        const accept = document.querySelector('.change-hunk-card .change-decision--accepted, .change-file-actions .change-decision--accepted');
         const status = document.getElementById('changes-status')?.textContent || '';
         if (!file || !accept || !file.textContent.includes(${JSON.stringify(electronAiFixture.CHAPTER_GENERATED_MARKER)})) return null;
         return {
@@ -1315,7 +1315,7 @@ async function run() {
       assert.strictEqual(projectService.readFile(project.rootPath, createdPath), beforeDisk);
 
       await first.client.evaluate(`(() => {
-        document.querySelector('.change-file-actions .change-decision--accepted').click();
+        document.querySelector('.change-hunk-card .change-decision--accepted, .change-file-actions .change-decision--accepted').click();
         document.getElementById('changes-apply').click();
       })()`);
       try {
@@ -1927,7 +1927,7 @@ async function run() {
       let planWritePhase = 'accept';
       try {
         planWriteTiming.acceptDispatchedAt = Date.now();
-        await first.client.evaluate(`document.querySelector('.change-file-actions .change-decision--accepted').click()`);
+        await first.client.evaluate(`document.querySelector('.change-hunk-card .change-decision--accepted, .change-file-actions .change-decision--accepted').click()`);
         const accepted = await waitForValue(first.client, `(() => {
           const apply = document.getElementById('changes-apply');
           const cards = [...document.querySelectorAll('.change-hunk-card')];
@@ -1937,9 +1937,9 @@ async function run() {
             rejected: cards.filter(card => card.classList.contains('is-rejected')).length,
             pending: cards.filter(card => card.classList.contains('is-pending')).length,
           };
-          const acceptedPressed = cards.length === 1 &&
-            cards[0].querySelector('.change-decision--accepted')?.getAttribute('aria-pressed') === 'true';
-          return acceptedPressed && counts.accepted === 1 && counts.pending === 0 &&
+          const acceptedSummary = cards.length === 1 &&
+            cards[0].querySelector('.change-hunk-result')?.textContent.includes('已选择接受');
+          return acceptedSummary && counts.accepted === 1 && counts.pending === 0 &&
             !apply.hidden && !apply.disabled ? counts : null;
         })()`, 'the accepted and enabled Plan review');
         assert.deepStrictEqual(accepted, { total: 1, accepted: 1, rejected: 0, pending: 0 });
@@ -1965,8 +1965,8 @@ async function run() {
             rejected: result.rejected + Number(card.classList.contains('is-rejected')),
             pending: result.pending + Number(card.classList.contains('is-pending')),
           }), { total: 0, accepted: 0, rejected: 0, pending: 0 }),
-          acceptedPressed: [...document.querySelectorAll('.change-hunk-card')]
-            .map(card => card.querySelector('.change-decision--accepted')?.getAttribute('aria-pressed') || ''),
+          acceptedSummary: [...document.querySelectorAll('.change-hunk-card')]
+            .map(card => card.querySelector('.change-hunk-result')?.textContent || ''),
         }))()`);
         const disk = projectService.readFile(project.rootPath, createdPath);
         diagnostic.disk = {

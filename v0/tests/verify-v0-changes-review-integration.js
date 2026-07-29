@@ -85,7 +85,9 @@ test('discard is project-instance bound and verifies pending ownership before de
 test('Renderer begins pending, sends exact decisions, supports bulk/reset and continues residual in place', () => {
   assert(html.indexOf('changes-review-state.js') < html.indexOf('changes-view.js'));
   assert(view.includes('WritCraftChangesReviewState?.create?.(result.review)'));
-  assert(view.includes("[['全部接受', 'accepted'], ['全部拒绝', 'rejected'], ['重置', 'pending']]"));
+  assert(view.includes("[['本文件全接受', 'accepted'], ['本文件全拒绝', 'rejected'], ['清除本文件决定', 'pending']]"));
+  assert(view.includes('if (file.hunks.length > 1)'));
+  assert(view.includes('State.updateFile(pending.reviewState, file.path, decision)'));
   assert(view.includes('WritCraftChangesReviewState?.toDecision?.(pending.reviewState)'));
   assert(view.includes('bridge.applyChanges(projectInstanceId, decision)'));
   assert(view.includes('if (result.review)'));

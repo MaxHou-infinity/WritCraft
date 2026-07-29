@@ -1,9 +1,9 @@
 # 笔触 · WritCraft · V0 开发状态与续作入口
 
-> 最后更新：2026-07-29（Asia/Shanghai，0.0AI 项目卡入口与第二阶段信息架构修复）
-> 当前状态：**V0 Developer Preview 已公开发布；0.0AH 的项目卡反馈与编辑器滚动修复已在提交 `58a9911` 推送 GitHub。0.0AI 继续处理作者现场反馈：项目卡从文件顶部工具栏迁至最左活动栏，以项目级图标常驻；第二阶段改为明确的“项目初始化 · 第 2 步”，隐藏无关 Changes 编排、History 与 Metrics，状态单独成行，有建议时使用等高等宽双动作，零建议时只保留“完成项目卡”。一次性授权与 Main fail-closed 写入边界没有放宽。Workspace **21/21**、Renderer dynamic **26/26**、项目卡 UI **12/12**、完整 `npm test` 与 Electron-enabled `npm run verify` exit 0，最终真实 Electron **36/36**。首轮真实 Electron 的旧文案断言超时、第二轮全部行为通过后固定计数 `36 !== 35` 均保留为测试漂移红灯；修正契约后同一产品源码全绿。npm registry 上不可变的 `writ-craft@0.1.0` 不包含 0.0AH/0.0AI。精确当前 HEAD 以 Git 与 Nowledge 权威记忆反查为准。**
+> 最后更新：2026-07-29（Asia/Shanghai，0.0AJ Changes 审阅与长等待反馈修复）
+> 当前状态：**V0 Developer Preview 已公开发布；当前源码继续吸收作者现场反馈。0.0AJ 将 Changes 明确拆成“选择审阅决定 → 确认写入 → 终态”三阶段：单修改文件移除重复的整文件工具栏，接受/拒绝后 Diff 收起为“已选择、尚未写入”摘要，可显式重新修改决定；底部按钮改为“确认决定并更新 edit.md / 写入文件”。章节与跨文件生成会替换旧结果并显示真实等待时间，且只有发起动作的按钮显示忙碌文案。一次性 capability、Main revision 校验和 fail-closed 写入边界没有放宽。新增 UX **7/7**，审阅集成 **6/6**、Graph Issue 集成 **6/6**，完整 `npm test` 与非沙箱 `npm run verify` exit 0，最终真实 Electron **36/36**。沙箱 `npm run verify` 的真实 DOM 子进程 `code=null` 红灯经同一探针非沙箱 **13/13** 证明为 GUI 环境限制；真实 Electron 首轮旧文案超时和第二轮 Graph 完整决策提示被新反馈覆盖的红灯均已分类、修正并保留。npm registry 上不可变的 `writ-craft@0.1.0` 不包含 0.0AH–0.0AJ。精确当前 HEAD 以 Git 与 Nowledge 权威记忆反查为准。**
 > 发布判断：**公开 npm 发布与 `@preview` 验收已完成。首包发布后 registry 同时要求存在 `latest: 0.1.0`；经浏览器认证执行 `npm dist-tag rm writ-craft latest` 仍返回 E400。npm registry 的公开对象契约要求 `dist-tags` 至少包含 `latest`，因此该标签不能在只有一个版本时删除。这是原“绝不发布 latest”合同未覆盖的外部平台约束，不得用 unpublish 或占位版本冒险掩盖。**
-> 下一阶段门禁：**0.0AF 已完成测试、合同、文档、Git、Nowledge 与两路独立终审，P0=0/P1=0/P2=0；不要重开 npm 发布、修改 tag、unpublish 或发布占位版本。`latest` 只是 registry 强制指向同一专有评估 Preview，所有推荐安装仍使用 `npx writ-craft@preview`。下一阶段进入合格真实作者项目验收：`edit.md`、5+ 章、2000+ 可见中文字符和 `references/`；当前显式候选不合格且未创建副本。**
+> 下一阶段门禁：**0.0AF 已完成测试、合同、文档、Git、Nowledge 与两路独立终审，P0=0/P1=0/P2=0；不要重开 npm 发布、修改 tag、unpublish 或发布占位版本。`latest` 只是 registry 强制指向同一专有评估 Preview，所有推荐安装仍使用 `npx writ-craft@preview`。下一阶段进入合格真实作者项目验收：`edit.md`、5+ 个 `chapters/` 章节、2000+ 可见中文字符和至少 1 个来源文件。2026-07-29 对用户显式候选做只读复检：`edit.md` 已有效、项目有 17 个文件，但合同口径仍为章节 0、可见中文字符 0、来源 0，因此不合格且未创建验收副本。**
 > 当前候选证据：**许可证 P1 修复后的 `npm run verify:npm-preview` 10/10；官方 Node 22.22.3/npm 10.9.8 arm64 与 Node 24.18.0/npm 11.16.0 x64 fresh-tarball 矩阵各 2/2；最终 `npm test` exit 0、非沙箱 `npm run verify:full` exit 0、真实 Electron 35/35、Persistent Main/IPC 3/3。临发布时 `npm audit --omit=dev` 为 0 vulnerabilities（prod 15、optional 13、total 27），`npm whoami` 为 `houxyue`，包名查询当时为 E404；当前 registry 已公开 `writ-craft@0.1.0`，shasum `a9cb1c4c02639dda213fec3922a204337a8291f9`。候选 tarball 为 119 文件、566,536 bytes packed、2,597,021 bytes unpacked。历史 x64 首轮 PATH 缺 `/usr/sbin` 的 `sysctl` 红灯和 0.0AC Graph `[51,52,52,101] ms` 性能红灯均保留。**
 > 0.0AA 历史保留红灯：**首轮真实 Electron 暴露 Inspector 在上下文失效时被清空、旧 5-chip 断言和项目 Chat 等待诊断；完整 test 又暴露 Plan 测试把 generation 函数正文写死。独立复审发现新请求预检窗口可提交不可见旧轮、同项目重开 UI/Main 串话、失败重开提前清会话及两项测试/错误文案缺口，均转为生产边界和回归后关闭。真实 Electron 曾连续两次在旧 Graph 恢复阶段超时；加入只读失败快照后该阶段连续四次通过，未改 Graph 产品逻辑，按重复同源证据关闭 timing P2。另一次 Chat preflight 红灯证明测试在恢复 `edit.md` 后未等待权威 watcher barrier；改为生产 `flushExternalChanges()` 收敛，而未放宽 Chat guard。该里程碑所有红运行保留，最终源码连续两次 34/34；后续 0.0AB 当时推进到 35/35，当前总链只看本文顶部当前里程碑。**
 > Graph 历史签字基线：**性能修复前的既有源码曾完整 `npm test`、Electron-enabled `npm run verify`、强制真实 Electron 26/26 exit 0；Graph Filter 15/15、Workbench 14/14、dynamic 5/5、Large 5/5、Watcher 15/15、Network 11/11、Intelligence 17/17，第二轮复审 P0=0/P1=0/P2=2。该数字只保留为历史过程；0.0AB 后来推进到 35/35，当前总链只看顶部当前里程碑。**
@@ -32,6 +32,14 @@ Chat 的三级 scope/context、Main-owned 多轮连续性、Chapter、Onboarding
 5. 每批合入后重跑定向测试；阶段完成时再运行完整 `npm test`、`npm run verify` 与 `WRITCRAFT_E2E_FORCE=1 npm run e2e:electron`，保存当次证据。
 6. 真实 API 只使用用户显式配置的 Key；记录延迟、限流、超时、故障和费用，不记录 Key、Prompt、模型原文或正文。Key 前缀只表示凭据/计费类型，不能代替官方能力与现场门禁。首发按 npm Developer Preview 合同执行；独立 App 发布才需要 Developer ID、公证与 Gatekeeper。
 
+### 0.0AJ 2026-07-29 Changes 审阅与长等待反馈修复
+
+- **根因**：文件级“全部接受”和修改块“接受”都只更新 Renderer 的审阅选择，底部“提交审阅决定”才调用 Main 写盘；旧界面没有解释这一层级，重复点击已选状态又是无提示幂等操作。单修改文件同时展示两套等价控件，使用户误以为上方按钮应该立即创建文件。
+- **三阶段交互**：项目卡说明和底部状态现在明确“选择不等于写入”。单修改文件不再显示重复批量操作；多修改文件才显示“本文件全接受/拒绝”。作出决定后 Diff 自动收起为“已选择接受/拒绝、尚未写入”的摘要，按钮不再常驻制造失败错觉；“修改决定”可重新展开。Graph Issue 的完整决策门禁仍会在每次选择后明确剩余项数。
+- **等待与按钮所有权**：普通 Changes 和章节生成开始后会替换旧预览，显示旋转指示、当前真实工作边界和按秒等待时间；错误转为可见终态。章节生成只把章节按钮标成“生成中”，跨文件按钮不再同时显示“处理中”，避免把两个独立动作误读为并发卡死。
+- **测试过程**：新增 `verify-v0-changes-review-ux.js` **7/7** 并纳入 test/verify。定向审阅、Onboarding、Workspace、Graph Issue 全绿；旧集成测试曾因锁死“全部接受”文案红灯，已改为验证 `updateFile` 行为。首轮真实 Electron 又因旧“提交 edit.md 审阅决定”就绪断言超时；第二轮通过 19 个旅程后发现 Graph 强制完整决策提示被新局部反馈覆盖，写盘按钮始终 disabled，修正文案优先级后最终 **36/36**。
+- **完整证据**：`npm test` exit 0；沙箱 `npm run verify` 在真实 DOM Electron 启动以 `code=null` 退出，同一 DOM 探针非沙箱 **13/13**，随后完整非沙箱 `npm run verify` exit 0；最终强制真实 Electron **36/36**。本批没有真实 API 或付费图片调用。
+
 ### 0.0AI 2026-07-29 项目卡入口与第二阶段信息架构修复
 
 - **入口层级**：`项目卡` 不再占用当前文件的顶部工具栏；改为最左活动栏中的“文”图标，标题和 `aria-label` 明确其项目级职责。入口位置常驻，未打开项目或缺少 `edit.md` 时 disabled，打开项目卡时用 `is-active` 与 `aria-pressed` 显示当前状态。
@@ -39,7 +47,7 @@ Chat 的三级 scope/context、Main-owned 多轮连续性、Chapter、Onboarding
 - **操作层级**：底部状态占据独立整行；有建议时“跳过文件创建 / 创建所选文件”等高等宽且使用短动词，勾选说明明确“选择不等于创建”。AI 返回零建议时隐藏创建按钮，只保留“完成项目卡”，仍通过 discard route 释放 exact confirmation token，不制造重复动作。
 - **验证证据**：Workspace **21/21**、Onboarding Renderer dynamic **26/26**、项目卡 UI **12/12**，完整 `npm test` exit 0。真实 Electron 首轮因测试仍要求旧 `edit.md` 文案在新零建议页面超时；第二轮 36 个行为阶段全部通过后，固定期望仍为 35 而在最终计数红灯。测试改为新用户契约并把新增长文滚动阶段计入固定总数后，最终完整真实 Electron **36/36**。两条红运行均保留，未修改产品权限或放宽性能阈值。
 - **最终回归与界面复核**：Electron-enabled `npm run verify` exit 0。作者项目 App 重新启动后，macOS Accessibility 树确认左栏存在可切换的“打开项目卡”项目级图标、文件顶部只保留 `edit.md` 状态与 AI 入口；实际截图确认项目卡已离开顶部工具栏，长文滚动条仍在。项目卡第二阶段由真实 Electron 自动化验证，不在作者项目中额外发起付费 AI 请求。
-- **待收口**：尚需 Git 提交/推送与 Nowledge 反查；完成前不把本段写成 npm 已发布版本。
+- **收口结果**：已在提交 `175b794` 推送 GitHub，并同步 Nowledge；仍不属于 npm 上不可变的 `0.1.0`。
 
 ### 0.0AH 2026-07-29 项目卡反馈与中央编辑器滚动修复
 

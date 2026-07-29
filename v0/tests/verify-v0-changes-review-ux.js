@@ -1,0 +1,67 @@
+'use strict';
+
+const assert = require('assert');
+const fs = require('fs');
+const path = require('path');
+
+const V0 = path.join(__dirname, '..');
+const view = fs.readFileSync(path.join(V0, 'src/renderer/changes-view.js'), 'utf8');
+const html = fs.readFileSync(path.join(V0, 'src/renderer/index.html'), 'utf8');
+
+let passed = 0;
+function test(name, run) {
+  run();
+  passed += 1;
+  console.log(`✓ ${name}`);
+}
+
+test('review copy separates local decisions from the disk commit', () => {
+  assert(view.includes('“接受 / 拒绝”只记录你的选择'));
+  assert(view.includes('确认决定并更新 edit.md'));
+  assert(view.includes('确认决定并写入文件'));
+  assert(view.includes('尚未写入项目文件'));
+});
+
+test('complete-decision reviews retain their blocking message after a choice', () => {
+  assert(view.includes('function setReviewDecisionStatus'));
+  assert(view.includes('请先处理全部修改块；还剩 ${counts.pending} 项'));
+  assert(view.includes('setReviewDecisionStatus(`已${next'));
+});
+
+test('single-hunk files do not render a redundant bulk toolbar', () => {
+  assert(view.includes('if (file.hunks.length > 1)'));
+  assert(!view.includes("['全部接受', 'accepted']"));
+  assert(view.includes('本文件全接受'));
+});
+
+test('selected review decisions become explicit non-clickable states', () => {
+  assert(view.includes("button.disabled = reviewCommitInFlight || active"));
+  assert(view.includes("button.setAttribute('aria-pressed', String(active))"));
+  assert(view.includes("? '已接受'"));
+  assert(html.includes('.change-decision:disabled[aria-pressed="true"]'));
+});
+
+test('decided hunks collapse into a truthful pre-commit summary', () => {
+  assert(view.includes("result.className = 'change-hunk-result'"));
+  assert(view.includes('已选择接受 · 尚未写入'));
+  assert(view.includes("revise.textContent = '修改决定'"));
+  assert(view.includes('expandedReviewHunks.delete(hunk.id)'));
+  assert(html.includes('.change-hunk-result'));
+});
+
+test('chapter generation owns only its own busy label', () => {
+  assert(view.includes("function setBusy(busy, owner = 'general')"));
+  assert(view.includes("busy && owner !== 'chapter'"));
+  assert(view.includes("busy && owner === 'chapter' ? '生成中…'"));
+  assert(view.includes("setBusy(true, 'chapter')"));
+});
+
+test('long-running generation replaces stale results with elapsed progress', () => {
+  assert(view.includes('function startGenerationProgress'));
+  assert(view.includes('已等待 ${seconds} 秒'));
+  assert(view.includes('请不要重复提交'));
+  assert(view.includes('startGenerationProgress('));
+  assert(html.includes('.changes-generation-progress'));
+});
+
+console.log(`\nChanges review UX verification: ${passed}/7 passed.`);

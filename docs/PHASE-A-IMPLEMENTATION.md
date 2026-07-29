@@ -8,7 +8,7 @@
 
 > **工程交接（2026-07-29，0.0AC npm Developer Preview 本地签字收口）**：0.0AC 新增 macOS CLI、窄 npm 包、Node `>=22.12.0`、npm 10/11 fail-closed、Electron `43.2.0`、Main 观测 `did-finish-load` 后的 CLI readiness IPC 和零网络 `--check`；同时让 `sk-cp-` 图片能力进入 provider 现场门禁。该 readiness 只证明页面加载完成，不单独证明全部 workspace/bootstrap 逻辑成功。完整 test/verify、Persistent **3/3**、npm Preview **10/10**、installed **2/2**、同源码连续两轮真实 Electron **35/35** 与真实合成图片调用通过；实现复审 P0/P1 已清零，registry、许可证、npm10/x64 和真实作者门禁仍开放。
 > **下一阶段合同**：`docs/AUTHOR-ACCEPTANCE-V1-CONTRACT.md` 已冻结，明确付费网络门禁、允许记录的隐私安全证据、真实长文旅程与发布前签字顺序。
-> **当前实现停点**：下一步严格按 `docs/NPM-DEVELOPER-PREVIEW-V1-CONTRACT.md` 完成文档/Git/Nowledge 收口；公开发布必须另行核验许可证、npm10/x64、包名/账户并取得显式授权。真实作者链等待符合合同的作者项目。不得从历史 TODO 重开回收区、Chat、Prompt 或 watcher 安全链，也不得把分区编译误扩写成所有 AI 模式已统一采用。
+> **当前实现停点**：npm Developer Preview 已公开发布；当前作者现场反馈推进至 0.0AJ Changes 审阅三阶段与长等待反馈修复，精确证据见 `v0/DEVELOPMENT-STATUS.md`。下一产品门禁仍是符合合同的隔离真实作者项目验收；后续分发这些修复必须使用新版本、完整候选签字和显式发布授权。不得从历史 TODO 重开回收区、Chat、Prompt 或 watcher 安全链。
 
 ## 1. 阶段目标
 
@@ -249,6 +249,7 @@ Main 为当前窗口保存不可伪造的 project session，不允许 renderer �
 - 有实际 `edit.md` Diff 时，只有绑定精确提案的一次性 capability 被完整应用后才能继续创建文件；no-op 使用独立 onboarding token。拒绝、丢弃、residual、过期、项目切换或 revision 变化均使授权失效。
 - 用户查看最终 Diff 和文件清单后必须二次确认。批量创建先全量预检，再暂存和提交；任一失败都回滚为零个用户可见的新文件，不沿用旧 v1 的部分创建续跑语义。
 - Renderer 只展示能够证明的进度：请求已提交、AI 整理与 Main 安全检查正在进行、成功后进入 Changes，并按秒显示等待时间；不把定时轮播文案冒充模型内部阶段。失败按稳定错误码映射为作者可执行说明，明确磁盘零修改与本页回答保留，不回显 JSON、内部路径分类或 Main 技术消息，也不把内存态保留误称为持久化保存。
+- Changes Renderer 必须把审阅选择与磁盘提交分成两个明确阶段：接受/拒绝只更新 ID-only decision，底部显式确认才进入 Main apply。单 hunk 不重复渲染文件级批量按钮；已决定 hunk 默认收起为“尚未写入”的摘要，并允许重新展开。长耗时生成必须替换旧预览、显示已等待时间，并只让实际发起者拥有忙碌文案；错误或 no-op 必须终止进度状态。
 - 项目卡入口属于项目级 activity rail，必须常驻可发现；当前文件工具栏不得重复放置文字按钮。入口用 disabled/`aria-pressed` 表达不可用与打开状态，不能通过隐藏造成入口位置漂移。
 - Onboarding confirmation 必须把通用 Changes 面板收敛成单任务页：标题标明“项目初始化 · 第 2 步”，展示 `edit.md` 已完成 → 文件创建由作者决定的两步关系，隐藏 compose/History/Metrics，并把状态与动作分行。存在建议时显示等权尺寸的“跳过文件创建 / 创建所选文件”；零建议时隐藏创建动作，只保留“完成项目卡”，同时释放同一一次性 confirmation token。
 
