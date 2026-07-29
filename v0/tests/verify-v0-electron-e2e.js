@@ -37,7 +37,7 @@ const GRAPH_CACHE_BUDGET_MS = 700;
 const GRAPH_INCREMENTAL_BUDGET_MS = 800;
 const GRAPH_INTERACTION_BUDGET_MS = 100;
 const GRAPH_RENDERER_HEAP_BUDGET_BYTES = 150 * 1024 * 1024;
-const EXPECTED_STAGE_COUNT = ONBOARDING_FOCUS ? 2 : 36;
+const EXPECTED_STAGE_COUNT = ONBOARDING_FOCUS ? 2 : 37;
 
 let passed = 0;
 const activeElectronInstances = new Set();
@@ -2776,6 +2776,64 @@ async function run() {
       assert.strictEqual(projectService.readFile(project.rootPath, issuePath), beforeDisk);
       assert.strictEqual(projectService.readFile(project.rootPath, 'edit.md'), editBefore);
       await first.client.evaluate(`window.__assistantDock.close()`);
+    });
+
+    await stage('keeps primary workspace navigation exclusive across repeated Source and Graph switches', async () => {
+      const sequence = ['sources', 'graph', 'sources', 'graph', 'search', 'explorer'];
+      for (const view of sequence) {
+        const snapshot = await first.client.evaluate(`(() => {
+          const view = ${JSON.stringify(view)};
+          document.querySelector(\`[data-workspace-view="\${view}"]\`).click();
+          const shell = document.querySelector('.app-shell');
+          const sidebar = document.querySelector('.project-sidebar');
+          const selected = [...document.querySelectorAll('.activity-button[data-workspace-view].is-active')]
+            .map(button => button.dataset.workspaceView);
+          const visibleSidebarViews = [...document.querySelectorAll('.sidebar-view')]
+            .filter(node => !node.hidden)
+            .map(node => node.id);
+          return {
+            route: shell.dataset.workspaceView,
+            selected,
+            graphActive: document.getElementById('work-area').classList.contains('graph-active'),
+            sidebarDisplay: getComputedStyle(sidebar).display,
+            visibleSidebarViews,
+          };
+        })()`);
+        assert.strictEqual(snapshot.route, view);
+        assert.deepStrictEqual(snapshot.selected, [view]);
+        assert.strictEqual(snapshot.graphActive, view === 'graph');
+        if (view === 'graph') {
+          assert.strictEqual(snapshot.sidebarDisplay, 'none');
+          assert.deepStrictEqual(snapshot.visibleSidebarViews, []);
+        } else {
+          assert.notStrictEqual(snapshot.sidebarDisplay, 'none');
+          assert.deepStrictEqual(snapshot.visibleSidebarViews, [`sidebar-${view}-view`]);
+        }
+      }
+
+      const menu = await first.client.evaluate(`(() => {
+        const details = document.getElementById('project-menu');
+        const create = document.getElementById('sidebar-create-project');
+        const open = document.getElementById('sidebar-open-project');
+        const initiallyHidden = !details.open && !create.checkVisibility() && !open.checkVisibility();
+        details.querySelector('summary').click();
+        const expanded = details.open && create.checkVisibility() && open.checkVisibility();
+        details.querySelector('summary').click();
+        return {
+          initiallyHidden,
+          expanded,
+          collapsed: !details.open,
+          welcomeCreate: Boolean(document.getElementById('welcome-create-project')),
+          welcomeOpen: Boolean(document.getElementById('welcome-open-project')),
+        };
+      })()`);
+      assert.deepStrictEqual(menu, {
+        initiallyHidden: true,
+        expanded: true,
+        collapsed: true,
+        welcomeCreate: true,
+        welcomeOpen: true,
+      });
     });
 
     await stage('switches all four Assistant tabs in the project runtime without invoking AI', async () => {

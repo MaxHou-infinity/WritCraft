@@ -107,7 +107,7 @@ async function run() {
       return buildCalls === 1 ? a.promise : b.promise;
     },
   });
-  await refreshHarness.activity.fire('click');
+  refreshHarness.window.__sourcesView.activate();
   refreshHarness.window.__workspace.state.project = { instanceId: 'B' };
   refreshHarness.dispatch('writcraft:project-entered');
   a.resolve({ ok: true, index: indexFor('A') });
@@ -161,7 +161,7 @@ async function run() {
       return { ok: true, recorded: true, handoffAvailable: true, evidenceChanged: false };
     },
   });
-  await judgmentHarness.activity.fire('click');
+  judgmentHarness.window.__sourcesView.activate();
   await tick();
   const sourceCheckbox = findElement(judgmentHarness.elements['source-index-list'], node => node.type === 'checkbox');
   sourceCheckbox.checked = true;
@@ -230,7 +230,7 @@ async function run() {
   lockedHarness.window.__changesView = {
     async openResearchCard() { lockedHandoffCalls += 1; return { ok: true }; },
   };
-  await lockedHarness.activity.fire('click');
+  lockedHarness.window.__sourcesView.activate();
   await tick();
   const lockedCheckbox = findElement(lockedHarness.elements['source-index-list'], node => node.type === 'checkbox');
   lockedCheckbox.checked = true;
@@ -284,7 +284,7 @@ async function run() {
     },
     recordResearchJudgment() { lateJudgmentCalls += 1; return late.promise; },
   });
-  await lateHarness.activity.fire('click');
+  lateHarness.window.__sourcesView.activate();
   await tick();
   const lateCheckbox = findElement(lateHarness.elements['source-index-list'], node => node.type === 'checkbox');
   lateCheckbox.checked = true;

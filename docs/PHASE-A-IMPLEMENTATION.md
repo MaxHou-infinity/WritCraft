@@ -8,7 +8,7 @@
 
 > **工程交接（2026-07-29，0.0AC npm Developer Preview 本地签字收口）**：0.0AC 新增 macOS CLI、窄 npm 包、Node `>=22.12.0`、npm 10/11 fail-closed、Electron `43.2.0`、Main 观测 `did-finish-load` 后的 CLI readiness IPC 和零网络 `--check`；同时让 `sk-cp-` 图片能力进入 provider 现场门禁。该 readiness 只证明页面加载完成，不单独证明全部 workspace/bootstrap 逻辑成功。完整 test/verify、Persistent **3/3**、npm Preview **10/10**、installed **2/2**、同源码连续两轮真实 Electron **35/35** 与真实合成图片调用通过；实现复审 P0/P1 已清零，registry、许可证、npm10/x64 和真实作者门禁仍开放。
 > **下一阶段合同**：`docs/AUTHOR-ACCEPTANCE-V1-CONTRACT.md` 已冻结，明确付费网络门禁、允许记录的隐私安全证据、真实长文旅程与发布前签字顺序。
-> **当前实现停点**：npm Developer Preview 已公开发布；当前作者现场反馈推进至 0.0AJ Changes 审阅三阶段与长等待反馈修复，精确证据见 `v0/DEVELOPMENT-STATUS.md`。下一产品门禁仍是符合合同的隔离真实作者项目验收；后续分发这些修复必须使用新版本、完整候选签字和显式发布授权。不得从历史 TODO 重开回收区、Chat、Prompt 或 watcher 安全链。
+> **当前实现停点**：npm Developer Preview 已公开发布；当前作者现场反馈推进至 0.0AK 工作区导航与活动栏 UX 收口。文件、搜索、来源和图谱现在由一个 Renderer 路由统一拥有；图谱占据完整工作区，“新建项目 / 打开项目”收纳进项目标题菜单。当前源码真实 Electron **37/37**、Persistent Main/IPC **3/3**，精确红绿记录见 `v0/DEVELOPMENT-STATUS.md`。下一产品门禁仍是符合合同的隔离真实作者项目验收；后续分发这些修复必须使用新版本、完整候选签字和显式发布授权。不得从历史 TODO 重开回收区、Chat、Prompt 或 watcher 安全链。
 
 ## 1. 阶段目标
 
@@ -106,6 +106,7 @@ window.writcraft = {
 Renderer 负责：
 
 - 活动栏、文件树、标签页、编辑器、AI 面板和状态栏；
+- 一个主工作区路由统一拥有文件、搜索、来源和图谱的可见性、活动态与侧栏生命周期；功能 Renderer 只响应 `activate/deactivate`，不得竞争同一导航点击；
 - 每个打开文件的内存 buffer、dirty 状态、光标与滚动状态；
 - debounce 自动保存调度，但不直接写磁盘；
 - 呈现保存错误、外部冲突和迁移预览；
@@ -372,7 +373,7 @@ Main 为当前窗口保存不可伪造的 project session，不允许 renderer �
 - **Research→Changes**：`writcraft.research-handoff/v1` 已完成契约、实现、强制 Electron reject/A→B 与当前源码 App 人工旅程；来源保持只读并进入 ChangeSet provenance。生产 apply transaction 以真实磁盘/History 关闭 committed-warning 动态故障注入，最终独立二审 P0=0/P1=0/P2=0。
 - **Inline Rewrite**：已冻结并实现 selection/block anchor、target revision、`end_turn`、输出边界、保留路径禁写、Main capability/ACK、接受时依赖复核、durable reconciliation 和 Change History；原位红绿 Diff、阻断恢复与当前源码人工旅程均已签字。
 - **Plan 生成**：`docs/PLAN-STRICT-V1-CONTRACT.md` 已实现；request/project/target revision ownership、strict JSON、stopReason、单文本块、失败终态、资源上限及 identifier-only Plan→Changes provenance 均已冻结并验证。
-- **Graph 扩展验收**：`docs/GRAPH-ACCEPTANCE-V1-CONTRACT.md` 已签字；筛选/双证据/stale/作者纠错、failure live、键盘/AX、布局及大图性能已覆盖。后续韧性批又关闭 deferred async ownership、缓存/分析器完整语义权威、有界不可变 Renderer 快照与 Unicode quote 边界，独立二审 P0/P1/P2=0；0.0AB 当时总链为真实 Electron 35/35，当前证据见顶部 0.0AC。
+- **Graph 扩展验收**：`docs/GRAPH-ACCEPTANCE-V1-CONTRACT.md` 已签字；筛选/双证据/stale/作者纠错、failure live、键盘/AX、布局及大图性能已覆盖。后续韧性批又关闭 deferred async ownership、缓存/分析器完整语义权威、有界不可变 Renderer 快照与 Unicode quote 边界，独立二审 P0/P1/P2=0；0.0AB 当时总链为真实 Electron 35/35，当前证据见文首“当前实现停点”与 `v0/DEVELOPMENT-STATUS.md` 顶部。
 - **Diagnostic Export**：`docs/DIAGNOSTIC-EXPORT-V1-CONTRACT.md` 已实现；Main 构造递归 allowlist JSON，Renderer 只显示精确预览并回传 token，原生保存拒绝覆盖并在失败时只清理由本次创建且 inode 相同的文件；取消、项目/导航漂移、TTL 跨 fsync 与并发替换均有动态门禁。
 - **Image Review**：`docs/IMAGE-REVIEW-V1-CONTRACT.md` 已实现自动化主链与 Trash 扩展；Main 绑定窗口/项目/代际/资产，Renderer 只回传 token、评分、终态、可选费用及 Trash opaque capability。恢复/清空使用 transaction quarantine、inode/digest 双复核和 committed-state 精确重试，不修改 Markdown 或既有评审证据。
 
@@ -394,7 +395,7 @@ Main 为当前窗口保存不可伪造的 project session，不允许 renderer �
 - [x] renderer sandbox、context isolation 和窄 preload API 保持开启。
 - [x] Phase A 地基、当前 Chat/Chapter 源码的单元/IPC 集成和强制真实 Electron 验收通过；失败证据不被静态 verify 掩盖。
 
-> 证据边界：0.0AC 当前源码通过完整 test/verify、Persistent **3/3**、npm Preview **10/10**、installed **2/2**、同源码连续两轮真实 Electron **35/35** 和一次真实 Coding Plan 合成图片门禁；实现复审 P0/P1 已清零。当前 installed 证据仅覆盖 npm 11/arm64；真实作者质量/采纳、npm10/x64 和 registry 发布仍未关闭。
+> 历史证据边界（0.0AC 发布候选）：该批源码通过完整 test/verify、Persistent **3/3**、npm Preview **10/10**、installed **2/2**、同源码连续两轮真实 Electron **35/35** 和一次真实 Coding Plan 合成图片门禁；实现复审 P0/P1 已清零。registry 随后的公开发布与当前 0.0AK 源码证据见文首；真实作者质量/采纳仍未关闭。
 
 Phase A 只有在全部清单有可复现证据时才算完成；“页面看起来像工作区”或“测试只检查元素存在”都不构成验收。
 

@@ -18,6 +18,7 @@
   const editDiagnosticFeedback = document.getElementById('edit-diagnostic-feedback');
   const saveState = document.getElementById('save-state');
   const welcome = document.getElementById('welcome');
+  const appShell = document.querySelector('.app-shell');
   const workArea = document.getElementById('work-area');
   const chatPanel = document.getElementById('chat-panel');
   const editorScroll = document.querySelector('.editor-scroll');
@@ -60,6 +61,9 @@
   const migrationConfirm = document.getElementById('migration-confirm');
   const onboardingHost = document.getElementById('project-onboarding-host');
   const startOnboardingButton = document.getElementById('start-project-onboarding');
+  const projectMenu = document.getElementById('project-menu');
+  const WORKSPACE_VIEWS = new Set(['explorer', 'search', 'sources', 'graph']);
+  let activeWorkspaceView = 'explorer';
   let migrationResolver = null;
   let legacyDraftSnoozed = false;
   let treeOpenTimer = null;
@@ -2324,17 +2328,43 @@
     document.getElementById('activity-ai')?.setAttribute('aria-pressed', String(visible));
   }
 
-  function setSidebarView(name) {
-    const search = name === 'search';
-    const sources = name === 'sources';
-    if (explorerView) explorerView.hidden = search || sources;
-    if (searchView) searchView.hidden = !search;
-    if (sourcesView) sourcesView.hidden = !sources;
-    document.querySelector('[data-view="explorer"]')?.classList.toggle('is-active', !search && !sources);
-    document.querySelector('[data-view="search"]')?.classList.toggle('is-active', search);
-    document.querySelector('[data-view="sources"]')?.classList.toggle('is-active', sources);
-    if (search || sources || name === 'explorer') window.__graphView?.close?.();
+  function setWorkspaceView(name) {
+    if (!WORKSPACE_VIEWS.has(name)) return false;
+    if (name === 'graph' && !state.project) {
+      setSaveState('请先创建或打开写作项目', 'error');
+      return false;
+    }
+
+    const previous = activeWorkspaceView;
+    activeWorkspaceView = name;
+    if (appShell) appShell.dataset.workspaceView = name;
+
+    const sidebarVisible = name !== 'graph';
+    if (explorerView) explorerView.hidden = !sidebarVisible || name !== 'explorer';
+    if (searchView) searchView.hidden = !sidebarVisible || name !== 'search';
+    if (sourcesView) sourcesView.hidden = !sidebarVisible || name !== 'sources';
+
+    for (const button of document.querySelectorAll('.activity-button[data-workspace-view]')) {
+      const selected = button.dataset.workspaceView === name;
+      button.classList.toggle('is-active', selected);
+      if (selected) button.setAttribute('aria-current', 'page');
+      else button.removeAttribute('aria-current');
+    }
+
+    if (name === 'graph') window.__graphView?.activate?.();
+    else window.__graphView?.deactivate?.();
+    if (name === 'search') window.__searchView?.activate?.();
+    if (name === 'sources') window.__sourcesView?.activate?.();
+
     document.dispatchEvent(new CustomEvent('writcraft:sidebar-view-changed', { detail: name }));
+    document.dispatchEvent(new CustomEvent('writcraft:workspace-view-changed', {
+      detail: { view: name, previous },
+    }));
+    return true;
+  }
+
+  function setSidebarView(name) {
+    return setWorkspaceView(name);
   }
 
   function getAIContext() {
@@ -2598,13 +2628,19 @@
   }
 
   createButtons.forEach(button => button.addEventListener('click', () => {
+    if (projectMenu) projectMenu.open = false;
     projectNameInput.value = '';
     createDialog.showModal();
     projectNameInput.focus();
   }));
-  openButtons.forEach(button => button.addEventListener('click', openProject));
+  openButtons.forEach(button => button.addEventListener('click', () => {
+    if (projectMenu) projectMenu.open = false;
+    openProject();
+  }));
   startOnboardingButton?.addEventListener('click', openProjectOnboarding);
-  document.querySelector('[data-view="explorer"]')?.addEventListener('click', () => setSidebarView('explorer'));
+  document.querySelectorAll('.activity-button[data-workspace-view]').forEach(button => {
+    button.addEventListener('click', () => setWorkspaceView(button.dataset.workspaceView));
+  });
   newFileButton.addEventListener('click', () => {
     newFileInput.value = '';
     newFileDialog.showModal();
@@ -2670,6 +2706,13 @@
   });
   document.addEventListener('click', event => {
     if (!event.target.closest?.('.tree-file-menu')) closeFileMenus();
+    if (projectMenu?.open && !event.target.closest?.('#project-menu')) projectMenu.open = false;
+  });
+  projectMenu?.addEventListener('keydown', event => {
+    if (event.key !== 'Escape' || !projectMenu.open) return;
+    event.preventDefault();
+    projectMenu.open = false;
+    projectMenu.querySelector('summary')?.focus();
   });
   markdownTrash?.addEventListener('toggle', () => {
     markdownTrashToggle?.setAttribute('aria-expanded', String(markdownTrash.open));
@@ -2738,6 +2781,7 @@
     revealContextChip,
     insertSourceCitation,
     insertGeneratedImage,
+    setWorkspaceView,
     setSidebarView,
     setAIVisible,
     openProjectOnboarding,

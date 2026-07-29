@@ -9,7 +9,6 @@
   const issueList = document.getElementById('issue-list');
   const detail = document.getElementById('graph-detail');
   const summary = document.getElementById('graph-summary');
-  const graphButton = document.querySelector('[data-view="graph"]');
   const graphFilter = document.getElementById('graph-filter');
   const graphScope = document.getElementById('graph-scope');
   const graphFile = document.getElementById('graph-file-filter');
@@ -881,24 +880,24 @@
     }
   }
 
-  function openGraph() {
-    if (!window.__workspace?.state?.project) {
-      const status = document.getElementById('save-state');
-      if (status) status.textContent = '请先创建或打开写作项目';
-      return;
-    }
+  function activateGraph() {
     window.__changesView?.close?.();
     workArea.classList.add('graph-active');
-    graphButton?.classList.add('is-active');
     refreshGraph();
   }
 
-  function closeGraph() {
+  function deactivateGraph() {
     workArea.classList.remove('graph-active');
-    graphButton?.classList.remove('is-active');
   }
 
-  graphButton?.addEventListener('click', openGraph);
+  function openGraph() {
+    window.__workspace?.setWorkspaceView?.('graph');
+  }
+
+  function closeGraph() {
+    window.__workspace?.setWorkspaceView?.('explorer');
+  }
+
   document.getElementById('graph-back')?.addEventListener('click', closeGraph);
   document.getElementById('graph-refresh')?.addEventListener('click', refreshGraph);
   graphFilter?.addEventListener('change', () => {
@@ -984,5 +983,11 @@
     renderGraph({ preserveAll: true });
   });
 
-  window.__graphView = { open: openGraph, close: closeGraph, refresh: refreshGraph };
+  window.__graphView = {
+    open: openGraph,
+    close: closeGraph,
+    activate: activateGraph,
+    deactivate: deactivateGraph,
+    refresh: refreshGraph,
+  };
 })();

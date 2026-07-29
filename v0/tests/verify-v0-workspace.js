@@ -30,10 +30,12 @@ check('页面具备项目导航、中央编辑器与 AI 三栏骨架', () => {
     assert.ok(html.includes(`id="${id}"`), `缺少 #${id}`);
   }
 });
-check('项目入口同时存在于侧栏与欢迎页', () => {
+check('项目入口收纳在标题菜单，并在空白欢迎页保留首次入口', () => {
   for (const id of ['sidebar-create-project', 'sidebar-open-project', 'welcome-create-project', 'welcome-open-project']) {
     assert.ok(html.includes(`id="${id}"`), `缺少 #${id}`);
   }
+  assert.ok(html.includes('id="project-menu"'));
+  assert.ok(!html.includes('<div class="project-actions">'));
   assert.ok(workspace.includes("document.getElementById('welcome-create-project')"));
   assert.ok(workspace.includes("document.getElementById('welcome-open-project')"));
 });

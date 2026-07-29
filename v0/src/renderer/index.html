@@ -35,7 +35,9 @@
     }
     button, input { font: inherit; }
     button { color: inherit; }
-    .app-shell { display: grid; grid-template-columns: 50px 248px minmax(520px, 1fr); grid-template-rows: minmax(0, 1fr); height: 100vh; }
+    .app-shell { display: grid; grid-template-columns: 54px 248px minmax(520px, 1fr); grid-template-rows: minmax(0, 1fr); height: 100vh; }
+    .app-shell[data-workspace-view="graph"] { grid-template-columns: 54px minmax(520px, 1fr); }
+    .app-shell[data-workspace-view="graph"] .project-sidebar { display: none; }
 
     /* 书脊式活动栏：整个工作区唯一的深色常驻结构 */
     .activity-bar {
@@ -44,9 +46,11 @@
       display: flex;
       flex-direction: column;
       align-items: center;
-      padding: 14px 7px 10px;
-      gap: 8px;
+      padding: 14px 8px 10px;
+      gap: 7px;
       border-right: 1px solid #171511;
+      position: relative;
+      z-index: 20;
     }
     .brand-seal {
       width: 34px; height: 34px; border-radius: 10px;
@@ -56,31 +60,76 @@
       margin-bottom: 10px;
     }
     .activity-button {
-      width: 36px; height: 36px; border: 0; border-radius: 8px;
+      width: 38px; height: 38px; border: 0; border-radius: 9px;
       display: grid; place-items: center;
       background: transparent; color: #a9a194; cursor: pointer;
-      font-size: 17px;
+      position: relative;
     }
     .activity-button:hover, .activity-button:focus-visible { background: var(--spine-soft); color: #fff; outline: none; }
-    .activity-button.is-active { background: #474139; color: #fff; box-shadow: inset 2px 0 var(--theme); }
+    .activity-button.is-active {
+      background: #474139; color: #fff;
+      box-shadow: inset 3px 0 var(--activity-accent, var(--theme));
+    }
+    .activity-button svg {
+      width: 19px; height: 19px; fill: none; stroke: currentColor;
+      stroke-width: 1.75; stroke-linecap: round; stroke-linejoin: round;
+      pointer-events: none;
+    }
+    .activity-button::after {
+      content: attr(data-label);
+      position: absolute; left: 45px; top: 50%; transform: translate(4px,-50%);
+      padding: 6px 9px; border: 1px solid #504a41; border-radius: 6px;
+      color: #f8f4ec; background: #312e29; box-shadow: 0 8px 22px rgba(0,0,0,.18);
+      font-size: 11px; line-height: 1; white-space: nowrap;
+      opacity: 0; visibility: hidden; pointer-events: none;
+      transition: opacity 120ms ease, transform 120ms ease, visibility 120ms;
+    }
+    .activity-button:hover::after, .activity-button:focus-visible::after {
+      opacity: 1; visibility: visible; transform: translate(0,-50%);
+    }
     .activity-button:disabled { cursor: not-allowed; opacity: .34; }
     .activity-button:disabled:hover { background: transparent; color: #a9a194; }
-    #start-project-onboarding { position: relative; font: 600 15px/1 "Songti SC", "STSong", serif; }
-    #start-project-onboarding::after {
-      content: ""; position: absolute; right: 5px; bottom: 5px; width: 5px; height: 5px;
+    #start-project-onboarding { position: relative; }
+    #start-project-onboarding::before {
+      content: ""; position: absolute; right: 6px; bottom: 6px; width: 5px; height: 5px;
       border: 1px solid var(--spine); border-radius: 50%; background: var(--theme);
     }
-    .activity-button[data-view="graph"] { color: #b69cf0; }
+    .activity-button[data-view="graph"] { color: #b69cf0; --activity-accent: var(--graph); }
+    .activity-separator { width: 26px; height: 1px; margin: 3px 0; background: #484239; }
     .activity-spacer { flex: 1; }
 
     .project-sidebar {
       min-width: 0; background: var(--panel); border-right: 1px solid var(--line);
       display: flex; flex-direction: column;
     }
-    .project-heading { padding: 17px 15px 13px; border-bottom: 1px solid var(--line); }
+    .project-heading {
+      min-height: 68px; padding: 15px 11px 12px 15px; border-bottom: 1px solid var(--line);
+      display: grid; grid-template-columns: minmax(0,1fr) auto; align-items: center; gap: 8px;
+    }
+    .project-heading-copy { min-width: 0; }
     .eyebrow { color: var(--ink-soft); font-size: 10px; letter-spacing: .12em; text-transform: uppercase; }
     #project-title { margin: 5px 0 0; font: 500 15px/1.3 "Songti SC", "STSong", serif; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
-    .project-actions { display: grid; grid-template-columns: 1fr 1fr; gap: 7px; padding: 10px 12px; border-bottom: 1px solid var(--line); }
+    .project-menu { position: relative; }
+    .project-menu > summary {
+      width: 30px; height: 30px; display: grid; place-items: center;
+      list-style: none; border-radius: 7px; color: var(--ink-soft); cursor: pointer;
+      font-weight: 700; letter-spacing: 1px;
+    }
+    .project-menu > summary::-webkit-details-marker { display: none; }
+    .project-menu > summary:hover, .project-menu > summary:focus-visible,
+    .project-menu[open] > summary { color: var(--theme-deep); background: #e7e0d5; outline: none; }
+    .project-menu-popover {
+      position: absolute; z-index: 30; top: 35px; right: 0; width: 154px;
+      display: grid; gap: 3px; padding: 6px; border: 1px solid #d1c8bb; border-radius: 8px;
+      background: #fffdf9; box-shadow: 0 14px 30px rgba(45,38,29,.16);
+    }
+    .project-menu-popover button {
+      border: 0; border-radius: 5px; padding: 8px 9px;
+      color: var(--ink); background: transparent; text-align: left; cursor: pointer; font-size: 12px;
+    }
+    .project-menu-popover button:hover, .project-menu-popover button:focus-visible {
+      color: var(--theme-deep); background: #f1ebe2; outline: none;
+    }
     .quiet-button {
       border: 1px solid #d6cec1; background: rgba(255,255,255,.52); border-radius: 5px;
       padding: 6px 8px; font-size: 11px; cursor: pointer; color: var(--ink-soft);
@@ -839,40 +888,66 @@
     }
 
     @media (max-width: 980px) {
-      .app-shell { grid-template-columns: 46px 210px minmax(440px,1fr); }
+      .app-shell { grid-template-columns: 50px 210px minmax(440px,1fr); }
+      .app-shell[data-workspace-view="graph"] { grid-template-columns: 50px minmax(440px,1fr); }
       .work-area.has-ai, .work-area.has-assistant { grid-template-columns: minmax(0,1fr) 320px; }
       #editor { width: calc(100% - 42px); }
     }
     @media (max-width: 760px) {
       .app-shell { grid-template-columns: 42px minmax(0,1fr); }
+      .app-shell[data-workspace-view="graph"] { grid-template-columns: 42px minmax(0,1fr); }
+      .activity-bar { padding-inline: 2px; }
+      .activity-button { width: 36px; }
       .project-sidebar { display: none; }
     }
     @media (prefers-reduced-motion: reduce) { *, *::before, *::after { scroll-behavior: auto !important; transition: none !important; } }
   </style>
 </head>
 <body>
-  <div class="app-shell">
+  <div class="app-shell" data-workspace-view="explorer">
     <nav class="activity-bar" aria-label="工作区视图">
       <div class="brand-seal" title="笔触">笔</div>
-      <button class="activity-button is-active" data-view="explorer" title="项目文件">▤</button>
-      <button class="activity-button" id="start-project-onboarding" type="button" title="项目卡 · 定义项目主旨、目标与结构" aria-label="打开项目卡" aria-pressed="false" disabled>文</button>
-      <button class="activity-button" data-view="search" title="项目全文搜索">⌕</button>
-      <button class="activity-button" data-view="graph" title="一致性星图">⌘</button>
-      <button class="activity-button" id="activity-changes" title="跨文件 Changes">⇄</button>
-      <button class="activity-button" data-view="sources" title="来源与证据">⌁</button>
+      <button class="activity-button is-active" type="button" data-view="explorer" data-workspace-view="explorer" data-label="项目文件" title="项目文件" aria-label="项目文件" aria-current="page">
+        <svg viewBox="0 0 24 24" aria-hidden="true"><path d="M4 5.5h6l2 2h8v11H4z"/><path d="M4 9.5h16"/></svg>
+      </button>
+      <button class="activity-button" type="button" data-view="search" data-workspace-view="search" data-label="全文搜索" title="项目全文搜索" aria-label="项目全文搜索">
+        <svg viewBox="0 0 24 24" aria-hidden="true"><circle cx="10.5" cy="10.5" r="5.5"/><path d="m15 15 4.5 4.5"/></svg>
+      </button>
+      <button class="activity-button" type="button" data-view="sources" data-workspace-view="sources" data-label="来源与证据" title="来源与证据" aria-label="来源与证据">
+        <svg viewBox="0 0 24 24" aria-hidden="true"><path d="M5 4.5h10a3 3 0 0 1 3 3v12H8a3 3 0 0 1-3-3z"/><path d="M8 8h7M8 11.5h7M8 15h4"/></svg>
+      </button>
+      <button class="activity-button" type="button" data-view="graph" data-workspace-view="graph" data-label="一致性星图" title="一致性星图" aria-label="一致性星图">
+        <svg viewBox="0 0 24 24" aria-hidden="true"><circle cx="12" cy="5" r="2"/><circle cx="6" cy="17" r="2"/><circle cx="18" cy="17" r="2"/><path d="m11 7-4 8m6-8 4 8M8 17h8"/></svg>
+      </button>
+      <div class="activity-separator" aria-hidden="true"></div>
+      <button class="activity-button" id="start-project-onboarding" type="button" data-label="项目卡" title="项目卡 · 定义项目主旨、目标与结构" aria-label="打开项目卡" aria-pressed="false" disabled>
+        <svg viewBox="0 0 24 24" aria-hidden="true"><path d="M6 3.5h9l3 3v14H6z"/><path d="M15 3.5v4h3M9 11h6M9 14.5h6M9 18h4"/></svg>
+      </button>
+      <button class="activity-button" id="activity-changes" type="button" data-label="跨文件修改" title="跨文件 Changes" aria-label="跨文件修改" aria-pressed="false">
+        <svg viewBox="0 0 24 24" aria-hidden="true"><path d="M5 7h12m0 0-3-3m3 3-3 3M19 17H7m0 0 3-3m-3 3 3 3"/></svg>
+      </button>
       <div class="activity-spacer"></div>
-      <button class="activity-button" id="activity-settings" title="设置">⚙</button>
-      <button class="activity-button" id="activity-ai" title="AI 写作助手">✦</button>
+      <button class="activity-button" id="activity-ai" type="button" data-label="AI 写作助手" title="AI 写作助手" aria-label="AI 写作助手" aria-pressed="false">
+        <svg viewBox="0 0 24 24" aria-hidden="true"><path d="m12 3 1.35 4.15L17.5 8.5l-4.15 1.35L12 14l-1.35-4.15L6.5 8.5l4.15-1.35z"/><path d="m18.5 14 .7 2.3 2.3.7-2.3.7-.7 2.3-.7-2.3-2.3-.7 2.3-.7z"/></svg>
+      </button>
+      <button class="activity-button" id="activity-settings" type="button" data-label="设置" title="设置" aria-label="设置">
+        <svg viewBox="0 0 24 24" aria-hidden="true"><circle cx="12" cy="12" r="3"/><path d="M19 12a7 7 0 0 0-.1-1l2-1.5-2-3.4-2.4 1a8 8 0 0 0-1.7-1L14.5 3h-5l-.4 3.1a8 8 0 0 0-1.7 1l-2.4-1-2 3.4L5.1 11a7 7 0 0 0 0 2L3 14.5l2 3.4 2.4-1a8 8 0 0 0 1.7 1l.4 3.1h5l.4-3.1a8 8 0 0 0 1.7-1l2.4 1 2-3.4-2.1-1.5a7 7 0 0 0 .1-1z"/></svg>
+      </button>
     </nav>
 
     <aside class="project-sidebar">
       <div class="project-heading">
-        <div class="eyebrow">Writing project</div>
-        <div id="project-title">尚未打开项目</div>
-      </div>
-      <div class="project-actions">
-        <button class="quiet-button" id="sidebar-create-project">新建项目</button>
-        <button class="quiet-button" id="sidebar-open-project">打开项目</button>
+        <div class="project-heading-copy">
+          <div class="eyebrow">Writing project</div>
+          <div id="project-title">尚未打开项目</div>
+        </div>
+        <details class="project-menu" id="project-menu">
+          <summary aria-label="项目菜单" title="项目菜单">•••</summary>
+          <div class="project-menu-popover" role="menu" aria-label="项目管理">
+            <button id="sidebar-create-project" type="button" role="menuitem">新建项目…</button>
+            <button id="sidebar-open-project" type="button" role="menuitem">打开项目…</button>
+          </div>
+        </details>
       </div>
       <section class="sidebar-view" id="sidebar-explorer-view">
         <div class="explorer-label"><span>项目文件</span><button id="new-file-button" title="新建 Markdown 文件" disabled>＋</button></div>

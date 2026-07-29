@@ -1,7 +1,6 @@
 // Local source and citation index view.
 (function () {
   const bridge = window.writCraft?.project;
-  const button = document.querySelector('[data-view="sources"]');
   const list = document.getElementById('source-index-list');
   const status = document.getElementById('source-index-status');
   const refreshButton = document.getElementById('source-index-refresh');
@@ -436,11 +435,9 @@
 
   function open() {
     active = true;
-    window.__workspace?.setSidebarView?.('sources');
     refresh();
   }
 
-  button?.addEventListener('click', open);
   importButton?.addEventListener('click', importReference);
   refreshButton?.addEventListener('click', refresh);
   researchQuestion?.addEventListener('input', syncResearchControls);
@@ -463,4 +460,6 @@
   document.addEventListener('writcraft:sidebar-view-changed', event => {
     active = event.detail === 'sources';
   });
+
+  window.__sourcesView = { activate: open };
 })();

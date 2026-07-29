@@ -4,7 +4,6 @@
   const input = document.getElementById('project-search-input');
   const results = document.getElementById('project-search-results');
   const status = document.getElementById('project-search-status');
-  const button = document.querySelector('[data-view="search"]');
   let timer = null;
   let requestId = 0;
 
@@ -91,12 +90,10 @@
   }
 
   function openSearch() {
-    window.__workspace?.setSidebarView?.('search');
     input.focus();
     if (input.value.trim()) searchNow();
   }
 
-  button?.addEventListener('click', openSearch);
   input?.addEventListener('input', () => {
     clearTimeout(timer);
     timer = setTimeout(searchNow, 180);
@@ -104,7 +101,9 @@
   document.addEventListener('keydown', event => {
     if ((event.metaKey || event.ctrlKey) && event.shiftKey && event.key.toLowerCase() === 'f') {
       event.preventDefault();
-      openSearch();
+      window.__workspace?.setWorkspaceView?.('search');
     }
   });
+
+  window.__searchView = { activate: openSearch };
 })();

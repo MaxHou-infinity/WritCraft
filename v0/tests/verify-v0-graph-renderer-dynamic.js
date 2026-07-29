@@ -547,7 +547,7 @@ console.log('\nGraph renderer dynamic stale verification');
   buildMode = 'build-race';
   state.project = { instanceId: 'project-race-a' };
   state.revision = 'race-a';
-  window.__graphView.open();
+  window.__graphView.activate();
   await new Promise(resolve => setImmediate(resolve));
   assert(racedBuildProjects.includes('project-race-a'));
   assert.strictEqual(typeof resolveDelayedBuildA, 'function');
