@@ -17,7 +17,7 @@
 > Diagnostic Export 契约：`../docs/DIAGNOSTIC-EXPORT-V1-CONTRACT.md`（2026-07-26 已实现并完成自动化产品链签收）
 > Image Review 契约：`../docs/IMAGE-REVIEW-V1-CONTRACT.md`（2026-07-27 Trash 扩展已签字，待真实付费/作者验收）
 > Markdown Trash 契约：`../docs/MARKDOWN-TRASH-V1-CONTRACT.md`（2026-07-28 0.0AB 已实现并独立签收）
-> npm Developer Preview 契约：`../docs/NPM-DEVELOPER-PREVIEW-V1-CONTRACT.md`（2026-07-29 0.0AD 已选择专有评估许可并验证账户；待最终复审/授权）
+> npm Developer Preview 契约：`../docs/NPM-DEVELOPER-PREVIEW-V1-CONTRACT.md`（2026-07-29 0.0AD 本地候选已签字；待显式发布授权）
 
 ## 0. 续作口令
 
@@ -512,7 +512,7 @@ Onboarding v2 已取代上述“容错解析完整 `editContent` + 部分创建�
 | image-01 插图 | 🟡 | Coding Plan 真实合成调用、解码尺寸/比例和零正文插入已通过；安全审阅/废纸篓链保持签字，仍待真实作者质量、采纳、费用/限流样本 |
 | 6→7 章 Electron E2E | 🟡 | 0.0AC 当前源码真实 Electron 35/35；本地稳定性通过，仍待合格真实作者项目 |
 | 10 名作者内测与 Continue 指标 | ⬜ | 尚无真实样本，不得做 Go/No-Go 结论 |
-| npm Developer Preview | 🟡 | 0.0AD 专有评估许可、账户验证、10/10 package、npm 10/arm64 与 npm 11/x64 各 2/2 已完成；待最终复审/Git/Nowledge、显式授权与发布后公网 `npx` |
+| npm Developer Preview | 🟡 | 0.0AD 专有评估许可、账户验证、10/10 package、npm 10/arm64 与 npm 11/x64 各 2/2、最终复审/Git/Nowledge 已完成；待显式授权与发布后公网 `npx` |
 | 独立 macOS App 发布 | ⬜ | 当前不是首发路线；若未来启用，仍需 Developer ID、hardened runtime、公证和 Gatekeeper |
 
 ## 4. 后续 TODO（严格顺序）
