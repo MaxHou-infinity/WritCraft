@@ -1,9 +1,9 @@
 # 笔触 · WritCraft · V0 开发状态与续作入口
 
-> 最后更新：2026-07-29（Asia/Shanghai，0.0AD 专有评估许可候选已签字）
-> 当前状态：**V0 候选原型。0.0AD 专有评估许可 npm Developer Preview 候选已完成实现、最终全链、三路独立终审、Git 与 Nowledge 收口，P0=0/P1=0/P2=0。候选提交为 `3390a86`，同一条 Nowledge 权威记忆 `e435dd78-2352-46fa-8299-2da2507d0361` 已原位更新。尚未推送 GitHub，也尚未公开发布 npm。**
-> 发布判断：**仍未公开发布。现有 ad-hoc App/ZIP 继续只是本地证据；许可证、账户、独立复审与候选收口门禁已关闭，`writ-craft` 只读查询仍为 E404，但这不构成占名。公开发布现在只等待用户对提交 `3390a86` 与 tarball shasum `a9cb1c4c02639dda213fec3922a204337a8291f9` 的显式 publish 授权；发布后公网 `npx` 复验尚未发生。**
-> 下一阶段门禁：**先向用户报告最终提交与 tarball 哈希；只有用户随后明确回复“授权发布 `writ-craft@0.1.0` 到 npm `preview`”，才可临发布再次复查 E404/audit 并执行 `npm publish --tag preview`。发布后必须在全新目录完成公网 `npx writ-craft@preview` 隔离验收。第三阶段仍需符合 `edit.md`、5+ 章、2000+ 可见中文字符和 `references/` 的真实作者项目；当前显式候选不合格且未创建副本。**
+> 最后更新：2026-07-29（Asia/Shanghai，0.0AE npm 发布被 2FA 门禁阻断）
+> 当前状态：**V0 候选原型。0.0AD 专有评估许可 npm Developer Preview 候选已签字，P0=0/P1=0/P2=0。用户已明确授权发布；2026-07-29 以账户 `houxyue` 执行 `npm publish --tag preview`，registry 返回 `E403`：发布必须提供双因素验证码，或使用允许绕过 2FA 的 granular access token。请求未提交包版本，随后 `npm view writ-craft@0.1.0` 仍为 E404。尚未推送 GitHub，也尚未公开发布 npm。**
+> 发布判断：**仍未公开发布。此次红灯是 npm 账户认证门禁，不是代码、许可证或包体故障；不得重试普通 `npm publish` 消耗额度。候选仍绑定提交 `3390a86` 与 tarball shasum `a9cb1c4c02639dda213fec3922a204337a8291f9`。**
+> 下一阶段门禁：**需要所有者在自己的终端完成带当前一次性验证码的发布，或在 npm 网站创建仅允许发布该包且可绕过 2FA 的 granular token 并在本机配置；不要把验证码或 token 发给 Codex。发布成功后再继续公网 `npx writ-craft@preview` 隔离验收。第三阶段仍需符合 `edit.md`、5+ 章、2000+ 可见中文字符和 `references/` 的真实作者项目；当前显式候选不合格且未创建副本。**
 > 当前候选证据：**许可证 P1 修复后的 `npm run verify:npm-preview` 10/10；官方 Node 22.22.3/npm 10.9.8 arm64 与 Node 24.18.0/npm 11.16.0 x64 fresh-tarball 矩阵各 2/2；最终 `npm test` exit 0、非沙箱 `npm run verify:full` exit 0、真实 Electron 35/35、Persistent Main/IPC 3/3。2026-07-29 即时 `npm audit --omit=dev` 为 0 vulnerabilities（prod 15、optional 13、total 27），`npm whoami` 为 `houxyue`，包名为 E404。最新候选 tarball 为 119 文件、566,536 bytes packed、2,597,021 bytes unpacked、shasum `a9cb1c4c02639dda213fec3922a204337a8291f9`。历史 x64 首轮 PATH 缺 `/usr/sbin` 的 `sysctl` 红灯和 0.0AC Graph `[51,52,52,101] ms` 性能红灯均保留。**
 > 0.0AA 历史保留红灯：**首轮真实 Electron 暴露 Inspector 在上下文失效时被清空、旧 5-chip 断言和项目 Chat 等待诊断；完整 test 又暴露 Plan 测试把 generation 函数正文写死。独立复审发现新请求预检窗口可提交不可见旧轮、同项目重开 UI/Main 串话、失败重开提前清会话及两项测试/错误文案缺口，均转为生产边界和回归后关闭。真实 Electron 曾连续两次在旧 Graph 恢复阶段超时；加入只读失败快照后该阶段连续四次通过，未改 Graph 产品逻辑，按重复同源证据关闭 timing P2。另一次 Chat preflight 红灯证明测试在恢复 `edit.md` 后未等待权威 watcher barrier；改为生产 `flushExternalChanges()` 收敛，而未放宽 Chat guard。该里程碑所有红运行保留，最终源码连续两次 34/34；后续 0.0AB 当时推进到 35/35，当前总链只看本文顶部当前里程碑。**
 > Graph 历史签字基线：**性能修复前的既有源码曾完整 `npm test`、Electron-enabled `npm run verify`、强制真实 Electron 26/26 exit 0；Graph Filter 15/15、Workbench 14/14、dynamic 5/5、Large 5/5、Watcher 15/15、Network 11/11、Intelligence 17/17，第二轮复审 P0=0/P1=0/P2=2。该数字只保留为历史过程；0.0AB 后来推进到 35/35，当前总链只看顶部当前里程碑。**
@@ -17,7 +17,7 @@
 > Diagnostic Export 契约：`../docs/DIAGNOSTIC-EXPORT-V1-CONTRACT.md`（2026-07-26 已实现并完成自动化产品链签收）
 > Image Review 契约：`../docs/IMAGE-REVIEW-V1-CONTRACT.md`（2026-07-27 Trash 扩展已签字，待真实付费/作者验收）
 > Markdown Trash 契约：`../docs/MARKDOWN-TRASH-V1-CONTRACT.md`（2026-07-28 0.0AB 已实现并独立签收）
-> npm Developer Preview 契约：`../docs/NPM-DEVELOPER-PREVIEW-V1-CONTRACT.md`（2026-07-29 0.0AD 本地候选已签字；待显式发布授权）
+> npm Developer Preview 契约：`../docs/NPM-DEVELOPER-PREVIEW-V1-CONTRACT.md`（2026-07-29 0.0AD 本地候选已签字；0.0AE 发布被 npm 2FA 门禁阻断）
 
 ## 0. 续作口令
 
@@ -30,7 +30,14 @@ Chat 的三级 scope/context、Main-owned 多轮连续性、Chapter、Onboarding
 5. 每批合入后重跑定向测试；阶段完成时再运行完整 `npm test`、`npm run verify` 与 `WRITCRAFT_E2E_FORCE=1 npm run e2e:electron`，保存当次证据。
 6. 真实 API 只使用用户显式配置的 Key；记录延迟、限流、超时、故障和费用，不记录 Key、Prompt、模型原文或正文。Key 前缀只表示凭据/计费类型，不能代替官方能力与现场门禁。首发按 npm Developer Preview 合同执行；独立 App 发布才需要 Developer ID、公证与 Gatekeeper。
 
-### 0.0AD 2026-07-29 专有评估许可发布候选（待最终授权）
+### 0.0AE 2026-07-29 npm 发布尝试（2FA 阻断，未发布）
+
+- **已取得授权**：用户明确授权发布 `writ-craft@0.1.0` 到 npm `preview`。
+- **临发布复核**：Git HEAD `4c9bd51`、工作树干净、`npm whoami=houxyue`、包名 E404、生产依赖审计 0 vulnerabilities；dry-run 仍为 119 文件、566,536 bytes packed、2,597,021 bytes unpacked、shasum `a9cb1c4c02639dda213fec3922a204337a8291f9`。
+- **保留红灯**：`npm publish --tag preview` 到达 npm registry 后返回 `E403`，要求发布 2FA OTP 或启用 bypass 2FA 的 granular token。紧接着只读查询 `writ-craft@0.1.0` 仍为 E404，证明本次没有创建版本或 dist-tag。
+- **严格恢复**：不要再次执行无 OTP 的普通 publish。所有者应在自己的终端运行带当前 OTP 的发布命令，或在 npm 网站创建最小权限 granular token 并只在本机配置；不得把 OTP/token 写入仓库、日志、聊天或 Nowledge。成功后再进行公网隔离 `npx` 验收。
+
+### 0.0AD 2026-07-29 专有评估许可发布候选（已签字）
 
 - **所有者决定**：选择 `WritCraft Proprietary Evaluation License 1.0`；`package.json` 与 shrinkwrap 根均使用 `SEE LICENSE IN LICENSE`。许可允许个人或组织内部授权评估，禁止生产、商业交付、托管服务、转售和对外再分发；npm 依赖继续保留各自包内许可证与声明。
 - **账户与名称**：`npm whoami` 实时成功为 `houxyue`；不记录密码、验证码或 token。`writ-craft` 只读查询仍为 E404，该结果不是名称保留，发布前必须再查。
@@ -38,7 +45,7 @@ Chat 的三级 scope/context、Main-owned 多轮连续性、Chapter、Onboarding
 - **候选证据**：P1 修复后定向 10/10；npm 10/arm64 与 npm 11/x64 各 2/2；最终 `npm test` 与非沙箱 `npm run verify:full` 均 exit 0，真实 Electron 35/35、Persistent 3/3。独立复审已在自动化之后另行完成，未用绿色测试代替签字。
 - **最终独立复审**：许可证、npm 包候选和文档一致性三路均为 **P0=0/P1=0/P2=0，可以进入 Git/Nowledge 收口**。文档线曾阻断合同提前签字及写死旧里程碑指针，修复后再次只读确认清零。
 - **包体**：当前 dry-run 为 119 文件、566,536 bytes packed、2,597,021 bytes unpacked、shasum `a9cb1c4c02639dda213fec3922a204337a8291f9`。任何后续修改都会使该哈希失效。
-- **收口与剩余边界**：候选提交 `3390a86`；Nowledge 权威记忆 `e435dd78-2352-46fa-8299-2da2507d0361` 已更新并反查。尚未 `npm publish`；只有用户在看到提交与哈希后明确授权，才能发布 `preview`，不得发布 `latest`。
+- **0.0AD 当时的收口与剩余边界（已由顶部 0.0AE 取代）**：候选提交 `3390a86`；Nowledge 权威记忆 `e435dd78-2352-46fa-8299-2da2507d0361` 已更新并反查。当时尚未取得 publish 授权；0.0AE 已取得授权但被 npm 2FA 门禁阻断，仍不得发布 `latest`。
 
 ### 0.0AC 2026-07-29 npm Developer Preview 与 Coding Plan 图片能力（本地候选已签字）
 
@@ -512,7 +519,7 @@ Onboarding v2 已取代上述“容错解析完整 `editContent` + 部分创建�
 | image-01 插图 | 🟡 | Coding Plan 真实合成调用、解码尺寸/比例和零正文插入已通过；安全审阅/废纸篓链保持签字，仍待真实作者质量、采纳、费用/限流样本 |
 | 6→7 章 Electron E2E | 🟡 | 0.0AC 当前源码真实 Electron 35/35；本地稳定性通过，仍待合格真实作者项目 |
 | 10 名作者内测与 Continue 指标 | ⬜ | 尚无真实样本，不得做 Go/No-Go 结论 |
-| npm Developer Preview | 🟡 | 0.0AD 专有评估许可、账户验证、10/10 package、npm 10/arm64 与 npm 11/x64 各 2/2、最终复审/Git/Nowledge 已完成；待显式授权与发布后公网 `npx` |
+| npm Developer Preview | 🟡 | 0.0AD 候选已签字，用户已显式授权；首次 publish 被 npm 2FA E403 阻断且确认未发布。待所有者仅在本机以 OTP 或最小权限 token 完成发布及发布后公网 `npx` |
 | 独立 macOS App 发布 | ⬜ | 当前不是首发路线；若未来启用，仍需 Developer ID、hardened runtime、公证和 Gatekeeper |
 
 ## 4. 后续 TODO（严格顺序）
@@ -678,7 +685,7 @@ WRITCRAFT_REAL_API_ACCEPTANCE=1 WRITCRAFT_REAL_API_SCOPE=image WRITCRAFT_REAL_AP
 - [x] 在 npm 10/arm64 与 npm 11/x64 完成 fresh-tarball `--check`、Main-observed page-load IPC、退出与清理矩阵，各 **2/2**。x64 首轮测试 PATH 缺 `/usr/sbin` 的环境红灯已保留；补回标准 PATH 后同源码通过。
 - [x] 2026-07-29 `npm whoami` 已验证为 `houxyue`，`npm audit --omit=dev` 为 0 vulnerabilities；`writ-craft` 只读查询仍为 E404，但不视为占名。
 - [x] 0.0AD P1 修复后的最终完整主链、三路独立复审、候选 Git 提交 `3390a86` 与 Nowledge 权威记忆同步已完成；临发布仍需重新核验名称与再次 audit。
-- [ ] 经显式授权后只发布 preview tag，并从全新目录执行真实 `npx` 安装/启动验收；发布前轮换任何曾暴露的 MiniMax Key。
+- [ ] 用户已显式授权；首次 `npm publish --tag preview` 因账户发布 2FA 返回 E403，确认未发布。由所有者在本机以 OTP 或最小权限 bypass-2FA granular token 完成 preview 发布后，再从全新目录执行真实公网 `npx` 安装/启动验收；不得发布 `latest`。
 - [ ] 若未来转向独立 macOS App，再完成干净账户 Finder 启动、Developer ID、hardened runtime、时间戳、公证、staple 与 Gatekeeper。
 
 ## 5. 下次不要做

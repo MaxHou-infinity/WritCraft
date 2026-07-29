@@ -1,9 +1,9 @@
 # 笔触 · WritCraft（写作 IDE）
 
-> 状态：**V0 候选原型；0.0AD 专有评估许可 npm Developer Preview 候选已完成实现、全链、三路独立终审、Git 与 Nowledge 收口，P0/P1/P2=0；尚未推送 GitHub 或公开发布 npm** · 发起方：Max
+> 状态：**V0 候选原型；0.0AD 专有评估许可 npm Developer Preview 候选已签字，P0/P1/P2=0；用户已授权发布，但首次发布被 npm 账户 2FA 门禁以 E403 阻断，确认尚未公开发布** · 发起方：Max
 > 当前开发真相与唯一续作入口：[`v0/DEVELOPMENT-STATUS.md`](v0/DEVELOPMENT-STATUS.md)。Coding Plan Key 已通过一次合成 `image-01` 能力/解码门禁；这不等于作者质量、费用或采纳验收。现有 App/ZIP 仍不可分发，npm 包也尚未发布。
 > 下一阶段验收边界：[`docs/AUTHOR-ACCEPTANCE-V1-CONTRACT.md`](docs/AUTHOR-ACCEPTANCE-V1-CONTRACT.md) 已冻结；真实调用、作者内容与发布证据必须遵守其中的隐私和付费门禁。
-> 当前停点：0.0AD 使用 `WritCraft Proprietary Evaluation License 1.0`，npm 身份已验证为 `houxyue`；npm Preview **10/10**、npm 10/arm64 与 npm 11/x64 fresh-tarball installed 各 **2/2**，最终 `npm test`、`npm run verify:full`、真实 Electron **35/35** 与 Persistent **3/3** 已通过，三路独立终审 P0/P1/P2=0。候选提交为 `3390a86`，当前 shasum 为 `a9cb1c4c02639dda213fec3922a204337a8291f9`；只待显式发布授权，发布后公网 `npx` 和合格真实作者项目仍是开放门禁。
+> 当前停点：0.0AD 使用 `WritCraft Proprietary Evaluation License 1.0`，npm 身份为 `houxyue`，候选提交 `3390a86`，shasum `a9cb1c4c02639dda213fec3922a204337a8291f9`。2026-07-29 的 `npm publish --tag preview` 因缺少发布 2FA OTP 或 bypass-2FA granular token 返回 E403；随后 registry 查询仍为 E404。所有者需在本机完成认证发布；OTP/token 只在本机输入或配置，绝不发送给 Codex，也不写入仓库、日志、聊天或 Nowledge。成功后再做公网 `npx` 与合格真实作者项目验收。
 
 ## 2026-07-28 当前复核快照
 

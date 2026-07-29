@@ -1,6 +1,6 @@
 # WritCraft V0 · npm Developer Preview v1
 
-> Status: the 0.0AD proprietary-evaluation candidate was signed locally on 2026-07-29 after implementation, full regression, real-Electron, installed-tarball verification, three independent reviews with P0/P1/P2=0, and documentation/Git/Nowledge closeout. Candidate commit `3390a86`; tarball shasum `a9cb1c4c02639dda213fec3922a204337a8291f9`. Public registry publication and the external acceptance gates below remain open.
+> Status: the 0.0AD proprietary-evaluation candidate was signed locally on 2026-07-29 after implementation, full regression, real-Electron, installed-tarball verification, three independent reviews with P0/P1/P2=0, and documentation/Git/Nowledge closeout. Candidate commit `3390a86`; tarball shasum `a9cb1c4c02639dda213fec3922a204337a8291f9`. The first authorized `npm publish --tag preview` reached the registry but failed with `E403` because publish 2FA or a bypass-2FA granular token is required; a subsequent version lookup remained `E404`, so no public package or dist-tag was created. Any OTP or token must be entered or configured only on the owner's machine and must never be sent to Codex or written to the repository, logs, chat, or Nowledge.
 
 ## Distribution boundary
 
