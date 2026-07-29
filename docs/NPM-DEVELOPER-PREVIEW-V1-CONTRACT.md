@@ -1,6 +1,6 @@
 # WritCraft V0 · npm Developer Preview v1
 
-> Status: the 0.0AD proprietary-evaluation candidate has completed implementation, full regression, real-Electron, installed-tarball verification, and three independent reviews with P0/P1/P2=0. Documentation/Git/Nowledge closeout must finish before candidate sign-off. Public registry publication and the external acceptance gates below remain open.
+> Status: the 0.0AD proprietary-evaluation candidate was signed locally on 2026-07-29 after implementation, full regression, real-Electron, installed-tarball verification, three independent reviews with P0/P1/P2=0, and documentation/Git/Nowledge closeout. Candidate commit `3390a86`; tarball shasum `a9cb1c4c02639dda213fec3922a204337a8291f9`. Public registry publication and the external acceptance gates below remain open.
 
 ## Distribution boundary
 
