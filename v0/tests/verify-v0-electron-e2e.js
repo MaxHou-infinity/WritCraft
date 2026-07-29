@@ -37,7 +37,7 @@ const GRAPH_CACHE_BUDGET_MS = 700;
 const GRAPH_INCREMENTAL_BUDGET_MS = 800;
 const GRAPH_INTERACTION_BUDGET_MS = 100;
 const GRAPH_RENDERER_HEAP_BUDGET_BYTES = 150 * 1024 * 1024;
-const EXPECTED_STAGE_COUNT = ONBOARDING_FOCUS ? 2 : 35;
+const EXPECTED_STAGE_COUNT = ONBOARDING_FOCUS ? 2 : 36;
 
 let passed = 0;
 const activeElectronInstances = new Set();
@@ -751,10 +751,10 @@ async function run() {
         document.getElementById('changes-apply').click();
       })()`);
       const editApplied = await waitForValue(first.client, `(() => {
-        const summary = document.querySelector('.onboarding-confirmation-summary')?.textContent || '';
+        const summary = document.querySelector('.onboarding-confirmation-flow')?.textContent || '';
         const confirm = [...document.querySelectorAll('button')]
-          .find(node => node.textContent.includes('确认创建所选初始文件'));
-        return summary.includes('edit.md') && summary.includes('初始文件尚未创建') && confirm && !confirm.disabled
+          .find(node => node.textContent.includes('创建所选文件'));
+        return summary.includes('edit.md') && summary.includes('是否创建建议文件') && confirm && !confirm.disabled
           ? { summary, confirm: confirm.textContent, currentPath: window.__workspace.state.currentPath }
           : null;
       })()`, 'independent initial-file confirmation after edit.md apply');
@@ -767,12 +767,12 @@ async function run() {
 
       fs.writeFileSync(secondPath, '# 外部冲突文件\n', 'utf8');
       await first.client.evaluate(`([...document.querySelectorAll('button')]
-        .find(node => node.textContent.includes('确认创建所选初始文件'))).click()`);
+        .find(node => node.textContent.includes('创建所选文件'))).click()`);
       const atomicFailure = await waitForValue(first.client, `(() => {
         const status = document.getElementById('changes-status')?.textContent || '';
         const preview = document.querySelector('#changes-preview .tree-empty')?.textContent || '';
         const retry = [...document.querySelectorAll('button')]
-          .find(node => node.textContent.includes('确认创建所选初始文件') && !node.disabled);
+          .find(node => node.textContent.includes('创建所选文件') && !node.disabled);
         return status.includes('初始文件') && preview.includes('零部分创建') &&
           preview.includes('重新整理项目卡') && !retry
           ? { status, preview, retryable: Boolean(retry) }
@@ -829,7 +829,7 @@ async function run() {
       try {
         await waitForValue(first.client, `(() => {
           const confirm = [...document.querySelectorAll('button')]
-            .find(node => node.textContent.includes('确认创建所选初始文件'));
+            .find(node => node.textContent.includes('创建所选文件'));
           return confirm && !confirm.disabled ? true : null;
         })()`, 'fresh one-time initial-file confirmation');
       } catch (error) {
@@ -842,7 +842,7 @@ async function run() {
             status: document.getElementById('changes-status')?.textContent || '',
             notice: document.getElementById('changes-commit-notice')?.textContent || '',
             preview: document.querySelector('#changes-preview .tree-empty')?.textContent || '',
-            summary: document.querySelector('.onboarding-confirmation-summary')?.textContent || '',
+            summary: document.querySelector('.onboarding-confirmation-flow')?.textContent || '',
             apply: apply?.textContent || '',
             applyHidden: Boolean(apply?.hidden),
             applyDisabled: Boolean(apply?.disabled),
@@ -865,14 +865,14 @@ async function run() {
       assert.strictEqual(fs.existsSync(secondPath), false);
 
       await first.client.evaluate(`([...document.querySelectorAll('button')]
-        .find(node => node.textContent.includes('确认创建所选初始文件'))).click()`);
+        .find(node => node.textContent.includes('创建所选文件'))).click()`);
       let created;
       try {
         created = await waitForValue(first.client, `(() => {
           const status = document.getElementById('changes-status')?.textContent || '';
           const preview = document.querySelector('#changes-preview .tree-empty')?.textContent || '';
           const retry = [...document.querySelectorAll('button')]
-            .find(node => node.textContent.includes('确认创建所选初始文件') && !node.disabled);
+            .find(node => node.textContent.includes('创建所选文件') && !node.disabled);
           return status.includes('初始文件') && preview.includes('已创建 2 个初始文件') && !retry
             ? { status, preview, retryable: Boolean(retry) }
             : null;
@@ -943,24 +943,24 @@ async function run() {
       assert(wizardSubmission.firstAnswer.includes(electronAiFixture.ONBOARDING_NOOP_REQUEST));
 
       const noOpConfirmation = await waitForValue(first.client, `(() => {
-        const summary = document.querySelector('.onboarding-confirmation-summary')?.textContent || '';
+        const summary = document.querySelector('.onboarding-confirmation-flow')?.textContent || '';
         const confirmation = window.__e2eOnboardingNoOpConfirmation;
-        const apply = document.getElementById('changes-apply');
+        const complete = document.getElementById('changes-discard');
         const selected = document.querySelectorAll('[data-onboarding-path]:checked').length;
-        return summary.includes('edit.md') && summary.includes('无需修改') && confirmation?.token &&
-          confirmation?.proposalDigest && apply?.textContent.includes('确认创建') && !apply.disabled
+        return summary.includes('项目说明无需改动') && summary.includes('确认项目卡完成') && confirmation?.token &&
+          confirmation?.proposalDigest && complete?.textContent.includes('完成项目卡') && !complete.disabled
           ? { token: confirmation.token, proposalDigest: confirmation.proposalDigest, selected }
           : null;
       })()`, 'no-op Onboarding confirmation from a real ten-question request');
       assert.strictEqual(noOpConfirmation.selected, 0, 'the no-op fixture intentionally proposes zero files');
       assert.strictEqual(projectService.readFile(project.rootPath, 'edit.md'), beforeNoOpEdit);
 
-      await first.client.evaluate(`document.getElementById('changes-apply').click()`);
+      await first.client.evaluate(`document.getElementById('changes-discard').click()`);
       await waitForValue(first.client, `(() => {
         const preview = document.querySelector('#changes-preview .tree-empty')?.textContent || '';
         const retry = [...document.querySelectorAll('button')]
-          .find(node => node.textContent.includes('确认创建所选初始文件') && !node.disabled);
-        return preview.includes('没有选择初始文件') && !retry ? true : null;
+          .find(node => node.textContent.includes('完成项目卡') && !node.disabled);
+        return preview.includes('已放弃初始文件创建') && !retry ? true : null;
       })()`, 'zero-selection no-op confirmation to terminate');
       assert.strictEqual(projectService.readFile(project.rootPath, 'edit.md'), beforeNoOpEdit);
       assert.strictEqual(projectService.readFile(project.rootPath, 'onboarding-a.md'), beforeNoOpFirst);
@@ -991,9 +991,9 @@ async function run() {
       })()`, true);
       assert.strictEqual(discardPrepared.ok, true, JSON.stringify(discardPrepared));
       await waitForValue(first.client, `(() => {
-        const summary = document.querySelector('.onboarding-confirmation-summary')?.textContent || '';
+        const summary = document.querySelector('.onboarding-confirmation-flow')?.textContent || '';
         const discard = document.getElementById('changes-discard');
-        return summary.includes('无需修改') && discard?.textContent.includes('不创建') && !discard.disabled
+        return summary.includes('项目说明无需改动') && discard?.textContent.includes('完成项目卡') && !discard.disabled
           ? true : null;
       })()`, 'a fresh no-op token before explicit discard');
       await first.client.evaluate(`document.getElementById('changes-discard').click()`);

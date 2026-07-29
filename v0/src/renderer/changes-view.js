@@ -4,6 +4,7 @@
   const bridge = window.writCraft && window.writCraft.project;
   const workArea = document.getElementById('work-area');
   const panel = document.getElementById('changes-panel');
+  const panelTitle = document.getElementById('changes-panel-title');
   const instruction = document.getElementById('changes-instruction');
   const preview = document.getElementById('changes-preview');
   const commitNotice = document.getElementById('changes-commit-notice');
@@ -376,7 +377,11 @@
 
   function resetCommitControls() {
     if (commitNotice) commitNotice.hidden = true;
-    if (panel) delete panel.dataset.onboardingPhase;
+    if (panel) {
+      delete panel.dataset.onboardingPhase;
+      delete panel.dataset.onboardingEmpty;
+    }
+    if (panelTitle) panelTitle.textContent = '⇄ Project Changes';
     applyButton.textContent = '应用所选';
     discardButton.textContent = '丢弃';
   }
@@ -888,6 +893,9 @@
     const counts = State.counts(pending.reviewState);
     const isOnboardingProposal = pending.proposalKind === 'onboarding_v2';
     const isEditPromptProposal = isOnboardingProposal || pending.proposalKind === 'edit_prompt_repair';
+    if (panelTitle) panelTitle.textContent = isOnboardingProposal
+      ? '项目初始化 · 第 1 步'
+      : '⇄ Project Changes';
     if (commitNotice) commitNotice.hidden = !isEditPromptProposal;
     if (isOnboardingProposal) showCommitNotice(
       '第一阶段 · edit.md 修改待确认',
@@ -915,10 +923,10 @@
     section.dataset.mode = mode;
     section.setAttribute('aria-label', mode === 'confirmation' ? '确认创建初始文件' : '初始文件建议预选');
     const heading = document.createElement('h3');
-    heading.textContent = mode === 'confirmation' ? '确认创建所选初始文件' : '初始文件建议 · 仅预选';
+    heading.textContent = mode === 'confirmation' ? '选择要创建的文件' : '初始文件建议 · 仅预选';
     const note = document.createElement('p');
     note.textContent = mode === 'confirmation'
-      ? '这是与 edit.md 提交分离的第二次确认。只有点击下方“确认创建所选初始文件”才会创建；取消勾选不会影响 edit.md。'
+      ? '勾选只是选择；只有点击下方“创建所选文件”才会真正创建。'
       : '当前仅选择建议。提交 edit.md 不会创建文件；完成审阅后还需要一次独立确认。';
     section.append(heading, note);
     for (const item of suggestions) {
@@ -1088,36 +1096,69 @@
       selectedPaths: new Set([...requested].filter(filePath => available.has(filePath))),
     };
     if (panel) panel.dataset.onboardingPhase = 'confirmation';
+    if (panelTitle) panelTitle.textContent = '项目初始化 · 第 2 步';
+    const hasSuggestions = confirmation.fileSuggestions.length > 0;
+    if (panel) panel.dataset.onboardingEmpty = String(!hasSuggestions);
     pending = null;
     preview.replaceChildren();
-    const summary = document.createElement('div');
-    summary.className = 'onboarding-confirmation-summary';
-    summary.tabIndex = -1;
-    const title = document.createElement('strong');
-    title.textContent = confirmationMode.editNoChanges
-      ? 'edit.md 无需修改，初始文件仍需独立确认'
-      : 'edit.md 已提交，初始文件尚未创建';
-    const detail = document.createElement('p');
-    detail.textContent = confirmationMode.editNoChanges
-      ? '当前 edit.md 已符合项目卡内容，因此第一阶段没有写盘。下面仍是一次独立、可取消的文件创建确认。'
-      : '第一阶段只更新了 edit.md。现在可以单独决定是否创建建议文件。';
-    summary.append(title, detail);
-    preview.appendChild(summary);
+    const flow = document.createElement('div');
+    flow.className = 'onboarding-confirmation-flow';
+    flow.tabIndex = -1;
+    const completedStep = document.createElement('div');
+    completedStep.className = 'onboarding-confirmation-step is-complete';
+    const completedLabel = document.createElement('small');
+    completedLabel.textContent = '第 1 步 · 已完成';
+    const completedTitle = document.createElement('strong');
+    completedTitle.textContent = confirmationMode.editNoChanges ? '项目说明无需改动' : '项目说明已写入 edit.md';
+    completedStep.append(completedLabel, completedTitle);
+    const arrow = document.createElement('span');
+    arrow.className = 'onboarding-confirmation-arrow';
+    arrow.setAttribute('aria-hidden', 'true');
+    arrow.textContent = '→';
+    const currentStep = document.createElement('div');
+    currentStep.className = 'onboarding-confirmation-step is-current';
+    const currentLabel = document.createElement('small');
+    currentLabel.textContent = '第 2 步 · 由你决定';
+    const currentTitle = document.createElement('strong');
+    currentTitle.textContent = hasSuggestions ? '是否创建建议文件' : '确认项目卡完成';
+    currentStep.append(currentLabel, currentTitle);
+    flow.append(completedStep, arrow, currentStep);
+    const explainer = document.createElement('p');
+    explainer.className = 'onboarding-confirmation-explainer';
+    const explainerLead = document.createElement('strong');
+    explainerLead.textContent = hasSuggestions
+      ? '这一页只决定要不要新建文件。'
+      : 'AI 没有提出需要新建的文件。';
+    const explainerDetail = document.createElement('span');
+    explainerDetail.textContent = hasSuggestions
+      ? ' 勾选的文件会在点击“创建所选文件”后一次创建；取消勾选或选择“跳过文件创建”都不会撤销已经完成的 edit.md。'
+      : ' edit.md 已经处理完成；点击“完成项目卡”即可返回写作。';
+    explainer.append(
+      explainerLead,
+      explainerDetail
+    );
+    preview.append(flow, explainer);
     renderOnboardingSuggestions(confirmationMode.fileSuggestions, confirmationMode.selectedPaths, 'confirmation');
     showCommitNotice(
-      '第二阶段 · 初始文件创建确认',
+      '项目卡 · 第 2 步（共 2 步）',
       confirmationMode.editNoChanges
-        ? 'edit.md 无需修改；尚未创建任何文件。此次确认只处理你勾选的初始文件。'
-        : 'edit.md 已完成提交；尚未创建任何初始文件。此次确认是独立操作。'
+        ? hasSuggestions
+          ? '项目说明已经符合本次项目卡；下面只确认是否创建建议文件。'
+          : '项目说明已经符合本次项目卡，且没有需要新建的文件。'
+        : hasSuggestions
+          ? '项目说明已经写入 edit.md；下面只确认是否创建建议文件。'
+          : '项目说明已经写入 edit.md，且没有需要新建的文件。'
     );
-    applyButton.hidden = false;
-    applyButton.textContent = '确认创建所选初始文件';
+    applyButton.hidden = !hasSuggestions;
+    applyButton.textContent = '创建所选文件';
     discardButton.hidden = false;
-    discardButton.textContent = '不创建，结束项目卡';
+    discardButton.textContent = hasSuggestions ? '跳过文件创建' : '完成项目卡';
     syncApplyButton();
-    setStatus('等待第二次确认；当前零个初始文件被创建');
+    setStatus(hasSuggestions
+      ? '尚未创建任何文件。请勾选要创建的建议文件，或直接跳过。'
+      : '项目说明已经完成；本次没有建议创建的文件。');
     if (typeof requestAnimationFrame === 'function') requestAnimationFrame(() => {
-      if (confirmationMode) summary.focus();
+      if (confirmationMode) flow.focus();
     });
     return true;
   }
@@ -1648,7 +1689,7 @@
         .map(box => box.dataset.onboardingPath);
       reviewCommitInFlight = true;
       setBusy(true);
-      setStatus('正在保存当前文件并确认创建所选初始文件…');
+      setStatus('正在保存当前文件并创建所选文件…');
       let commitAcknowledged = false;
       let committedFiles = null;
       try {

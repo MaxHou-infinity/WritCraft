@@ -1001,7 +1001,7 @@
           ? `edit.md Front Matter 有提示${revisionLabel}`
         : path === 'edit.md' ? `正在编辑项目 Prompt${revisionLabel}` : `edit.md 已载入${revisionLabel}`;
     renderEditDiagnostics(promptDiagnostics, promptHasDiagnostics, promptRepairable);
-    if (startOnboardingButton) startOnboardingButton.hidden = !state.project || state.projectPromptMissing;
+    if (startOnboardingButton) startOnboardingButton.disabled = !state.project || state.projectPromptMissing;
     renderTree();
     renderTabs();
   }
@@ -1974,7 +1974,7 @@
           await loadEditContext();
           await openFile('edit.md');
           setSaveState('已创建项目说明 edit.md', 'saved');
-          if (startOnboardingButton) startOnboardingButton.hidden = false;
+          if (startOnboardingButton) startOnboardingButton.disabled = false;
           openProjectOnboarding();
         } else {
           showError(resultMessage(created, '创建 edit.md 失败，现有文件未修改'));
@@ -1985,7 +1985,7 @@
     }
     document.dispatchEvent(new CustomEvent('writcraft:project-entered'));
     await refreshMarkdownTrash();
-    if (startOnboardingButton) startOnboardingButton.hidden = state.projectPromptMissing;
+    if (startOnboardingButton) startOnboardingButton.disabled = state.projectPromptMissing;
     if (result.onboardingRecommended && !state.projectPromptMissing) openProjectOnboarding();
   }
 
@@ -1993,6 +1993,8 @@
     state.onboardingController?.destroy?.();
     state.onboardingController = null;
     if (onboardingHost) onboardingHost.hidden = true;
+    startOnboardingButton?.classList.remove('is-active');
+    startOnboardingButton?.setAttribute('aria-pressed', 'false');
   }
 
   function openProjectOnboarding() {
@@ -2008,6 +2010,8 @@
     setAIVisible(false);
     closeProjectOnboarding();
     onboardingHost.hidden = false;
+    startOnboardingButton?.classList.add('is-active');
+    startOnboardingButton?.setAttribute('aria-pressed', 'true');
     state.onboardingController = window.WritCraftProjectOnboarding.mount(onboardingHost, {
       stateApi: window.WritCraftOnboardingState,
       onGenerate: async (request, _session, onboardingAttempt) => {

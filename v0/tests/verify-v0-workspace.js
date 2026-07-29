@@ -42,6 +42,17 @@ check('具备文件树、多标签和新建 Markdown 文件入口', () => {
   assert.ok(html.includes('id="new-file-button"'));
   assert.ok(html.includes('id="file-dialog"'));
 });
+check('项目卡作为项目级图标常驻左侧活动栏，不占用文件工具栏', () => {
+  const activityStart = html.indexOf('<nav class="activity-bar"');
+  const activityEnd = html.indexOf('</nav>', activityStart);
+  const documentToolsStart = html.indexOf('<div class="document-tools">');
+  const documentToolsEnd = html.indexOf('</div>', documentToolsStart);
+  assert.ok(html.slice(activityStart, activityEnd).includes('id="start-project-onboarding"'));
+  assert.ok(!html.slice(documentToolsStart, documentToolsEnd).includes('id="start-project-onboarding"'));
+  assert.ok(html.includes('aria-label="打开项目卡"'));
+  assert.ok(workspace.includes("startOnboardingButton.disabled = !state.project || state.projectPromptMissing"));
+  assert.ok(workspace.includes("startOnboardingButton?.setAttribute('aria-pressed', 'true')"));
+});
 check('edit.md 被定义为项目启动上下文', () => {
   assert.ok(html.includes('每个 WritCraft 项目都从一个可见的 edit.md 开始'));
   assert.ok(workspace.includes("state.projectPromptMissing ? markdownPaths()[0] || '' : 'edit.md'"));

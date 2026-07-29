@@ -531,7 +531,7 @@ function extractFunction(source, name) {
     await harness.document.getElementById('changes-apply').click();
     assert.strictEqual(harness.calls.apply, 1);
     assert.strictEqual(harness.calls.confirm, 0, 'first-stage apply must never create files');
-    assert.strictEqual(harness.document.getElementById('changes-apply').textContent, '确认创建所选初始文件');
+    assert.strictEqual(harness.document.getElementById('changes-apply').textContent, '创建所选文件');
     await harness.document.getElementById('changes-apply').click();
     assert.strictEqual(harness.calls.confirm, 1);
     assert.deepStrictEqual(JSON.parse(JSON.stringify(harness.calls.confirmArgs[3])), ['chapters/a.md']);
@@ -607,7 +607,7 @@ function extractFunction(source, name) {
     assert.strictEqual(harness.calls.refresh, 0);
     assert.strictEqual(harness.calls.reload, 0);
     assert.strictEqual(harness.calls.history, historyBeforeApply);
-    assert.strictEqual(harness.document.getElementById('changes-apply').textContent, '确认创建所选初始文件');
+    assert.strictEqual(harness.document.getElementById('changes-apply').textContent, '创建所选文件');
   });
 
   await test('project switch settles the exact Onboarding operation before releasing its confirmation', async () => {
@@ -811,10 +811,14 @@ function extractFunction(source, name) {
 
   await test('no-op confirmation can be discarded and project switch releases its token', async () => {
     const first = loadChangesHarness();
+    const noSuggestions = { ...confirmation(), fileSuggestions: [] };
     assert.strictEqual(first.window.__changesView.acceptProposal({
-      ok: true, noChanges: true, proposalKind: 'onboarding_v2', onboardingConfirmation: confirmation(),
+      ok: true, noChanges: true, proposalKind: 'onboarding_v2', onboardingConfirmation: noSuggestions,
     }).mode, 'onboarding_confirmation');
-    assert(allText(first.document.getElementById('changes-preview')).includes('edit.md 无需修改'));
+    assert(allText(first.document.getElementById('changes-preview')).includes('AI 没有提出需要新建的文件'));
+    assert.strictEqual(first.document.getElementById('changes-apply').hidden, true);
+    assert.strictEqual(first.document.getElementById('changes-discard').textContent, '完成项目卡');
+    assert.strictEqual(first.document.getElementById('changes-panel').dataset.onboardingEmpty, 'true');
     await first.document.getElementById('changes-discard').click();
     assert.strictEqual(first.calls.discardConfirmation, 1);
 

@@ -1,7 +1,7 @@
 # 笔触 · WritCraft · V0 开发状态与续作入口
 
-> 最后更新：2026-07-29（Asia/Shanghai，0.0AH 项目卡反馈与中央编辑器滚动修复）
-> 当前状态：**V0 Developer Preview 已公开发布并完成 0.0AF 全链收口；0.0AG 已建立公开 GitHub 仓库 [`MaxHou-infinity/WritCraft`](https://github.com/MaxHou-infinity/WritCraft)，本地 `main` 跟踪 `origin/main`。0.0AH 根据作者现场反馈修正两项基础体验：项目卡显示真实三段进度与已等待时间、阻止重复提交、把安全拦截解释为“未修改文件 + 本页回答仍保留 + 如何重试”，并在模型 Prompt 中明确禁止建议 `edit.md`、内部/来源/已有路径；中央编辑器补齐 Grid 高度约束与始终可见的独立纵向滚动条。Main fail-closed 边界保持不变。npm registry 上 `writ-craft@0.1.0` 的 shasum 为 `a9cb1c4c02639dda213fec3922a204337a8291f9`，与原签字候选完全一致；`preview: 0.1.0`。该已发布版本不可覆盖，0.0AH 源码修复尚未发布为新 npm 版本。公网/本地隔离安装与真实 Electron 启停各 2/2，两路独立终审 P0=0/P1=0/P2=0；GitHub 用户向首页、品牌图、上手指南、公开路线图、根许可证、安全与参与说明的实现提交为 `ce63eb1`。提交文档不能自指其最终哈希，精确当前 HEAD 以 `git rev-parse --short HEAD` 和 Nowledge 权威记忆 `e435dd78-2352-46fa-8299-2da2507d0361` 的反查结果为准。**
+> 最后更新：2026-07-29（Asia/Shanghai，0.0AI 项目卡入口与第二阶段信息架构修复）
+> 当前状态：**V0 Developer Preview 已公开发布；0.0AH 的项目卡反馈与编辑器滚动修复已在提交 `58a9911` 推送 GitHub。0.0AI 继续处理作者现场反馈：项目卡从文件顶部工具栏迁至最左活动栏，以项目级图标常驻；第二阶段改为明确的“项目初始化 · 第 2 步”，隐藏无关 Changes 编排、History 与 Metrics，状态单独成行，有建议时使用等高等宽双动作，零建议时只保留“完成项目卡”。一次性授权与 Main fail-closed 写入边界没有放宽。Workspace **21/21**、Renderer dynamic **26/26**、项目卡 UI **12/12**、完整 `npm test` 与 Electron-enabled `npm run verify` exit 0，最终真实 Electron **36/36**。首轮真实 Electron 的旧文案断言超时、第二轮全部行为通过后固定计数 `36 !== 35` 均保留为测试漂移红灯；修正契约后同一产品源码全绿。npm registry 上不可变的 `writ-craft@0.1.0` 不包含 0.0AH/0.0AI。精确当前 HEAD 以 Git 与 Nowledge 权威记忆反查为准。**
 > 发布判断：**公开 npm 发布与 `@preview` 验收已完成。首包发布后 registry 同时要求存在 `latest: 0.1.0`；经浏览器认证执行 `npm dist-tag rm writ-craft latest` 仍返回 E400。npm registry 的公开对象契约要求 `dist-tags` 至少包含 `latest`，因此该标签不能在只有一个版本时删除。这是原“绝不发布 latest”合同未覆盖的外部平台约束，不得用 unpublish 或占位版本冒险掩盖。**
 > 下一阶段门禁：**0.0AF 已完成测试、合同、文档、Git、Nowledge 与两路独立终审，P0=0/P1=0/P2=0；不要重开 npm 发布、修改 tag、unpublish 或发布占位版本。`latest` 只是 registry 强制指向同一专有评估 Preview，所有推荐安装仍使用 `npx writ-craft@preview`。下一阶段进入合格真实作者项目验收：`edit.md`、5+ 章、2000+ 可见中文字符和 `references/`；当前显式候选不合格且未创建副本。**
 > 当前候选证据：**许可证 P1 修复后的 `npm run verify:npm-preview` 10/10；官方 Node 22.22.3/npm 10.9.8 arm64 与 Node 24.18.0/npm 11.16.0 x64 fresh-tarball 矩阵各 2/2；最终 `npm test` exit 0、非沙箱 `npm run verify:full` exit 0、真实 Electron 35/35、Persistent Main/IPC 3/3。临发布时 `npm audit --omit=dev` 为 0 vulnerabilities（prod 15、optional 13、total 27），`npm whoami` 为 `houxyue`，包名查询当时为 E404；当前 registry 已公开 `writ-craft@0.1.0`，shasum `a9cb1c4c02639dda213fec3922a204337a8291f9`。候选 tarball 为 119 文件、566,536 bytes packed、2,597,021 bytes unpacked。历史 x64 首轮 PATH 缺 `/usr/sbin` 的 `sysctl` 红灯和 0.0AC Graph `[51,52,52,101] ms` 性能红灯均保留。**
@@ -31,6 +31,15 @@ Chat 的三级 scope/context、Main-owned 多轮连续性、Chapter、Onboarding
 4. 不重写已经签字的 Onboarding v2 service、capability store、batch、Main/preload 与 Renderer 契约；Main 动态 admission、single-flight 和 Renderer 生命周期 authority 清理均已关闭。
 5. 每批合入后重跑定向测试；阶段完成时再运行完整 `npm test`、`npm run verify` 与 `WRITCRAFT_E2E_FORCE=1 npm run e2e:electron`，保存当次证据。
 6. 真实 API 只使用用户显式配置的 Key；记录延迟、限流、超时、故障和费用，不记录 Key、Prompt、模型原文或正文。Key 前缀只表示凭据/计费类型，不能代替官方能力与现场门禁。首发按 npm Developer Preview 合同执行；独立 App 发布才需要 Developer ID、公证与 Gatekeeper。
+
+### 0.0AI 2026-07-29 项目卡入口与第二阶段信息架构修复
+
+- **入口层级**：`项目卡` 不再占用当前文件的顶部工具栏；改为最左活动栏中的“文”图标，标题和 `aria-label` 明确其项目级职责。入口位置常驻，未打开项目或缺少 `edit.md` 时 disabled，打开项目卡时用 `is-active` 与 `aria-pressed` 显示当前状态。
+- **第二阶段职责**：通用 Changes 面板在 confirmation 模式下切换为“项目初始化 · 第 2 步”，显示“项目说明已完成 → 是否创建建议文件”的真实两步关系，并隐藏跨文件 compose、修改历史与协作回顾，避免用户误以为仍需继续审阅 `edit.md`。
+- **操作层级**：底部状态占据独立整行；有建议时“跳过文件创建 / 创建所选文件”等高等宽且使用短动词，勾选说明明确“选择不等于创建”。AI 返回零建议时隐藏创建按钮，只保留“完成项目卡”，仍通过 discard route 释放 exact confirmation token，不制造重复动作。
+- **验证证据**：Workspace **21/21**、Onboarding Renderer dynamic **26/26**、项目卡 UI **12/12**，完整 `npm test` exit 0。真实 Electron 首轮因测试仍要求旧 `edit.md` 文案在新零建议页面超时；第二轮 36 个行为阶段全部通过后，固定期望仍为 35 而在最终计数红灯。测试改为新用户契约并把新增长文滚动阶段计入固定总数后，最终完整真实 Electron **36/36**。两条红运行均保留，未修改产品权限或放宽性能阈值。
+- **最终回归与界面复核**：Electron-enabled `npm run verify` exit 0。作者项目 App 重新启动后，macOS Accessibility 树确认左栏存在可切换的“打开项目卡”项目级图标、文件顶部只保留 `edit.md` 状态与 AI 入口；实际截图确认项目卡已离开顶部工具栏，长文滚动条仍在。项目卡第二阶段由真实 Electron 自动化验证，不在作者项目中额外发起付费 AI 请求。
+- **待收口**：尚需 Git 提交/推送与 Nowledge 反查；完成前不把本段写成 npm 已发布版本。
 
 ### 0.0AH 2026-07-29 项目卡反馈与中央编辑器滚动修复
 
