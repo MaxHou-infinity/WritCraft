@@ -7,7 +7,9 @@
 // migration of the two small files that existed before the stable path.
 
 const crypto = require('crypto');
+const childProcess = require('child_process');
 const fs = require('fs');
+const os = require('os');
 const path = require('path');
 
 const apiKeyConfigService = require('./api-key-config-service');
@@ -72,6 +74,73 @@ function ensurePrivateDirectory(directory, options = {}) {
   }
   if (process.platform !== 'win32') fs.chmodSync(absolute, 0o700);
   return canonical;
+}
+
+function hasAllowAcl(directory) {
+  if (process.platform !== 'darwin') return false;
+  const inspected = childProcess.spawnSync('/bin/ls', ['-lde', directory], {
+    encoding: 'utf8',
+    env: { PATH: '/usr/bin:/bin', LC_ALL: 'C' },
+    timeout: 5_000,
+  });
+  if (inspected.status !== 0 || typeof inspected.stdout !== 'string') {
+    fail('UNSAFE_STABLE_DIRECTORY', '无法验证隔离配置目录访问控制');
+  }
+  return inspected.stdout
+    .split('\n')
+    .slice(1)
+    .some(line => /\ballow\b/.test(line));
+}
+
+function assertPrivateDirectory(directory, options = {}) {
+  if (typeof directory !== 'string' || !path.isAbsolute(directory)) {
+    fail('UNSAFE_STABLE_DIRECTORY', '隔离配置目录必须是绝对路径');
+  }
+  const requested = path.resolve(directory);
+  const requestedStat = lstatOrNull(requested);
+  if (!requestedStat || requestedStat.isSymbolicLink() || !requestedStat.isDirectory()) {
+    fail('UNSAFE_STABLE_DIRECTORY', '隔离配置目录必须是普通目录');
+  }
+  const absolute = fs.realpathSync(requested);
+  const homeInput = options.homeDirectory || os.homedir();
+  if (typeof homeInput !== 'string' || !path.isAbsolute(homeInput)) {
+    fail('UNSAFE_STABLE_DIRECTORY', '用户主目录无效');
+  }
+  const homeRequested = path.resolve(homeInput);
+  const homeStat = lstatOrNull(homeRequested);
+  if (!homeStat || homeStat.isSymbolicLink() || !homeStat.isDirectory()) {
+    fail('UNSAFE_STABLE_DIRECTORY', '用户主目录不可信');
+  }
+  const home = fs.realpathSync(homeRequested);
+  const relative = path.relative(home, absolute);
+  if (!relative || relative.startsWith(`..${path.sep}`) || relative === '..' || path.isAbsolute(relative)) {
+    fail('UNSAFE_STABLE_DIRECTORY', '隔离配置目录必须位于用户主目录内');
+  }
+
+  const candidates = [home];
+  let current = home;
+  for (const component of relative.split(path.sep)) {
+    current = path.join(current, component);
+    candidates.push(current);
+  }
+  for (const [index, candidate] of candidates.entries()) {
+    const stat = fs.lstatSync(candidate);
+    if (stat.isSymbolicLink() || !stat.isDirectory() || fs.realpathSync(candidate) !== candidate) {
+      fail('UNSAFE_STABLE_DIRECTORY', '隔离配置目录祖先不可信');
+    }
+    if (typeof process.getuid === 'function' && stat.uid !== process.getuid()) {
+      fail('UNSAFE_STABLE_DIRECTORY', '隔离配置目录不属于当前用户');
+    }
+    const isLeaf = index === candidates.length - 1;
+    const forbiddenMode = isLeaf ? 0o077 : 0o022;
+    if (process.platform !== 'win32' && (stat.mode & forbiddenMode) !== 0) {
+      fail('UNSAFE_STABLE_DIRECTORY', '隔离配置目录权限不安全');
+    }
+    if (hasAllowAcl(candidate)) {
+      fail('UNSAFE_STABLE_DIRECTORY', '隔离配置目录包含额外访问授权');
+    }
+  }
+  return absolute;
 }
 
 // Create a complete file at one new name without ever replacing an existing
@@ -210,6 +279,14 @@ function configureUserData(electronApp, options = {}) {
     return { stableDirectory: isolated, isolated: true, migration: null };
   }
 
+  if (typeof options.isolatedPreviewDirectory === 'string' && options.isolatedPreviewDirectory) {
+    const isolated = assertPrivateDirectory(options.isolatedPreviewDirectory, {
+      homeDirectory: options.previewHomeDirectory,
+    });
+    electronApp.setPath('userData', isolated);
+    return { stableDirectory: isolated, isolated: true, migration: null };
+  }
+
   // appData is the only Electron path read before userData is fixed.
   const appDataDirectory = assertCanonicalDirectory(electronApp.getPath('appData'), '系统应用数据目录');
   const stableDirectory = ensurePrivateDirectory(path.join(appDataDirectory, STABLE_DIRECTORY_NAME));
@@ -226,4 +303,5 @@ module.exports = {
   atomicCreate,
   migrateLegacyUserData,
   configureUserData,
+  assertPrivateDirectory,
 };

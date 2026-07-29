@@ -5,7 +5,7 @@
 // no fixture object or control channel is exposed to the renderer.
 
 const TEXT_ENDPOINT = 'https://api.minimaxi.com/anthropic/v1/messages';
-const IMAGE_ENDPOINT = 'https://api.minimax.io/v1/image_generation';
+const IMAGE_ENDPOINT = 'https://api.minimaxi.com/v1/image_generation';
 const API_KEY = 'sk-api-writcraft-e2e-fixture-only';
 const IMAGE_PROMPT = 'WritCraft E2E 配图验收：旧港档案室';
 const ONBOARDING_MARKER = 'E2E 项目卡已确认写入';

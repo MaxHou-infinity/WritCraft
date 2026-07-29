@@ -3,7 +3,8 @@
 
 // Explicit live MiniMax acceptance. This script is intentionally excluded
 // from npm verify: it performs paid/limited POST requests only when the caller
-// opts in. It uses synthetic fixture content and prints metadata only—never a
+// opts in. Image generation may consume Token Plan quota or paid Credits. It
+// uses synthetic fixture content and prints metadata only—never a
 // key fingerprint, prompt, provider text, quote, image bytes or project path.
 
 const childProcess = require('child_process');
@@ -42,7 +43,6 @@ const SAFE_STAGE_ERRORS = new Set([
   'IMAGE_RATE_LIMITED', 'IMAGE_SERVICE_UNAVAILABLE', 'IMAGE_API_FAILED',
   'IMAGE_INSUFFICIENT_BALANCE', 'IMAGE_CONTENT_REJECTED',
   'IMAGE_QUOTA_EXCEEDED', 'IMAGE_INVALID_REQUEST',
-  'IMAGE_KEY_UNSUPPORTED',
   'IMAGE_TIMEOUT', 'IMAGE_REQUEST_FAILED', 'INVALID_IMAGE_RESPONSE',
   'UNSUPPORTED_IMAGE_TYPE', 'INVALID_IMAGE_DATA', 'IMAGE_ASPECT_MISMATCH',
   'MODEL_OUTPUT_INCOMPLETE', 'MODEL_OUTPUT_TOO_LARGE', 'MODEL_OUTPUT_TRUNCATED',
@@ -373,7 +373,6 @@ async function runAcceptance(options = {}) {
 
     if (env[IMAGE_GATE] === '1') {
       await stage('image_01', async () => {
-        if (credential.keyType === 'CODING_PLAN') throw { code: 'IMAGE_KEY_UNSUPPORTED' };
         const rootPath = fs.mkdtempSync(path.join(scratch, 'image-project-'));
         let decodedSize = null;
         const result = await imageService.generateAndSaveImage({
@@ -405,7 +404,7 @@ async function runAcceptance(options = {}) {
     } else {
       report.stages.push({
         name: 'image_01', ok: null, skipped: true,
-        reason: `${IMAGE_GATE}=1 is required because image generation may consume paid quota.`,
+        reason: `${IMAGE_GATE}=1 is required because image generation may consume Token Plan quota or paid Credits.`,
       });
     }
   } finally {

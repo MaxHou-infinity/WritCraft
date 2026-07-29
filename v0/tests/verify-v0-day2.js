@@ -1,7 +1,7 @@
 #!/usr/bin/env node
 // WritCraft V0 · Day 2 verify (修订版: contenteditable, 非 TipTap)
 // Day 2 验收: 加载 → 输入 → 字符计数实时更新
-// TipTap 完整集成留到 Day 3 + Vite 引入后
+// 当前产品固定使用原生 contenteditable，不携带未使用的 TipTap 运行依赖。
 
 const fs = require('fs');
 const path = require('path');
@@ -50,12 +50,13 @@ check('preload.js: detectKeyType (Day 1)', preloadJs.includes('detectKeyType'));
 
 // Electron 资产
 check('Electron.app 安装', fs.existsSync(path.join(V0, 'node_modules/electron/dist/Electron.app/Contents/MacOS/Electron')));
-check('@tiptap/core 安装（Day 3 备用）', fs.existsSync(path.join(V0, 'node_modules/@tiptap/core/package.json')));
-check('@tiptap/starter-kit 安装（Day 3 备用）', fs.existsSync(path.join(V0, 'node_modules/@tiptap/starter-kit/package.json')));
+const packageJson = JSON.parse(fs.readFileSync(path.join(V0, 'package.json'), 'utf-8'));
+check('@tiptap/core 不进入运行依赖', !packageJson.dependencies?.['@tiptap/core']);
+check('@tiptap/starter-kit 不进入运行依赖', !packageJson.dependencies?.['@tiptap/starter-kit']);
 
 console.log(`\n通过 ${PASS} / 失败 ${FAIL}`);
 if (FAIL === 0) {
-  console.log('\n✅ Day 2 文件层全过（contenteditable 方案 · TipTap Day 3 接）');
+  console.log('\n✅ Day 2 文件层全过（contenteditable 方案）');
   console.log('⚠️  GUI 层验证（需主人目视）:');
   console.log('   1. 弹窗里可点击编辑区');
   console.log('   2. 输入字符计数实时更新');

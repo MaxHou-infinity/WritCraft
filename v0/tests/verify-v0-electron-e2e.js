@@ -319,7 +319,18 @@ async function waitForRenderer(client) {
     if (ready) return;
     await delay(100);
   }
-  throw new Error('Renderer did not reach the expected runtime-ready state');
+  const diagnostic = await client.evaluate(`(() => ({
+    protocol: location.protocol,
+    readyState: document.readyState,
+    title: document.title,
+    hasEditor: Boolean(window.__editor),
+    hasAssistantDock: Boolean(window.__assistantDock),
+    assistantModes: document.querySelectorAll('[data-assistant-mode]').length,
+    scriptNames: [...document.scripts].map(script => script.src.split('/').pop()).slice(0, 40),
+  }))()`).catch(() => null);
+  throw new Error(
+    `Renderer did not reach the expected runtime-ready state; diagnostic=${JSON.stringify(diagnostic)}`
+  );
 }
 
 async function waitForValue(client, expression, description, timeoutMs = START_TIMEOUT_MS) {
@@ -3970,6 +3981,9 @@ if (require.main === module) {
   run()
     .catch(error => {
       console.error(error && error.stack ? error.stack : error);
+      if (error && error.processLog) {
+        console.error(`Electron process log:\n${boundedLog(error.processLog)}`);
+      }
       process.exitCode = 1;
     })
     .finally(() => clearInterval(lifecycleGuard));

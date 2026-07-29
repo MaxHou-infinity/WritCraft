@@ -4,7 +4,7 @@ const crypto = require('crypto');
 const fs = require('fs');
 const path = require('path');
 
-const ENDPOINT = 'https://api.minimax.io/v1/image_generation';
+const ENDPOINT = 'https://api.minimaxi.com/v1/image_generation';
 const MODEL = 'image-01';
 const MAX_PROMPT_CHARS = 1500;
 const MAX_IMAGE_BYTES = 8 * 1024 * 1024;
@@ -137,7 +137,7 @@ function abortable(promise, signal) {
 function imageHttpFailure(status) {
   const code = Number(status);
   if (code === 401 || code === 403) {
-    return { code: 'IMAGE_AUTH_FAILED', message: '图片服务鉴权失败，请检查完整 API Key 是否支持 image-01' };
+    return { code: 'IMAGE_AUTH_FAILED', message: '图片服务鉴权失败，请检查 MiniMax Key 是否有效且当前套餐支持 image-01' };
   }
   if (code === 408) {
     return { code: 'IMAGE_TIMEOUT', message: '图片服务请求超时，请稍后再试' };
@@ -158,10 +158,10 @@ function imageProviderFailure(statusCode) {
     return { code: 'IMAGE_RATE_LIMITED', message: '图片服务当前限流，请稍后再试' };
   }
   if ([1004, 2049].includes(code)) {
-    return { code: 'IMAGE_AUTH_FAILED', message: '当前 Key 无法使用图片服务；Coding Plan Key 可能仅支持文本，请配置完整 API Key' };
+    return { code: 'IMAGE_AUTH_FAILED', message: '当前 MiniMax Key 无效或与账户不匹配，请重新配置后再试' };
   }
   if (code === 1008) {
-    return { code: 'IMAGE_INSUFFICIENT_BALANCE', message: '图片服务余额不足，请检查 MiniMax 账户余额' };
+    return { code: 'IMAGE_INSUFFICIENT_BALANCE', message: '图片服务余额或 Credits 不足，请检查 MiniMax 账户资源' };
   }
   if ([1026, 1027].includes(code)) {
     return { code: 'IMAGE_CONTENT_REJECTED', message: '图片描述或生成结果未通过内容安全检查，请调整描述' };
@@ -170,7 +170,10 @@ function imageProviderFailure(statusCode) {
     return { code: 'IMAGE_INVALID_REQUEST', message: '图片描述或请求内容超出服务限制，请缩短后重试' };
   }
   if (code === 2056) {
-    return { code: 'IMAGE_QUOTA_EXCEEDED', message: '图片服务额度或用量已达上限，请检查套餐后再试' };
+    return {
+      code: 'IMAGE_QUOTA_EXCEEDED',
+      message: '当前套餐未包含 image-01，或今日图片额度已用完；请检查 Token Plan 权益或等待额度重置',
+    };
   }
   if (code === 2013) {
     return { code: 'IMAGE_INVALID_REQUEST', message: '图片服务未接受当前参数，请更新应用或调整图片比例' };
@@ -327,12 +330,12 @@ async function responsePayload(response, signal) {
   if (typeof text !== 'string' || text.length > MAX_RESPONSE_CHARS) {
     fail('IMAGE_RESPONSE_TOO_LARGE', '图片服务响应超过大小上限');
   }
-  let payload;
-  try { payload = JSON.parse(text); } catch (_) { fail('INVALID_API_RESPONSE', '图片服务返回了无效 JSON'); }
   if (!response.ok) {
     const failure = imageHttpFailure(response.status);
     fail(failure.code, failure.message);
   }
+  let payload;
+  try { payload = JSON.parse(text); } catch (_) { fail('INVALID_API_RESPONSE', '图片服务返回了无效 JSON'); }
   const statusCode = payload?.base_resp?.status_code;
   if (statusCode !== undefined && Number(statusCode) !== 0) {
     const failure = imageProviderFailure(statusCode);

@@ -79,8 +79,14 @@ const isElectronWatcherFailureFixture = isElectronAiFixture &&
 const e2eUserDataArgument = isElectronE2eUserData
   ? process.argv.find(argument => argument.startsWith('--user-data-dir='))
   : null;
+const isNpmPreview = !app.isPackaged && process.env.WRITCRAFT_NPM_PREVIEW === '1';
+const npmPreviewProfile = isNpmPreview &&
+  typeof process.env.WRITCRAFT_NPM_PREVIEW_PROFILE === 'string'
+  ? process.env.WRITCRAFT_NPM_PREVIEW_PROFILE
+  : null;
 userDataService.configureUserData(app, {
   isolatedTestDirectory: e2eUserDataArgument ? e2eUserDataArgument.slice('--user-data-dir='.length) : null,
+  isolatedPreviewDirectory: npmPreviewProfile,
 });
 
 // A deterministic provider exists only for the real GUI E2E. Production and
@@ -1110,6 +1116,16 @@ function validateRendererContext(projectContext, contextRequest) {
 }
 
 function createWindow() {
+  let npmPreviewReady = false;
+  const sendNpmPreviewStatus = status => {
+    if (!isNpmPreview || typeof process.send !== 'function' || !process.connected) return;
+    try {
+      process.send({
+        schema: 'writcraft.npm-preview-renderer/v1',
+        status,
+      });
+    } catch (_) {}
+  };
   mainWindow = new BrowserWindow({
     width: 1400,
     height: 900,
@@ -1139,6 +1155,10 @@ function createWindow() {
     inlineRewriteStore.clearOwner(inlineRewriteOwnerId);
     chatConversationStore.invalidateOwner(rendererOwnerId, 'chat_reopened');
     advanceRendererNavigationEpoch();
+    if (isNpmPreview && !npmPreviewReady) {
+      sendNpmPreviewStatus('failed');
+      app.exit(1);
+    }
   });
   mainWindow.webContents.on('destroyed', () => {
     researchHandoffStore.clearOwner(rendererOwnerId);
@@ -1164,6 +1184,10 @@ function createWindow() {
   );
 
   mainWindow.loadFile(RENDERER_ENTRY);
+  mainWindow.webContents.once('did-finish-load', () => {
+    npmPreviewReady = true;
+    sendNpmPreviewStatus('ready');
+  });
 
   // 仅开发命令自动打开 DevTools，正常启动保持写作心流
   if (process.argv.includes('--dev')) {
@@ -1180,9 +1204,16 @@ function createWindow() {
   });
 
   // The raw Chromium description and URL are deliberately not logged.
-  mainWindow.webContents.on('did-fail-load', () => {
+  mainWindow.webContents.on('did-fail-load', (_event, errorCode, _description, _url, isMainFrame) => {
     diagnosticRecorder.record('window', 'RENDERER_LOAD_FAILED');
     console.error('[renderer]', 'RENDERER_LOAD_FAILED');
+    if (isElectronAiFixture) {
+      console.error('[renderer-e2e]', `RENDERER_LOAD_FAILED_${errorCode}_${isMainFrame ? 'MAIN' : 'SUB'}`);
+    }
+    if (isNpmPreview && !npmPreviewReady) {
+      sendNpmPreviewStatus('failed');
+      app.exit(1);
+    }
   });
 }
 
@@ -1326,9 +1357,9 @@ const diagnosticExportHandler = diagnosticExportHandlerService.createDiagnosticE
 ipcMain.handle('writcraft:detect-key-type', (event, key) => {
   assertTrustedSender(event);
   if (!key || typeof key !== 'string') return 'INVALID';
-  // Coding Plan Key（sk-cp-）仅用于兼容的 M3/M2.7 文本服务；image-01 必须使用完整 sk-api-。
+  // Key 前缀只标识计费/额度来源；文本和 image-01 的实际能力
+  // 由 MiniMax 服务端套餐权益、Credits 与当前额度决定。
   if (key.startsWith('sk-cp-')  || key.startsWith('SK-cp-'))  return 'CODING_PLAN';
-  // 完整 API Key（sk-api-）可用于文本与 image-01；具体能力仍由服务端权限决定。
   if (key.startsWith('sk-api-') || key.startsWith('SK-api-')) return 'FULL';
   if (key.startsWith('sk-'))                                  return 'UNKNOWN';
   return 'INVALID';
@@ -3150,12 +3181,6 @@ ipcMain.handle('writcraft:project:generate-image', async (event, projectInstance
       throw new projectService.ProjectServiceError('PROJECT_CHANGED', '项目已切换，未生成配图');
     }
     const apiKey = resolveActiveApiKey();
-    if (apiKeyConfigService.detectKeyType(apiKey) === 'CODING_PLAN') {
-      throw new imageGenerationService.ImageGenerationError(
-        'IMAGE_KEY_UNSUPPORTED',
-        'Coding Plan Key 可用于文本服务；生成 image-01 配图需要完整 API Key（sk-api-）'
-      );
-    }
     if (typeof operationId !== 'string' ||
         !imageReviewServiceModule.OPERATION_ID_RE.test(operationId)) {
       throw new imageReviewServiceModule.ImageReviewError(

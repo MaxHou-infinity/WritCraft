@@ -41,9 +41,10 @@ check('editor.js 选区作用域显示精确选区与相邻段落', edJs.include
 
 // 4.4 Markdown 渲染
 check('marked.umd.js 在 renderer 目录', fs.existsSync(path.join(V0, 'src/renderer/marked.umd.js')));
-check('marked 在 package.json deps', (() => {
+check('marked 浏览器 bundle 有第三方许可且不重复进入运行依赖', (() => {
   const p = JSON.parse(fs.readFileSync(path.join(V0, 'package.json'), 'utf-8'));
-  return p.dependencies && p.dependencies.marked;
+  const notices = fs.readFileSync(path.join(V0, 'THIRD_PARTY_NOTICES.md'), 'utf-8');
+  return !p.dependencies?.marked && notices.includes('Marked 18.0.6');
 })());
 
 check('HTML 含 .md-body 样式', html.includes('.md-body'));

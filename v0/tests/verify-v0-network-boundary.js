@@ -286,12 +286,14 @@ test('renderer console and load failures log stable codes without raw browser co
   assert.match(main, /webContents\.on\('console-message', \(_event, level\) =>/);
   assert.match(main, /console\.log\('\[renderer\]', code\)/);
   assert.doesNotMatch(main, /webContents\.on\('console-message', \(_event, level, message/);
-  assert.match(main, /webContents\.on\('did-fail-load', \(\) =>/);
+  assert.match(main,
+    /webContents\.on\('did-fail-load', \(_event, errorCode, _description, _url, isMainFrame\) =>/);
   assert.match(main, /console\.error\('\[renderer\]', 'RENDERER_LOAD_FAILED'\)/);
+  assert.doesNotMatch(main, /console\.error\('\[renderer(?:-e2e)?\]'[^;\n]*(?:_description|_url)/);
 });
 
 test('image generation fixes the official host and rejects redirects without retrying', () => {
-  assert.match(image, /const ENDPOINT = 'https:\/\/api\.minimax\.io\/v1\/image_generation'/);
+  assert.match(image, /const ENDPOINT = 'https:\/\/api\.minimaxi\.com\/v1\/image_generation'/);
   assert.match(image, /redirect: 'error'/);
   assert.strictEqual((image.match(/request\(ENDPOINT/g) || []).length, 1);
   assert.match(image, /AbortController/);

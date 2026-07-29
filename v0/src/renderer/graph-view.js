@@ -845,6 +845,11 @@
         summary.textContent = '当前文件未能保存，已停止分析，避免使用过期内容';
         return;
       }
+      if (typeof window.__workspace.flushExternalChanges !== 'function') {
+        throw new Error('项目文件同步服务未连接，请重新打开项目');
+      }
+      await window.__workspace.flushExternalChanges();
+      if (!requestIsCurrent()) return;
       const result = bridge?.buildGraph
         ? await bridge.buildGraph(projectInstanceId)
         : { ok: false, message: '一致性引擎尚未连接' };

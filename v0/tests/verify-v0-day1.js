@@ -25,8 +25,9 @@ const pkg = JSON.parse(fs.readFileSync(path.join(V0, 'package.json'), 'utf-8'));
 check("package.json 是合法 JSON", !!pkg.name);
 check("name = writ-craft", pkg.name === "writ-craft");
 check("main = src/main/main.js", pkg.main === "src/main/main.js");
-check("包含 electron 依赖", !!pkg.devDependencies.electron);
-check("包含 @tiptap/core 依赖", !!pkg.dependencies["@tiptap/core"]);
+check("包含 electron 运行时依赖", !!pkg.dependencies.electron);
+check("不发布未使用的 TipTap 运行依赖",
+  !pkg.dependencies["@tiptap/core"] && !pkg.dependencies["@tiptap/starter-kit"]);
 check("package.json 有 overrides 锁 markdown-it", !!pkg.overrides && !!pkg.overrides["markdown-it"]);  // 反陷阱 13 改进：方括号语法避免 hyphen 解析
 
 const mainJs = fs.readFileSync(path.join(V0, 'src/main/main.js'), 'utf-8');
@@ -50,12 +51,8 @@ check('HTML 保留 V0 产品阶段标识', html.includes('V0'));
 
 console.log(`\n通过 ${PASS} / 失败 ${FAIL}`);
 if (FAIL === 0) {
-  console.log('\n✅ Day 1 12 项 verify 全过 — 文件结构 + 内容合法性 + 心流规范 全部 OK');
-  console.log('⚠️  下一步（需要主人手跑）：');
-  console.log('   1. cd ' + V0);
-  console.log('   2. npm install');
-  console.log('   3. npm start  # 启动后在设置中保存 MiniMax Key');
-  console.log('      开发自动化也可在启动环境注入 WRITCRAFT_MINIMAX_KEY');
+  console.log('\n✅ Day 1 verify 全过 — 文件结构 + 内容合法性 + 心流规范 全部 OK');
+  console.log('   Electron 作为 npm Developer Preview 的运行时依赖发布。');
   process.exit(0);
 } else {
   console.log('\n❌ 有失败项需要修复');

@@ -63,7 +63,7 @@ async function generate(root, bytes, overrides = {}) {
     rootPath: root,
     prompt: '雨后的港口档案室，纪实摄影',
     aspectRatio: selectedRatio,
-    apiKey: 'sk-api-test-only-key',
+    apiKey: 'sk-cp-test-only-key',
     fetchImpl: async () => successResponse(bytes),
     decodeImage: () => ({ ...expected }),
     ...overrides,
@@ -87,7 +87,7 @@ async function run() {
       assert.strictEqual(captured.url, service.ENDPOINT);
       assert.strictEqual(captured.options.method, 'POST');
       assert.strictEqual(captured.options.redirect, 'error');
-      assert.strictEqual(captured.options.headers.Authorization, 'Bearer sk-api-test-only-key');
+      assert.strictEqual(captured.options.headers.Authorization, 'Bearer sk-cp-test-only-key');
       assert.strictEqual(captured.options.headers['Content-Type'], 'application/json');
       assert.deepStrictEqual(JSON.parse(captured.options.body), {
         model: 'image-01',
@@ -356,6 +356,13 @@ async function run() {
           fetchImpl: async () => response({ status_msg: key }, { ok: false, status }),
         }), error => error.code === code && !error.message.includes(key));
       }
+      await assert.rejects(() => service.generateAndSaveImage({
+        rootPath: root,
+        prompt: '正常描述',
+        aspectRatio: '1:1',
+        apiKey: key,
+        fetchImpl: async () => response(`Unauthorized ${key}`, { ok: false, status: 401 }),
+      }), error => error.code === 'IMAGE_AUTH_FAILED' && !error.message.includes(key));
       for (const [providerStatusCode, code] of [
         [1001, 'IMAGE_TIMEOUT'],
         [1002, 'IMAGE_RATE_LIMITED'],
@@ -390,9 +397,11 @@ async function run() {
     assert(main.includes("ipcMain.handle('writcraft:project:generate-image'"));
     assert.match(main, /writcraft:project:generate-image'[\s\S]{0,200}assertTrustedSender\(event\)/);
     assert.match(main, /generateAndSaveImage\(\{[\s\S]{0,500}rootPath: project\.rootPath/);
-    assert.match(main, /const apiKey = resolveActiveApiKey\(\);[\s\S]{0,400}detectKeyType\(apiKey\) === 'CODING_PLAN'/);
+    assert.match(main, /const apiKey = resolveActiveApiKey\(\);[\s\S]{0,900}generateAndSaveImage\(\{/);
     assert.match(main, /generateAndSaveImage\(\{[\s\S]{0,500}\n\s*apiKey,/);
-    assert(main.includes("'IMAGE_KEY_UNSUPPORTED'"));
+    assert(!main.includes("'IMAGE_KEY_UNSUPPORTED'"));
+    assert(!/detectKeyType\(apiKey\) === 'CODING_PLAN'/.test(main),
+      'Main must let the provider decide Token Plan image capability');
     assert.match(main, /beforeCommit\(\)[\s\S]{0,350}projectMutationGeneration !== mutationGeneration/);
     assert.match(preload, /generateImage: \(projectInstanceId, operationId, prompt, aspectRatio\) =>\s+ipcRenderer\.invoke\('writcraft:project:generate-image', projectInstanceId, operationId, prompt, aspectRatio\)/);
     assert.match(preload, /settleImageReview: \(projectInstanceId, review, insertionProof\) =>\s+ipcRenderer\.invoke\('writcraft:project:settle-image-review', projectInstanceId, review, insertionProof\)/);

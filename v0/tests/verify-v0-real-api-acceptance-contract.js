@@ -21,6 +21,8 @@ const scriptPath = path.join(__dirname, 'verify-v0-api.js');
 const source = fs.readFileSync(scriptPath, 'utf8');
 const packageJson = JSON.parse(fs.readFileSync(path.join(root, 'package.json'), 'utf8'));
 const TEST_CREDENTIAL = Object.freeze({ apiKey: 'sk-api-offline-contract-only', keyType: 'FULL', source: 'test' });
+const TEST_CP_CREDENTIAL = Object.freeze({ apiKey: 'sk-cp-offline-contract-only', keyType: 'CODING_PLAN', source: 'test' });
+const EXPECTED_CHECKS = 16;
 const TEXT_STAGES = Object.freeze([
   'models_handshake', 'minimal_message', 'project_onboarding_json', 'research_exact_quote',
 ]);
@@ -62,13 +64,15 @@ async function main() {
     }
   });
 
-  await test('acceptance uses only synthetic fixtures and requires a second gate for paid image generation', () => {
+  await test('acceptance uses only synthetic fixtures and requires a second gate for quota-consuming image generation', () => {
     assert(source.includes("const LIVE_GATE = 'WRITCRAFT_REAL_API_ACCEPTANCE'"));
     assert(source.includes("const IMAGE_GATE = 'WRITCRAFT_REAL_API_IMAGE'"));
     assert(source.includes("env.WRITCRAFT_REAL_API_SCOPE === 'image'"));
     assert(source.includes("require('./fixtures/writcraft-longform-project')"));
     assert(source.includes('syntheticContentOnly: true'));
-    assert(source.includes('image generation may consume paid quota'));
+    assert(source.includes('image generation may consume Token Plan quota or paid Credits'));
+    assert(!source.includes("credential.keyType === 'CODING_PLAN'"),
+      'Token Plan image capability must be decided by the provider, not the key prefix');
   });
 
   await test('credential lookup follows explicit key, explicit userData, stable, then ordered legacy precedence', () => {
@@ -263,6 +267,27 @@ async function main() {
     assert.strictEqual(image.exitCode, 0);
   });
 
+  await test('image-only scope admits a Coding Plan key and defers capability to the provider', async () => {
+    const imageOrder = [];
+    const image = await acceptance.runAcceptance({
+      env: {
+        WRITCRAFT_REAL_API_ACCEPTANCE: '1',
+        WRITCRAFT_REAL_API_SCOPE: 'image',
+        WRITCRAFT_REAL_API_IMAGE: '1',
+      },
+      loadCredential: () => TEST_CP_CREDENTIAL,
+      stageTasks: injectedStages(imageOrder, {
+        image_01: async ({ credential }) => {
+          assert.strictEqual(credential.keyType, 'CODING_PLAN');
+          return { providerCapabilityChecked: true };
+        },
+      }),
+    });
+    assert.deepStrictEqual(imageOrder, ['image_01']);
+    assert.strictEqual(image.payload.stages[0].providerCapabilityChecked, true);
+    assert.strictEqual(image.exitCode, 0);
+  });
+
   await test('hostile thrown messages and unknown codes collapse to metadata-only ACCEPTANCE_FAILED', async () => {
     const secret = 'sk-api-DO_NOT_LEAK prompt manuscript provider-body';
     const result = await acceptance.runAcceptance({
@@ -315,7 +340,8 @@ async function main() {
     }
   });
 
-  console.log(`\n${passed}/15 real API acceptance contract checks passed; 0 network calls.`);
+  assert.strictEqual(passed, EXPECTED_CHECKS);
+  console.log(`\n${passed}/${EXPECTED_CHECKS} real API acceptance contract checks passed; 0 network calls.`);
 }
 
 main().catch(error => {

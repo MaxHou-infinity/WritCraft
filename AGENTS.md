@@ -16,15 +16,24 @@ Run commands from `v0/`:
 - `npm test` — run the main Node behavior suite.
 - `npm run verify` — run the broader regression, security, and packaging checks.
 - `npm run verify:full` — run verification plus forced real-Electron E2E.
+- `npm run verify:npm-preview` — verify the CLI/package allowlist and inspect the preview tarball without publishing.
+- `npm run verify:npm-preview:installed` — install the tarball in isolation and prove Main-observed page-load IPC, profile isolation, signal forwarding, and cleanup.
+- `npm audit --omit=dev` — require zero known production vulnerabilities for every preview candidate and again immediately before publication.
 - `npm run package:mac` and `npm run release:verify` — build and inspect the macOS artifact.
 
 Real API checks require explicit gates; never enable them casually or log keys, prompts, or document content.
+
+The initial distribution route is the macOS npm Developer Preview in `docs/NPM-DEVELOPER-PREVIEW-V1-CONTRACT.md`. Do not publish to a registry without explicit authorization. Treat the package name as provisional until ownership is verified.
+
+Do not infer a validated platform matrix from manifest declarations or universal helper slices. Record the exact Node/npm/architecture used by installed-tarball evidence; npm 10 and x64 remain open until their public CLI reaches the same Main-observed page-load IPC and clean-exit contract. That IPC proves `did-finish-load`, not every workspace/bootstrap behavior.
 
 ## Coding Style & Naming Conventions
 
 Use CommonJS JavaScript with `'use strict'`, two-space indentation, semicolons, single quotes, and `const` by default. Name modules in kebab-case (`onboarding-batch-service.js`), verification files `verify-v0-<feature>.js`, and constants in `UPPER_SNAKE_CASE`. No formatter or linter is enforced; preserve surrounding style and run `node --check <file>` for changed JavaScript.
 
 Main owns filesystem, revision, capability, and network authority. Renderer code must not access Node APIs or make HTTP(S) requests directly. AI writes must remain reviewable through ChangeSet/History boundaries.
+
+Never infer provider capability from a credential prefix. `sk-cp-` and `sk-api-` identify credential/billing families; current official documentation plus a gated, privacy-safe provider response decide whether `image-01` is available. Pin Electron to a currently supported stable release and re-run real-Electron behavior after every upgrade.
 
 Before any paid call or irreversible side effect, complete authority/capacity preflight and acquire an owner-specific single-flight lease. Release only a lease this request actually acquired. After a commit, retries must preserve committed truth: do not rerun stale pre-commit validation or repeat the mutation; retry only missing evidence, fsync, or response reconstruction.
 

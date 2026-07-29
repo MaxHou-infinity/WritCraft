@@ -6,7 +6,7 @@
 > 适用范围：V0 起的桌面写作 IDE  
 > 优先级：若本文件与旧版 PRD、路线图或原型行为冲突，以本文件为准；工程实现以 `docs/PHASE-A-IMPLEMENTATION.md` 为准。
 
-> **实现状态注记（2026-07-28，0.0AB）**：本文仍是产品权威规格，**完整 PRD 尚未完成真实作者与正式发布验收**。0.0AA 的 Main-owned 最近对话保持签字；0.0AB 新增 Explorer 可见普通 Markdown 项目回收区，支持有界列表、刷新和单项恢复，并由 Main watcher barrier、opaque capability、exact-owner mutation lease 与 native fd-relative journal transaction 保护。native worker **20/20**、Trash service/handler **11/11**、完整 test/verify、Persistent **3/3**、真实 Electron **35/35**、package **8/8** 与 release **7/7** 通过；独立复审 **P0=0/P1=0/P2=0**。当前本地产品实现批已经清零；剩余为完整 `sk-api-` 图片验收、作者显式选择的合格真实项目、真实作者指标及 Developer ID/公证/Gatekeeper 等外部门禁。其他 AI 模式仍未统一采用 `edit.md` 分区编译器。
+> **实现状态注记（2026-07-29，0.0AC）**：本文仍是产品权威规格，**完整 PRD 尚未完成真实作者与公开发布验收**。0.0AC 已实现 macOS npm Developer Preview 和 Coding Plan 图片能力纠错；当前源码 test/verify、Persistent **3/3**、npm Preview **10/10**、installed **2/2**、同源码连续两轮真实 Electron **35/35** 通过，真实 `sk-cp-` 合成图片调用成功，实现复审 P0/P1 已清零。许可证、npm10/x64、registry 和合格真实作者项目仍是开放门禁。Developer ID/公证仅在未来独立 App 路线需要；其他 AI 模式仍未统一采用 `edit.md` 分区编译器。
 
 > **完成定义**：任何“V0 完成”声明必须同时满足 §10.1–§10.4、全量自动回归、真实 Electron E2E 和独立复审。局部 suite 通过、本地 ad-hoc App 或历史 ZIP 均不能单独构成完成证据。
 
@@ -358,7 +358,7 @@ Issue 类型首批支持：
 - Renderer 是离线文档表面：CSP 禁止连接，Electron session 继续拦截 HTTP(S) 与 WS(S)，并默认拒绝浏览器和设备权限；Renderer 不持有 Key 或网络原语。
 - 作者证据指标保持项目私有和内容无关：只允许 workflow、结果、耗时、字符计数与时间，不记录正文、Prompt、答案、模型原文、错误消息、Key 或路径；旧指标文件必须兼容，小样本不得包装成结论。
 - 图片评审证据与通用指标分离：通用指标记录生成耗时/安全结果；图片评审只记录 operation、1–5 分、插入/保留/废纸篓、可选人工核对费用和时间。生成不得改正文，删除必须移动 Main 绑定的精确资产到项目私有可恢复废纸篓。
-- Main 的 V0 远端 allowlist 仅为文本 `api.minimaxi.com/anthropic/v1/{models,messages}` 与图片 `api.minimax.io/v1/image_generation`，不得接受 Renderer 提交 URL、主机、Key 或输出路径。
+- Main 的 V0 远端 allowlist 仅为文本 `api.minimaxi.com/anthropic/v1/{models,messages}` 与图片 `api.minimaxi.com/v1/image_generation`，不得接受 Renderer 提交 URL、主机、Key 或输出路径。
 - 网络请求必须有请求/响应字节上限、贯穿响应体读取的 deadline、项目 owner abort、禁止重定向和写操作自动重试；远端 body、Prompt、正文、Key 与未知异常不得进入日志或用户错误。
 - 所有 AI 请求必须绑定可信 sender、origin project instance 和 mutation generation；项目切换、正文/结构提交或外部权威文件变化后必须中止在途请求并拒绝发布陈旧结果。
 
@@ -398,7 +398,7 @@ Issue 类型首批支持：
 
 ### 10.3 Phase C：一致性星图
 
-本节的动态旅程、零写入边界、可访问性、最小窗口和大型图谱性能门禁由 `docs/GRAPH-ACCEPTANCE-V1-CONTRACT.md` 细化。产品契约于 2026-07-22 签字，2026-07-23 性能批源码完整 test/verify 与强制 Electron 连续两轮 26/26 通过，可见帧性能复审 P0/P1/P2=0。后续 Graph 韧性批又关闭完整语义权威、不可变快照、异步所有权与 Unicode quote 边界；当前 0.0AB 基线完整 verify 通过、总链强制 Electron **35/35**。
+本节的动态旅程、零写入边界、可访问性、最小窗口和大型图谱性能门禁由 `docs/GRAPH-ACCEPTANCE-V1-CONTRACT.md` 细化。产品契约于 2026-07-22 签字，2026-07-23 性能批源码完整 test/verify 与强制 Electron 连续两轮 26/26 通过，可见帧性能复审 P0/P1/P2=0。后续 Graph 韧性批又关闭完整语义权威、不可变快照、异步所有权与 Unicode quote 边界；0.0AB 当时完整 verify 与强制 Electron **35/35** 通过，当前证据见本文顶部 0.0AC。
 
 1. 能从至少三个项目文件增量生成统一节点、关系、证据和问题。
 2. 默认显示当前文件子图，可切换全项目并按类型、文件和问题筛选。
@@ -409,7 +409,7 @@ Issue 类型首批支持：
 
 ### 10.4 完整 V0 体验
 
-以一个包含 `edit.md`、不少于五个章节文件和来源材料的真实项目完成：项目定义 → 文件写作 → 段落 Diff → 跨文件修改 → 一致性检查 → 重启恢复。验收必须包含真实 Electron 行为测试；仅检查 DOM 元素或源码字符串不能证明完成。完整 V0 还需关闭作者显式选择项目上的真实 GUI 项目卡落盘验收、完整 `sk-api-` 图片、真实作者长文与价值指标、干净打包、签名/公证/Gatekeeper 门禁；精确顺序与命令以 `v0/DEVELOPMENT-STATUS.md` 为准。
+以一个包含 `edit.md`、不少于五个章节文件和来源材料的真实项目完成：项目定义 → 文件写作 → 段落 Diff → 跨文件修改 → 一致性检查 → 重启恢复。验收必须包含真实 Electron 行为测试；仅检查 DOM 元素或源码字符串不能证明完成。完整 V0 还需关闭作者显式选择项目上的真实 GUI 项目卡落盘验收、真实作者图片质量/采纳与长文价值指标，以及 npm Developer Preview 的许可证、npm10/x64、registry、发布后安装门禁；独立 App 的签名/公证/Gatekeeper 属于未来可选路线。
 
 ## 11. 文档治理
 

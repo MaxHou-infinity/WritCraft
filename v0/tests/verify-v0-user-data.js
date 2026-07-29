@@ -248,4 +248,70 @@ test('isolated test profile is explicitly set without consulting appData or runn
   }
 });
 
-console.log(`\n${passed}/8 stable userData checks passed.\n`);
+test('npm preview profile accepts only an existing owner-private directory without migration', () => {
+  const scratch = makeScratch();
+  try {
+    const isolated = path.join(scratch, 'preview');
+    fs.mkdirSync(isolated, { mode: 0o700 });
+    const calls = [];
+    const app = {
+      getPath() { throw new Error('must not read appData'); },
+      setPath(name, value) { calls.push([name, value]); },
+    };
+    const result = userDataService.configureUserData(app, {
+      isolatedPreviewDirectory: isolated,
+      previewHomeDirectory: scratch,
+    });
+    assert.deepStrictEqual(result, {
+      stableDirectory: isolated,
+      isolated: true,
+      migration: null,
+    });
+    assert.deepStrictEqual(calls, [['userData', isolated]]);
+
+    fs.chmodSync(isolated, 0o755);
+    assert.throws(
+      () => userDataService.configureUserData(app, {
+        isolatedPreviewDirectory: isolated,
+        previewHomeDirectory: scratch,
+      }),
+      error => error && error.code === 'UNSAFE_STABLE_DIRECTORY'
+    );
+
+    fs.chmodSync(isolated, 0o700);
+    const replaceableParent = path.join(scratch, 'replaceable');
+    const nested = path.join(replaceableParent, 'profile');
+    fs.mkdirSync(replaceableParent, { mode: 0o777 });
+    fs.chmodSync(replaceableParent, 0o777);
+    fs.mkdirSync(nested, { mode: 0o700 });
+    assert.throws(
+      () => userDataService.configureUserData(app, {
+        isolatedPreviewDirectory: nested,
+        previewHomeDirectory: scratch,
+      }),
+      error => error && error.code === 'UNSAFE_STABLE_DIRECTORY'
+    );
+
+    if (process.platform === 'darwin') {
+      const aclProfile = path.join(scratch, 'acl-profile');
+      fs.mkdirSync(aclProfile, { mode: 0o700 });
+      const acl = require('child_process').spawnSync(
+        '/bin/chmod',
+        ['+a', 'everyone allow list,search,readattr,readextattr,readsecurity', aclProfile],
+        { encoding: 'utf8' }
+      );
+      assert.strictEqual(acl.status, 0, acl.stderr);
+      assert.throws(
+        () => userDataService.configureUserData(app, {
+          isolatedPreviewDirectory: aclProfile,
+          previewHomeDirectory: scratch,
+        }),
+        error => error && error.code === 'UNSAFE_STABLE_DIRECTORY'
+      );
+    }
+  } finally {
+    fs.rmSync(scratch, { recursive: true, force: true });
+  }
+});
+
+console.log(`\n${passed}/9 stable userData checks passed.\n`);

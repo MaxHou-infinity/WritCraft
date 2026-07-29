@@ -3,9 +3,37 @@
   "version": "0.1.0",
   "description": "中国第一款 Cursor 范式 AI 写作 IDE — V0 桌面应用原型",
   "main": "src/main/main.js",
+  "bin": {
+    "writcraft": "bin/writcraft.js"
+  },
+  "files": [
+    "bin/writcraft.js",
+    "src/main/**/*.js",
+    "src/main/native/*",
+    "src/renderer/**/*",
+    "README.md",
+    "LICENSE",
+    "THIRD_PARTY_NOTICES.md",
+    "npm-shrinkwrap.json"
+  ],
+  "os": [
+    "darwin"
+  ],
+  "cpu": [
+    "arm64",
+    "x64"
+  ],
+  "engines": {
+    "node": ">=22.12.0",
+    "npm": ">=10 <12"
+  },
+  "publishConfig": {
+    "access": "public",
+    "tag": "preview"
+  },
   "scripts": {
-    "posttest": "node tests/verify-v0-markdown-trash-worker.js && node tests/verify-v0-markdown-trash.js && npm run verify:author-acceptance && node tests/verify-v0-localized-edit-service.js && node tests/verify-v0-project-changes-proposal.js && node tests/verify-v0-project-changes-scope.js && node tests/verify-v0-graph-evolution-renderer.js && node tests/verify-v0-graph-renderer-dynamic.js && node tests/verify-v0-graph-issue-handoff-transaction.js && node tests/verify-v0-graph-issue-handoff.js && node tests/verify-v0-graph-issue-handoff-integration.js && node tests/verify-v0-research-handoff.js && node tests/verify-v0-research-handoff-renderer.js",
-    "postverify": "node tests/verify-v0-markdown-trash-worker.js && node tests/verify-v0-markdown-trash.js && npm run verify:author-acceptance && node tests/verify-v0-localized-edit-service.js && node tests/verify-v0-project-changes-proposal.js && node tests/verify-v0-project-changes-scope.js && node tests/verify-v0-graph-evolution-renderer.js && node tests/verify-v0-graph-renderer-dynamic.js && node tests/verify-v0-graph-issue-handoff-transaction.js && node tests/verify-v0-graph-issue-handoff.js && node tests/verify-v0-graph-issue-handoff-integration.js && node tests/verify-v0-research-handoff.js && node tests/verify-v0-research-handoff-renderer.js",
+    "posttest": "node tests/verify-v0-markdown-trash-worker.js && node tests/verify-v0-markdown-trash.js && npm run verify:author-acceptance && node tests/verify-v0-localized-edit-service.js && node tests/verify-v0-project-changes-proposal.js && node tests/verify-v0-project-changes-scope.js && node tests/verify-v0-graph-evolution-renderer.js && node tests/verify-v0-graph-renderer-dynamic.js && node tests/verify-v0-graph-issue-handoff-transaction.js && node tests/verify-v0-graph-issue-handoff.js && node tests/verify-v0-graph-issue-handoff-integration.js && node tests/verify-v0-research-handoff.js && node tests/verify-v0-research-handoff-renderer.js && node tests/verify-v0-npm-preview.js",
+    "postverify": "node tests/verify-v0-markdown-trash-worker.js && node tests/verify-v0-markdown-trash.js && npm run verify:author-acceptance && node tests/verify-v0-localized-edit-service.js && node tests/verify-v0-project-changes-proposal.js && node tests/verify-v0-project-changes-scope.js && node tests/verify-v0-graph-evolution-renderer.js && node tests/verify-v0-graph-renderer-dynamic.js && node tests/verify-v0-graph-issue-handoff-transaction.js && node tests/verify-v0-graph-issue-handoff.js && node tests/verify-v0-graph-issue-handoff-integration.js && node tests/verify-v0-research-handoff.js && node tests/verify-v0-research-handoff-renderer.js && node tests/verify-v0-npm-preview.js",
     "start": "electron .",
     "dev": "electron . --dev",
     "build:native-helper": "node scripts/build-native-helper.js",
@@ -23,6 +51,8 @@
     "verify:watcher-flush": "node tests/verify-v0-project-hash-worker.js && node tests/verify-v0-project-watcher.js && node tests/verify-v0-watcher-flush-integration.js",
     "verify:diagnostics": "npm run verify:watcher-flush && node tests/verify-v0-diagnostic-export-service.js && node tests/verify-v0-diagnostic-export-handler.js && node tests/verify-v0-diagnostic-export-renderer.js",
     "verify:image-review": "node tests/verify-v0-image-generation.js && node tests/verify-v0-image-review-service.js && node tests/verify-v0-image-review-handler.js && node tests/verify-v0-image-trash-service.js && node tests/verify-v0-image-trash-handler.js && node tests/verify-v0-image-trash-integration.js && node tests/verify-v0-image-generation-renderer.js && node tests/verify-v0-image-trash-renderer.js && node tests/verify-v0-ai-metrics-renderer.js",
+    "verify:npm-preview": "node tests/verify-v0-npm-preview.js",
+    "verify:npm-preview:installed": "node tests/verify-v0-npm-preview-installed.js",
     "verify:author-acceptance": "node tests/verify-v0-real-api-acceptance-contract.js && node tests/verify-v0-author-acceptance-preflight.js",
     "verify:full": "npm run verify && WRITCRAFT_E2E_FORCE=1 npm run e2e:electron && WRITCRAFT_E2E_FORCE=1 npm run e2e:watcher-main-ipc",
     "pretest": "npm run verify:diagnostics && npm run verify:image-review && node tests/verify-v0-minimax-text-service.js && node tests/verify-v0-network-boundary.js && node tests/verify-v0-project-onboarding-v2.js && node tests/verify-v0-onboarding-capability.js && node tests/verify-v0-onboarding-batch.js && node tests/verify-v0-project-onboarding-handler.js && node tests/verify-v0-tab-semantics.js && node tests/verify-v0-project-plan.js && node tests/verify-v0-plan-handoff.js && node tests/verify-v0-plan-handoff-transaction.js && node tests/verify-v0-changes-proposal-transaction.js && node tests/verify-v0-context-policy.js && node tests/verify-v0-research-service.js && node tests/verify-v0-research-integration.js && node tests/verify-v0-research-apply-transaction.js && node tests/verify-v0-research-judgment-transaction.js && node tests/verify-v0-sources-race.js && node tests/verify-v0-plan-mode-ui.js && node tests/verify-v0-assistant-dock.js && node tests/verify-v0-assistant-integration.js && node tests/verify-v0-ai-metrics-integration.js",
@@ -38,16 +68,11 @@
     "minimax"
   ],
   "author": "Max Hou",
-  "license": "MIT",
-  "devDependencies": {
-    "electron": "^32.0.0"
-  },
+  "license": "UNLICENSED",
   "dependencies": {
-    "@tiptap/core": "~2.10.0",
-    "@tiptap/starter-kit": "~2.10.0",
-    "diff": "^9.0.0",
-    "marked": "^18.0.6",
-    "pdfjs-dist": "^5.4.149"
+    "diff": "9.0.0",
+    "electron": "43.2.0",
+    "pdfjs-dist": "5.4.149"
   },
   "overrides": {
     "markdown-it": "14.1.0"

@@ -146,6 +146,7 @@ console.log('\nGraph renderer dynamic stale verification');
   let buildCalls = 0;
   let layoutCalls = 0;
   let buildMode = 'fixture';
+  let flushMode = 'success';
   let resolveDelayedBuildA;
   let resolveDelayedPersistA;
   let settleSameProjectOldBuild;
@@ -153,6 +154,7 @@ console.log('\nGraph renderer dynamic stale verification');
   let correctionMode = 'fixture';
   const racedBuildProjects = [];
   const racedPersistProjects = [];
+  const graphAuthorityEvents = [];
   const sample = {
     nodes: [
       { id: 'alice', key: 'Alice', type: 'person', label: 'Alice', evidenceIds: ['e1'] },
@@ -198,6 +200,7 @@ console.log('\nGraph renderer dynamic stale verification');
     },
     writCraft: { project: {
       buildGraph: async projectInstanceId => {
+        graphAuthorityEvents.push(`build:${projectInstanceId}`);
         buildCalls += 1;
         if (buildMode === 'build-race') {
           racedBuildProjects.push(projectInstanceId);
@@ -279,6 +282,11 @@ console.log('\nGraph renderer dynamic stale verification');
     __workspace: {
       state,
       getCurrentPath: () => 'other.md',
+      flushExternalChanges: async () => {
+        graphAuthorityEvents.push(`flush:${state.project?.instanceId || ''}`);
+        if (flushMode === 'reject') throw new Error('GRAPH_FLUSH_BLOCKED');
+        return { ok: true };
+      },
       persistCurrent: async () => {
         const owner = state.project?.instanceId;
         if (buildMode !== 'persist-race') return true;
@@ -294,8 +302,12 @@ console.log('\nGraph renderer dynamic stale verification');
   vm.runInNewContext(source, { window, document, console, Map, Set, Array }, { filename: 'graph-view.js' });
   await window.__graphView.refresh();
   assert.strictEqual(buildCalls, 1);
+  assert.deepStrictEqual(graphAuthorityEvents.slice(0, 2), [
+    'flush:project-a',
+    'build:project-a',
+  ], 'Graph refresh must cross the Main-owned watcher barrier before building from project files');
   assert.match(elements.get('graph-summary').textContent, /分析失败.*图谱 fixture 构建失败/);
-  pass('Main Graph build failure is announced through the existing live region');
+  pass('Graph refresh crosses the watcher barrier before Main build and announces build failure');
 
   await window.__graphView.refresh();
   assert.strictEqual(buildCalls, 2);
@@ -634,6 +646,16 @@ console.log('\nGraph renderer dynamic stale verification');
   assert.match(elements.get('graph-summary').textContent, /纠错保存中断.*non-plain object/);
   pass('an invalid correction Graph fails closed because Main may already have committed its ledger');
   correctionMode = 'fixture';
+
+  flushMode = 'reject';
+  buildMode = 'fixture';
+  const buildCallsBeforeFlushFailure = buildCalls;
+  await window.__graphView.refresh();
+  assert.strictEqual(buildCalls, buildCallsBeforeFlushFailure,
+    'a failed watcher barrier must stop before invoking Main buildGraph');
+  assert.match(elements.get('graph-summary').textContent, /分析中断.*GRAPH_FLUSH_BLOCKED/);
+  pass('a failed watcher barrier blocks Graph build and remains visibly fail-closed');
+  flushMode = 'success';
 
   buildMode = 'invalid-snapshot';
   await window.__graphView.refresh();

@@ -181,7 +181,7 @@ test('preload exposes set/clear/status/check and renderer never handles plaintex
   assert(html.includes('id="activity-settings"'));
   assert(html.includes('id="api-key-dialog"'));
   assert(html.includes('type="password"'));
-  assert(html.includes('生成 image-01 配图需要完整 API Key'));
+  assert(html.includes('image-01 是否可用由当前套餐权益、Credits 与每日额度决定'));
   assert(html.includes('id="api-key-check"'));
   assert(html.includes('id="api-key-connection"'));
   assert(html.includes('aria-live="polite"'));
