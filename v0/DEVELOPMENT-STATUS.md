@@ -39,7 +39,7 @@ Chat 的三级 scope/context、Main-owned 多轮连续性、Chapter、Onboarding
 - **接受 operation**：`cd20e785…` 为 **5,143 ms `generated` → 4,032 ms `accepted`**，字符计数 32 → 44。唯一 post-manifest History 为 **`change_6516ccbc…`**，`application/applied`，目标精确为 `chapters/01-cope-origin/chapter-01-why-cope.md`；before revision **`1bdb3a5c…`**、after revision **`f9b89aac…`**，当前磁盘 SHA-256 与 after 精确一致。
 - **拒绝 operation**：`8f093bb9…` 为 **4,807 ms `generated` → 2,151 ms `rejected`**，预览 44 → 76 字符，拒绝终态回到 44。该 operation 发生在接受写盘之后，但目标 mtime 仍为接受时的 `2026-07-30T14:59:34.333Z`，没有第二条 post-manifest History；桌面终态明确显示 **“原文已恢复”**。因此它证明的是“保留第一次已接受真相、拒绝第二次建议零额外写入”。
 - **项目与原稿边界**：当前 14 个 Markdown 合计 97,349 bytes，组合摘要 **`0a526eb1c963cf51d73df8bbb42e7061be3c1beb2283621ae22eca7c7635ed3d`**；相对验收源只有上述第一章发生变化。原始验收源仍 eligible，snapshot digest 继续为 **`9d0898863636da74615481a669c3e40362a60176249870e6d1793380c85b4380`**。
-- **下一步唯一目标**：在修改历史中只撤销明确标记为“最新”、且路径精确为 `chapters/01-cope-origin/chapter-01-why-cope.md` 的 **`change_6516ccbc…`**。不得撤销 `edit.md` 或任何更早记录；完成后必须证明正文恢复 `1bdb3a5c…`、该 History 进入 undone 终态且原始源不变。
+- **下一步唯一目标**：桌面修改历史已展开，最上方卡片明确显示 **`chapters/01-cope-origin/chapter-01-why-cope.md 最新 · 已应用 7/30 22:59`**，对应按钮 aria-label 为“安全撤销：chapters/01-cope-origin/chapter-01-why-cope.md”。作者只撤销这张 **`change_6516ccbc…`**；不得点击其下方旧 `manuscript/...` 或两条 `edit.md`。完成后必须证明正文恢复 `1bdb3a5c…`、该 History 进入 undone 终态且原始源不变。
 - **证据口径纠正**：0.0BK 曾直接读取不存在的 `changes.json.history`，把继承 History 总数误写为 0。权威 `changeHistoryService.listHistory()` 证明第五副本基线继承 **3** 条、manifest 后为 **0** 条；接受后总数 **4**、本轮新增 **1**。错误只在证据解析与文档，不影响磁盘、History 服务或作者操作。
 
 ### 0.0BK 2026-07-30 · `9b21a9d` 第五 fresh Inline 验收副本
