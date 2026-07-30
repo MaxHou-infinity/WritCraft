@@ -1,11 +1,11 @@
 # 笔触 · WritCraft · V0 开发状态与续作入口
 
-> 最后更新：2026-07-30（Asia/Shanghai，0.0BH · 第四个 fresh 作者验收副本就绪）
+> 最后更新：2026-07-30（Asia/Shanghai，0.0BI · 第四副本真实作者项目卡通过）
 > 当前状态：**`writ-craft@0.1.1` 已从 exact candidate `c65981e` 发布到 npm `preview`；registry 时间 `2026-07-29T14:30:16.176Z`，shasum `d370c500666e25cfb373852deafa21b232d2bc18` 与本地候选一致。公网隔离安装/启动/退出为 2/2。annotated tag `v0.1.1` 指向同一提交，GitHub prerelease 已公开：`https://github.com/MaxHou-infinity/WritCraft/releases/tag/v0.1.1`。**
 > 发布判断：**0.1.1 Developer Preview 已完成版本、自动化、双架构安装、独立复审、npm 发布、公网安装和 GitHub prerelease。registry 标签保持 `preview: 0.1.1`、`latest: 0.1.0`，因此本次没有把 Preview 冒充稳定版，也没有执行 unpublish、占位发布或上传未签名 App/ZIP。**
 > 当前目标版本：**`docs/ROADMAP.md` 的 `RM-1.0 / writ-craft@0.1.2` 真实作者可用性闭环。必须使用 `edit.md`、5+ 个 `chapters/` 章节、2000+ 可见中文字符和至少 1 个来源文件的作者隔离副本，完成五段旅程，并关闭现场 `Graph INVALID_CACHE` 的诊断/恢复终态。0.1.2 签字前不得插入驾驶舱、新 AI 模式或其他后续版本功能。**
 > 当前源码证据：**旧的未发布 0.1.2 candidates `45b1815`、`9a05c44`、`89658f0`、`6ed6f89` 与 `30a06b0` 均已被后续生产修复失效，不得发布或复用受影响验收证据。新的 exact production candidate 为 `5ed4147`，修复了“已提交 edit.md 后跳过初始文件仍显示结果未变”的陈旧终态文案，并新增跨真实 Changes 回调的动态回归；Onboarding Renderer dynamic 从 29/29 提升到 **30/30**，Changes UX 8/8。完整 `npm test` 前两次均在与本修复无关的 native Markdown trash helper 启动阶段以 `bind timed out` 红灯（各 19/20，具体用例不同），单独同测试 20/20；根因是测试把 22 个 helper 的 bind/普通恢复等待预算硬编码为 1 秒，而生产默认 30 秒。测试专用 bind/普通恢复预算现为 5 秒，`ready()` 后的故障注入仍为 100ms；聚焦 20/20，随后完整 `npm test` exit 0。批准 GUI 环境的完整 `npm run verify` exit 0，强制真实 Electron **37/37**；npm Preview **10/10**，本机、Node 22/npm 10 arm64 与 Node 24/npm 11 x64 的 fresh-tarball 安装均 **2/2**，联网生产依赖审计 **0 vulnerabilities**。dry-run 包为 **120 files / 574,848 bytes / 2,631,510 unpacked / shasum `65af5cedcc154dcf3099284240e8b16a755b3696`**。独立复审结论 **P0=0/P1=0/P2=1**，唯一 P2 是本段已修正的测试预算表述精度；不改变生产候选并允许创建第四 fresh 副本。npm/GitHub 未发布 0.1.2。**
-> 当前作者验收进度：**第三个 fresh 副本在旧 candidate `30a06b0` 上完成的一次安全零写入和一次真实落盘已经因终态文案生产修复失效，只保留为红灯与修复输入。`5ed4147` 全门禁及独立复审已关闭；第四个 fresh 副本 `/Users/maxhou/Desktop/Max 项目-2026/WritCraft 作者验收/WritCraft-0.1.2-作者验收-4` 已从未变验收源创建，manifest `createdAt=2026-07-30T13:12:06.288Z`，20 files / 608,433 bytes，source digest 仍为 `9d089886…`。旧 App 已终止，新候选已用稳定 profile 启动；桌面界面确认项目名、`edit.md` 和 revision `e9e9f7c…`。下一步由作者本人从项目卡重启五段旅程，自动化不得代填或代做接受判断。**
+> 当前作者验收进度：**第四副本真实作者项目卡已通过。operation `32b817da…` 为 `generated → accepted`；新增 `application/applied` History `change_5417c8da…`，只修改 `edit.md`，接受 2 hunks、拒绝 0，磁盘/History 从 `e9e9f7c…` 精确更新为 `8b68a5b…`。界面同时显示“已按磁盘、文件树和修改历史确认本次操作”“已跳过初始文件创建；edit.md 已保留本轮接受的更新”“项目卡已完成”。原稿仍为 eligible、20 files / 608,433 bytes、snapshot digest `9d089886…`，未被修改。项目卡不得再次重跑；下一步进入普通正文 Inline Rewrite 的独立拒绝操作。**
 > 0.0AA 历史保留红灯：**首轮真实 Electron 暴露 Inspector 在上下文失效时被清空、旧 5-chip 断言和项目 Chat 等待诊断；完整 test 又暴露 Plan 测试把 generation 函数正文写死。独立复审发现新请求预检窗口可提交不可见旧轮、同项目重开 UI/Main 串话、失败重开提前清会话及两项测试/错误文案缺口，均转为生产边界和回归后关闭。真实 Electron 曾连续两次在旧 Graph 恢复阶段超时；加入只读失败快照后该阶段连续四次通过，未改 Graph 产品逻辑，按重复同源证据关闭 timing P2。另一次 Chat preflight 红灯证明测试在恢复 `edit.md` 后未等待权威 watcher barrier；改为生产 `flushExternalChanges()` 收敛，而未放宽 Chat guard。该里程碑所有红运行保留，最终源码连续两次 34/34；后续 0.0AB 当时推进到 35/35，当前总链只看本文顶部当前里程碑。**
 > Graph 历史签字基线：**性能修复前的既有源码曾完整 `npm test`、Electron-enabled `npm run verify`、强制真实 Electron 26/26 exit 0；Graph Filter 15/15、Workbench 14/14、dynamic 5/5、Large 5/5、Watcher 15/15、Network 11/11、Intelligence 17/17，第二轮复审 P0=0/P1=0/P2=2。该数字只保留为历史过程；0.0AB 后来推进到 35/35，当前总链只看顶部当前里程碑。**
 > Graph 动态边界：**300 文件/1279 节点 cold-to-interactive、cache/incremental、筛选/内存/布局、AX/键鼠、三类纠错、stale/Issue→Changes、failure live、重启与项目隔离均进入真实 Electron；正文/History/ledger 的零写入门禁通过。**  
@@ -32,6 +32,15 @@ Chat 的三级 scope/context、Main-owned 多轮连续性、Chapter、Onboarding
 4. 不重写已经签字的 Onboarding v2 service、capability store、batch、Main/preload 与 Renderer 契约；Main 动态 admission、single-flight 和 Renderer 生命周期 authority 清理均已关闭。
 5. 每批合入后重跑定向测试；阶段完成时再运行完整 `npm test`、`npm run verify` 与 `WRITCRAFT_E2E_FORCE=1 npm run e2e:electron`，保存当次证据。
 6. 真实 API 只使用用户显式配置的 Key；记录延迟、限流、超时、故障和费用，不记录 Key、Prompt、模型原文或正文。Key 前缀只表示凭据/计费类型，不能代替官方能力与现场门禁。首发按 npm Developer Preview 合同执行；独立 App 发布才需要 Developer ID、公证与 Gatekeeper。
+
+### 0.0BI 2026-07-30 · 第四副本真实作者项目卡通过
+
+- **作者操作**：作者本人在第四 fresh 副本填写、生成、审阅并提交项目卡，第二阶段选择跳过初始文件。自动化没有代填、代选 hunk 或代做内容判断。
+- **指标与 History**：manifest 后 operation **`32b817da…`** 记录 **7,037 ms `generated` → 31,481 ms `accepted`**。新增 History **`change_5417c8da…`**，类型 `application`、状态 `applied`、文件仅 `edit.md`；接受 **2** 个 hunk、拒绝 **0**。
+- **磁盘真相**：第四副本 `edit.md` SHA-256 从 **`e9e9f7c2…`** 更新为 **`8b68a5b18e6469a9ad4d0f7cff321b15c5f631bd02e9a2bd9c3a864b1d6772b3`**，与 History after revision 精确一致；History before revision 与初始 hash 精确一致。
+- **修复现场闭环**：桌面界面显示 revision **`8b68a5b…`**、磁盘/文件树/修改历史确认，并明确显示 **“已跳过初始文件创建；edit.md 已保留本轮接受的更新”** 与 **“项目卡已完成；edit.md 更新已保留，没有创建初始文件”**。0.0BG 的陈旧终态 P1 在真实作者路径关闭。
+- **原稿隔离**：只读 preflight 仍为 eligible、12 章节、4,748 可见中文字符、1 source、20 files / 608,433 bytes；snapshot digest 仍为 **`9d0898863636da74615481a669c3e40362a60176249870e6d1793380c85b4380`**，源 `edit.md` 仍为 **`e9e9f7c2…`**。
+- **下一步**：项目卡子旅程已关闭，不得要求作者再次重复。下一项是在一篇普通 `chapters/` 正文中选择一小段，发起 Inline Rewrite 并明确拒绝；完成后先证明正文和 History 零写入，再进入独立接受与 Safe Undo。
 
 ### 0.0BH 2026-07-30 · 第四个 fresh 作者验收副本就绪
 
