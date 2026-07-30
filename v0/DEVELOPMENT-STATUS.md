@@ -41,7 +41,7 @@ Chat 的三级 scope/context、Main-owned 多轮连续性、Chapter、Onboarding
 - **计数边界**：manifest `createdAt = 2026-07-30T14:48:31.566Z`。副本继承的 metrics 23 条与 History 0 条均早于该时间，不能冒充本轮证据；只计算该时间之后绑定第五副本的事件和磁盘变化。
 - **拒绝前 Markdown 基线**：排除 `.writcraft` 后，对 14 个 `.md/.markdown` 的规范相对路径和精确文件字节做长度分隔 SHA-256，得到 **`7ead5eaa21d1432a2ac6c27ee24913c03b68a495b2bc9daa3c3796a0c3a6d362`**；合计 97,313 bytes，最大 mtime `2026-07-30T14:48:31.562Z`。拒绝通过必须保持该摘要、字节数、mtime 与 History 0 不变，只允许新增绑定本轮 operation 的内容无关指标事件。
 - **验收范围**：项目卡证据由第四副本继承且不受 Inline v2 生产变化影响，禁止重复。作者只需在普通 `chapters/` 正文完成三个独立动作：`⌘K` 输入真实改写要求后拒绝；新的 operation 接受；从明确标记为最新且精确指向该正文的 History 执行 Safe Undo。自动化不得代选文本、代填指令或代作审阅决定。
-- **启动入口**：稳定 profile 只读显示 AI Key 已配置为 Coding Plan；旧候选实例已正常退出，recent-project 已通过项目服务指向第五副本。桌面只读核验确认源码 App 已打开 `WritCraft-0.1.2-作者验收-5 / edit.md`，revision `e9e9f7c…`、状态“已保存”，没有残留 Diff 或恢复锁。
+- **启动入口**：稳定 profile 只读显示 AI Key 已配置为 Coding Plan；旧候选实例已正常退出，recent-project 已通过项目服务指向第五副本。桌面只读核验确认源码 App 已打开第五副本且没有残留 Diff 或恢复锁；当前已导航到 `chapters/01-cope-origin/chapter-01-why-cope.md`、状态“已保存”。自动化没有选择文字、输入指令或触发 AI，唯一下一动作仍须由作者完成。
 
 ### 0.0BI 2026-07-30 · 第四副本真实作者项目卡通过
 
