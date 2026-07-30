@@ -1,11 +1,11 @@
 # 笔触 · WritCraft · V0 开发状态与续作入口
 
-> 最后更新：2026-07-30（Asia/Shanghai，0.0AS · 真实作者 Inline 拒绝与正文零写入已通过）
+> 最后更新：2026-07-30（Asia/Shanghai，0.0AT · 真实作者 Inline 接受已写盘并进入 Safe Undo）
 > 当前状态：**`writ-craft@0.1.1` 已从 exact candidate `c65981e` 发布到 npm `preview`；registry 时间 `2026-07-29T14:30:16.176Z`，shasum `d370c500666e25cfb373852deafa21b232d2bc18` 与本地候选一致。公网隔离安装/启动/退出为 2/2。annotated tag `v0.1.1` 指向同一提交，GitHub prerelease 已公开：`https://github.com/MaxHou-infinity/WritCraft/releases/tag/v0.1.1`。**
 > 发布判断：**0.1.1 Developer Preview 已完成版本、自动化、双架构安装、独立复审、npm 发布、公网安装和 GitHub prerelease。registry 标签保持 `preview: 0.1.1`、`latest: 0.1.0`，因此本次没有把 Preview 冒充稳定版，也没有执行 unpublish、占位发布或上传未签名 App/ZIP。**
 > 当前目标版本：**`docs/ROADMAP.md` 的 `RM-1.0 / writ-craft@0.1.2` 真实作者可用性闭环。必须使用 `edit.md`、5+ 个 `chapters/` 章节、2000+ 可见中文字符和至少 1 个来源文件的作者隔离副本，完成五段旅程，并关闭现场 `Graph INVALID_CACHE` 的诊断/恢复终态。0.1.2 签字前不得插入驾驶舱、新 AI 模式或其他后续版本功能。**
 > 当前源码证据：**未发布的 0.1.2 exact candidate 为 `45b1815 chore(release): prepare 0.1.2 candidate`，已推送 `origin/main`：完整 `npm test` exit 0；沙箱 `npm run verify` 在真实 DOM Electron 以 `code=null` 退出，同一命令在获准 GUI 上下文原样通过；强制真实 Electron 37/37、Persistent Main/IPC 3/3、npm Preview 10/10、默认/Node 22 npm 10 arm64/Node 24 npm 11 x64 的本地隔离安装均 2/2、生产依赖 0 vulnerabilities。候选 tarball 为 119 文件、572,607 bytes、2,623,581 bytes unpacked、shasum `ae4fb9b1a551a71214e0e4e36aebd100f9acd3b8`；双路最终独立复审 P0/P1/P2=0。以上不是作者五段旅程、npm 发布或 GitHub Release。公开 0.1.1 的 registry 证据保持不变。**
-> 当前作者验收进度：**项目卡第一段已通过；所有者随后完成真实 Inline 拒绝。以 author-copy manifest 的 `createdAt` 为切点，Inline 出现两个独立生成操作：第一条仅 generated，第二条 generated→rejected；明确拒绝的生成耗时 6,547 ms、决定耗时 1,887 ms。自第一次 Inline 生成起 Markdown mtime 零变化，副本创建后 History 仍只有项目卡对 `edit.md` 的 1 条 application/applied，证明拒绝未写正文、未制造可撤销应用记录。Inline 接受与 Safe Undo、Chapter/Plan、Research、image-01、Graph/恢复仍开放；真实 image 付费尚未发生。**
+> 当前作者验收进度：**项目卡第一段和 Inline 拒绝均已通过；所有者随后完成真实 Inline 接受。新操作记录 `generated → accepted`，生成 3,906 ms、接受决定 2,712 ms；目标正文 revision/hash 从 `c73db7c1…` 变为 `81e80023…`，磁盘 SHA-256 与 History `afterHash` 精确一致，fresh History 新增 1 条该正文的 `application/applied`。这证明接受已经真实落盘而非只改变界面。下一步必须由作者执行该记录的 Safe Undo，并证明正文恢复到 `c73db7c1…`；之后才进入 Chapter/Plan、Research、image-01、Graph/恢复。**
 > 0.0AA 历史保留红灯：**首轮真实 Electron 暴露 Inspector 在上下文失效时被清空、旧 5-chip 断言和项目 Chat 等待诊断；完整 test 又暴露 Plan 测试把 generation 函数正文写死。独立复审发现新请求预检窗口可提交不可见旧轮、同项目重开 UI/Main 串话、失败重开提前清会话及两项测试/错误文案缺口，均转为生产边界和回归后关闭。真实 Electron 曾连续两次在旧 Graph 恢复阶段超时；加入只读失败快照后该阶段连续四次通过，未改 Graph 产品逻辑，按重复同源证据关闭 timing P2。另一次 Chat preflight 红灯证明测试在恢复 `edit.md` 后未等待权威 watcher barrier；改为生产 `flushExternalChanges()` 收敛，而未放宽 Chat guard。该里程碑所有红运行保留，最终源码连续两次 34/34；后续 0.0AB 当时推进到 35/35，当前总链只看本文顶部当前里程碑。**
 > Graph 历史签字基线：**性能修复前的既有源码曾完整 `npm test`、Electron-enabled `npm run verify`、强制真实 Electron 26/26 exit 0；Graph Filter 15/15、Workbench 14/14、dynamic 5/5、Large 5/5、Watcher 15/15、Network 11/11、Intelligence 17/17，第二轮复审 P0=0/P1=0/P2=2。该数字只保留为历史过程；0.0AB 后来推进到 35/35，当前总链只看顶部当前里程碑。**
 > Graph 动态边界：**300 文件/1279 节点 cold-to-interactive、cache/incremental、筛选/内存/布局、AX/键鼠、三类纠错、stale/Issue→Changes、failure live、重启与项目隔离均进入真实 Electron；正文/History/ledger 的零写入门禁通过。**  
@@ -32,6 +32,13 @@ Chat 的三级 scope/context、Main-owned 多轮连续性、Chapter、Onboarding
 4. 不重写已经签字的 Onboarding v2 service、capability store、batch、Main/preload 与 Renderer 契约；Main 动态 admission、single-flight 和 Renderer 生命周期 authority 清理均已关闭。
 5. 每批合入后重跑定向测试；阶段完成时再运行完整 `npm test`、`npm run verify` 与 `WRITCRAFT_E2E_FORCE=1 npm run e2e:electron`，保存当次证据。
 6. 真实 API 只使用用户显式配置的 Key；记录延迟、限流、超时、故障和费用，不记录 Key、Prompt、模型原文或正文。Key 前缀只表示凭据/计费类型，不能代替官方能力与现场门禁。首发按 npm Developer Preview 合同执行；独立 App 发布才需要 Developer ID、公证与 Gatekeeper。
+
+### 0.0AT 2026-07-30 · 真实作者 Inline 接受写盘通过
+
+- **作者动作**：所有者在 fresh 正式副本重新发起段落级 Inline，并明确回复“已接受”；自动化没有替作者选择文本、输入指令或接受建议。
+- **指标与事务**：该独立 operation 记录 `generated → accepted`；生成 3,906 ms、人工接受决定 2,712 ms，字符计数从 11 到 135。fresh History 新增 1 条目标正文的 `application/applied`，没有污染 `edit.md` 或其他文件。
+- **磁盘证明**：History 绑定的 before revision/hash 为 `c73db7c1…`，after revision/hash 为 `81e80023…`；目标正文当前磁盘 SHA-256 为 `81e80023…`，与 afterHash 精确一致。接受因此满足“人工决定后才落盘、磁盘与 History 同步”的契约。
+- **下一步**：作者从“修改历史与安全撤销”对该最新正文记录执行 Safe Undo。通过标准是该 History 状态变为 `undone`，正文磁盘 SHA-256 恢复到 `c73db7c1…`，且 `edit.md` 保持 `c678a336…`。
 
 ### 0.0AS 2026-07-30 · 真实作者 Inline 拒绝零写入通过
 
@@ -785,7 +792,8 @@ Graph Extended Acceptance v1 已签字。首轮复审曾以 P1=3 回退 watcher�
 - [x] Image Trash 最新 21/21 竞态加固最终独立复审：P0=0/P1=0/P2=1，可以签字；P2 为非阻断 external open-FD residual。
 - [x] 在真实 GUI 完成“项目卡 → edit.md ChangeSet → 人工确认 → 磁盘落盘 → 独立确认创建 10 个初始文件”；0.0AR 记录本次生成 1/接受 1/失败 0/结构化失败 0/重试 0，并以副本创建时间排除继承的历史样本。
 - [x] 真实作者 Inline 拒绝：两次独立生成中第二次明确 rejected；0.0AS 证明自首条生成起 Markdown 零写入，且没有新增 application/History。
-- [ ] 真实作者 Inline 接受与 Safe Undo：必须证明接受后磁盘/History 同步，撤销后正文恢复。
+- [x] 真实作者 Inline 接受：0.0AT 证明 before/after revision 变化，磁盘 SHA-256 与新 application/applied 的 afterHash 精确一致。
+- [ ] 真实作者 Inline Safe Undo：必须证明最新正文 History 变为 undone、正文恢复到 beforeHash，且 `edit.md` 不变。
 - [ ] 由作者显式选择的合格源创建 fresh 隔离副本并完成五段真实旅程；项目卡第一段已通过，Inline/Chapter/Plan、Research、image-01、Graph/恢复仍开放。
 
 ### P2：Main 网络与安全审计
