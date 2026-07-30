@@ -1379,6 +1379,13 @@ async function run() {
         return document.getElementById('changes-status')?.textContent.includes('已撤销 1 个文件') &&
           remaining === ${undoCount - 1};
       })()`, 'undoing the complete chapter generation');
+      const undoProgress = await first.client.evaluate(`(() => ({
+        generationState: document.getElementById('changes-panel')?.dataset.generationState || '',
+        preview: document.getElementById('changes-preview')?.textContent || '',
+      }))()`);
+      assert.strictEqual(undoProgress.generationState, '');
+      assert(undoProgress.preview.includes('安全撤销已结束'));
+      assert(!undoProgress.preview.includes('正在生成跨文件修改'));
       assert.strictEqual(projectService.readFile(project.rootPath, createdPath), beforeDisk);
       await first.client.evaluate(`window.__assistantDock.close()`);
     });

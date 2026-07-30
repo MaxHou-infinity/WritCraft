@@ -69,6 +69,10 @@ test('history undo names its exact target and warns on older records', () => {
   assert(view.includes("undo.setAttribute('aria-label', `安全撤销：${target.title}`)"));
   assert(view.includes('undoHistory(entry, { isLatest: index === 0 })'));
   assert(view.includes('historyPresentation?.undoConfirmation?.(entry, options)'));
+  assert(view.includes("'正在安全撤销'"));
+  assert(view.includes('不会调用 AI。'));
+  assert(view.includes('const undoProgressActive = panel?.dataset.generationState'));
+  assert(view.includes("'安全撤销已结束；结果已在状态栏和修改历史中确认。'"));
   assert(view.includes("title.className = 'history-card-title'"));
   assert(html.includes('changes-history-presentation.js'));
   assert(html.includes('.history-card.is-latest'));

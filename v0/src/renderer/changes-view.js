@@ -1326,8 +1326,8 @@
     historyUndoInFlight = true;
     setBusy(true);
     startGenerationProgress(
-      '正在生成跨文件修改',
-      '笔触正在读取已确认范围和项目 Prompt，并生成可逐项审阅的 Diff。'
+      '正在安全撤销',
+      '笔触正在核对目标记录、磁盘版本和修改历史；不会调用 AI。'
     );
     setStatus('正在检查版本并安全撤销…');
     try {
@@ -1362,6 +1362,14 @@
       setStatus(`已撤销 ${result?.applied?.length || reconciled.recovery?.affectedPaths?.length || entry.files.length} 个文件`);
     } finally {
       historyUndoInFlight = false;
+      const undoProgressActive = panel?.dataset.generationState === 'active';
+      stopGenerationProgress();
+      if (undoProgressActive) {
+        preview.replaceChildren(Object.assign(document.createElement('div'), {
+          className: 'tree-empty',
+          textContent: '安全撤销已结束；结果已在状态栏和修改历史中确认。',
+        }));
+      }
       setBusy(false);
     }
   }
