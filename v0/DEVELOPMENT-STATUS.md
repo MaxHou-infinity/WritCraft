@@ -24,7 +24,7 @@
 
 ## 0. 续作口令
 
-Chat 的三级 scope/context、Main-owned 多轮连续性、Chapter、Onboarding v2、Research→Changes、Inline Rewrite 既有写入/恢复链与 Plan Strict 已经签字；本次 Inline Rewrite v2 作者指令 amendment 只有在独立复审与 exact candidate 提交后才可签。下一轮不要重写已经关闭的协议，也不要分发现有 `release/` 产物。
+Chat 的三级 scope/context、Main-owned 多轮连续性、Chapter、Onboarding v2、Research→Changes、Inline Rewrite v2 与 Plan Strict 已经完成技术签字。当前 exact production candidate 为 `9b21a9d`；下一步只在第五 fresh 副本完成 Inline 拒绝、独立接受与 Safe Undo，不重复项目卡，不重写已经关闭的协议，也不分发现有 `release/` 产物。
 
 1. 先读 `../docs/ROADMAP.md` 的当前目标，再读本文、`package.json`、对应合同、当前源码文件与 `git log -1 --stat`；本地 Git 历史从 2026-07-26 V0 基线开始，不得据此臆测更早的开发过程。
 2. **Diagnostic Export v1、Research Accuracy v1、committed-warning、Graph 三项韧性缺口、Changes/History durable recovery、Image Review v1 与 Image Trash 本地链均已完整签收，不再重开这些协议。**
@@ -32,6 +32,14 @@ Chat 的三级 scope/context、Main-owned 多轮连续性、Chapter、Onboarding
 4. 不重写已经签字的 Onboarding v2 service、capability store、batch、Main/preload 与 Renderer 契约；Main 动态 admission、single-flight 和 Renderer 生命周期 authority 清理均已关闭。
 5. 每批合入后重跑定向测试；阶段完成时再运行完整 `npm test`、`npm run verify` 与 `WRITCRAFT_E2E_FORCE=1 npm run e2e:electron`，保存当次证据。
 6. 真实 API 只使用用户显式配置的 Key；记录延迟、限流、超时、故障和费用，不记录 Key、Prompt、模型原文或正文。Key 前缀只表示凭据/计费类型，不能代替官方能力与现场门禁。首发按 npm Developer Preview 合同执行；独立 App 发布才需要 Developer ID、公证与 Gatekeeper。
+
+### 0.0BK 2026-07-30 · `9b21a9d` 第五 fresh Inline 验收副本
+
+- **候选绑定**：生产源码仍精确绑定 **`9b21a9d fix(inline): require author rewrite instruction`**；后续 `c33565e` 及本节只收口文档，不改变候选行为。Inline v2 第三轮独立复审为 **P0=0/P1=0/P2=0**。
+- **只读源门禁**：已确认验收源再次预检为 eligible：`edit.md` valid、12 chapters、4,748 可见中文字符、1 source、20 files / 608,433 bytes；snapshot digest 仍为 **`9d0898863636da74615481a669c3e40362a60176249870e6d1793380c85b4380`**。
+- **复制事务**：在既有所有者授权范围内创建 `/Users/maxhou/Desktop/Max 项目-2026/WritCraft 作者验收/WritCraft-0.1.2-作者验收-5`。事务返回 `copyCreated=true / sourceUnchanged=true`、20 files / 608,433 bytes；副本自身含私有验收 manifest 后为 eligible、21 files / 608,701 bytes，digest **`7002be616c01f0b25592597e0ffad6557a26396d08c096835fe37db4079310f9`**。
+- **计数边界**：manifest `createdAt = 2026-07-30T14:48:31.566Z`。副本继承的 metrics 23 条与 History 0 条均早于该时间，不能冒充本轮证据；只计算该时间之后绑定第五副本的事件和磁盘变化。
+- **验收范围**：项目卡证据由第四副本继承且不受 Inline v2 生产变化影响，禁止重复。作者只需在普通 `chapters/` 正文完成三个独立动作：`⌘K` 输入真实改写要求后拒绝；新的 operation 接受；从明确标记为最新且精确指向该正文的 History 执行 Safe Undo。自动化不得代选文本、代填指令或代作审阅决定。
 
 ### 0.0BI 2026-07-30 · 第四副本真实作者项目卡通过
 
