@@ -15,6 +15,7 @@
   const discardButton = document.getElementById('changes-discard');
   const activityButton = document.getElementById('activity-changes');
   const historyList = document.getElementById('changes-history-list');
+  const historyPresentation = window.WritCraftChangesHistoryPresentation;
   const recoveryHost = document.getElementById('changes-recovery');
   const recoveryTitle = document.getElementById('changes-recovery-title');
   const recoveryMessage = document.getElementById('changes-recovery-message');
@@ -1265,35 +1266,45 @@
       historyList.appendChild(empty);
       return;
     }
-    for (const entry of entries) {
+    for (const [index, entry] of entries.entries()) {
       const card = document.createElement('article');
       card.className = 'history-card';
+      if (index === 0) card.classList.add('is-latest');
       const head = document.createElement('div');
       head.className = 'history-card-head';
       const title = document.createElement('strong');
+      title.className = 'history-card-title';
       const accepted = entry.review?.acceptedHunkIds?.length || 0;
       const rejected = entry.review?.rejectedHunkIds?.length || 0;
-      title.textContent = entry.kind === 'review'
-        ? `仅审阅 · 已拒绝 ${rejected} 个修改块`
-        : `${entry.files.length} 个文件 · ${entry.status === 'undone' ? '已撤销' : '已应用'}${entry.review ? ` · 接受 ${accepted} / 拒绝 ${rejected}` : ''}`;
+      const target = historyPresentation?.target?.(entry) || {
+        title: entry.kind === 'review' ? '仅审阅记录' : `${entry.files.length} 个文件`,
+        detail: entry.files.map(file => file.path).join('、'),
+      };
+      title.textContent = target.title;
+      const state = document.createElement('span');
+      state.className = 'history-card-state';
+      state.textContent = `${index === 0 ? '最新 · ' : ''}${entry.kind === 'review'
+        ? `已拒绝 ${rejected} 个修改块`
+        : `${entry.status === 'undone' ? '已撤销' : '已应用'}${entry.review ? ` · 接受 ${accepted} / 拒绝 ${rejected}` : ''}`}`;
       const time = document.createElement('time');
       const timestamp = entry.reviewedAt || entry.appliedAt || '';
       time.dateTime = timestamp;
       time.textContent = timestamp ? new Date(timestamp).toLocaleString('zh-CN', { month: 'numeric', day: 'numeric', hour: '2-digit', minute: '2-digit' }) : '';
-      head.append(title, time);
+      head.append(title, state, time);
       if (entry.status === 'applied') {
         const undo = document.createElement('button');
         undo.type = 'button';
         undo.className = 'history-undo';
-        undo.textContent = '安全撤销';
+        undo.textContent = '撤销此记录';
+        undo.setAttribute('aria-label', `安全撤销：${target.title}`);
         undo.disabled = historyUndoInFlight;
-        undo.addEventListener('click', () => undoHistory(entry));
+        undo.addEventListener('click', () => undoHistory(entry, { isLatest: index === 0 }));
         head.appendChild(undo);
       }
       const files = document.createElement('p');
       files.textContent = entry.kind === 'review'
         ? '项目文件未改变；审阅决定已写入审计历史。'
-        : entry.files.map(file => file.path).join('、');
+        : target.detail;
       card.append(head, files);
       historyList.appendChild(card);
     }
@@ -1306,9 +1317,11 @@
     renderHistory(result.history || []);
   }
 
-  async function undoHistory(entry) {
+  async function undoHistory(entry, options = {}) {
     if (recoveryBlocked || historyUndoInFlight || !bridge?.undoChange || entry.status !== 'applied') return;
-    const accepted = window.confirm(`撤销这次对 ${entry.files.length} 个文件的修改？\n撤销前会再次检查所有文件版本。`);
+    const message = historyPresentation?.undoConfirmation?.(entry, options) ||
+      `撤销这次对 ${entry.files.length} 个文件的修改？\n撤销前会再次检查所有文件版本。`;
+    const accepted = window.confirm(message);
     if (!accepted) return;
     historyUndoInFlight = true;
     setBusy(true);

@@ -1,11 +1,11 @@
 # 笔触 · WritCraft · V0 开发状态与续作入口
 
-> 最后更新：2026-07-30（Asia/Shanghai，0.0AT · 真实作者 Inline 接受已写盘并进入 Safe Undo）
+> 最后更新：2026-07-30（Asia/Shanghai，0.0AU · 真实作者误撤销暴露 History 防误操作 P1；旧候选与旧副本已失效）
 > 当前状态：**`writ-craft@0.1.1` 已从 exact candidate `c65981e` 发布到 npm `preview`；registry 时间 `2026-07-29T14:30:16.176Z`，shasum `d370c500666e25cfb373852deafa21b232d2bc18` 与本地候选一致。公网隔离安装/启动/退出为 2/2。annotated tag `v0.1.1` 指向同一提交，GitHub prerelease 已公开：`https://github.com/MaxHou-infinity/WritCraft/releases/tag/v0.1.1`。**
 > 发布判断：**0.1.1 Developer Preview 已完成版本、自动化、双架构安装、独立复审、npm 发布、公网安装和 GitHub prerelease。registry 标签保持 `preview: 0.1.1`、`latest: 0.1.0`，因此本次没有把 Preview 冒充稳定版，也没有执行 unpublish、占位发布或上传未签名 App/ZIP。**
 > 当前目标版本：**`docs/ROADMAP.md` 的 `RM-1.0 / writ-craft@0.1.2` 真实作者可用性闭环。必须使用 `edit.md`、5+ 个 `chapters/` 章节、2000+ 可见中文字符和至少 1 个来源文件的作者隔离副本，完成五段旅程，并关闭现场 `Graph INVALID_CACHE` 的诊断/恢复终态。0.1.2 签字前不得插入驾驶舱、新 AI 模式或其他后续版本功能。**
-> 当前源码证据：**未发布的 0.1.2 exact candidate 为 `45b1815 chore(release): prepare 0.1.2 candidate`，已推送 `origin/main`：完整 `npm test` exit 0；沙箱 `npm run verify` 在真实 DOM Electron 以 `code=null` 退出，同一命令在获准 GUI 上下文原样通过；强制真实 Electron 37/37、Persistent Main/IPC 3/3、npm Preview 10/10、默认/Node 22 npm 10 arm64/Node 24 npm 11 x64 的本地隔离安装均 2/2、生产依赖 0 vulnerabilities。候选 tarball 为 119 文件、572,607 bytes、2,623,581 bytes unpacked、shasum `ae4fb9b1a551a71214e0e4e36aebd100f9acd3b8`；双路最终独立复审 P0/P1/P2=0。以上不是作者五段旅程、npm 发布或 GitHub Release。公开 0.1.1 的 registry 证据保持不变。**
-> 当前作者验收进度：**项目卡第一段和 Inline 拒绝均已通过；所有者随后完成真实 Inline 接受。新操作记录 `generated → accepted`，生成 3,906 ms、接受决定 2,712 ms；目标正文 revision/hash 从 `c73db7c1…` 变为 `81e80023…`，磁盘 SHA-256 与 History `afterHash` 精确一致，fresh History 新增 1 条该正文的 `application/applied`。这证明接受已经真实落盘而非只改变界面。下一步必须由作者执行该记录的 Safe Undo，并证明正文恢复到 `c73db7c1…`；之后才进入 Chapter/Plan、Research、image-01、Graph/恢复。**
+> 当前源码证据：**旧的未发布 0.1.2 candidate `45b1815` 已被 0.0AU 的生产界面修复失效，不得继续作为最终候选或复用其受影响作者证据。当前工作树已新增 History 精确目标、`最新` 标记、`撤销此记录`、非最新/edit.md 双重确认警告与控制字符防伪；定向 8/8、5/5，完整 `npm test` 与 `npm run verify` 均 exit 0，强制真实 Electron 37/37（含真实 DOM 防误撤销断言），生产依赖审计 0 vulnerabilities。新 exact candidate 提交仍在本里程碑收尾；npm/GitHub 未发布 0.1.2。公开 0.1.1 的 registry 证据保持不变。**
+> 当前作者验收进度：**0.0AR–0.0AT 证明旧副本上的项目卡、Inline 拒绝和 Inline 接受本身真实发生；但作者随后在通用 History 卡片中误撤销了较早的 `edit.md`，而最新章节 Inline 记录仍为 `applied`。这次操作是产品防误操作红灯，不是作者验收通过：旧副本现仅保留为诊断证据，所有受影响旅程不得计入新候选签字。必须先完成 0.0AU 新候选，再从已确认验收源创建全新隔离副本，重跑项目卡与完整 Inline 拒绝/接受/Safe Undo；之后才进入 Chapter/Plan、Research、image-01、Graph/恢复。**
 > 0.0AA 历史保留红灯：**首轮真实 Electron 暴露 Inspector 在上下文失效时被清空、旧 5-chip 断言和项目 Chat 等待诊断；完整 test 又暴露 Plan 测试把 generation 函数正文写死。独立复审发现新请求预检窗口可提交不可见旧轮、同项目重开 UI/Main 串话、失败重开提前清会话及两项测试/错误文案缺口，均转为生产边界和回归后关闭。真实 Electron 曾连续两次在旧 Graph 恢复阶段超时；加入只读失败快照后该阶段连续四次通过，未改 Graph 产品逻辑，按重复同源证据关闭 timing P2。另一次 Chat preflight 红灯证明测试在恢复 `edit.md` 后未等待权威 watcher barrier；改为生产 `flushExternalChanges()` 收敛，而未放宽 Chat guard。该里程碑所有红运行保留，最终源码连续两次 34/34；后续 0.0AB 当时推进到 35/35，当前总链只看本文顶部当前里程碑。**
 > Graph 历史签字基线：**性能修复前的既有源码曾完整 `npm test`、Electron-enabled `npm run verify`、强制真实 Electron 26/26 exit 0；Graph Filter 15/15、Workbench 14/14、dynamic 5/5、Large 5/5、Watcher 15/15、Network 11/11、Intelligence 17/17，第二轮复审 P0=0/P1=0/P2=2。该数字只保留为历史过程；0.0AB 后来推进到 35/35，当前总链只看顶部当前里程碑。**
 > Graph 动态边界：**300 文件/1279 节点 cold-to-interactive、cache/incremental、筛选/内存/布局、AX/键鼠、三类纠错、stale/Issue→Changes、failure live、重启与项目隔离均进入真实 Electron；正文/History/ledger 的零写入门禁通过。**  
@@ -33,12 +33,20 @@ Chat 的三级 scope/context、Main-owned 多轮连续性、Chapter、Onboarding
 5. 每批合入后重跑定向测试；阶段完成时再运行完整 `npm test`、`npm run verify` 与 `WRITCRAFT_E2E_FORCE=1 npm run e2e:electron`，保存当次证据。
 6. 真实 API 只使用用户显式配置的 Key；记录延迟、限流、超时、故障和费用，不记录 Key、Prompt、模型原文或正文。Key 前缀只表示凭据/计费类型，不能代替官方能力与现场门禁。首发按 npm Developer Preview 合同执行；独立 App 发布才需要 Developer ID、公证与 Gatekeeper。
 
+### 0.0AU 2026-07-30 · History 误撤销红灯与防误操作修复
+
+- **真实红灯**：作者按“Safe Undo”提示操作后，磁盘与 History 证明被撤销的是较早的 `edit.md` 项目卡记录；最新章节 Inline 记录仍为 `application/applied`。`edit.md` 从已接受 hash `c678a336…` 恢复到原始 `e9e9f7c…`，章节仍为接受后 hash `81e80023…`。因此 Safe Undo 未通过，旧验收副本已失去当前项目 Prompt，禁止把它修补后继续签字。
+- **根因**：History 列表虽然按时间倒序，但每张卡只显示通用文件数量，所有按钮都叫“安全撤销”，确认框也只说文件数；界面没有标出最新记录、精确目标，也没有对非最新记录或 `edit.md` 的项目级影响警告。用户无法在不可逆动作前建立正确心智模型。
+- **生产修复**：单文件卡直接显示精确相对路径；`edit.md` 明示为“项目 Prompt · edit.md”；最新卡显示 `最新` 并强化边框；按钮改为“撤销此记录”且 aria-label 带目标。撤销较早记录时明确警告“不是最新修改记录”，涉及 `edit.md` 时额外说明会改变后续 AI 项目上下文；确认清单有界并清除控制字符，避免伪造提示行。
+- **当前验证**：纯逻辑 **5/5**、Changes UX **8/8**、完整 `npm test` 与 `npm run verify` 均 exit 0、生产依赖 **0 vulnerabilities**；强制真实 Electron **37/37** 动态证明最新标记、精确章节路径、旧 `edit.md` aria-label/双重确认以及最新记录正常撤销。三次早期 E2E 红灯均来自新增断言的选择器/精确措辞校准，未改磁盘事务，红运行保留。
+- **候选与验收边界**：这是生产源码变化，故 `45b1815` 和旧副本的受影响作者证据全部失效。下一步必须形成新 exact candidate，并从已确认源创建另一个不覆盖旧证据的 fresh 副本；项目卡与 Inline 三步必须重跑。旧副本只用于复盘，禁止自动恢复、删除或继续累计为最终样本。
+
 ### 0.0AT 2026-07-30 · 真实作者 Inline 接受写盘通过
 
 - **作者动作**：所有者在 fresh 正式副本重新发起段落级 Inline，并明确回复“已接受”；自动化没有替作者选择文本、输入指令或接受建议。
 - **指标与事务**：该独立 operation 记录 `generated → accepted`；生成 3,906 ms、人工接受决定 2,712 ms，字符计数从 11 到 135。fresh History 新增 1 条目标正文的 `application/applied`，没有污染 `edit.md` 或其他文件。
 - **磁盘证明**：History 绑定的 before revision/hash 为 `c73db7c1…`，after revision/hash 为 `81e80023…`；目标正文当前磁盘 SHA-256 为 `81e80023…`，与 afterHash 精确一致。接受因此满足“人工决定后才落盘、磁盘与 History 同步”的契约。
-- **下一步**：作者从“修改历史与安全撤销”对该最新正文记录执行 Safe Undo。通过标准是该 History 状态变为 `undone`，正文磁盘 SHA-256 恢复到 `c73db7c1…`，且 `edit.md` 保持 `c678a336…`。
+- **后续结果（已由 0.0AU 覆盖）**：作者尝试 Safe Undo 时因旧 UI 目标表达不足，误撤销较早的 `edit.md` 记录；本节只保留为旧候选上的历史 accepted 证据，不再是当前可续作入口。
 
 ### 0.0AS 2026-07-30 · 真实作者 Inline 拒绝零写入通过
 

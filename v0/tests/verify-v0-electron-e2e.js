@@ -1341,6 +1341,34 @@ async function run() {
       const generated = projectService.readFile(project.rootPath, createdPath);
       assert(generated.includes(electronAiFixture.CHAPTER_GENERATED_MARKER));
 
+      const historyUndoPresentation = await first.client.evaluate(`(() => {
+        const cards = [...document.querySelectorAll('.history-card')];
+        const newest = cards[0];
+        const editCard = cards.find(card =>
+          card.querySelector('.history-card-title')?.textContent.includes('项目 Prompt · edit.md')
+        );
+        let confirmation = '';
+        window.confirm = message => {
+          confirmation = String(message || '');
+          return false;
+        };
+        editCard?.querySelector('.history-undo')?.click();
+        return {
+          newestIsMarked: newest?.classList.contains('is-latest') || false,
+          newestState: newest?.querySelector('.history-card-state')?.textContent || '',
+          newestTitle: newest?.querySelector('.history-card-title')?.textContent || '',
+          editAriaLabel: editCard?.querySelector('.history-undo')?.getAttribute('aria-label') || '',
+          confirmation,
+        };
+      })()`);
+      assert.strictEqual(historyUndoPresentation.newestIsMarked, true);
+      assert(historyUndoPresentation.newestState.includes('最新'));
+      assert(historyUndoPresentation.newestTitle.includes(createdPath));
+      assert(historyUndoPresentation.editAriaLabel.includes('项目 Prompt · edit.md'));
+      assert(historyUndoPresentation.confirmation.includes('这不是最新修改记录'));
+      assert(historyUndoPresentation.confirmation.includes('项目 Prompt · edit.md'));
+      assert(historyUndoPresentation.confirmation.includes('后续 AI'));
+
       const undoCount = await first.client.evaluate(`document.querySelectorAll('.history-card .history-undo').length`);
       await first.client.evaluate(`(() => {
         window.confirm = () => true;

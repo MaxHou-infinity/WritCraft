@@ -64,4 +64,14 @@ test('long-running generation replaces stale results with elapsed progress', () 
   assert(html.includes('.changes-generation-progress'));
 });
 
-console.log(`\nChanges review UX verification: ${passed}/7 passed.`);
+test('history undo names its exact target and warns on older records', () => {
+  assert(view.includes("undo.textContent = '撤销此记录'"));
+  assert(view.includes("undo.setAttribute('aria-label', `安全撤销：${target.title}`)"));
+  assert(view.includes('undoHistory(entry, { isLatest: index === 0 })'));
+  assert(view.includes('historyPresentation?.undoConfirmation?.(entry, options)'));
+  assert(view.includes("title.className = 'history-card-title'"));
+  assert(html.includes('changes-history-presentation.js'));
+  assert(html.includes('.history-card.is-latest'));
+});
+
+console.log(`\nChanges review UX verification: ${passed}/8 passed.`);
