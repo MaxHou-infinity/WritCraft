@@ -1,11 +1,11 @@
 # 笔触 · WritCraft · V0 开发状态与续作入口
 
-> 最后更新：2026-07-30（Asia/Shanghai，0.0BE · 第三轮验收安全暂停于真实作者项目卡门禁）
+> 最后更新：2026-07-30（Asia/Shanghai，0.0BF · 第三轮项目卡首次操作安全结束但未形成 edit.md 落盘）
 > 当前状态：**`writ-craft@0.1.1` 已从 exact candidate `c65981e` 发布到 npm `preview`；registry 时间 `2026-07-29T14:30:16.176Z`，shasum `d370c500666e25cfb373852deafa21b232d2bc18` 与本地候选一致。公网隔离安装/启动/退出为 2/2。annotated tag `v0.1.1` 指向同一提交，GitHub prerelease 已公开：`https://github.com/MaxHou-infinity/WritCraft/releases/tag/v0.1.1`。**
 > 发布判断：**0.1.1 Developer Preview 已完成版本、自动化、双架构安装、独立复审、npm 发布、公网安装和 GitHub prerelease。registry 标签保持 `preview: 0.1.1`、`latest: 0.1.0`，因此本次没有把 Preview 冒充稳定版，也没有执行 unpublish、占位发布或上传未签名 App/ZIP。**
 > 当前目标版本：**`docs/ROADMAP.md` 的 `RM-1.0 / writ-craft@0.1.2` 真实作者可用性闭环。必须使用 `edit.md`、5+ 个 `chapters/` 章节、2000+ 可见中文字符和至少 1 个来源文件的作者隔离副本，完成五段旅程，并关闭现场 `Graph INVALID_CACHE` 的诊断/恢复终态。0.1.2 签字前不得插入驾驶舱、新 AI 模式或其他后续版本功能。**
 > 当前源码证据：**旧的未发布 0.1.2 candidates `45b1815`、`9a05c44`、`89658f0` 与 `6ed6f89` 均已被后续生产修复失效，不得发布或复用受影响验收证据。当前 exact production candidate 为 `30a06b0 fix(history): bind undo progress ownership`：Safe Undo 的阶段专属长等待文案、progress/busy/undo owner token、跨项目 fail-closed 清理，以及 NO_KEY 设置往返、A→B 隔离、成功清理和迟到响应动态证据均已合入。第二轮独立复审为 **P0=0/P1=0/P2=1**；唯一 docs-only P2 已由 `b6041b6` 修正，不改变生产候选。定向 Changes UX 8/8、Renderer dynamic 29/29、Onboarding Workspace dynamic 4/4，完整 `npm test`、批准 GUI 环境 `npm run verify`、强制真实 Electron 37/37、npm Preview 10/10、本地 installed 2/2、Node 22/npm 10 arm64 2/2、Node 24/npm 11 x64 2/2 均通过；生产依赖 0 vulnerabilities。候选包为 120 files / 574,770 bytes / 2,631,216 unpacked / shasum `4d2805ca2894d8dcd5857cec414aab850a51ff28`。第三个 fresh 作者副本已从未变验收源创建并启动。npm/GitHub 未发布 0.1.2。**
-> 当前作者验收进度：**第二个 fresh 副本只保留为功能/红灯证据。第二轮独立复审放行后，已从同一未变验收源创建 `WritCraft-0.1.2-作者验收-3`：`copyCreated: true / sourceUnchanged: true`，20 files / 608,433 bytes，源 digest 仍为 `9d0898863636da74615481a669c3e40362a60176249870e6d1793380c85b4380`，manifest `createdAt` 为 `2026-07-30T10:56:11.255Z`。exact candidate `30a06b0` 已在正常稳定 profile 打开该副本并停留于 `edit.md`；连续三次只读复核后，manifest 之后 metrics/History 新事件仍均为 0，App 进程保持运行。目标现安全暂停于真实作者项目卡门禁；唯一下一步是作者本人点击左侧项目卡并完成填写、生成和审阅决定。自动化不得代填答案或代做接受/拒绝。**
+> 当前作者验收进度：**第二个 fresh 副本只保留为功能/红灯证据。第三个 fresh 副本 `WritCraft-0.1.2-作者验收-3` 继续绑定 exact candidate `30a06b0`。作者已解除项目卡入口门禁，但首次操作的私有指标是同一 operation 的 `generated → discarded`，新增 History 为 0；界面终态为“已放弃初始文件创建；edit.md 的结果保持不变”。副本与原稿 `edit.md` SHA-256 都是 `e9e9f7c2a4a83a1de2e4b5e31c92ad57eb625eea32c31f613d1aaf3da98a87c5`，原始源预检仍为 eligible、20 files / 608,433 bytes、snapshot digest `9d0898863636da74615481a669c3e40362a60176249870e6d1793380c85b4380`。因此本次证明了安全零写入，但没有满足路线图“edit.md ChangeSet → 人工确认 → 磁盘落盘”，项目卡旅程尚未通过。唯一下一步是作者重新打开项目卡，加入一个现有 `edit.md` 没有的真实约束，生成并接受至少一个 edit.md 修改块；初始文件仍可选择不创建。**
 > 0.0AA 历史保留红灯：**首轮真实 Electron 暴露 Inspector 在上下文失效时被清空、旧 5-chip 断言和项目 Chat 等待诊断；完整 test 又暴露 Plan 测试把 generation 函数正文写死。独立复审发现新请求预检窗口可提交不可见旧轮、同项目重开 UI/Main 串话、失败重开提前清会话及两项测试/错误文案缺口，均转为生产边界和回归后关闭。真实 Electron 曾连续两次在旧 Graph 恢复阶段超时；加入只读失败快照后该阶段连续四次通过，未改 Graph 产品逻辑，按重复同源证据关闭 timing P2。另一次 Chat preflight 红灯证明测试在恢复 `edit.md` 后未等待权威 watcher barrier；改为生产 `flushExternalChanges()` 收敛，而未放宽 Chat guard。该里程碑所有红运行保留，最终源码连续两次 34/34；后续 0.0AB 当时推进到 35/35，当前总链只看本文顶部当前里程碑。**
 > Graph 历史签字基线：**性能修复前的既有源码曾完整 `npm test`、Electron-enabled `npm run verify`、强制真实 Electron 26/26 exit 0；Graph Filter 15/15、Workbench 14/14、dynamic 5/5、Large 5/5、Watcher 15/15、Network 11/11、Intelligence 17/17，第二轮复审 P0=0/P1=0/P2=2。该数字只保留为历史过程；0.0AB 后来推进到 35/35，当前总链只看顶部当前里程碑。**
 > Graph 动态边界：**300 文件/1279 节点 cold-to-interactive、cache/incremental、筛选/内存/布局、AX/键鼠、三类纠错、stale/Issue→Changes、failure live、重启与项目隔离均进入真实 Electron；正文/History/ledger 的零写入门禁通过。**  
@@ -32,6 +32,13 @@ Chat 的三级 scope/context、Main-owned 多轮连续性、Chapter、Onboarding
 4. 不重写已经签字的 Onboarding v2 service、capability store、batch、Main/preload 与 Renderer 契约；Main 动态 admission、single-flight 和 Renderer 生命周期 authority 清理均已关闭。
 5. 每批合入后重跑定向测试；阶段完成时再运行完整 `npm test`、`npm run verify` 与 `WRITCRAFT_E2E_FORCE=1 npm run e2e:electron`，保存当次证据。
 6. 真实 API 只使用用户显式配置的 Key；记录延迟、限流、超时、故障和费用，不记录 Key、Prompt、模型原文或正文。Key 前缀只表示凭据/计费类型，不能代替官方能力与现场门禁。首发按 npm Developer Preview 合同执行；独立 App 发布才需要 Developer ID、公证与 Gatekeeper。
+
+### 0.0BF 2026-07-30 · 项目卡首次操作为安全零写入，尚未通过落盘门禁
+
+- **作者操作终态**：作者报告“项目卡已接受”，但运行时界面显示“已放弃初始文件创建；edit.md 的结果保持不变”和“已结束项目卡确认，没有创建初始文件”。本轮 post-manifest 私有指标为同一 operation 的 **`generated` → `discarded`**，新增 History **0**。
+- **磁盘与源真相**：副本和原始验收源的 `edit.md` SHA-256 均为 **`e9e9f7c2a4a83a1de2e4b5e31c92ad57eb625eea32c31f613d1aaf3da98a87c5`**；原始源只读预检仍为 eligible、12 章节、4,748 可见中文字符、1 个来源、20 files / 608,433 bytes，snapshot digest 仍为 **`9d0898863636da74615481a669c3e40362a60176249870e6d1793380c85b4380`**。没有误写原稿或正文。
+- **验收判断**：该操作证明生成后放弃能保持零写入，但不满足 `ROADMAP.md` §4.2 的 **项目卡 → edit.md ChangeSet → 人工确认 → 磁盘落盘**，不得标为旅程通过，也不得进入 Chapter/Plan。
+- **最短补验收**：作者重新打开项目卡，在任一答案中加入一个现有 `edit.md` 不包含、且确实想长期保留的项目约束；生成后接受至少一个 `edit.md` 修改块并提交审阅决定。第二阶段的初始文件仍可选择不创建。完成后先核验新 edit hash、application History、accepted metric 和原始源 digest，再推进下一旅程。
 
 ### 0.0BE 2026-07-30 · 安全暂停于真实作者项目卡门禁
 
