@@ -8,7 +8,7 @@
 
 > **历史工程交接（2026-07-29，0.0AC npm Developer Preview 本地签字收口）**：0.0AC 新增 macOS CLI、窄 npm 包、Node `>=22.12.0`、npm 10/11 fail-closed、Electron `43.2.0`、Main 观测 `did-finish-load` 后的 CLI readiness IPC 和零网络 `--check`；同时让 `sk-cp-` 图片能力进入 provider 现场门禁。该 readiness 只证明页面加载完成，不单独证明全部 workspace/bootstrap 逻辑成功。该批历史证据为 Persistent **3/3**、npm Preview **10/10**、installed **2/2**、真实 Electron **35/35**；当前候选只看下条。
 > **下一阶段合同**：`docs/AUTHOR-ACCEPTANCE-V1-CONTRACT.md` 已冻结，明确付费网络门禁、允许记录的隐私安全证据、真实长文旅程与发布前签字顺序。
-> **当前实现停点**：0.0AL / `writ-craft@0.1.1` 已从 candidate `c65981e` 发布到 npm `preview`，公网 shasum 一致且隔离安装 **2/2**；同一 exact tag 的 GitHub `v0.1.1` prerelease 已创建，`latest` 仍为上一稳定指针 `0.1.0`。之后 `a72a179` 已关闭真实项目 Graph Unicode 路径与自动恢复阻断；首个 0.1.2 作者副本又在 Safe Undo 暴露 History 防误操作 P1，旧 candidate `45b1815` 已失效。0.0AU 的新 exact candidate `9a05c44` 已完成完整 test/verify、真实 Electron 37/37、npm Preview/三组隔离安装与零生产漏洞；必须用 fresh author copy 重跑受影响的项目卡与 Inline 旅程。五段真实作者旅程、最终签字和另行发布授权都未完成；精确红绿与当前门禁只看 `v0/DEVELOPMENT-STATUS.md`。
+> **当前实现停点**：0.0AL / `writ-craft@0.1.1` 已从 candidate `c65981e` 发布到 npm `preview`，公网 shasum 一致且隔离安装 **2/2**；同一 exact tag 的 GitHub `v0.1.1` prerelease 已创建，`latest` 仍为上一稳定指针 `0.1.0`。之后 `a72a179` 已关闭真实项目 Graph Unicode 路径与自动恢复阻断；首个 0.1.2 作者副本又在 Safe Undo 暴露 History 防误操作 P1，旧 candidate `45b1815` 已失效。0.0AU 的新 exact candidate `9a05c44` 已完成完整 test/verify、真实 Electron 37/37、npm Preview/三组隔离安装与零生产漏洞；0.0AV 已从不变的确认源创建第二个 fresh author copy，并停在项目卡 1/10 等待作者操作。五段真实作者旅程、最终签字和另行发布授权都未完成；精确红绿与当前门禁只看 `v0/DEVELOPMENT-STATUS.md`。
 > **路线图入口**：Phase A 已是工程地基，不再负责后续版本排期。当前唯一目标是 `docs/ROADMAP.md` 的 `RM-1.0 / writ-craft@0.1.2` 真实作者可用性闭环。
 
 ## 1. 阶段目标

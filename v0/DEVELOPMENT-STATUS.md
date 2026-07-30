@@ -1,11 +1,11 @@
 # 笔触 · WritCraft · V0 开发状态与续作入口
 
-> 最后更新：2026-07-30（Asia/Shanghai，0.0AU · 真实作者误撤销暴露 History 防误操作 P1；旧候选与旧副本已失效）
+> 最后更新：2026-07-30（Asia/Shanghai，0.0AV · 新 candidate 的 fresh 作者副本已创建并停在项目卡 1/10）
 > 当前状态：**`writ-craft@0.1.1` 已从 exact candidate `c65981e` 发布到 npm `preview`；registry 时间 `2026-07-29T14:30:16.176Z`，shasum `d370c500666e25cfb373852deafa21b232d2bc18` 与本地候选一致。公网隔离安装/启动/退出为 2/2。annotated tag `v0.1.1` 指向同一提交，GitHub prerelease 已公开：`https://github.com/MaxHou-infinity/WritCraft/releases/tag/v0.1.1`。**
 > 发布判断：**0.1.1 Developer Preview 已完成版本、自动化、双架构安装、独立复审、npm 发布、公网安装和 GitHub prerelease。registry 标签保持 `preview: 0.1.1`、`latest: 0.1.0`，因此本次没有把 Preview 冒充稳定版，也没有执行 unpublish、占位发布或上传未签名 App/ZIP。**
 > 当前目标版本：**`docs/ROADMAP.md` 的 `RM-1.0 / writ-craft@0.1.2` 真实作者可用性闭环。必须使用 `edit.md`、5+ 个 `chapters/` 章节、2000+ 可见中文字符和至少 1 个来源文件的作者隔离副本，完成五段旅程，并关闭现场 `Graph INVALID_CACHE` 的诊断/恢复终态。0.1.2 签字前不得插入驾驶舱、新 AI 模式或其他后续版本功能。**
 > 当前源码证据：**旧的未发布 0.1.2 candidate `45b1815` 已被 0.0AU 的生产界面修复失效，不得继续作为最终候选或复用其受影响作者证据。新的 exact candidate 是 `9a05c44 fix(history): prevent wrong-target undo`：History 精确目标、`最新` 标记、`撤销此记录`、非最新/edit.md 双重确认警告与控制字符防伪；定向 8/8、5/5，完整 `npm test` 与 `npm run verify` 均 exit 0，强制真实 Electron 37/37（含真实 DOM 防误撤销断言），本机与 Node 22/npm 10 arm64、Node 24/npm 11 x64 fresh-tarball 各 2/2，生产依赖审计 0 vulnerabilities。包为 120 files / 573,745 bytes / 2,626,999 unpacked / shasum `4e41acaa8803efdbc093bb4ea72140d1b34fc768`。npm/GitHub 未发布 0.1.2。公开 0.1.1 的 registry 证据保持不变。**
-> 当前作者验收进度：**0.0AR–0.0AT 证明旧副本上的项目卡、Inline 拒绝和 Inline 接受本身真实发生；但作者随后在通用 History 卡片中误撤销了较早的 `edit.md`，而最新章节 Inline 记录仍为 `applied`。这次操作是产品防误操作红灯，不是作者验收通过：旧副本现仅保留为诊断证据，所有受影响旅程不得计入新候选签字。必须先完成 0.0AU 新候选，再从已确认验收源创建全新隔离副本，重跑项目卡与完整 Inline 拒绝/接受/Safe Undo；之后才进入 Chapter/Plan、Research、image-01、Graph/恢复。**
+> 当前作者验收进度：**0.0AR–0.0AT 证明旧副本上的项目卡、Inline 拒绝和 Inline 接受本身真实发生；但作者随后误撤销较早的 `edit.md`，故旧副本只保留为红灯证据。0.0AV 已从同一确认源原子创建 `WritCraft-0.1.2-作者验收-2`，`sourceUnchanged: true`，并通过隔离 npm Preview profile 明确打开；App 当前停在“项目卡 1/10 · 内容主旨”，尚未发生新 AI/付费调用。下一步由作者亲自重跑项目卡与完整 Inline 拒绝/接受/Safe Undo；之后才进入 Chapter/Plan、Research、image-01、Graph/恢复。**
 > 0.0AA 历史保留红灯：**首轮真实 Electron 暴露 Inspector 在上下文失效时被清空、旧 5-chip 断言和项目 Chat 等待诊断；完整 test 又暴露 Plan 测试把 generation 函数正文写死。独立复审发现新请求预检窗口可提交不可见旧轮、同项目重开 UI/Main 串话、失败重开提前清会话及两项测试/错误文案缺口，均转为生产边界和回归后关闭。真实 Electron 曾连续两次在旧 Graph 恢复阶段超时；加入只读失败快照后该阶段连续四次通过，未改 Graph 产品逻辑，按重复同源证据关闭 timing P2。另一次 Chat preflight 红灯证明测试在恢复 `edit.md` 后未等待权威 watcher barrier；改为生产 `flushExternalChanges()` 收敛，而未放宽 Chat guard。该里程碑所有红运行保留，最终源码连续两次 34/34；后续 0.0AB 当时推进到 35/35，当前总链只看本文顶部当前里程碑。**
 > Graph 历史签字基线：**性能修复前的既有源码曾完整 `npm test`、Electron-enabled `npm run verify`、强制真实 Electron 26/26 exit 0；Graph Filter 15/15、Workbench 14/14、dynamic 5/5、Large 5/5、Watcher 15/15、Network 11/11、Intelligence 17/17，第二轮复审 P0=0/P1=0/P2=2。该数字只保留为历史过程；0.0AB 后来推进到 35/35，当前总链只看顶部当前里程碑。**
 > Graph 动态边界：**300 文件/1279 节点 cold-to-interactive、cache/incremental、筛选/内存/布局、AX/键鼠、三类纠错、stale/Issue→Changes、failure live、重启与项目隔离均进入真实 Electron；正文/History/ledger 的零写入门禁通过。**  
@@ -32,6 +32,13 @@ Chat 的三级 scope/context、Main-owned 多轮连续性、Chapter、Onboarding
 4. 不重写已经签字的 Onboarding v2 service、capability store、batch、Main/preload 与 Renderer 契约；Main 动态 admission、single-flight 和 Renderer 生命周期 authority 清理均已关闭。
 5. 每批合入后重跑定向测试；阶段完成时再运行完整 `npm test`、`npm run verify` 与 `WRITCRAFT_E2E_FORCE=1 npm run e2e:electron`，保存当次证据。
 6. 真实 API 只使用用户显式配置的 Key；记录延迟、限流、超时、故障和费用，不记录 Key、Prompt、模型原文或正文。Key 前缀只表示凭据/计费类型，不能代替官方能力与现场门禁。首发按 npm Developer Preview 合同执行；独立 App 发布才需要 Developer ID、公证与 Gatekeeper。
+
+### 0.0AV 2026-07-30 · 新 candidate 的 fresh 作者副本入口
+
+- **新副本事务**：从作者已确认的验收源创建另一个不覆盖旧红灯证据的隔离副本 `WritCraft-0.1.2-作者验收-2`。事务返回 `copyCreated: true / sourceUnchanged: true`；源 digest 仍为 `9d0898863636da74615481a669c3e40362a60176249870e6d1793380c85b4380`。
+- **资格**：fresh 副本仍为 `eligible: true`，`edit.md` valid、12 个章节、4748 个可见中文字符、1 个来源文件、20 个项目文件、608,433 bytes。
+- **App 入口**：先关闭旧源码/打包实例，再通过 npm Preview 的私有隔离 profile 启动 `9a05c44`。macOS 文件选择器中文辅助输入不可靠，因此改用产品自身 `saveRecentProject` 接口登记同一已授权目录，由 Main 的 `openRecentProject → openProjectRoot` 正常验证链打开；没有绕过项目服务或修改稿件。
+- **当前界面与边界**：标题精确显示新副本名，项目卡已打开在 `1 / 10 · 内容主旨`。自动化没有填写答案、点击继续、提交项目卡或触发真实 AI；此时新旅程费用为 0。下一动作必须由作者亲自完成项目卡。
 
 ### 0.0AU 2026-07-30 · History 误撤销红灯与防误操作修复
 
