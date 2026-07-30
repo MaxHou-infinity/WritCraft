@@ -52,6 +52,9 @@
   let recoveryBlocked = false;
   let recoveryActionInFlight = false;
   let generationProgressTimer = null;
+  let generationProgressOwner = null;
+  let controlsBusyOwner = null;
+  let historyUndoOwner = null;
   const expandedReviewHunks = new Set();
   let onboardingMetricSettlement = null;
   let unsettledOnboardingMetric = null;
@@ -511,14 +514,19 @@
     }
   }
 
-  function stopGenerationProgress() {
+  function stopGenerationProgress(owner = null) {
+    if (owner && generationProgressOwner !== owner) return false;
     if (generationProgressTimer) clearInterval(generationProgressTimer);
     generationProgressTimer = null;
+    generationProgressOwner = null;
     if (panel) delete panel.dataset.generationState;
+    return true;
   }
 
-  function startGenerationProgress(title, detail) {
+  function startGenerationProgress(title, detail, options = {}) {
     stopGenerationProgress();
+    const owner = options.owner || Symbol('changes-progress-owner');
+    generationProgressOwner = owner;
     const card = document.createElement('section');
     card.className = 'changes-generation-progress';
     card.setAttribute('role', 'status');
@@ -534,10 +542,14 @@
     const elapsed = document.createElement('small');
     const startedAt = Date.now();
     const updateElapsed = () => {
+      if (generationProgressOwner !== owner) return;
       const seconds = Math.max(0, Math.floor((Date.now() - startedAt) / 1000));
+      const longWaitingMessage = typeof options.longWaitingMessage === 'function'
+        ? options.longWaitingMessage(seconds)
+        : options.longWaitingMessage;
       elapsed.textContent = seconds < 10
-        ? '正在准备项目上下文…'
-        : `AI 正在处理，已等待 ${seconds} 秒。可以继续等待，请不要重复提交。`;
+        ? options.preparingMessage || '正在准备项目上下文…'
+        : longWaitingMessage || `AI 正在处理，已等待 ${seconds} 秒。可以继续等待，请不要重复提交。`;
     };
     updateElapsed();
     generationProgressTimer = setInterval(updateElapsed, 1000);
@@ -545,9 +557,17 @@
     card.append(indicator, copy);
     preview.replaceChildren(card);
     if (panel) panel.dataset.generationState = 'active';
+    return owner;
   }
 
-  function setBusy(busy, owner = 'general') {
+  function setBusy(busy, label = 'general', owner = null) {
+    if (busy) {
+      if (owner) controlsBusyOwner = owner;
+    } else if (controlsBusyOwner && controlsBusyOwner !== owner) {
+      return false;
+    } else {
+      controlsBusyOwner = null;
+    }
     const controlsBusy = Boolean(busy || recoveryBlocked);
     proposeButton.disabled = controlsBusy;
     chapterButton.disabled = controlsBusy;
@@ -560,12 +580,12 @@
     historyList.querySelectorAll('.history-undo').forEach(control => {
       control.disabled = controlsBusy || historyUndoInFlight;
     });
-    proposeButton.textContent = busy && owner !== 'chapter' ? '处理中…'
+    proposeButton.textContent = busy && label !== 'chapter' ? '处理中…'
       : activeResearchRequest ? activeResearchRequest.phase === 'review' ? 'Research 提案待审阅' : '依据核对卡生成 Diff'
         : activePlanRequest ? '重新生成此 Plan 任务'
         : activeIssueRequest ? '重新生成此星图问题'
           : normalScopePlan ? '确认范围并生成 Diff' : '跨文件修改';
-    chapterButton.textContent = busy && owner === 'chapter' ? '生成中…' : '生成当前章节';
+    chapterButton.textContent = busy && label === 'chapter' ? '生成中…' : '生成当前章节';
     contextPicker?.setAttribute('aria-busy', String(controlsBusy));
     targetPicker?.setAttribute('aria-busy', String(controlsBusy));
     if (controlsBusy) contextList?.querySelectorAll('input[type="checkbox"]').forEach(input => { input.disabled = true; });
@@ -575,6 +595,7 @@
       renderTargetPicker();
       syncApplyButton();
     }
+    return true;
   }
 
   function renderRecoveryState(value = null) {
@@ -1323,17 +1344,26 @@
       `撤销这次对 ${entry.files.length} 个文件的修改？\n撤销前会再次检查所有文件版本。`;
     const accepted = window.confirm(message);
     if (!accepted) return;
-    historyUndoInFlight = true;
-    setBusy(true);
-    startGenerationProgress(
+    const projectInstanceId = window.__workspace?.state?.project?.instanceId || null;
+    const progressOwner = startGenerationProgress(
       '正在安全撤销',
-      '笔触正在核对目标记录、磁盘版本和修改历史；不会调用 AI。'
+      '笔触正在核对目标记录、磁盘版本和修改历史；不会调用 AI。',
+      {
+        preparingMessage: '正在核对撤销所需的文件版本…',
+        longWaitingMessage: seconds => `安全撤销仍在核对，已等待 ${seconds} 秒。正文尚未改变，请不要重复操作。`,
+      }
     );
+    const undoOwner = { projectInstanceId, progressOwner };
+    historyUndoOwner = undoOwner;
+    historyUndoInFlight = true;
+    setBusy(true, 'general', progressOwner);
     setStatus('正在检查版本并安全撤销…');
+    const ownsCurrentUndo = () => historyUndoOwner === undoOwner &&
+      window.__workspace?.state?.project?.instanceId === projectInstanceId;
     try {
       const saved = await window.__workspace.persistCurrent(true);
+      if (!ownsCurrentUndo()) return;
       if (!saved) return setStatus('当前文件未能保存，已停止撤销', true);
-      const projectInstanceId = window.__workspace?.state?.project?.instanceId || null;
       window.__workspace?.beginChangesHistoryMutation?.('正在撤销并核对文件与修改历史…');
       let result = null;
       let failure = null;
@@ -1342,10 +1372,12 @@
       } catch (error) {
         failure = error;
       }
+      if (!ownsCurrentUndo()) return;
       const reconciled = await window.__workspace?.reconcileChangesHistoryAfterMutation?.(
         'undo',
         result
       );
+      if (!ownsCurrentUndo()) return;
       if (reconciled?.canceled) return;
       if (!reconciled?.ok) {
         return setStatus(reconciled?.message || '撤销结果需要人工恢复，项目写入已暂停', true);
@@ -1361,16 +1393,20 @@
       }
       setStatus(`已撤销 ${result?.applied?.length || reconciled.recovery?.affectedPaths?.length || entry.files.length} 个文件`);
     } finally {
+      if (historyUndoOwner !== undoOwner) return;
+      const stillCurrentProject = window.__workspace?.state?.project?.instanceId === projectInstanceId;
+      const undoProgressActive = generationProgressOwner === progressOwner &&
+        panel?.dataset.generationState === 'active';
+      historyUndoOwner = null;
       historyUndoInFlight = false;
-      const undoProgressActive = panel?.dataset.generationState === 'active';
-      stopGenerationProgress();
-      if (undoProgressActive) {
+      stopGenerationProgress(progressOwner);
+      if (undoProgressActive && stillCurrentProject) {
         preview.replaceChildren(Object.assign(document.createElement('div'), {
           className: 'tree-empty',
           textContent: '安全撤销已结束；结果已在状态栏和修改历史中确认。',
         }));
       }
-      setBusy(false);
+      setBusy(false, 'general', progressOwner);
     }
   }
 
@@ -1692,13 +1728,13 @@
         contextPaths: [...selectedContextPaths],
       },
     });
-    setBusy(true, 'chapter');
     const contextLabel = contextPaths.length ? `，并参考 ${contextPaths.length} 个文件` : '';
     setStatus(`正在依据 edit.md${contextLabel} 生成 ${targetPath} 的完整提案…`);
-    startGenerationProgress(
+    const progressOwner = startGenerationProgress(
       `正在生成 ${targetPath}`,
       `笔触正在依据 edit.md${contextLabel}组织完整章节；完成后会进入逐项审阅，不会自动写入。`
     );
+    setBusy(true, 'chapter', progressOwner);
     try {
       const saved = await window.__workspace.persistCurrent(true);
       if (!window.WritCraftChangesProposalTransaction.isChapterCurrent(
@@ -1776,8 +1812,8 @@
         window.__workspace?.state?.project?.instanceId || null
       );
       if (finish.releaseBusy) {
-        stopGenerationProgress();
-        setBusy(false);
+        stopGenerationProgress(progressOwner);
+        setBusy(false, 'chapter', progressOwner);
       }
     }
   }
@@ -2129,7 +2165,7 @@
   }
 
   async function discard() {
-    if (recoveryBlocked || reviewCommitInFlight) return;
+    if (recoveryBlocked || reviewCommitInFlight || historyUndoInFlight) return;
     if (confirmationMode) {
       const activeConfirmation = confirmationMode;
       if (!bridge?.discardOnboardingConfirmation) return setStatus('初始文件确认释放服务未连接', true);
@@ -2294,6 +2330,9 @@
     activeIssueRequest = null;
     activeResearchRequest = null;
     normalScopePlan = null;
+    historyUndoOwner = null;
+    historyUndoInFlight = false;
+    controlsBusyOwner = null;
     stopGenerationProgress();
     selectedTargetPaths = [];
     targetSelectionTouched = false;
@@ -2349,15 +2388,23 @@
     });
   });
   window.addEventListener('unload', () => {
+    historyUndoOwner = null;
+    historyUndoInFlight = false;
+    controlsBusyOwner = null;
+    stopGenerationProgress();
+    setBusy(false);
     const snapshot = snapshotResearchOwnership();
     if (snapshot) void releaseResearchOwnership(snapshot, { discardCard: false });
   }, { once: true });
 
   function canStartOnboarding() {
     if (onboardingMetricSettlement || unsettledOnboardingMetric || unsettledOnboardingConfirmationRelease ||
-        pending || confirmationMode || activePlanRequest || activeIssueRequest || activeResearchRequest) {
+        pending || confirmationMode || activePlanRequest || activeIssueRequest || activeResearchRequest ||
+        historyUndoInFlight) {
       return { ok: false, message: confirmationMode
         ? '请先确认或放弃当前初始文件创建'
+        : historyUndoInFlight
+          ? '正在安全撤销修改，请等待核对完成'
         : onboardingMetricSettlement || unsettledOnboardingMetric || unsettledOnboardingConfirmationRelease
           ? '正在结算上一轮项目卡，请稍候'
         : '请先处理或丢弃当前 Changes 审阅' };
@@ -2366,7 +2413,7 @@
   }
 
   async function discardPending() {
-    if (reviewCommitInFlight) return false;
+    if (reviewCommitInFlight || historyUndoInFlight) return false;
     if (unsettledOnboardingConfirmationRelease) {
       const active = unsettledOnboardingConfirmationRelease;
       const released = await releaseAbandonedOnboardingConfirmation(active.projectInstanceId, active.token);

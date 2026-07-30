@@ -17,6 +17,8 @@ The package requires macOS 12 or later, Node.js `>=22.12.0`, and npm 10 or 11. T
 
 On 2026-07-30 exact candidate `6ed6f89` repeated npm Preview **10/10**, local installed **2/2**, and fresh-tarball installed **2/2** on official Node 22.22.3/npm 10.9.8 arm64 and Node 24.18.0/npm 11.16.0 x64; the production audit reported **0 vulnerabilities**. Its dry-run package is **120 files / 574,171 bytes packed / 2,628,827 bytes unpacked / shasum `613a963b9ab2b18c746341448bcb9b4c3f9aab1e`**. This supersedes the invalidated `9a05c44` candidate evidence and proves only local candidate packaging and runtime preparation. It is not a completed real-author journey, registry publication, GitHub Release, or permission to move any dist-tag.
 
+The subsequent independent review invalidated `6ed6f89` for publication. The repaired but not-yet-committed tree repeats npm Preview **10/10**, approved-environment local installed **2/2**, both official runtime matrices **2/2**, and production audit at **0 vulnerabilities**. Its dry-run package is **120 files / 574,770 bytes packed / 2,631,216 bytes unpacked / shasum `4d2805ca2894d8dcd5857cec414aab850a51ff28`**. These figures become candidate evidence only after the exact source commit exists and passes a new independent review.
+
 ## Package invariants
 
 - Publish only `bin/`, production `src/main/`, production `src/renderer/`, `README.md`, `LICENSE`, `THIRD_PARTY_NOTICES.md`, the manifest, and the shrinkwrap.

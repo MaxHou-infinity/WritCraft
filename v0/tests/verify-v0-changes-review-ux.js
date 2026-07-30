@@ -50,14 +50,17 @@ test('decided hunks collapse into a truthful pre-commit summary', () => {
 });
 
 test('chapter generation owns only its own busy label', () => {
-  assert(view.includes("function setBusy(busy, owner = 'general')"));
-  assert(view.includes("busy && owner !== 'chapter'"));
-  assert(view.includes("busy && owner === 'chapter' ? '生成中…'"));
-  assert(view.includes("setBusy(true, 'chapter')"));
+  assert(view.includes("function setBusy(busy, label = 'general', owner = null)"));
+  assert(view.includes("busy && label !== 'chapter'"));
+  assert(view.includes("busy && label === 'chapter' ? '生成中…'"));
+  assert(view.includes("setBusy(true, 'chapter', progressOwner)"));
+  assert(view.includes("setBusy(false, 'chapter', progressOwner)"));
 });
 
 test('long-running generation replaces stale results with elapsed progress', () => {
   assert(view.includes('function startGenerationProgress'));
+  assert(view.includes('generationProgressOwner !== owner'));
+  assert(view.includes("typeof options.longWaitingMessage === 'function'"));
   assert(view.includes('已等待 ${seconds} 秒'));
   assert(view.includes('请不要重复提交'));
   assert(view.includes('startGenerationProgress('));
@@ -71,7 +74,9 @@ test('history undo names its exact target and warns on older records', () => {
   assert(view.includes('historyPresentation?.undoConfirmation?.(entry, options)'));
   assert(view.includes("'正在安全撤销'"));
   assert(view.includes('不会调用 AI。'));
-  assert(view.includes('const undoProgressActive = panel?.dataset.generationState'));
+  assert(view.includes('安全撤销仍在核对，已等待 ${seconds} 秒'));
+  assert(view.includes('generationProgressOwner === progressOwner'));
+  assert(view.includes('if (historyUndoOwner !== undoOwner) return'));
   assert(view.includes("'安全撤销已结束；结果已在状态栏和修改历史中确认。'"));
   assert(view.includes("title.className = 'history-card-title'"));
   assert(html.includes('changes-history-presentation.js'));

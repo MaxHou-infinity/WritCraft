@@ -234,10 +234,18 @@ function loadChangesHarness(overrides = {}) {
     reload: 0,
     open: 0,
     history: 0,
+    undo: 0,
+    undoArgs: [],
     metrics: [],
   };
   const bridge = {
-    listChangeHistory: async () => { calls.history += 1; return { ok: true, history: [] }; },
+    listChangeHistory: async () => { calls.history += 1; return { ok: true, history: overrides.history || [] }; },
+    undoChange: async (...args) => {
+      calls.undo += 1;
+      calls.undoArgs.push(args);
+      return typeof overrides.undoResult === 'function'
+        ? overrides.undoResult(...args) : overrides.undoResult;
+    },
     applyChanges: async () => { calls.apply += 1; return overrides.applyResult; },
     confirmOnboardingFiles: async (...args) => {
       calls.confirm += 1;
@@ -259,12 +267,23 @@ function loadChangesHarness(overrides = {}) {
   };
   const workspace = {
     state: { project: { instanceId: 'instance_aaaaaaaaaaaaaaaaaaaaaaaa' }, tree: [] },
-    persistCurrent: async () => true,
-    beginChangesHistoryMutation() {},
-    reconcileChangesHistoryAfterMutation: async () => {
+    persistCurrent: async (...args) => typeof overrides.persistCurrent === 'function'
+      ? overrides.persistCurrent(...args) : overrides.persistCurrent === undefined ? true : overrides.persistCurrent,
+    beginChangesHistoryMutation() {
+      if (overrides.recoveryUiDuringMutation) {
+        window.__changesView.setRecoveryState({
+          blocked: true,
+          state: 'checking',
+          title: '正在确认项目写入',
+          message: '正在核对撤销事务',
+        });
+      }
+    },
+    reconcileChangesHistoryAfterMutation: async (...args) => {
       calls.reconcile += 1;
+      if (overrides.recoveryUiDuringMutation) window.__changesView.clearRecoveryState();
       if (typeof overrides.reconcileResult === 'function') {
-        return overrides.reconcileResult(overrides.applyResult);
+        return overrides.reconcileResult(...args);
       }
       if (overrides.reconcileResult) return overrides.reconcileResult;
       return overrides.applyResult?.ok
@@ -310,10 +329,12 @@ function loadChangesHarness(overrides = {}) {
     addEventListener() {},
   };
   const context = {
-    window, document, console, Date, Object, Set, Map, Promise,
+    window, document, console, Date: overrides.Date || Date, Object, Set, Map, Promise,
     requestAnimationFrame: callback => callback(),
     CustomEvent: class CustomEvent { constructor(type, options = {}) { this.type = type; this.detail = options.detail; } },
     setTimeout, clearTimeout,
+    setInterval: overrides.setInterval || setInterval,
+    clearInterval: overrides.clearInterval || clearInterval,
   };
   const source = fs.readFileSync(path.join(__dirname, '../src/renderer/changes-view.js'), 'utf8');
   vm.runInNewContext(source, context, { filename: 'changes-view.js' });
@@ -359,6 +380,24 @@ function confirmation(source = 'no_op') {
     token: 'oct_' + '2'.repeat(32), proposalDigest: 'a'.repeat(64), source,
     fileSuggestions: [{ path: 'chapters/a.md', title: 'A', reason: '建立章节' }],
   };
+}
+
+function deferred() {
+  let resolve;
+  let reject;
+  const promise = new Promise((resolvePromise, rejectPromise) => {
+    resolve = resolvePromise;
+    reject = rejectPromise;
+  });
+  return { promise, resolve, reject };
+}
+
+async function flushUntil(predicate, attempts = 20) {
+  for (let attempt = 0; attempt < attempts; attempt += 1) {
+    if (predicate()) return;
+    await Promise.resolve();
+  }
+  assert(predicate(), 'expected async checkpoint was not reached');
 }
 
 let passed = 0;
@@ -1018,6 +1057,98 @@ function extractFunction(source, name) {
     assert.strictEqual(replaceCalls, replacementsAfterDestroy, 'destroyed generation must not render after settlement');
     assert.strictEqual(document.activeElement, underlay, 'queued frames must not refocus the destroyed host');
     global.requestAnimationFrame = originalAnimationFrame;
+  });
+
+  await test('safe undo long wait remains explicitly non-AI after ten seconds', async () => {
+    let now = 1_000;
+    let tick = null;
+    class FakeDate extends Date {
+      static now() { return now; }
+    }
+    const undo = deferred();
+    const entry = {
+      id: 'history_a',
+      kind: 'changes',
+      status: 'applied',
+      appliedAt: '2026-07-30T08:00:00.000Z',
+      files: [{ path: 'chapter-a.md' }],
+    };
+    const harness = loadChangesHarness({
+      Date: FakeDate,
+      setInterval: callback => { tick = callback; return 1; },
+      clearInterval: () => { tick = null; },
+      undoResult: () => undo.promise,
+      reconcileResult: {
+        ok: true,
+        status: 'undone',
+        mutationTrusted: true,
+        authoritativeReloaded: true,
+        recovery: { affectedPaths: ['chapter-a.md'] },
+      },
+    });
+    harness.window.__changesView.renderHistory([entry]);
+    const click = harness.document.querySelector('.history-undo').click();
+    await flushUntil(() => harness.calls.undo === 1);
+    assert.strictEqual(harness.calls.undo, 1);
+    now = 12_000;
+    tick();
+    const progress = allText(harness.document.getElementById('changes-preview'));
+    assert(progress.includes('安全撤销仍在核对，已等待 11 秒'));
+    assert(!progress.includes('AI 正在处理'));
+    undo.resolve({ ok: true, applied: [{ path: 'chapter-a.md' }] });
+    await click;
+  });
+
+  await test('late undo finally cannot clear a new project undo progress or controls', async () => {
+    const firstUndo = deferred();
+    const secondUndo = deferred();
+    const queue = [firstUndo, secondUndo];
+    const makeEntry = id => ({
+      id,
+      kind: 'changes',
+      status: 'applied',
+      appliedAt: '2026-07-30T08:00:00.000Z',
+      files: [{ path: `${id}.md` }],
+    });
+    const harness = loadChangesHarness({
+      undoResult: () => queue.shift().promise,
+      recoveryUiDuringMutation: true,
+      reconcileResult: {
+        ok: true,
+        status: 'undone',
+        mutationTrusted: true,
+        authoritativeReloaded: true,
+        recovery: { affectedPaths: ['history_b.md'] },
+      },
+    });
+    harness.window.__changesView.renderHistory([makeEntry('history_a')]);
+    const firstClick = harness.document.querySelector('.history-undo').click();
+    await flushUntil(() => harness.calls.undo === 1);
+    assert.strictEqual(harness.calls.undo, 1);
+
+    harness.workspace.state.project.instanceId = 'instance_bbbbbbbbbbbbbbbbbbbbbbbb';
+    harness.document.dispatchEvent({ type: 'writcraft:project-entered', detail: {} });
+    harness.window.__changesView.renderHistory([makeEntry('history_b')]);
+    const secondButton = harness.document.querySelector('.history-undo');
+    const secondClick = secondButton.click();
+    await flushUntil(() => harness.calls.undo === 2);
+    assert.strictEqual(harness.calls.undo, 2);
+
+    firstUndo.resolve({ ok: true, applied: [{ path: 'history_a.md' }] });
+    await firstClick;
+    const previewWhileSecondRuns = allText(harness.document.getElementById('changes-preview'));
+    assert(previewWhileSecondRuns.includes('正在安全撤销'));
+    assert(!previewWhileSecondRuns.includes('安全撤销已结束'));
+    assert.strictEqual(secondButton.disabled, true);
+    assert.strictEqual(
+      harness.document.getElementById('changes-status').textContent,
+      '正在检查版本并安全撤销…'
+    );
+
+    secondUndo.resolve({ ok: true, applied: [{ path: 'history_b.md' }] });
+    await secondClick;
+    assert(allText(harness.document.getElementById('changes-preview')).includes('安全撤销已结束'));
+    assert.strictEqual(secondButton.disabled, false);
   });
 
   await test('npm verify includes the dynamic Renderer gate exactly once and preverify excludes it', async () => {
