@@ -1,11 +1,11 @@
 # 笔触 · WritCraft · V0 开发状态与续作入口
 
-> 最后更新：2026-07-30（Asia/Shanghai，0.0AQ · 正式真实作者隔离副本已创建并在项目卡入口启动）
+> 最后更新：2026-07-30（Asia/Shanghai，0.0AR · 真实作者项目卡旅程已完成并通过双侧核验）
 > 当前状态：**`writ-craft@0.1.1` 已从 exact candidate `c65981e` 发布到 npm `preview`；registry 时间 `2026-07-29T14:30:16.176Z`，shasum `d370c500666e25cfb373852deafa21b232d2bc18` 与本地候选一致。公网隔离安装/启动/退出为 2/2。annotated tag `v0.1.1` 指向同一提交，GitHub prerelease 已公开：`https://github.com/MaxHou-infinity/WritCraft/releases/tag/v0.1.1`。**
 > 发布判断：**0.1.1 Developer Preview 已完成版本、自动化、双架构安装、独立复审、npm 发布、公网安装和 GitHub prerelease。registry 标签保持 `preview: 0.1.1`、`latest: 0.1.0`，因此本次没有把 Preview 冒充稳定版，也没有执行 unpublish、占位发布或上传未签名 App/ZIP。**
 > 当前目标版本：**`docs/ROADMAP.md` 的 `RM-1.0 / writ-craft@0.1.2` 真实作者可用性闭环。必须使用 `edit.md`、5+ 个 `chapters/` 章节、2000+ 可见中文字符和至少 1 个来源文件的作者隔离副本，完成五段旅程，并关闭现场 `Graph INVALID_CACHE` 的诊断/恢复终态。0.1.2 签字前不得插入驾驶舱、新 AI 模式或其他后续版本功能。**
 > 当前源码证据：**未发布的 0.1.2 exact candidate 为 `45b1815 chore(release): prepare 0.1.2 candidate`，已推送 `origin/main`：完整 `npm test` exit 0；沙箱 `npm run verify` 在真实 DOM Electron 以 `code=null` 退出，同一命令在获准 GUI 上下文原样通过；强制真实 Electron 37/37、Persistent Main/IPC 3/3、npm Preview 10/10、默认/Node 22 npm 10 arm64/Node 24 npm 11 x64 的本地隔离安装均 2/2、生产依赖 0 vulnerabilities。候选 tarball 为 119 文件、572,607 bytes、2,623,581 bytes unpacked、shasum `ae4fb9b1a551a71214e0e4e36aebd100f9acd3b8`；双路最终独立复审 P0/P1/P2=0。以上不是作者五段旅程、npm 发布或 GitHub Release。公开 0.1.1 的 registry 证据保持不变。**
-> 当前作者验收准备：**所有者已确认合格整理候选为新的验收原稿，并授权一次最高 20 元的 `image-01` 真实验收。正式 author-copy transaction 已返回 `copyCreated: true / sourceUnchanged: true`，源 digest 保持 `9d0898863636da74615481a669c3e40362a60176249870e6d1793380c85b4380`。fresh 副本仍为 `edit.md` valid、12 个章节、4748 个可见中文字符、1 个来源文件；因新增私有验收清单为 21 个文件、608,701 bytes，digest `bfddbe445eb1d96dd5fe322949cf5df0d344eaa2515d441594634b286e4dc1c5`。当前源码 App 已明确打开该副本并停在项目卡 1/10；旧项目没有被用作旅程，付费调用尚未发生、费用仍为 0。**
+> 当前作者验收进度：**所有者已在 fresh 隔离副本完成项目卡、`edit.md` ChangeSet 人工接受和独立的初始文件创建确认，并明确反馈功能无问题。磁盘侧 `edit.md` SHA-256 已从源原稿的 `e9e9f7c2…` 变为副本的 `c678a336…`，新增 1 条 applied History，随后创建 10 个 Markdown 初始文件；副本仍合格，现为 22 个章节、4834 个可见中文字符、1 个来源文件、31 个项目文件、625,121 bytes，digest `0322ab048299595aac5eac74daa9133d6b80988bf450ed2fbd9566e917a0fa50`。以 author-copy manifest 的 `createdAt` 为证据切点，本次 Onboarding 为生成 1/接受 1/失败 0/结构化失败 0，生成 22,171 ms、人工审阅 32,354 ms。整理源 digest 仍为 `9d089886…`；Inline/Chapter/Plan、Research、image-01、Graph/恢复四段仍开放，真实 image 付费尚未发生。**
 > 0.0AA 历史保留红灯：**首轮真实 Electron 暴露 Inspector 在上下文失效时被清空、旧 5-chip 断言和项目 Chat 等待诊断；完整 test 又暴露 Plan 测试把 generation 函数正文写死。独立复审发现新请求预检窗口可提交不可见旧轮、同项目重开 UI/Main 串话、失败重开提前清会话及两项测试/错误文案缺口，均转为生产边界和回归后关闭。真实 Electron 曾连续两次在旧 Graph 恢复阶段超时；加入只读失败快照后该阶段连续四次通过，未改 Graph 产品逻辑，按重复同源证据关闭 timing P2。另一次 Chat preflight 红灯证明测试在恢复 `edit.md` 后未等待权威 watcher barrier；改为生产 `flushExternalChanges()` 收敛，而未放宽 Chat guard。该里程碑所有红运行保留，最终源码连续两次 34/34；后续 0.0AB 当时推进到 35/35，当前总链只看本文顶部当前里程碑。**
 > Graph 历史签字基线：**性能修复前的既有源码曾完整 `npm test`、Electron-enabled `npm run verify`、强制真实 Electron 26/26 exit 0；Graph Filter 15/15、Workbench 14/14、dynamic 5/5、Large 5/5、Watcher 15/15、Network 11/11、Intelligence 17/17，第二轮复审 P0=0/P1=0/P2=2。该数字只保留为历史过程；0.0AB 后来推进到 35/35，当前总链只看顶部当前里程碑。**
 > Graph 动态边界：**300 文件/1279 节点 cold-to-interactive、cache/incremental、筛选/内存/布局、AX/键鼠、三类纠错、stale/Issue→Changes、failure live、重启与项目隔离均进入真实 Electron；正文/History/ledger 的零写入门禁通过。**  
@@ -33,21 +33,29 @@ Chat 的三级 scope/context、Main-owned 多轮连续性、Chapter、Onboarding
 5. 每批合入后重跑定向测试；阶段完成时再运行完整 `npm test`、`npm run verify` 与 `WRITCRAFT_E2E_FORCE=1 npm run e2e:electron`，保存当次证据。
 6. 真实 API 只使用用户显式配置的 Key；记录延迟、限流、超时、故障和费用，不记录 Key、Prompt、模型原文或正文。Key 前缀只表示凭据/计费类型，不能代替官方能力与现场门禁。首发按 npm Developer Preview 合同执行；独立 App 发布才需要 Developer ID、公证与 Gatekeeper。
 
+### 0.0AR 2026-07-30 · 真实作者项目卡旅程通过
+
+- **作者侧签字**：所有者在 exact candidate `45b1815` 的 fresh 正式副本内亲自完成项目卡，接受 `edit.md` 审阅决定，并在独立第二阶段确认创建初始文件；其明确反馈“功能没有问题，已完成操作”。自动化没有代替作者填写答案、选择 Diff 或作质量判断。
+- **磁盘与 History 证明**：源原稿 `edit.md` SHA-256 为 `e9e9f7c2…`，正式副本现为 `c678a336…`，证明修改不是只停留在右侧 UI。副本创建后新增 1 条 `application/applied` History，目标仅为 `edit.md`，接受 3 个 hunk、拒绝 0 个；随后新增 **10** 个可见 Markdown 文件。当前副本预检仍 `eligible: true`，为 22 章、4834 个可见中文字符、1 个来源文件、31 个项目文件、625,121 bytes。
+- **本次私有指标**：正式副本继承了验收源既有 `.writcraft` 历史，累计值不能冒充本次样本。以私有 author-copy manifest 的 `createdAt` 为唯一切点，本次 Onboarding 仅计生成 **1**、接受 **1**、失败 **0**、结构化失败 **0**、重试 **0**；模型生成 22,171 ms，作者审阅至接受 32,354 ms。样本量为 1，只证明本次旅程，不外推稳定接受率。
+- **原稿边界校正**：被确认的验收源全树 digest 继续保持 `9d0898863636da74615481a669c3e40362a60176249870e6d1793380c85b4380`。最初作者项目的可见作者文件仍与整理源 **16/16 字节一致**，但其私有 `.writcraft` 元数据后来发生过正常写入，当前全树 digest 已不是 0.0AP 记录的历史值；因此后续不再用该旧全树 digest 声称“最初项目全树未变”，只以确认后的验收源作为正式 source authority。
+- **下一步**：第一段“项目卡 → `edit.md` → 初始文件”已通过；五段总门禁尚未完成。下一段由作者在正文中依次完成 Inline 拒绝、Inline 接受、Safe Undo，再继续 Chapter/Plan。`image-01` 最高 20 元授权尚未使用，发布仍未授权。
+
 ### 0.0AQ 2026-07-30 · 正式作者隔离副本与旅程入口
 
 - **作者确认**：所有者已明确确认 0.0AP 的合格整理候选为 `0.1.2` 真实作者验收原稿；该确认与先前授权的正式副本父目录、一次最高 20 元的 `image-01` 旅程共同解除 copy gate。
 - **正式事务**：仓库内 `acceptance:author:prepare` 的 author-copy transaction 返回 `ok: true`、`copyCreated: true`、`sourceUnchanged: true`；源 snapshot digest 仍为 `9d0898863636da74615481a669c3e40362a60176249870e6d1793380c85b4380`。
-- **副本终态**：fresh 副本预检 `eligible: true`，`edit.md` valid、12 章、4748 个可见中文字符、1 个来源文件；私有验收清单使副本为 21 个文件、608,701 bytes，digest `bfddbe445eb1d96dd5fe322949cf5df0d344eaa2515d441594634b286e4dc1c5`。整理原稿和最初作者项目再次只读复验，两个原有 digest 均不变。
-- **App 入口**：当前源码与 `45b1815` 的生产文件无差异。笔触已明确恢复到 fresh 副本，界面显示 `chapters/`、`references/` 和副本内 `edit.md`，并停在“项目卡 1/10 · 内容主旨”。自动化没有代替作者填写或作质量判断。
-- **付费与旅程边界**：尚未触发任何新 AI/付费调用，费用为 0。五段真实旅程、内容无关指标、旅程后独立复审与最终签字仍开放；正式发布仍需另行授权。
+- **副本当时终态**：fresh 副本预检 `eligible: true`，`edit.md` valid、12 章、4748 个可见中文字符、1 个来源文件；私有验收清单使副本为 21 个文件、608,701 bytes，digest `bfddbe445eb1d96dd5fe322949cf5df0d344eaa2515d441594634b286e4dc1c5`。整理原稿 digest 当时不变；最初项目全树 digest 的后续校正见 0.0AR。
+- **当时 App 入口**：源码与 `45b1815` 的生产文件无差异。笔触已明确恢复到 fresh 副本，界面显示 `chapters/`、`references/` 和副本内 `edit.md`，并停在“项目卡 1/10 · 内容主旨”。后续项目卡完成事实见 0.0AR。
+- **当时付费与旅程边界**：截至副本刚启动时尚未触发新 AI/付费调用，费用为 0；后续项目卡真实文本调用与当前剩余门禁见 0.0AR，正式发布仍需另行授权。
 
 ### 0.0AP 2026-07-30 · 合格真实作者整理候选（待作者确认）
 
 - **授权边界**：所有者明确授权制作整理候选、指定正式隔离副本父目录，并授权一次最高 20 元的 `image-01` 真实付费验收；该授权不包含 npm/GitHub 发布。
 - **只做路径整理**：候选保留原项目全部 20 个文件，只将既有稿件目录映射为合同要求的 `chapters/`，并将唯一根级来源文件映射为 `references/`；逐文件 SHA-256 对比为 **20/20 字节一致、0 mismatch、0 extra**，没有改写 Markdown。
-- **原项目不变**：整理前后只读预检 digest 均为 `74beb7755729173272b59500b0707a2488830d2a8c8ea128f0f996bc7d9403a1`，仍是原有不合格结构；没有对原项目写入、移动或删除文件。
+- **原项目当时证据**：整理事务前后只读预检 digest 均为 `74beb7755729173272b59500b0707a2488830d2a8c8ea128f0f996bc7d9403a1`，证明该事务没有改动原项目；后续私有 `.writcraft` 元数据变化使该全树 digest 只可作为 0.0AP 的历史快照，当前边界见 0.0AR。
 - **候选资格**：新候选预检 `eligible: true`，`edit.md` valid、**12** 个章节、**4748** 个可见中文字符、**1** 个来源文件、20 个项目文件、608,433 bytes，snapshot digest `9d0898863636da74615481a669c3e40362a60176249870e6d1793380c85b4380`。
-- **下一门禁**：候选只是准备结果。必须由作者明确确认它为新的真实作者验收原稿，之后才能在已授权父目录通过正式 author-copy transaction 创建 fresh 隔离副本，并在 exact candidate `45b1815` 上开始五段旅程。付费调用尚未发生，费用仍为 0。
+- **当时下一门禁（已由 0.0AQ/0.0AR 执行）**：候选只是准备结果；作者确认、正式副本和项目卡第一段后来均已完成。当前只按 0.0AR 顶部状态续作。
 
 ### 0.0AO 2026-07-30 · 0.1.2 exact candidate `45b1815`（已独立复审并推送）
 
@@ -768,8 +776,8 @@ Graph Extended Acceptance v1 已签字。首轮复审曾以 P1=3 回退 watcher�
 - [ ] 在真实 GUI 由作者完成人工 image-01 质量评分、采纳/保留/废纸篓决定，并按安全字段记录费用或限流样本；自动合成调用不能代替此项。
 - [x] 为 `.writcraft/image-trash/` 增加可见恢复/清空入口与明确保留策略；V0 不自动永久删除，恢复/清空只走 Main 精确能力与真实 Electron 用户旅程。
 - [x] Image Trash 最新 21/21 竞态加固最终独立复审：P0=0/P1=0/P2=1，可以签字；P2 为非阻断 external open-FD residual。
-- [ ] 在真实 GUI 完成“项目卡 → edit.md ChangeSet → 人工确认 → 磁盘落盘”，并以真实作者项目记录结构化输出失败率与修复重试结果。
-- [ ] 由作者显式选择合格项目，运行 `acceptance:author:prepare` 并只在隔离副本中完成五段真实旅程；当前最近项目预检不合格，禁止扫描其他私人目录补位。
+- [x] 在真实 GUI 完成“项目卡 → edit.md ChangeSet → 人工确认 → 磁盘落盘 → 独立确认创建 10 个初始文件”；0.0AR 记录本次生成 1/接受 1/失败 0/结构化失败 0/重试 0，并以副本创建时间排除继承的历史样本。
+- [ ] 由作者显式选择的合格源创建 fresh 隔离副本并完成五段真实旅程；项目卡第一段已通过，Inline/Chapter/Plan、Research、image-01、Graph/恢复仍开放。
 
 ### P2：Main 网络与安全审计
 
