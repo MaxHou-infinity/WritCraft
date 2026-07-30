@@ -1,6 +1,6 @@
 {
   "name": "writ-craft",
-  "version": "0.1.1",
+  "version": "0.1.2",
   "description": "中国第一款 Cursor 范式 AI 写作 IDE — V0 桌面应用原型",
   "main": "src/main/main.js",
   "bin": {
