@@ -19,6 +19,8 @@ On 2026-07-30 exact candidate `6ed6f89` repeated npm Preview **10/10**, local in
 
 The subsequent independent review invalidated `6ed6f89` for publication. Exact candidate `30a06b0` repeats npm Preview **10/10**, approved-environment local installed **2/2**, both official runtime matrices **2/2**, and production audit at **0 vulnerabilities**. Its dry-run package is **120 files / 574,770 bytes packed / 2,631,216 bytes unpacked / shasum `4d2805ca2894d8dcd5857cec414aab850a51ff28`**. A second independent review reports P0=0/P1=0; the sole P2 was the candidate commit's pre-commit documentation wording, corrected by the following docs-only closeout. This proves only local candidate packaging and runtime preparation, not registry publication or release authorization.
 
+The third-copy journey then invalidated `30a06b0` by exposing a committed-terminal UI contradiction. Exact candidate `5ed4147` fixes that production Renderer state and repeats npm Preview **10/10**, approved-environment local installed **2/2**, official Node 22.22.3/npm 10.9.8 arm64 and Node 24.18.0/npm 11.16.0 x64 installed checks **2/2** each, and production audit at **0 vulnerabilities**. Its dry-run package is **120 files / 574,848 bytes packed / 2,631,510 bytes unpacked / shasum `65af5cedcc154dcf3099284240e8b16a755b3696`**. This remains unpublished candidate evidence only; it does not authorize npm publication, a dist-tag move, a GitHub Release, or reuse of the invalidated third-copy author journey.
+
 ## Package invariants
 
 - Publish only `bin/`, production `src/main/`, production `src/renderer/`, `README.md`, `LICENSE`, `THIRD_PARTY_NOTICES.md`, the manifest, and the shrinkwrap.
