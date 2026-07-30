@@ -1,10 +1,10 @@
 # 笔触 · WritCraft · V0 开发状态与续作入口
 
-> 最后更新：2026-07-30（Asia/Shanghai，0.0AO · `writ-craft@0.1.2` exact candidate 技术准备已完成，待独立复审与 Git 收口）
+> 最后更新：2026-07-30（Asia/Shanghai，0.0AO · `writ-craft@0.1.2` exact candidate `45b1815` 已完成独立复审并推送）
 > 当前状态：**`writ-craft@0.1.1` 已从 exact candidate `c65981e` 发布到 npm `preview`；registry 时间 `2026-07-29T14:30:16.176Z`，shasum `d370c500666e25cfb373852deafa21b232d2bc18` 与本地候选一致。公网隔离安装/启动/退出为 2/2。annotated tag `v0.1.1` 指向同一提交，GitHub prerelease 已公开：`https://github.com/MaxHou-infinity/WritCraft/releases/tag/v0.1.1`。**
 > 发布判断：**0.1.1 Developer Preview 已完成版本、自动化、双架构安装、独立复审、npm 发布、公网安装和 GitHub prerelease。registry 标签保持 `preview: 0.1.1`、`latest: 0.1.0`，因此本次没有把 Preview 冒充稳定版，也没有执行 unpublish、占位发布或上传未签名 App/ZIP。**
 > 当前目标版本：**`docs/ROADMAP.md` 的 `RM-1.0 / writ-craft@0.1.2` 真实作者可用性闭环。必须使用 `edit.md`、5+ 个 `chapters/` 章节、2000+ 可见中文字符和至少 1 个来源文件的作者隔离副本，完成五段旅程，并关闭现场 `Graph INVALID_CACHE` 的诊断/恢复终态。0.1.2 签字前不得插入驾驶舱、新 AI 模式或其他后续版本功能。**
-> 当前源码证据：**工作树已把 package/shrinkwrap 根版本推进到未发布的 0.1.2 candidate：完整 `npm test` exit 0；沙箱 `npm run verify` 在真实 DOM Electron 以 `code=null` 退出，同一命令在获准 GUI 上下文原样通过；强制真实 Electron 37/37、Persistent Main/IPC 3/3、npm Preview 10/10、默认/Node 22 npm 10 arm64/Node 24 npm 11 x64 的本地隔离安装均 2/2、生产依赖 0 vulnerabilities。候选 tarball 为 119 文件、572,607 bytes、2,623,581 bytes unpacked、shasum `ae4fb9b1a551a71214e0e4e36aebd100f9acd3b8`。这些是未提交候选准备证据，不是作者五段旅程、npm 发布或 GitHub Release。公开 0.1.1 的 registry 证据保持不变。**
+> 当前源码证据：**未发布的 0.1.2 exact candidate 为 `45b1815 chore(release): prepare 0.1.2 candidate`，已推送 `origin/main`：完整 `npm test` exit 0；沙箱 `npm run verify` 在真实 DOM Electron 以 `code=null` 退出，同一命令在获准 GUI 上下文原样通过；强制真实 Electron 37/37、Persistent Main/IPC 3/3、npm Preview 10/10、默认/Node 22 npm 10 arm64/Node 24 npm 11 x64 的本地隔离安装均 2/2、生产依赖 0 vulnerabilities。候选 tarball 为 119 文件、572,607 bytes、2,623,581 bytes unpacked、shasum `ae4fb9b1a551a71214e0e4e36aebd100f9acd3b8`；双路最终独立复审 P0/P1/P2=0。以上不是作者五段旅程、npm 发布或 GitHub Release。公开 0.1.1 的 registry 证据保持不变。**
 > 0.0AA 历史保留红灯：**首轮真实 Electron 暴露 Inspector 在上下文失效时被清空、旧 5-chip 断言和项目 Chat 等待诊断；完整 test 又暴露 Plan 测试把 generation 函数正文写死。独立复审发现新请求预检窗口可提交不可见旧轮、同项目重开 UI/Main 串话、失败重开提前清会话及两项测试/错误文案缺口，均转为生产边界和回归后关闭。真实 Electron 曾连续两次在旧 Graph 恢复阶段超时；加入只读失败快照后该阶段连续四次通过，未改 Graph 产品逻辑，按重复同源证据关闭 timing P2。另一次 Chat preflight 红灯证明测试在恢复 `edit.md` 后未等待权威 watcher barrier；改为生产 `flushExternalChanges()` 收敛，而未放宽 Chat guard。该里程碑所有红运行保留，最终源码连续两次 34/34；后续 0.0AB 当时推进到 35/35，当前总链只看本文顶部当前里程碑。**
 > Graph 历史签字基线：**性能修复前的既有源码曾完整 `npm test`、Electron-enabled `npm run verify`、强制真实 Electron 26/26 exit 0；Graph Filter 15/15、Workbench 14/14、dynamic 5/5、Large 5/5、Watcher 15/15、Network 11/11、Intelligence 17/17，第二轮复审 P0=0/P1=0/P2=2。该数字只保留为历史过程；0.0AB 后来推进到 35/35，当前总链只看顶部当前里程碑。**
 > Graph 动态边界：**300 文件/1279 节点 cold-to-interactive、cache/incremental、筛选/内存/布局、AX/键鼠、三类纠错、stale/Issue→Changes、failure live、重启与项目隔离均进入真实 Electron；正文/History/ledger 的零写入门禁通过。**  
@@ -32,14 +32,15 @@ Chat 的三级 scope/context、Main-owned 多轮连续性、Chapter、Onboarding
 5. 每批合入后重跑定向测试；阶段完成时再运行完整 `npm test`、`npm run verify` 与 `WRITCRAFT_E2E_FORCE=1 npm run e2e:electron`，保存当次证据。
 6. 真实 API 只使用用户显式配置的 Key；记录延迟、限流、超时、故障和费用，不记录 Key、Prompt、模型原文或正文。Key 前缀只表示凭据/计费类型，不能代替官方能力与现场门禁。首发按 npm Developer Preview 合同执行；独立 App 发布才需要 Developer ID、公证与 Gatekeeper。
 
-### 0.0AO 2026-07-30 · 0.1.2 exact candidate 技术准备（待独立复审与 Git 收口）
+### 0.0AO 2026-07-30 · 0.1.2 exact candidate `45b1815`（已独立复审并推送）
 
 - **版本边界**：只把 `package.json` 与 `npm-shrinkwrap.json` 根版本从已发布 0.1.1 推进到未发布 0.1.2；没有增加 0.2.0+ 功能、打标签、执行 `npm publish`、创建 GitHub Release 或移动 `latest`。
 - **合同顺序修正**：真实作者合同原先一处同时要求“最终旅程绑定既有 exact candidate”和“旅程后才签 candidate”，形成流程循环；现按 `ROADMAP.md` §10 明确为先提交 candidate、再在新合格副本跑最终旅程、最后对同一候选证据签字并申请单独发布授权。
 - **定向与完整自动化**：Author copy **48/48**、离线真实 API 合同 **16/16（0 网络）**、Consistency **22/22**、Graph Index **17/17**、Graph correction integration **6/6**、npm Preview **10/10**；完整 `npm test` exit 0。沙箱 `npm run verify` 仅在真实 DOM Electron 以 `code=null` 退出，获准 GUI 上下文原样重跑 exit 0；该红灯保留为环境边界。
 - **真实应用与安装矩阵**：强制真实 Electron **37/37**（Plan 写入 206 ms、Graph 撤销 172 ms）、Persistent Main/IPC **3/3**；默认本机、官方 Node 22.22.3/npm 10.9.8 arm64、官方 Node 24.18.0/npm 11.16.0 x64 的新 tarball 隔离安装均 **2/2**。生产依赖联网审计为 **0 vulnerabilities**。
 - **包体**：随包 README 对公开 0.1.1 与未发布 0.1.2 证据完成区分后，`npm pack --dry-run --json` 为 **119 files / 572,607 bytes packed / 2,623,581 bytes unpacked / shasum `ae4fb9b1a551a71214e0e4e36aebd100f9acd3b8`**；包内版本与 shrinkwrap 一致为 0.1.2。
-- **未完成边界**：本节只证明形成 exact candidate 前的技术准备。作者显式选择的项目仍不合格，也没有作者指定的隔离副本父目录；不得自行重排原稿或采用未确认项目。五段作者旅程、真实内容无关指标、旅程后独立复审与最终签字仍开放；任何生产源码变化都会要求新 candidate 与新副本重跑受影响旅程。
+- **独立复审、Git 与记忆**：包/Graph 安全边界与文档一致性两路最终只读复审均为 **P0=0/P1=0/P2=0**。7 个候选文件已提交为 `45b1815 chore(release): prepare 0.1.2 candidate` 并推送；该提交是后续新合格隔离副本五段旅程必须绑定的 exact candidate。Nowledge 权威记忆 `e435dd78-2352-46fa-8299-2da2507d0361` 已原位更新并用 `45b1815`、候选 shasum 和作者门禁反查命中。后续纯文档收尾不改变该候选；任何生产源码变化都会使受影响人工证据失效。
+- **未完成边界**：本节只证明候选技术准备和 exact commit 已形成。作者显式选择的项目仍不合格，也没有作者指定的隔离副本父目录；不得自行重排原稿或采用未确认项目。五段作者旅程、真实内容无关指标、旅程后独立复审与最终签字仍开放；任何生产源码变化都会要求新 candidate 与新副本重跑受影响旅程。
 
 ### 0.0AN 2026-07-30 · Graph Unicode 路径与自动恢复（已独立签字）
 
@@ -49,7 +50,7 @@ Chat 的三级 scope/context、Main-owned 多轮连续性、Chapter、Onboarding
 - **原项目边界**：只读预检 digest 复查一致，原项目仍无 `graph.json` 写入。当前资格为 `edit.md` 有效、20 个项目文件、608,433 bytes，但合同路径下 `chapters=0`、可见中文字符 `0`、`references=0`，所以未创建验收副本，也不把本次诊断写成五段真实作者签字。
 - **完整回归与真实 App**：最终源码完整 `npm test` exit 0；沙箱 `npm run verify` 仅在真实 DOM Electron 以 `code=null` 退出，同一命令在获批 macOS GUI 上下文原样重跑 exit 0。强制真实 Electron **37/37**，并在真实 Main→Renderer Graph 文件筛选中同时看见全角冒号路径及其 NFKC 半角 peer；Persistent Main/IPC **3/3**。全部自动化保持 0 真实付费网络调用。
 - **独立复审**：首轮 **P0=0/P1=3/P2=2**，第二轮 **P0=0/P1=0/P2=2**；路径改写、公开错误边界、超大缓存终态、兼容等价双路径/cache roundtrip、测试分母与文档计数全部关闭后，第三轮最终 **P0=0/P1=0/P2=0**。
-- **当前门禁**：0.0AN 已提交并推送为 `a72a179 fix(graph): recover unicode author paths`，`HEAD` 与 `origin/main` 一致；Nowledge 权威记忆 `e435dd78-2352-46fa-8299-2da2507d0361` 已原位更新并反查。2026-07-30 再次只读预检作者显式选择的项目，digest 仍为 `74beb7755729173272b59500b0707a2488830d2a8c8ea128f0f996bc7d9403a1`，资格仍是 `edit.md` 有效但合同路径下 `chapters=0`、可见中文字符 `0`、`references=0`；没有发现作者另行明确选择的合格路径，也没有作者选择的隔离副本父目录，因此不得自行重排原稿、采用先前仅由助手建议但未被作者确认的项目，或创建正式验收副本。五段真实作者旅程与真实指标仍未完成；本地 package 已在 0.0AO 推进到未发布 0.1.2 candidate 准备状态，但不得发布或移动 npm 标签。
+- **当前门禁**：0.0AN 已提交并推送为 `a72a179 fix(graph): recover unicode author paths`；Nowledge 权威记忆 `e435dd78-2352-46fa-8299-2da2507d0361` 已原位更新并反查。2026-07-30 再次只读预检作者显式选择的项目，digest 仍为 `74beb7755729173272b59500b0707a2488830d2a8c8ea128f0f996bc7d9403a1`，资格仍是 `edit.md` 有效但合同路径下 `chapters=0`、可见中文字符 `0`、`references=0`；没有发现作者另行明确选择的合格路径，也没有作者选择的隔离副本父目录，因此不得自行重排原稿、采用先前仅由助手建议但未被作者确认的项目，或创建正式验收副本。五段真实作者旅程与真实指标仍未完成；0.0AO 已形成未发布 exact candidate `45b1815`，但不得发布或移动 npm 标签。
 
 ### 0.0AM 2026-07-29 · RM-1.0 目标模式路线图冻结
 
