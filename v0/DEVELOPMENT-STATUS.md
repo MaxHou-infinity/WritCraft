@@ -1,11 +1,11 @@
 # 笔触 · WritCraft · V0 开发状态与续作入口
 
-> 最后更新：2026-07-30（Asia/Shanghai，0.0BC · 独立复审发现并修复 Safe Undo 长等待/跨项目 owner 竞态）
+> 最后更新：2026-07-30（Asia/Shanghai，0.0BD · exact candidate 30a06b0 的第三个 fresh 作者副本已创建并启动）
 > 当前状态：**`writ-craft@0.1.1` 已从 exact candidate `c65981e` 发布到 npm `preview`；registry 时间 `2026-07-29T14:30:16.176Z`，shasum `d370c500666e25cfb373852deafa21b232d2bc18` 与本地候选一致。公网隔离安装/启动/退出为 2/2。annotated tag `v0.1.1` 指向同一提交，GitHub prerelease 已公开：`https://github.com/MaxHou-infinity/WritCraft/releases/tag/v0.1.1`。**
 > 发布判断：**0.1.1 Developer Preview 已完成版本、自动化、双架构安装、独立复审、npm 发布、公网安装和 GitHub prerelease。registry 标签保持 `preview: 0.1.1`、`latest: 0.1.0`，因此本次没有把 Preview 冒充稳定版，也没有执行 unpublish、占位发布或上传未签名 App/ZIP。**
 > 当前目标版本：**`docs/ROADMAP.md` 的 `RM-1.0 / writ-craft@0.1.2` 真实作者可用性闭环。必须使用 `edit.md`、5+ 个 `chapters/` 章节、2000+ 可见中文字符和至少 1 个来源文件的作者隔离副本，完成五段旅程，并关闭现场 `Graph INVALID_CACHE` 的诊断/恢复终态。0.1.2 签字前不得插入驾驶舱、新 AI 模式或其他后续版本功能。**
-> 当前源码证据：**旧的未发布 0.1.2 candidates `45b1815`、`9a05c44`、`89658f0` 与 `6ed6f89` 均已被后续生产修复失效，不得发布或复用受影响验收证据。当前 exact production candidate 为 `30a06b0 fix(history): bind undo progress ownership`：Safe Undo 的阶段专属长等待文案、progress/busy/undo owner token、跨项目 fail-closed 清理，以及 NO_KEY 设置往返、A→B 隔离、成功清理和迟到响应动态证据均已合入。第二轮独立复审为 **P0=0/P1=0/P2=1**，唯一 P2 是 candidate 提交内文档仍写“未提交/待复审”，本次 docs-only 收口即修正该偏差，不改变生产候选。定向 Changes UX 8/8、Renderer dynamic 29/29、Onboarding Workspace dynamic 4/4，完整 `npm test`、批准 GUI 环境 `npm run verify`、强制真实 Electron 37/37、npm Preview 10/10、本地 installed 2/2、Node 22/npm 10 arm64 2/2、Node 24/npm 11 x64 2/2 均通过；生产依赖 0 vulnerabilities。候选包为 120 files / 574,770 bytes / 2,631,216 unpacked / shasum `4d2805ca2894d8dcd5857cec414aab850a51ff28`。第三个 fresh 作者副本现在可以从未变验收源创建。npm/GitHub 未发布 0.1.2。**
-> 当前作者验收进度：**第二个 fresh 副本已完成项目卡、Inline 拒绝、Inline 接受与精确 Safe Undo，磁盘/History 事务通过：最新正文记录变为 `undone`，正文恢复 `1bdb3a5…`，`edit.md` 保持 `e9bacec…`。但该副本先后暴露撤销后假 AI 计时、长等待文案退化和跨项目 owner 竞态；因此只保留为功能/红灯证据，不能作为最终发布签字。第三个 fresh 副本尚未创建；必须等待新 candidate 的第二轮独立复审 P0/P1 为零。**
+> 当前源码证据：**旧的未发布 0.1.2 candidates `45b1815`、`9a05c44`、`89658f0` 与 `6ed6f89` 均已被后续生产修复失效，不得发布或复用受影响验收证据。当前 exact production candidate 为 `30a06b0 fix(history): bind undo progress ownership`：Safe Undo 的阶段专属长等待文案、progress/busy/undo owner token、跨项目 fail-closed 清理，以及 NO_KEY 设置往返、A→B 隔离、成功清理和迟到响应动态证据均已合入。第二轮独立复审为 **P0=0/P1=0/P2=1**；唯一 docs-only P2 已由 `b6041b6` 修正，不改变生产候选。定向 Changes UX 8/8、Renderer dynamic 29/29、Onboarding Workspace dynamic 4/4，完整 `npm test`、批准 GUI 环境 `npm run verify`、强制真实 Electron 37/37、npm Preview 10/10、本地 installed 2/2、Node 22/npm 10 arm64 2/2、Node 24/npm 11 x64 2/2 均通过；生产依赖 0 vulnerabilities。候选包为 120 files / 574,770 bytes / 2,631,216 unpacked / shasum `4d2805ca2894d8dcd5857cec414aab850a51ff28`。第三个 fresh 作者副本已从未变验收源创建并启动。npm/GitHub 未发布 0.1.2。**
+> 当前作者验收进度：**第二个 fresh 副本只保留为功能/红灯证据。第二轮独立复审放行后，已从同一未变验收源创建 `WritCraft-0.1.2-作者验收-3`：`copyCreated: true / sourceUnchanged: true`，20 files / 608,433 bytes，源 digest 仍为 `9d0898863636da74615481a669c3e40362a60176249870e6d1793380c85b4380`，manifest `createdAt` 为 `2026-07-30T10:56:11.255Z`。exact candidate `30a06b0` 已在正常稳定 profile 打开该副本并停留于 `edit.md`；创建后 metrics/History 新事件均为 0。下一步由作者本人从左侧项目卡开始第一段旅程，自动化不得代填答案或代做审阅决定。**
 > 0.0AA 历史保留红灯：**首轮真实 Electron 暴露 Inspector 在上下文失效时被清空、旧 5-chip 断言和项目 Chat 等待诊断；完整 test 又暴露 Plan 测试把 generation 函数正文写死。独立复审发现新请求预检窗口可提交不可见旧轮、同项目重开 UI/Main 串话、失败重开提前清会话及两项测试/错误文案缺口，均转为生产边界和回归后关闭。真实 Electron 曾连续两次在旧 Graph 恢复阶段超时；加入只读失败快照后该阶段连续四次通过，未改 Graph 产品逻辑，按重复同源证据关闭 timing P2。另一次 Chat preflight 红灯证明测试在恢复 `edit.md` 后未等待权威 watcher barrier；改为生产 `flushExternalChanges()` 收敛，而未放宽 Chat guard。该里程碑所有红运行保留，最终源码连续两次 34/34；后续 0.0AB 当时推进到 35/35，当前总链只看本文顶部当前里程碑。**
 > Graph 历史签字基线：**性能修复前的既有源码曾完整 `npm test`、Electron-enabled `npm run verify`、强制真实 Electron 26/26 exit 0；Graph Filter 15/15、Workbench 14/14、dynamic 5/5、Large 5/5、Watcher 15/15、Network 11/11、Intelligence 17/17，第二轮复审 P0=0/P1=0/P2=2。该数字只保留为历史过程；0.0AB 后来推进到 35/35，当前总链只看顶部当前里程碑。**
 > Graph 动态边界：**300 文件/1279 节点 cold-to-interactive、cache/incremental、筛选/内存/布局、AX/键鼠、三类纠错、stale/Issue→Changes、failure live、重启与项目隔离均进入真实 Electron；正文/History/ledger 的零写入门禁通过。**  
@@ -32,6 +32,14 @@ Chat 的三级 scope/context、Main-owned 多轮连续性、Chapter、Onboarding
 4. 不重写已经签字的 Onboarding v2 service、capability store、batch、Main/preload 与 Renderer 契约；Main 动态 admission、single-flight 和 Renderer 生命周期 authority 清理均已关闭。
 5. 每批合入后重跑定向测试；阶段完成时再运行完整 `npm test`、`npm run verify` 与 `WRITCRAFT_E2E_FORCE=1 npm run e2e:electron`，保存当次证据。
 6. 真实 API 只使用用户显式配置的 Key；记录延迟、限流、超时、故障和费用，不记录 Key、Prompt、模型原文或正文。Key 前缀只表示凭据/计费类型，不能代替官方能力与现场门禁。首发按 npm Developer Preview 合同执行；独立 App 发布才需要 Developer ID、公证与 Gatekeeper。
+
+### 0.0BD 2026-07-30 · 第三个 fresh 作者验收副本就绪
+
+- **门禁输入**：production candidate **`30a06b0`**；后续 `b6041b6` 只修正文档时态，不改变候选。第二轮独立复审 **P0=0/P1=0/P2=1（docs-only 已关闭）**。
+- **复制事务**：作者既有授权范围内，从 `/Users/maxhou/Desktop/Max 项目-2026/写作项目 test-WritCraft验收源` 创建 `/Users/maxhou/Desktop/Max 项目-2026/WritCraft 作者验收/WritCraft-0.1.2-作者验收-3`。事务返回 **20 files / 608,433 bytes / sourceUnchanged=true**；复制前、事务返回和复制后只读预检的 source digest 均为 **`9d0898863636da74615481a669c3e40362a60176249870e6d1793380c85b4380`**。
+- **计数边界**：副本 manifest `createdAt = 2026-07-30T10:56:11.255Z`。源内已有 `.writcraft` 私有历史继续保留，但仅晚于该时间的事件可计入第三轮；启动后核对 metrics/History 新事件均为 **0**。
+- **启动状态**：旧源码/打包实例已终止；当前 `npm start` 运行 `30a06b0`，使用正常稳定 profile 的既有配置，经产品 recent-project → `openRecentProject` 验证链打开第三副本。界面标题为 **WritCraft-0.1.2-作者验收-3**，当前文件 `edit.md`。
+- **作者下一步**：点击左侧 **项目卡**，由作者本人填写并提交；不允许自动化代填项目定义、点击接受/拒绝或替作者给出内容质量判断。
 
 ### 0.0BC 2026-07-30 · 独立复审拦截 Safe Undo 时序缺口
 
