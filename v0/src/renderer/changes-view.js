@@ -2185,13 +2185,19 @@
       }
       confirmationMode = null;
       await settleOnboardingMetric(activeConfirmation.editNoChanges ? 'discarded' : 'accepted', activeConfirmation.metric);
+      const editWasUpdated = !activeConfirmation.editNoChanges;
       preview.replaceChildren(Object.assign(document.createElement('div'), {
-        className: 'tree-empty', textContent: '已放弃初始文件创建；edit.md 的结果保持不变。',
+        className: 'tree-empty',
+        textContent: editWasUpdated
+          ? '已跳过初始文件创建；edit.md 已保留本轮接受的更新。'
+          : '已放弃初始文件创建；edit.md 的结果保持不变。',
       }));
       applyButton.hidden = true;
       discardButton.hidden = true;
       resetCommitControls();
-      setStatus('已结束项目卡确认，没有创建初始文件');
+      setStatus(editWasUpdated
+        ? '项目卡已完成；edit.md 更新已保留，没有创建初始文件'
+        : '已结束项目卡确认，没有创建初始文件');
       return;
     }
     if (pending?.proposalKind === 'research_card' && activeResearchRequest) {

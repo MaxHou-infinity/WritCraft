@@ -10,6 +10,7 @@ const path = require('path');
 const { once } = require('events');
 const { createMarkdownTrashWorker, createMarkdownTrashWorkerForRoot } = require('../src/main/markdown-trash-worker');
 
+const TEST_HELPER_TIMEOUT_MS = 5000;
 let passed = 0;
 async function check(label, fn) {
   try { await fn(); passed += 1; console.log(`  ✓ ${label}`); }
@@ -63,12 +64,12 @@ async function run() {
     finally { await close(worker); fs.closeSync(fd); fs.rmSync(scratch, { recursive: true, force: true }); }
   });
   await check('reconciles a committed restore after the helper loses its success response', async () => {
-    const scratch = fs.mkdtempSync(path.join(os.tmpdir(), 'writcraft-md-trash-')); const data = setup(scratch); const helper = compile(scratch, ['-DWRITCRAFT_TEST_DROP_COMMITTED_RESPONSE']); const fd = rootFd(data.root); const first = createMarkdownTrashWorker({ rootFd: fd, expectedRootIdentity: identity(data.root), helperPath: helper, timeoutMs: 1000 });
+    const scratch = fs.mkdtempSync(path.join(os.tmpdir(), 'writcraft-md-trash-')); const data = setup(scratch); const helper = compile(scratch, ['-DWRITCRAFT_TEST_DROP_COMMITTED_RESPONSE']); const fd = rootFd(data.root); const first = createMarkdownTrashWorker({ rootFd: fd, expectedRootIdentity: identity(data.root), helperPath: helper, timeoutMs: TEST_HELPER_TIMEOUT_MS });
     const restore = request(data);
     try {
       await assert.rejects(first.restore(restore), error => error?.code === 'MARKDOWN_TRASH_RECOVERY_REQUIRED');
       if (!first.closed) await close(first);
-      const second = createMarkdownTrashWorker({ rootFd: fd, expectedRootIdentity: identity(data.root), helperPath: compile(scratch), timeoutMs: 1000 });
+      const second = createMarkdownTrashWorker({ rootFd: fd, expectedRootIdentity: identity(data.root), helperPath: compile(scratch), timeoutMs: TEST_HELPER_TIMEOUT_MS });
       try { assert.deepStrictEqual(await second.restore(restore), { state: 'COMMITTED', reason: 'NONE' }); assert.strictEqual(fs.readFileSync(path.join(data.root, 'chapters', 'restored.md'), 'utf8'), 'original manuscript'); assert.strictEqual(fs.readFileSync(path.join(data.trash, 'manifest.json'), 'utf8'), data.nextManifest.toString()); }
       finally { await close(second); }
     } finally { fs.closeSync(fd); fs.rmSync(scratch, { recursive: true, force: true }); }
@@ -91,8 +92,8 @@ async function run() {
     finally { await close(worker); fs.closeSync(fd); fs.rmSync(scratch, { recursive: true, force: true }); }
   });
   await check('reconciles a committed trash after its success response is lost', async () => {
-    const scratch = fs.mkdtempSync(path.join(os.tmpdir(), 'writcraft-md-trash-')); const data = trashSetup(scratch); const fd = rootFd(data.root); const requestValue = trashRequest(data); const statusValue = { ...requestValue, operation: 'T' }; const first = createMarkdownTrashWorker({ rootFd: fd, expectedRootIdentity: identity(data.root), helperPath: compile(scratch, ['-DWRITCRAFT_TEST_DROP_TRASH_COMMITTED_RESPONSE']), timeoutMs: 1000 });
-    try { await assert.rejects(first.trash(requestValue), error => error?.code === 'MARKDOWN_TRASH_RECOVERY_REQUIRED'); if (!first.closed) await close(first); const second = createMarkdownTrashWorker({ rootFd: fd, expectedRootIdentity: identity(data.root), helperPath: compile(scratch), timeoutMs: 1000 }); try { assert.deepStrictEqual(await second.status(statusValue), { state: 'COMMITTED', reason: 'NONE' }); assert.deepStrictEqual(await second.reconcile(), { state: 'COMMITTED' }); assert.strictEqual(fs.readFileSync(path.join(data.trash, 'entry.md'), 'utf8'), 'draft manuscript'); assert.strictEqual(fs.readFileSync(path.join(data.trash, 'manifest.json'), 'utf8'), data.nextManifest.toString()); } finally { await close(second); } }
+    const scratch = fs.mkdtempSync(path.join(os.tmpdir(), 'writcraft-md-trash-')); const data = trashSetup(scratch); const fd = rootFd(data.root); const requestValue = trashRequest(data); const statusValue = { ...requestValue, operation: 'T' }; const first = createMarkdownTrashWorker({ rootFd: fd, expectedRootIdentity: identity(data.root), helperPath: compile(scratch, ['-DWRITCRAFT_TEST_DROP_TRASH_COMMITTED_RESPONSE']), timeoutMs: TEST_HELPER_TIMEOUT_MS });
+    try { await assert.rejects(first.trash(requestValue), error => error?.code === 'MARKDOWN_TRASH_RECOVERY_REQUIRED'); if (!first.closed) await close(first); const second = createMarkdownTrashWorker({ rootFd: fd, expectedRootIdentity: identity(data.root), helperPath: compile(scratch), timeoutMs: TEST_HELPER_TIMEOUT_MS }); try { assert.deepStrictEqual(await second.status(statusValue), { state: 'COMMITTED', reason: 'NONE' }); assert.deepStrictEqual(await second.reconcile(), { state: 'COMMITTED' }); assert.strictEqual(fs.readFileSync(path.join(data.trash, 'entry.md'), 'utf8'), 'draft manuscript'); assert.strictEqual(fs.readFileSync(path.join(data.trash, 'manifest.json'), 'utf8'), data.nextManifest.toString()); } finally { await close(second); } }
     finally { fs.closeSync(fd); fs.rmSync(scratch, { recursive: true, force: true }); }
   });
   await check('binds an inspect digest to one stable fd-relative file identity', async () => {
@@ -112,8 +113,8 @@ async function run() {
   await check('auto-reconciles owned T journals after P, Q, and D crash states without a reconstructed request', async () => {
     for (const [marker, expected] of [['-DWRITCRAFT_TEST_CRASH_T_P', 'UNCOMMITTED'], ['-DWRITCRAFT_TEST_CRASH_T_Q', 'UNCOMMITTED'], ['-DWRITCRAFT_TEST_CRASH_T_D', 'COMMITTED']]) {
       const scratch = fs.mkdtempSync(path.join(os.tmpdir(), 'writcraft-md-trash-')); const data = trashSetup(scratch); const fd = rootFd(data.root); const requestValue = trashRequest(data);
-      const first = createMarkdownTrashWorker({ rootFd: fd, expectedRootIdentity: identity(data.root), helperPath: compile(scratch, [marker]), timeoutMs: 1000 });
-      try { await assert.rejects(first.trash(requestValue), error => error?.code === 'MARKDOWN_TRASH_RECOVERY_REQUIRED'); if (!first.closed) await close(first); const second = createMarkdownTrashWorker({ rootFd: fd, expectedRootIdentity: identity(data.root), helperPath: compile(scratch), timeoutMs: 1000 }); try { assert.deepStrictEqual(await second.reconcile(), { state: expected }); if (expected === 'UNCOMMITTED') { assert.strictEqual(fs.readFileSync(data.source, 'utf8'), 'draft manuscript'); assert(!fs.existsSync(path.join(data.trash, 'entry.md'))); assert.strictEqual(fs.readFileSync(path.join(data.trash, 'manifest.json'), 'utf8'), data.manifest.toString()); } else { assert.strictEqual(fs.readFileSync(path.join(data.trash, 'entry.md'), 'utf8'), 'draft manuscript'); assert.strictEqual(fs.readFileSync(path.join(data.trash, 'manifest.json'), 'utf8'), data.nextManifest.toString()); } } finally { await close(second); } }
+      const first = createMarkdownTrashWorker({ rootFd: fd, expectedRootIdentity: identity(data.root), helperPath: compile(scratch, [marker]), timeoutMs: TEST_HELPER_TIMEOUT_MS });
+      try { await assert.rejects(first.trash(requestValue), error => error?.code === 'MARKDOWN_TRASH_RECOVERY_REQUIRED'); if (!first.closed) await close(first); const second = createMarkdownTrashWorker({ rootFd: fd, expectedRootIdentity: identity(data.root), helperPath: compile(scratch), timeoutMs: TEST_HELPER_TIMEOUT_MS }); try { assert.deepStrictEqual(await second.reconcile(), { state: expected }); if (expected === 'UNCOMMITTED') { assert.strictEqual(fs.readFileSync(data.source, 'utf8'), 'draft manuscript'); assert(!fs.existsSync(path.join(data.trash, 'entry.md'))); assert.strictEqual(fs.readFileSync(path.join(data.trash, 'manifest.json'), 'utf8'), data.manifest.toString()); } else { assert.strictEqual(fs.readFileSync(path.join(data.trash, 'entry.md'), 'utf8'), 'draft manuscript'); assert.strictEqual(fs.readFileSync(path.join(data.trash, 'manifest.json'), 'utf8'), data.nextManifest.toString()); } } finally { await close(second); } }
       finally { fs.closeSync(fd); fs.rmSync(scratch, { recursive: true, force: true }); }
     }
   });
@@ -140,8 +141,8 @@ async function run() {
   await check('auto-reconciles owned R journals after P, Q, and D crash states without assuming a preexisting M1', async () => {
     for (const [marker, expected] of [['-DWRITCRAFT_TEST_CRASH_R_P', 'UNCOMMITTED'], ['-DWRITCRAFT_TEST_CRASH_R_Q', 'UNCOMMITTED'], ['-DWRITCRAFT_TEST_CRASH_R_D', 'COMMITTED']]) {
       const scratch = fs.mkdtempSync(path.join(os.tmpdir(), 'writcraft-md-trash-')); const data = setup(scratch); const fd = rootFd(data.root); const restoreValue = request(data);
-      const first = createMarkdownTrashWorker({ rootFd: fd, expectedRootIdentity: identity(data.root), helperPath: compile(scratch, [marker]), timeoutMs: 1000 });
-      try { await assert.rejects(first.restore(restoreValue), error => error?.code === 'MARKDOWN_TRASH_RECOVERY_REQUIRED'); if (!first.closed) await close(first); const second = createMarkdownTrashWorker({ rootFd: fd, expectedRootIdentity: identity(data.root), helperPath: compile(scratch), timeoutMs: 1000 }); try { assert.deepStrictEqual(await second.reconcile(), { state: expected }); if (expected === 'UNCOMMITTED') { assert.strictEqual(fs.readFileSync(data.source, 'utf8'), 'original manuscript'); assert(!fs.existsSync(path.join(data.root, 'chapters', 'restored.md'))); assert.strictEqual(fs.readFileSync(path.join(data.trash, 'manifest.json'), 'utf8'), data.manifest.toString()); } else { assert.strictEqual(fs.readFileSync(path.join(data.root, 'chapters', 'restored.md'), 'utf8'), 'original manuscript'); assert.strictEqual(fs.readFileSync(path.join(data.trash, 'manifest.json'), 'utf8'), data.nextManifest.toString()); } } finally { await close(second); } }
+      const first = createMarkdownTrashWorker({ rootFd: fd, expectedRootIdentity: identity(data.root), helperPath: compile(scratch, [marker]), timeoutMs: TEST_HELPER_TIMEOUT_MS });
+      try { await assert.rejects(first.restore(restoreValue), error => error?.code === 'MARKDOWN_TRASH_RECOVERY_REQUIRED'); if (!first.closed) await close(first); const second = createMarkdownTrashWorker({ rootFd: fd, expectedRootIdentity: identity(data.root), helperPath: compile(scratch), timeoutMs: TEST_HELPER_TIMEOUT_MS }); try { assert.deepStrictEqual(await second.reconcile(), { state: expected }); if (expected === 'UNCOMMITTED') { assert.strictEqual(fs.readFileSync(data.source, 'utf8'), 'original manuscript'); assert(!fs.existsSync(path.join(data.root, 'chapters', 'restored.md'))); assert.strictEqual(fs.readFileSync(path.join(data.trash, 'manifest.json'), 'utf8'), data.manifest.toString()); } else { assert.strictEqual(fs.readFileSync(path.join(data.root, 'chapters', 'restored.md'), 'utf8'), 'original manuscript'); assert.strictEqual(fs.readFileSync(path.join(data.trash, 'manifest.json'), 'utf8'), data.nextManifest.toString()); } } finally { await close(second); } }
       finally { fs.closeSync(fd); fs.rmSync(scratch, { recursive: true, force: true }); }
     }
   });
@@ -152,19 +153,19 @@ async function run() {
     ];
     for (const [kind, marker, expected] of cases) {
       const scratch = fs.mkdtempSync(path.join(os.tmpdir(), 'writcraft-md-trash-')); const data = kind === 'T' ? trashSetup(scratch) : setup(scratch); const fd = rootFd(data.root);
-      const operation = kind === 'T' ? trashRequest(data) : request(data); const first = createMarkdownTrashWorker({ rootFd: fd, expectedRootIdentity: identity(data.root), helperPath: compile(scratch, [marker]), timeoutMs: 1000 });
-      try { await first.ready(); first.timeoutMs = 100; await assert.rejects(kind === 'T' ? first.trash(operation) : first.restore(operation), error => error?.code === 'MARKDOWN_TRASH_RECOVERY_REQUIRED'); if (!first.closed) await close(first); const second = createMarkdownTrashWorker({ rootFd: fd, expectedRootIdentity: identity(data.root), helperPath: compile(scratch), timeoutMs: 1000 }); try { assert.deepStrictEqual(await second.reconcile(), { state: expected }); } finally { await close(second); } }
+      const operation = kind === 'T' ? trashRequest(data) : request(data); const first = createMarkdownTrashWorker({ rootFd: fd, expectedRootIdentity: identity(data.root), helperPath: compile(scratch, [marker]), timeoutMs: TEST_HELPER_TIMEOUT_MS });
+      try { await first.ready(); first.timeoutMs = 100; await assert.rejects(kind === 'T' ? first.trash(operation) : first.restore(operation), error => error?.code === 'MARKDOWN_TRASH_RECOVERY_REQUIRED'); if (!first.closed) await close(first); const second = createMarkdownTrashWorker({ rootFd: fd, expectedRootIdentity: identity(data.root), helperPath: compile(scratch), timeoutMs: TEST_HELPER_TIMEOUT_MS }); try { assert.deepStrictEqual(await second.reconcile(), { state: expected }); } finally { await close(second); } }
       finally { fs.closeSync(fd); fs.rmSync(scratch, { recursive: true, force: true }); }
     }
   });
   await check('fails recovery rollback when the named source parent is replaced after entry validation', async () => {
     const scratch = fs.mkdtempSync(path.join(os.tmpdir(), 'writcraft-md-trash-')); const data = trashSetup(scratch); const fd = rootFd(data.root);
-    const first = createMarkdownTrashWorker({ rootFd: fd, expectedRootIdentity: identity(data.root), helperPath: compile(scratch, ['-DWRITCRAFT_TEST_CRASH_T_Q']), timeoutMs: 1000 });
+    const first = createMarkdownTrashWorker({ rootFd: fd, expectedRootIdentity: identity(data.root), helperPath: compile(scratch, ['-DWRITCRAFT_TEST_CRASH_T_Q']), timeoutMs: TEST_HELPER_TIMEOUT_MS });
     try {
       await first.ready(); first.timeoutMs = 100;
       await assert.rejects(first.trash(trashRequest(data)), error => error?.code === 'MARKDOWN_TRASH_RECOVERY_REQUIRED');
       if (!first.closed) await close(first);
-      const second = createMarkdownTrashWorker({ rootFd: fd, expectedRootIdentity: identity(data.root), helperPath: compile(scratch, ['-DWRITCRAFT_TEST_RECOVER_ROLLBACK_PARENT_SWAP']), timeoutMs: 1000 });
+      const second = createMarkdownTrashWorker({ rootFd: fd, expectedRootIdentity: identity(data.root), helperPath: compile(scratch, ['-DWRITCRAFT_TEST_RECOVER_ROLLBACK_PARENT_SWAP']), timeoutMs: TEST_HELPER_TIMEOUT_MS });
       try {
         assert.deepStrictEqual(await second.reconcile(), { state: 'RECOVERY_REQUIRED' });
         assert(!fs.existsSync(path.join(data.root, 'chapters', 'draft.md')));
@@ -175,13 +176,13 @@ async function run() {
   });
   await check('fails recovery roll-forward when the named target parent is replaced after entry validation', async () => {
     const scratch = fs.mkdtempSync(path.join(os.tmpdir(), 'writcraft-md-trash-')); const data = setup(scratch); const fd = rootFd(data.root);
-    const first = createMarkdownTrashWorker({ rootFd: fd, expectedRootIdentity: identity(data.root), helperPath: compile(scratch, ['-DWRITCRAFT_TEST_CRASH_R_D']), timeoutMs: 1000 });
+    const first = createMarkdownTrashWorker({ rootFd: fd, expectedRootIdentity: identity(data.root), helperPath: compile(scratch, ['-DWRITCRAFT_TEST_CRASH_R_D']), timeoutMs: TEST_HELPER_TIMEOUT_MS });
     try {
       await first.ready(); first.timeoutMs = 100;
       await assert.rejects(first.restore(request(data)), error => error?.code === 'MARKDOWN_TRASH_RECOVERY_REQUIRED');
       if (!first.closed) await close(first);
       const manifestBefore = fs.readFileSync(path.join(data.trash, 'manifest.json'));
-      const second = createMarkdownTrashWorker({ rootFd: fd, expectedRootIdentity: identity(data.root), helperPath: compile(scratch, ['-DWRITCRAFT_TEST_RECOVER_ROLLFORWARD_PARENT_SWAP']), timeoutMs: 1000 });
+      const second = createMarkdownTrashWorker({ rootFd: fd, expectedRootIdentity: identity(data.root), helperPath: compile(scratch, ['-DWRITCRAFT_TEST_RECOVER_ROLLFORWARD_PARENT_SWAP']), timeoutMs: TEST_HELPER_TIMEOUT_MS });
       try {
         assert.deepStrictEqual(await second.reconcile(), { state: 'RECOVERY_REQUIRED' });
         assert(!fs.existsSync(path.join(data.root, 'chapters', 'restored.md')));
@@ -191,12 +192,12 @@ async function run() {
     } finally { fs.closeSync(fd); fs.rmSync(scratch, { recursive: true, force: true }); }
   });
   await check('does not delete a same-schema journal replacement with a different inode', async () => {
-    const scratch = fs.mkdtempSync(path.join(os.tmpdir(), 'writcraft-md-trash-')); const data = trashSetup(scratch); const fd = rootFd(data.root); const first = createMarkdownTrashWorker({ rootFd: fd, expectedRootIdentity: identity(data.root), helperPath: compile(scratch, ['-DWRITCRAFT_TEST_CRASH_T_P']), timeoutMs: 1000 });
-    try { await first.ready(); first.timeoutMs = 100; await assert.rejects(first.trash(trashRequest(data)), error => error?.code === 'MARKDOWN_TRASH_RECOVERY_REQUIRED'); if (!first.closed) await close(first); const journal = fs.readdirSync(data.trash).find(name => name.startsWith('.writcraft-md-restore-')); assert(journal); const replacement = fs.readFileSync(path.join(data.trash, journal)); fs.renameSync(path.join(data.trash, journal), path.join(data.trash, `${journal}.original`)); fs.writeFileSync(path.join(data.trash, journal), replacement, { mode: 0o600 }); const replacedIdentity = identity(path.join(data.trash, journal)); const second = createMarkdownTrashWorker({ rootFd: fd, expectedRootIdentity: identity(data.root), helperPath: compile(scratch), timeoutMs: 1000 }); try { assert.deepStrictEqual(await second.reconcile(), { state: 'RECOVERY_REQUIRED' }); const after = identity(path.join(data.trash, journal)); assert.strictEqual(after.ino, replacedIdentity.ino); assert.strictEqual(fs.readFileSync(path.join(data.trash, journal)).equals(replacement), true); } finally { await close(second); } }
+    const scratch = fs.mkdtempSync(path.join(os.tmpdir(), 'writcraft-md-trash-')); const data = trashSetup(scratch); const fd = rootFd(data.root); const first = createMarkdownTrashWorker({ rootFd: fd, expectedRootIdentity: identity(data.root), helperPath: compile(scratch, ['-DWRITCRAFT_TEST_CRASH_T_P']), timeoutMs: TEST_HELPER_TIMEOUT_MS });
+    try { await first.ready(); first.timeoutMs = 100; await assert.rejects(first.trash(trashRequest(data)), error => error?.code === 'MARKDOWN_TRASH_RECOVERY_REQUIRED'); if (!first.closed) await close(first); const journal = fs.readdirSync(data.trash).find(name => name.startsWith('.writcraft-md-restore-')); assert(journal); const replacement = fs.readFileSync(path.join(data.trash, journal)); fs.renameSync(path.join(data.trash, journal), path.join(data.trash, `${journal}.original`)); fs.writeFileSync(path.join(data.trash, journal), replacement, { mode: 0o600 }); const replacedIdentity = identity(path.join(data.trash, journal)); const second = createMarkdownTrashWorker({ rootFd: fd, expectedRootIdentity: identity(data.root), helperPath: compile(scratch), timeoutMs: TEST_HELPER_TIMEOUT_MS }); try { assert.deepStrictEqual(await second.reconcile(), { state: 'RECOVERY_REQUIRED' }); const after = identity(path.join(data.trash, journal)); assert.strictEqual(after.ino, replacedIdentity.ino); assert.strictEqual(fs.readFileSync(path.join(data.trash, journal)).equals(replacement), true); } finally { await close(second); } }
     finally { fs.closeSync(fd); fs.rmSync(scratch, { recursive: true, force: true }); }
   });
   await check('rejects an in-place journal rewrite whose canonical body no longer matches its receipt digest', async () => {
-    const scratch = fs.mkdtempSync(path.join(os.tmpdir(), 'writcraft-md-trash-')); const data = trashSetup(scratch); const fd = rootFd(data.root); const first = createMarkdownTrashWorker({ rootFd: fd, expectedRootIdentity: identity(data.root), helperPath: compile(scratch, ['-DWRITCRAFT_TEST_CRASH_T_P']), timeoutMs: 1000 });
+    const scratch = fs.mkdtempSync(path.join(os.tmpdir(), 'writcraft-md-trash-')); const data = trashSetup(scratch); const fd = rootFd(data.root); const first = createMarkdownTrashWorker({ rootFd: fd, expectedRootIdentity: identity(data.root), helperPath: compile(scratch, ['-DWRITCRAFT_TEST_CRASH_T_P']), timeoutMs: TEST_HELPER_TIMEOUT_MS });
     try {
       await first.ready(); first.timeoutMs = 100;
       await assert.rejects(first.trash(trashRequest(data)), error => error?.code === 'MARKDOWN_TRASH_RECOVERY_REQUIRED');
@@ -207,13 +208,13 @@ async function run() {
       const journalFd = fs.openSync(journalPath, 'r+');
       try { fs.writeSync(journalFd, bytes, 0, bytes.length, 0); fs.fsyncSync(journalFd); } finally { fs.closeSync(journalFd); }
       assert.strictEqual(identity(journalPath).ino, before.ino);
-      const second = createMarkdownTrashWorker({ rootFd: fd, expectedRootIdentity: identity(data.root), helperPath: compile(scratch), timeoutMs: 1000 });
+      const second = createMarkdownTrashWorker({ rootFd: fd, expectedRootIdentity: identity(data.root), helperPath: compile(scratch), timeoutMs: TEST_HELPER_TIMEOUT_MS });
       try { assert.deepStrictEqual(await second.reconcile(), { state: 'RECOVERY_REQUIRED' }); assert.strictEqual(fs.readFileSync(journalPath).equals(bytes), true); }
       finally { await close(second); }
     } finally { fs.closeSync(fd); fs.rmSync(scratch, { recursive: true, force: true }); }
   });
   await check('does not accept a same-byte M1 manifest replacement as the committed artifact', async () => {
-    const scratch = fs.mkdtempSync(path.join(os.tmpdir(), 'writcraft-md-trash-')); const data = trashSetup(scratch); const fd = rootFd(data.root); const first = createMarkdownTrashWorker({ rootFd: fd, expectedRootIdentity: identity(data.root), helperPath: compile(scratch, ['-DWRITCRAFT_TEST_CRASH_T_AFTER_MANIFEST_PUBLISH']), timeoutMs: 1000 });
+    const scratch = fs.mkdtempSync(path.join(os.tmpdir(), 'writcraft-md-trash-')); const data = trashSetup(scratch); const fd = rootFd(data.root); const first = createMarkdownTrashWorker({ rootFd: fd, expectedRootIdentity: identity(data.root), helperPath: compile(scratch, ['-DWRITCRAFT_TEST_CRASH_T_AFTER_MANIFEST_PUBLISH']), timeoutMs: TEST_HELPER_TIMEOUT_MS });
     try {
       await first.ready(); first.timeoutMs = 100;
       await assert.rejects(first.trash(trashRequest(data)), error => error?.code === 'MARKDOWN_TRASH_RECOVERY_REQUIRED');
@@ -222,13 +223,13 @@ async function run() {
       const originalInode = identity(manifestPath).ino; fs.renameSync(manifestPath, `${manifestPath}.original`);
       fs.writeFileSync(manifestPath, replacement, { mode: 0o600 }); const replacementInode = identity(manifestPath).ino;
       assert.notStrictEqual(replacementInode, originalInode);
-      const second = createMarkdownTrashWorker({ rootFd: fd, expectedRootIdentity: identity(data.root), helperPath: compile(scratch), timeoutMs: 1000 });
+      const second = createMarkdownTrashWorker({ rootFd: fd, expectedRootIdentity: identity(data.root), helperPath: compile(scratch), timeoutMs: TEST_HELPER_TIMEOUT_MS });
       try { assert.deepStrictEqual(await second.reconcile(), { state: 'RECOVERY_REQUIRED' }); assert.strictEqual(identity(manifestPath).ino, replacementInode); assert(fs.readdirSync(data.trash).some(name => name.startsWith('.writcraft-md-restore-'))); }
       finally { await close(second); }
     } finally { fs.closeSync(fd); fs.rmSync(scratch, { recursive: true, force: true }); }
   });
   await check('does not delete a same-byte qmanifest replacement after a committed rename', async () => {
-    const scratch = fs.mkdtempSync(path.join(os.tmpdir(), 'writcraft-md-trash-')); const data = trashSetup(scratch); const fd = rootFd(data.root); const first = createMarkdownTrashWorker({ rootFd: fd, expectedRootIdentity: identity(data.root), helperPath: compile(scratch, ['-DWRITCRAFT_TEST_CRASH_T_AFTER_MANIFEST_PUBLISH']), timeoutMs: 1000 });
+    const scratch = fs.mkdtempSync(path.join(os.tmpdir(), 'writcraft-md-trash-')); const data = trashSetup(scratch); const fd = rootFd(data.root); const first = createMarkdownTrashWorker({ rootFd: fd, expectedRootIdentity: identity(data.root), helperPath: compile(scratch, ['-DWRITCRAFT_TEST_CRASH_T_AFTER_MANIFEST_PUBLISH']), timeoutMs: TEST_HELPER_TIMEOUT_MS });
     try {
       await first.ready(); first.timeoutMs = 100;
       await assert.rejects(first.trash(trashRequest(data)), error => error?.code === 'MARKDOWN_TRASH_RECOVERY_REQUIRED');
@@ -238,7 +239,7 @@ async function run() {
       const originalInode = identity(qpath).ino; fs.renameSync(qpath, `${qpath}.original`);
       fs.writeFileSync(qpath, replacement, { mode: 0o600 }); const replacementInode = identity(qpath).ino;
       assert.notStrictEqual(replacementInode, originalInode);
-      const second = createMarkdownTrashWorker({ rootFd: fd, expectedRootIdentity: identity(data.root), helperPath: compile(scratch), timeoutMs: 1000 });
+      const second = createMarkdownTrashWorker({ rootFd: fd, expectedRootIdentity: identity(data.root), helperPath: compile(scratch), timeoutMs: TEST_HELPER_TIMEOUT_MS });
       try { assert.deepStrictEqual(await second.reconcile(), { state: 'RECOVERY_REQUIRED' }); assert.strictEqual(identity(qpath).ino, replacementInode); assert(fs.readdirSync(data.trash).some(name => name.startsWith('.writcraft-md-restore-'))); }
       finally { await close(second); }
     } finally { fs.closeSync(fd); fs.rmSync(scratch, { recursive: true, force: true }); }

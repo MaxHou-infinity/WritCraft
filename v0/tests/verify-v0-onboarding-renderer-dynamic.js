@@ -613,6 +613,31 @@ function extractFunction(source, name) {
     assert(allText(harness.document.getElementById('changes-preview')).includes('已创建 1 个初始文件'));
   });
 
+  await test('skipping files after committed edit preserves truthful terminal copy', async () => {
+    const harness = loadChangesHarness({
+      applyResult: {
+        ok: true,
+        applied: [{ path: 'edit.md', revision: 'b'.repeat(64) }],
+        onboardingConfirmation: confirmation('review'),
+      },
+    });
+    const operationId = '9'.repeat(32);
+    assert.strictEqual(harness.window.__changesView.acceptProposal(changedProposal(), {
+      onboardingAttempt: { operationId, startedAt: Date.now() - 10 },
+    }).ok, true);
+    await acceptFirstReviewItem(harness.document.getElementById('changes-preview'));
+    await harness.document.getElementById('changes-apply').click();
+    await harness.document.getElementById('changes-discard').click();
+    const previewText = allText(harness.document.getElementById('changes-preview'));
+    const statusText = harness.document.getElementById('changes-status').textContent;
+    assert(previewText.includes('edit.md 已保留本轮接受的更新'));
+    assert(!previewText.includes('edit.md 的结果保持不变'));
+    assert(statusText.includes('edit.md 更新已保留'));
+    assert.deepStrictEqual(harness.calls.metrics.map(item => [item.event.operationId, item.event.outcome]), [
+      [operationId, 'accepted'],
+    ]);
+  });
+
   await test('authoritative apply recovery reaches the shared terminal state without repeating refresh IPCs', async () => {
     const harness = loadChangesHarness({
       applyResult: { ok: true, applied: [{ path: 'chapters/a.md', revision: 'b'.repeat(64) }] },
