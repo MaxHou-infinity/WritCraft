@@ -1,11 +1,11 @@
 # 笔触 · WritCraft · V0 开发状态与续作入口
 
-> 最后更新：2026-07-30（Asia/Shanghai，0.0BJ · `⌘K` 作者指令 P1 已实现并完成自动化门禁）
+> 最后更新：2026-07-30（Asia/Shanghai，0.0BL · 第五副本 Inline 接受与拒绝通过，待 Safe Undo）
 > 当前状态：**`writ-craft@0.1.1` 已从 exact candidate `c65981e` 发布到 npm `preview`；registry 时间 `2026-07-29T14:30:16.176Z`，shasum `d370c500666e25cfb373852deafa21b232d2bc18` 与本地候选一致。公网隔离安装/启动/退出为 2/2。annotated tag `v0.1.1` 指向同一提交，GitHub prerelease 已公开：`https://github.com/MaxHou-infinity/WritCraft/releases/tag/v0.1.1`。**
 > 发布判断：**0.1.1 Developer Preview 已完成版本、自动化、双架构安装、独立复审、npm 发布、公网安装和 GitHub prerelease。registry 标签保持 `preview: 0.1.1`、`latest: 0.1.0`，因此本次没有把 Preview 冒充稳定版，也没有执行 unpublish、占位发布或上传未签名 App/ZIP。**
 > 当前目标版本：**`docs/ROADMAP.md` 的 `RM-1.0 / writ-craft@0.1.2` 真实作者可用性闭环。必须使用 `edit.md`、5+ 个 `chapters/` 章节、2000+ 可见中文字符和至少 1 个来源文件的作者隔离副本，完成五段旅程，并关闭现场 `Graph INVALID_CACHE` 的诊断/恢复终态。0.1.2 签字前不得插入驾驶舱、新 AI 模式或其他后续版本功能。**
 > 当前源码证据：**exact production candidate 为 `9b21a9d fix(inline): require author rewrite instruction`；旧 `5ed4147` 已失效，不得发布，也不得复用其受影响的 Inline 人工验收。`⌘K` 已从“按默认风格立即生成”补齐为“冻结选区 → 选区旁输入必填作者要求 → 提交后才生成”；`⌘L` 仍只负责项目/文件/选区 Chat。请求升级为 exact `writcraft.inline-rewrite/v2`，Main 在 generation admission 前校验私有指令，History/recovery/metrics 继续兼容公开 v1 且不保存指令或其 hash。完整 `npm test` exit 0；沙箱 `npm run verify` 在真实 DOM Electron 以 `code=null` 退出，原样在批准 GUI 环境 exit 0；强制真实 Electron 首轮在改写阶段暴露 MiniMax 适配器不允许 `system` role，改回安全规则优先的单 `user` 消息后该阶段通过；随后一次在无关 Graph 阶段出现 `Input.dispatchMouseEvent` CDP timeout，最终源码完整复跑 **37/37**。这些红灯必须保留。第三轮独立复审 **P0=0/P1=0/P2=0**；`9b21a9d` 已作为 `origin/main` 的祖先推送，npm/GitHub Release 仍未发布 0.1.2。**
-> 当前作者验收进度：**第四副本项目卡已通过。作者随后在旧 `5ed4147` 行为上完成一次普通正文 Inline 接受：operation `2a0fcc…` 为 `generated → accepted`，History `change_57926957…`，正文从 `1bdb3a5c…` 更新为 `21f7f4c…`。该操作证明旧链可落盘，但同时暴露 `⌘K` 无法输入改写要求的 P1，因此不能作为新候选的最终 Inline 签字，也不要求作者现在撤销或重复项目卡。修复合入后必须从未变原稿建立新的合格隔离副本，只重跑受生产变化影响的 Inline 拒绝、接受与 Safe Undo，再继续 Chapter/Plan、Research、image-01、Graph/恢复。**
+> 当前作者验收进度：**第四副本项目卡已通过且不再重复。第五 fresh 副本已在 exact candidate `9b21a9d` 完成两个独立 Inline operation：第一次 `generated → accepted`，唯一新增 applied History `change_6516ccbc…` 与第一章磁盘从 `1bdb3a5c…` 到 `f9b89aac…` 精确一致；第二次 `generated → rejected`，没有再次改变目标 mtime/hash，也没有新增 History，界面显示“原文已恢复”。原始验收源 digest 仍为 `9d089886…`。当前唯一下一步是从修改历史撤销明确标记为最新且精确指向该第一章的 `change_6516ccbc…`，完成 Safe Undo 后再进入 Chapter/Plan。**
 > 0.0AA 历史保留红灯：**首轮真实 Electron 暴露 Inspector 在上下文失效时被清空、旧 5-chip 断言和项目 Chat 等待诊断；完整 test 又暴露 Plan 测试把 generation 函数正文写死。独立复审发现新请求预检窗口可提交不可见旧轮、同项目重开 UI/Main 串话、失败重开提前清会话及两项测试/错误文案缺口，均转为生产边界和回归后关闭。真实 Electron 曾连续两次在旧 Graph 恢复阶段超时；加入只读失败快照后该阶段连续四次通过，未改 Graph 产品逻辑，按重复同源证据关闭 timing P2。另一次 Chat preflight 红灯证明测试在恢复 `edit.md` 后未等待权威 watcher barrier；改为生产 `flushExternalChanges()` 收敛，而未放宽 Chat guard。该里程碑所有红运行保留，最终源码连续两次 34/34；后续 0.0AB 当时推进到 35/35，当前总链只看本文顶部当前里程碑。**
 > Graph 历史签字基线：**性能修复前的既有源码曾完整 `npm test`、Electron-enabled `npm run verify`、强制真实 Electron 26/26 exit 0；Graph Filter 15/15、Workbench 14/14、dynamic 5/5、Large 5/5、Watcher 15/15、Network 11/11、Intelligence 17/17，第二轮复审 P0=0/P1=0/P2=2。该数字只保留为历史过程；0.0AB 后来推进到 35/35，当前总链只看顶部当前里程碑。**
 > Graph 动态边界：**300 文件/1279 节点 cold-to-interactive、cache/incremental、筛选/内存/布局、AX/键鼠、三类纠错、stale/Issue→Changes、failure live、重启与项目隔离均进入真实 Electron；正文/History/ledger 的零写入门禁通过。**  
@@ -33,13 +33,22 @@ Chat 的三级 scope/context、Main-owned 多轮连续性、Chapter、Onboarding
 5. 每批合入后重跑定向测试；阶段完成时再运行完整 `npm test`、`npm run verify` 与 `WRITCRAFT_E2E_FORCE=1 npm run e2e:electron`，保存当次证据。
 6. 真实 API 只使用用户显式配置的 Key；记录延迟、限流、超时、故障和费用，不记录 Key、Prompt、模型原文或正文。Key 前缀只表示凭据/计费类型，不能代替官方能力与现场门禁。首发按 npm Developer Preview 合同执行；独立 App 发布才需要 Developer ID、公证与 Gatekeeper。
 
+### 0.0BL 2026-07-30 · 第五副本 Inline 接受与拒绝通过
+
+- **作者实际顺序**：作者第一次输入真实改写要求、生成 Diff 后明确接受；随后用新的 operation 再次生成并明确拒绝。两个场景必须分别记账，不能因顺序与提示不同而要求作者重复。
+- **接受 operation**：`cd20e785…` 为 **5,143 ms `generated` → 4,032 ms `accepted`**，字符计数 32 → 44。唯一 post-manifest History 为 **`change_6516ccbc…`**，`application/applied`，目标精确为 `chapters/01-cope-origin/chapter-01-why-cope.md`；before revision **`1bdb3a5c…`**、after revision **`f9b89aac…`**，当前磁盘 SHA-256 与 after 精确一致。
+- **拒绝 operation**：`8f093bb9…` 为 **4,807 ms `generated` → 2,151 ms `rejected`**，预览 44 → 76 字符，拒绝终态回到 44。该 operation 发生在接受写盘之后，但目标 mtime 仍为接受时的 `2026-07-30T14:59:34.333Z`，没有第二条 post-manifest History；桌面终态明确显示 **“原文已恢复”**。因此它证明的是“保留第一次已接受真相、拒绝第二次建议零额外写入”。
+- **项目与原稿边界**：当前 14 个 Markdown 合计 97,349 bytes，组合摘要 **`0a526eb1c963cf51d73df8bbb42e7061be3c1beb2283621ae22eca7c7635ed3d`**；相对验收源只有上述第一章发生变化。原始验收源仍 eligible，snapshot digest 继续为 **`9d0898863636da74615481a669c3e40362a60176249870e6d1793380c85b4380`**。
+- **下一步唯一目标**：在修改历史中只撤销明确标记为“最新”、且路径精确为 `chapters/01-cope-origin/chapter-01-why-cope.md` 的 **`change_6516ccbc…`**。不得撤销 `edit.md` 或任何更早记录；完成后必须证明正文恢复 `1bdb3a5c…`、该 History 进入 undone 终态且原始源不变。
+- **证据口径纠正**：0.0BK 曾直接读取不存在的 `changes.json.history`，把继承 History 总数误写为 0。权威 `changeHistoryService.listHistory()` 证明第五副本基线继承 **3** 条、manifest 后为 **0** 条；接受后总数 **4**、本轮新增 **1**。错误只在证据解析与文档，不影响磁盘、History 服务或作者操作。
+
 ### 0.0BK 2026-07-30 · `9b21a9d` 第五 fresh Inline 验收副本
 
 - **候选绑定**：生产源码仍精确绑定 **`9b21a9d fix(inline): require author rewrite instruction`**；后续 `c33565e` 及本节只收口文档，不改变候选行为。Inline v2 第三轮独立复审为 **P0=0/P1=0/P2=0**。
 - **只读源门禁**：已确认验收源再次预检为 eligible：`edit.md` valid、12 chapters、4,748 可见中文字符、1 source、20 files / 608,433 bytes；snapshot digest 仍为 **`9d0898863636da74615481a669c3e40362a60176249870e6d1793380c85b4380`**。
 - **复制事务**：在既有所有者授权范围内创建 `/Users/maxhou/Desktop/Max 项目-2026/WritCraft 作者验收/WritCraft-0.1.2-作者验收-5`。事务返回 `copyCreated=true / sourceUnchanged=true`、20 files / 608,433 bytes；副本自身含私有验收 manifest 后为 eligible、21 files / 608,701 bytes，digest **`7002be616c01f0b25592597e0ffad6557a26396d08c096835fe37db4079310f9`**。
-- **计数边界**：manifest `createdAt = 2026-07-30T14:48:31.566Z`。副本继承的 metrics 23 条与 History 0 条均早于该时间，不能冒充本轮证据；只计算该时间之后绑定第五副本的事件和磁盘变化。
-- **拒绝前 Markdown 基线**：排除 `.writcraft` 后，对 14 个 `.md/.markdown` 的规范相对路径和精确文件字节做长度分隔 SHA-256，得到 **`7ead5eaa21d1432a2ac6c27ee24913c03b68a495b2bc9daa3c3796a0c3a6d362`**；合计 97,313 bytes，最大 mtime `2026-07-30T14:48:31.562Z`。拒绝通过必须保持该摘要、字节数、mtime 与 History 0 不变，只允许新增绑定本轮 operation 的内容无关指标事件。
+- **计数边界**：manifest `createdAt = 2026-07-30T14:48:31.566Z`。副本继承的 metrics 23 条与 History 3 条均早于该时间，不能冒充本轮证据；manifest 后新增指标/History 均为 0，只计算该时间之后绑定第五副本的事件和磁盘变化。
+- **操作前 Markdown 基线**：排除 `.writcraft` 后，对 14 个 `.md/.markdown` 的规范相对路径和精确文件字节做长度分隔 SHA-256，得到 **`7ead5eaa21d1432a2ac6c27ee24913c03b68a495b2bc9daa3c3796a0c3a6d362`**；合计 97,313 bytes，最大 mtime `2026-07-30T14:48:31.562Z`。接受允许一次有 History 的明确推进；其后的拒绝必须保持接受后的 hash/mtime、且不新增第二条 History。
 - **验收范围**：项目卡证据由第四副本继承且不受 Inline v2 生产变化影响，禁止重复。作者只需在普通 `chapters/` 正文完成三个独立动作：`⌘K` 输入真实改写要求后拒绝；新的 operation 接受；从明确标记为最新且精确指向该正文的 History 执行 Safe Undo。自动化不得代选文本、代填指令或代作审阅决定。
 - **启动入口**：稳定 profile 只读显示 AI Key 已配置为 Coding Plan；旧候选实例已正常退出，recent-project 已通过项目服务指向第五副本。桌面只读核验确认源码 App 已打开第五副本且没有残留 Diff 或恢复锁；当前已导航到 `chapters/01-cope-origin/chapter-01-why-cope.md`、状态“已保存”。自动化没有选择文字、输入指令或触发 AI，唯一下一动作仍须由作者完成。
 
