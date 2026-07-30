@@ -24,7 +24,7 @@
 
 ## 0. 续作口令
 
-Chat 的三级 scope/context、Main-owned 多轮连续性、Chapter、Onboarding v2、Research→Changes、Inline Rewrite v2 与 Plan Strict 已经完成技术签字。当前 exact production candidate 为 `9b21a9d`；下一步只在第五 fresh 副本完成 Inline 拒绝、独立接受与 Safe Undo，不重复项目卡，不重写已经关闭的协议，也不分发现有 `release/` 产物。
+Chat 的三级 scope/context、Main-owned 多轮连续性、Chapter、Onboarding v2、Research→Changes、Inline Rewrite v2 与 Plan Strict 已经完成技术签字。当前 exact production candidate 为 `9b21a9d`；第五 fresh 副本的 Inline 拒绝、独立接受与 Safe Undo 已全部完成并关闭。下一步只在同一副本完成 Chapter proposal 与 Plan handoff，不重复项目卡或 Inline，不重写已经关闭的协议，也不分发现有 `release/` 产物。
 
 1. 先读 `../docs/ROADMAP.md` 的当前目标，再读本文、`package.json`、对应合同、当前源码文件与 `git log -1 --stat`；本地 Git 历史从 2026-07-26 V0 基线开始，不得据此臆测更早的开发过程。
 2. **Diagnostic Export v1、Research Accuracy v1、committed-warning、Graph 三项韧性缺口、Changes/History durable recovery、Image Review v1 与 Image Trash 本地链均已完整签收，不再重开这些协议。**
@@ -814,10 +814,10 @@ Onboarding v2 已取代上述“容错解析完整 `editContent` + 部分创建�
 ### RM-1.0 / 0.1.2：当前唯一目标
 
 - [x] 由作者显式指定满足合同的真实项目，完成只读预检与隔离副本；0.0AQ 的正式事务证明源不变，fresh 副本已合格创建并在当前 App 打开。
-- [ ] 在隔离副本完成项目卡、Inline/Chapter/Plan、Research、image-01、Graph/恢复五段真实旅程；第四副本项目卡已通过，但本次 Inline P1 使受影响的 Inline 人工证据失效。
+- [ ] 在隔离副本完成项目卡、Inline/Chapter/Plan、Research、image-01、Graph/恢复五段真实旅程；第四副本项目卡已关闭，第五副本 Inline 接受、拒绝与 Safe Undo 已通过，当前只继续 Chapter/Plan，随后按顺序进入 Research、image-01 与 Graph/恢复。
 - [x] 复现并诊断作者项目 `Graph INVALID_CACHE`；0.0AN / `a72a179` 已提供不删除作者数据、不手工清缓存的可理解诊断、自动重建与失败恢复终态，最终独立复审 P0/P1/P2=0。
 - [ ] 收集内容无关的 Inline 接受率、Plan 采用、Research 匹配判断、图片评分/采纳和耗时样本。
-- [ ] 只修复验收中发现的 P0/P1 与决定阻断发版的 P2；`⌘K` 必填作者指令 P1 已实现并完成自动化，待独立复审/提交；不得插入 `0.2.0+` 功能。
+- [ ] 只修复验收中发现的 P0/P1 与决定阻断发版的 P2；`⌘K` 必填作者指令 P1 已实现、完成自动化与独立复审，并作为 exact candidate `9b21a9d` 提交推送；不得插入 `0.2.0+` 功能。
 - [ ] 完成完整回归、连续真实 Electron、独立复审、文档/Git/Nowledge 同步，并在另获授权后发布 0.1.2 Preview。
 
 ### P1：能力审计后的本地产品缺口
@@ -946,10 +946,10 @@ Graph Extended Acceptance v1 已签字。首轮复审曾以 P1=3 回退 watcher�
 - [x] 为 `.writcraft/image-trash/` 增加可见恢复/清空入口与明确保留策略；V0 不自动永久删除，恢复/清空只走 Main 精确能力与真实 Electron 用户旅程。
 - [x] Image Trash 最新 21/21 竞态加固最终独立复审：P0=0/P1=0/P2=1，可以签字；P2 为非阻断 external open-FD residual。
 - [x] 在真实 GUI 完成“项目卡 → edit.md ChangeSet → 人工确认 → 磁盘落盘 → 独立确认创建初始文件”；0.0AR 旧副本曾创建 10 个文件，0.0AX 当前 fresh 副本创建 9 个文件，并记录一次结构化失败后作者重试成功。两次证据按各自 copy manifest 切分，旧副本不计入最终签字。
-- [x] 真实作者 Inline 拒绝：0.0AS 是旧失效副本的历史证据；0.0AY 在当前 fresh 副本以独立 operation 记录 `generated → rejected`，并证明生成后全项目 Markdown 与 History 零写入。
-- [x] 真实作者 Inline 接受：0.0AT 是旧失效副本的历史证据；0.0AZ 在当前 fresh 副本证明独立 operation 的 before/after revision 变化，磁盘 SHA-256 与最新 application/applied 的 after revision 精确一致，且 `edit.md` 不变。
-- [ ] 真实作者 Inline Safe Undo：必须证明最新正文 History 变为 undone、正文恢复到 beforeHash，且 `edit.md` 不变。
-- [ ] 由作者显式选择的合格源创建 fresh 隔离副本并完成五段真实旅程；第四副本项目卡第一段已通过且不重跑，形成新 candidate 后新建副本，从 Inline 指令/拒绝/接受/Safe Undo 起继续，Chapter/Plan、Research、image-01、Graph/恢复仍开放。
+- [x] 真实作者 Inline 拒绝：第五副本 operation `8f093bb9…` 记录 `generated → rejected`，没有新增 History，目标 mtime 和磁盘内容保持在前一笔已接受真相；界面明确显示“原文已恢复”。
+- [x] 真实作者 Inline 接受：第五副本 operation `cd20e785…` 产生唯一 post-manifest application/applied History `change_6516ccbc…`，目标 before/after revision 与磁盘 SHA-256 精确一致。
+- [x] 真实作者 Inline Safe Undo：第五副本最新正文 History 已变为 `undone`，正文 SHA-256 恢复到 beforeHash `1bdb3a5c…`，14 个 Markdown 的组合摘要精确回到基线 `7ead5eaa…`，原始验收源保持不变。
+- [ ] 由作者显式选择的合格源创建 fresh 隔离副本并完成五段真实旅程；第四副本项目卡第一段已通过且不重跑，第五副本 Inline 指令/拒绝/接受/Safe Undo 已关闭，Chapter/Plan、Research、image-01、Graph/恢复仍开放。
 
 ### P2：Main 网络与安全审计
 
