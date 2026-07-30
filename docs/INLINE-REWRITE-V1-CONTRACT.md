@@ -1,6 +1,6 @@
 # Inline Rewrite v1 Contract
 
-> Status: **0.1.2 P1 amendment implemented and independently signed P0=0/P1=0/P2=0; exact-candidate commit pending**. The historical v1 write/capability chain remains signed. Real-author acceptance proved that `⌘K` had skipped the original natural-language rewrite instruction; request v2 and the command composer now implement that missing boundary. Current directed/full/real-Electron evidence and retained red runs live in `v0/DEVELOPMENT-STATUS.md`; the older 21/21 figure below is historical focused evidence only.
+> Status: **0.1.2 P1 amendment implemented and independently signed P0=0/P1=0/P2=0; exact production candidate `9b21a9d`**. The historical v1 write/capability chain remains signed. Real-author acceptance proved that `⌘K` had skipped the original natural-language rewrite instruction; request v2 and the command composer now implement that missing boundary. Current directed/full/real-Electron evidence and retained red runs live in `v0/DEVELOPMENT-STATUS.md`; the older 21/21 figure below is historical focused evidence only.
 > Request schema: `writcraft.inline-rewrite/v2`
 > Result schema: `writcraft.inline-rewrite-result/v1`
 
