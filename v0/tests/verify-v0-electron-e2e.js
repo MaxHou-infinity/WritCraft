@@ -579,6 +579,10 @@ async function run() {
   const scratch = fs.mkdtempSync(path.join(os.tmpdir(), 'writcraft-electron-e2e-'));
   const project = longformFixture.buildLongformProject({ parentPath: scratch, projectService });
   seedLargeGraphFiles(project.rootPath);
+  const unicodeGraphPath = 'Graph：Unicode-路径.md';
+  const unicodeGraphPeer = unicodeGraphPath.normalize('NFKC');
+  fs.writeFileSync(path.join(project.rootPath, unicodeGraphPath), '# Unicode 路径\n路径变量是全角版本。\n', 'utf8');
+  fs.writeFileSync(path.join(project.rootPath, unicodeGraphPeer), '# Unicode 路径\n路径变量是半角版本。\n', 'utf8');
   const createdPath = 'chapters/07-electron-e2e.md';
   const changesSecondPath = electronAiFixture.CHANGES_SECOND_PATH;
   const changesSecondInitial = projectService.readFile(project.rootPath, changesSecondPath);
@@ -2012,7 +2016,7 @@ async function run() {
         const issueTriggers = [...document.querySelectorAll('.issue-card .issue-detail-trigger')];
         const canvas = document.getElementById('consistency-graph');
         const fileOptions = [...document.querySelectorAll('#graph-file-filter option')]
-          .filter(option => Boolean(option.value)).length;
+          .filter(option => Boolean(option.value));
         const liveReady = summary?.textContent.includes('个节点') &&
           summary.getAttribute('role') === 'status' &&
           ['polite', 'assertive'].includes(summary.getAttribute('aria-live'));
@@ -2033,7 +2037,11 @@ async function run() {
           elapsed: performance.now() - window.__graphColdUiStarted,
           nodes: interactiveNodes.length,
           issues: issueTriggers.length,
-          fileOptions,
+          fileOptions: fileOptions.length,
+          unicodePaths: [
+            fileOptions.some(option => option.value === ${JSON.stringify(unicodeGraphPath)}),
+            fileOptions.some(option => option.value === ${JSON.stringify(unicodeGraphPeer)}),
+          ],
           summary: summary.textContent,
           role: summary.getAttribute('role'),
           live: summary.getAttribute('aria-live'),
@@ -2044,6 +2052,8 @@ async function run() {
       assert(coldUi.issues >= 4, `cold Graph UI exposed only ${coldUi.issues} interactive issue actions`);
       assert(coldUi.fileOptions >= LARGE_GRAPH_FILE_COUNT,
         `cold Graph UI exposed only ${coldUi.fileOptions} project-file filter options`);
+      assert.deepStrictEqual(coldUi.unicodePaths, [true, true],
+        'real Electron must preserve both compatibility-distinct author paths');
       assert(coldUi.summary.includes('已重建索引'),
         `first Graph UI open did not prove a cold rebuild: ${coldUi.summary}`);
       assert.strictEqual(coldUi.role, 'status');

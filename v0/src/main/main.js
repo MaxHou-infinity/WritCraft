@@ -299,6 +299,8 @@ function projectFailure(error) {
     : 'PROJECT_OPERATION_FAILED';
   diagnosticRecorder.record('project', diagnosticCode);
   console.error('[project]', diagnosticCode);
+  const graphFailure = graphIndexService.publicGraphIndexFailure(error);
+  if (graphFailure) return graphFailure;
   const isSafeProjectError = error instanceof projectService.ProjectServiceError ||
     error instanceof issueStateService.IssueStateError ||
     error instanceof changeHistoryService.ChangeHistoryError ||

@@ -22,6 +22,17 @@ const MAX_CACHE_BYTES = 64 * 1024 * 1024;
 const REVISION_RE = /^[a-f0-9]{64}$/;
 const CONTENT_HASH_RE = /^sha256:[a-f0-9]{64}$/;
 const BLOCK_ID_RE = /^blk_[a-f0-9]{16}$/;
+const PUBLIC_ERROR_CODES = new Set([
+  'ANALYZER_AUTHORITY_MISMATCH',
+  'AUTHORITY_SNAPSHOT_MISMATCH',
+  'CACHE_TOO_LARGE',
+  'EVIDENCE_SNAPSHOT_MISMATCH',
+  'INVALID_CACHE',
+  'INVALID_PROJECT_SERVICE',
+  'INVALID_ROOT',
+  'UNSAFE_CACHE_PATH',
+  'UNSAFE_PATH',
+]);
 
 class GraphIndexError extends Error {
   constructor(code, message) {
@@ -33,6 +44,15 @@ class GraphIndexError extends Error {
 
 function fail(code, message) {
   throw new GraphIndexError(code, message);
+}
+
+function publicGraphIndexFailure(error) {
+  if (!(error instanceof GraphIndexError)) return null;
+  return {
+    ok: false,
+    error: PUBLIC_ERROR_CODES.has(error.code) ? error.code : 'GRAPH_INDEX_FAILED',
+    message: '图谱分析未完成。正文没有变化，请点击“重新分析”再试',
+  };
 }
 
 function compareText(left, right) {
@@ -509,6 +529,7 @@ module.exports = {
   CACHE_RELATIVE_PATH,
   MAX_CACHE_BYTES,
   GraphIndexError,
+  publicGraphIndexFailure,
   indexProjectGraph,
   loadGraphCache,
   saveGraphCache,

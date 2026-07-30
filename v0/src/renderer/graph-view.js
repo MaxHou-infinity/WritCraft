@@ -39,10 +39,25 @@
   }
 
   function failureMessage(prefix, resultOrError, fallback) {
+    const code = resultOrError?.error || resultOrError?.code;
+    if (['INVALID_CACHE', 'EVIDENCE_SNAPSHOT_MISMATCH', 'AUTHORITY_SNAPSHOT_MISMATCH',
+      'ANALYZER_AUTHORITY_MISMATCH', 'CACHE_TOO_LARGE', 'INVALID_PROJECT_SERVICE',
+      'INVALID_ROOT', 'UNSAFE_CACHE_PATH', 'UNSAFE_PATH', 'GRAPH_INDEX_FAILED'].includes(code)) {
+      return `${prefix}：图谱索引未能安全重建。正文没有变化，请点击“重新分析”再试`;
+    }
     const detail = typeof resultOrError === 'string'
       ? resultOrError
       : resultOrError?.message || resultOrError?.error;
     return detail ? `${prefix}：${detail}` : fallback;
+  }
+
+  function graphIndexStatus(index) {
+    if (['CACHE_INVALID', 'CACHE_CORRUPT', 'CACHE_TOO_LARGE'].includes(index?.cacheReason)) {
+      return '检测到旧图谱索引不可用，已根据项目文件安全重建；正文未受影响';
+    }
+    if (index?.status === 'cache_hit') return '索引未变化';
+    if (index?.status === 'incremental') return `增量分析 ${index?.analyzedPaths?.length || 0} 个文件`;
+    return '已重建索引';
   }
 
   function rejectInvalidGraphSnapshot(error) {
@@ -865,9 +880,7 @@
       transform = { x: 0, y: 0, scale: 1 };
       const nodeCount = graph.nodes?.length || 0;
       const issueCount = graph.issues?.length || 0;
-      const indexLabel = result.index?.status === 'cache_hit' ? '索引未变化'
-        : result.index?.status === 'incremental' ? `增量分析 ${result.index.analyzedPaths?.length || 0} 个文件`
-        : '已重建索引';
+      const indexLabel = graphIndexStatus(result.index);
       summary.textContent = `${nodeCount} 个节点 · ${graph.edges?.length || 0} 条关系 · ${issueCount} 个高置信问题 · ${indexLabel}`;
       populateGraphFilters();
       renderGraph();

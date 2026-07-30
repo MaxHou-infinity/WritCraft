@@ -1,6 +1,6 @@
 # 笔触 · WritCraft · V0 开发状态与续作入口
 
-> 最后更新：2026-07-29（Asia/Shanghai，0.0AM · RM-1.0 目标模式路线图冻结）
+> 最后更新：2026-07-30（Asia/Shanghai，0.0AN · Graph Unicode 路径与自动恢复纵切已独立签字）
 > 当前状态：**`writ-craft@0.1.1` 已从 exact candidate `c65981e` 发布到 npm `preview`；registry 时间 `2026-07-29T14:30:16.176Z`，shasum `d370c500666e25cfb373852deafa21b232d2bc18` 与本地候选一致。公网隔离安装/启动/退出为 2/2。annotated tag `v0.1.1` 指向同一提交，GitHub prerelease 已公开：`https://github.com/MaxHou-infinity/WritCraft/releases/tag/v0.1.1`。**
 > 发布判断：**0.1.1 Developer Preview 已完成版本、自动化、双架构安装、独立复审、npm 发布、公网安装和 GitHub prerelease。registry 标签保持 `preview: 0.1.1`、`latest: 0.1.0`，因此本次没有把 Preview 冒充稳定版，也没有执行 unpublish、占位发布或上传未签名 App/ZIP。**
 > 当前目标版本：**`docs/ROADMAP.md` 的 `RM-1.0 / writ-craft@0.1.2` 真实作者可用性闭环。必须使用 `edit.md`、5+ 个 `chapters/` 章节、2000+ 可见中文字符和至少 1 个来源文件的作者隔离副本，完成五段旅程，并关闭现场 `Graph INVALID_CACHE` 的诊断/恢复终态。0.1.2 签字前不得插入驾驶舱、新 AI 模式或其他后续版本功能。**
@@ -31,6 +31,16 @@ Chat 的三级 scope/context、Main-owned 多轮连续性、Chapter、Onboarding
 4. 不重写已经签字的 Onboarding v2 service、capability store、batch、Main/preload 与 Renderer 契约；Main 动态 admission、single-flight 和 Renderer 生命周期 authority 清理均已关闭。
 5. 每批合入后重跑定向测试；阶段完成时再运行完整 `npm test`、`npm run verify` 与 `WRITCRAFT_E2E_FORCE=1 npm run e2e:electron`，保存当次证据。
 6. 真实 API 只使用用户显式配置的 Key；记录延迟、限流、超时、故障和费用，不记录 Key、Prompt、模型原文或正文。Key 前缀只表示凭据/计费类型，不能代替官方能力与现场门禁。首发按 npm Developer Preview 合同执行；独立 App 发布才需要 Developer ID、公证与 Gatekeeper。
+
+### 0.0AN 2026-07-30 · Graph Unicode 路径与自动恢复（已独立签字）
+
+- **现场根因**：在用户此前显式指定项目的诊断副本中稳定复现 `INVALID_CACHE`。项目内一个合法 Markdown 文件名含全角冒号 `U+FF1A`；Consistency Engine 错把文件路径当正文执行 NFKC，改写为 ASCII 冒号，随后 Graph Index 的精确证据路径校验正确拒绝该贡献。fresh build 在写缓存前失败，因此这不是“坏缓存需要用户删除”，而是权威路径被分析器改写。
+- **两个 P1 的修复**：路径与文本归一化已分离，Graph 证据保留项目服务给出的精确相对路径；`GraphIndexError` 进入 Main 的有界稳定错误映射，不再统一误报“文件系统操作失败”。旧/坏/过大索引自动从权威 Markdown 重建，成功时显示“已安全重建、正文未受影响”；失败时明确正文未改变并提供现有“重新分析”动作，不暴露 `INVALID_CACHE` 或要求手工清缓存。
+- **红绿证据**：新增全角路径回归先稳定红于 `缓存证据路径无效`。首轮独立复审发现路径仍会改写 public contract 外输入、Main 原样信任 Graph message、超大缓存失败缺少统一终态等 **P1=3/P2=2**；均转为拒绝而非改写、code allowlist + 固定公开文案和补充行为测试。修复后 Graph Index **17/17**、Consistency **22/22**、Graph correction integration **6/6**、Renderer dynamic **17/17**、Workbench **14/14**。同一诊断副本从原现场失败转为成功重建：14 个 Markdown、466 节点、63 条关系、500 条证据、1 个问题；没有删除作者数据。
+- **原项目边界**：只读预检 digest 复查一致，原项目仍无 `graph.json` 写入。当前资格为 `edit.md` 有效、20 个项目文件、608,433 bytes，但合同路径下 `chapters=0`、可见中文字符 `0`、`references=0`，所以未创建验收副本，也不把本次诊断写成五段真实作者签字。
+- **完整回归与真实 App**：最终源码完整 `npm test` exit 0；沙箱 `npm run verify` 仅在真实 DOM Electron 以 `code=null` 退出，同一命令在获批 macOS GUI 上下文原样重跑 exit 0。强制真实 Electron **37/37**，并在真实 Main→Renderer Graph 文件筛选中同时看见全角冒号路径及其 NFKC 半角 peer；Persistent Main/IPC **3/3**。全部自动化保持 0 真实付费网络调用。
+- **独立复审**：首轮 **P0=0/P1=3/P2=2**，第二轮 **P0=0/P1=0/P2=2**；路径改写、公开错误边界、超大缓存终态、兼容等价双路径/cache roundtrip、测试分母与文档计数全部关闭后，第三轮最终 **P0=0/P1=0/P2=0**。
+- **当前门禁**：0.0AN 的代码、测试与合同已签字，下一步是 Git/Nowledge 收口。五段真实作者旅程、真实指标和 `0.1.2` exact candidate 仍未完成；当前作者项目仍不合格，package 版本继续保持 `0.1.1`，不得发布或移动 npm 标签。
 
 ### 0.0AM 2026-07-29 · RM-1.0 目标模式路线图冻结
 

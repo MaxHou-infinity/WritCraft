@@ -345,8 +345,13 @@ function analyzeProject(inputFiles, options = {}) {
 
 function normalizeFile(file, index) {
   if (!file || typeof file !== 'object') throw new TypeError(`files[${index}] must be an object`);
-  const path = normalized(file.path).replace(/\\/g, '/').replace(/^\.\//, '');
-  if (!path || path.includes('\0') || path.startsWith('/') || /^[A-Za-z]:\//.test(path) || path.split('/').includes('..')) {
+  // A project path is filesystem identity, not prose. Compatibility
+  // normalization can rewrite legal author filenames and detach Graph
+  // evidence from the authoritative project path.
+  const path = typeof file.path === 'string' ? file.path : '';
+  if (!path || path.includes('\0') || path.includes('\\') || path.startsWith('./') ||
+      path.startsWith('/') || /^[A-Za-z]:[\\/]/.test(path) ||
+      path.split('/').some(part => !part || part === '.' || part === '..')) {
     throw new TypeError(`files[${index}].path must be project-relative`);
   }
   if (typeof file.content !== 'string') throw new TypeError(`files[${index}].content must be a string`);

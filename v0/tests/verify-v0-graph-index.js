@@ -82,6 +82,52 @@ test('builds and persists a unified v2 graph with a revision manifest', () => {
   }
 });
 
+test('preserves compatibility-distinct author filenames as exact Graph evidence paths', () => {
+  const root = makeProject();
+  const authorPath = 'COPE：共创式组织产品模型》知识体系手册-v1.0.md';
+  const compatibilityPeer = authorPath.normalize('NFKC');
+  try {
+    fs.writeFileSync(path.join(root, authorPath), '# 参考手册\nCOPE支持协作。\n');
+    fs.writeFileSync(path.join(root, compatibilityPeer), '# 另一份参考\nCOPE反驳旧结论。\n');
+    const result = indexProjectGraph(projectService, root);
+    assert.strictEqual(result.status, 'rebuilt');
+    assert(result.graph.evidence.some(item => item.path === authorPath && item.filePath === authorPath));
+    assert(result.graph.evidence.some(item => item.path === compatibilityPeer && item.filePath === compatibilityPeer));
+    assert(result.graph.manifest.inputFiles.some(item => item.path === authorPath));
+    assert(result.graph.manifest.inputFiles.some(item => item.path === compatibilityPeer));
+    assert.notStrictEqual(
+      result.graph.evidence.find(item => item.path === authorPath)?.id,
+      result.graph.evidence.find(item => item.path === compatibilityPeer)?.id
+    );
+    const cached = indexProjectGraph(projectService, root);
+    assert.strictEqual(cached.status, 'cache_hit');
+    assert(cached.graph.evidence.some(item => item.path === authorPath));
+    assert(cached.graph.evidence.some(item => item.path === compatibilityPeer));
+  } finally {
+    fs.rmSync(root, { recursive: true, force: true });
+  }
+});
+
+test('publishes only bounded path-free Graph failure messages', () => {
+  const known = require('../src/main/graph-index-service').publicGraphIndexFailure(
+    new (require('../src/main/graph-index-service').GraphIndexError)(
+      'CACHE_TOO_LARGE',
+      'private path and manuscript fragment must not cross IPC'
+    )
+  );
+  assert.deepStrictEqual(known, {
+    ok: false,
+    error: 'CACHE_TOO_LARGE',
+    message: '图谱分析未完成。正文没有变化，请点击“重新分析”再试',
+  });
+  const unknown = require('../src/main/graph-index-service').publicGraphIndexFailure(
+    new (require('../src/main/graph-index-service').GraphIndexError)('FUTURE_PRIVATE_CODE', '/private/author/project')
+  );
+  assert.strictEqual(unknown.error, 'GRAPH_INDEX_FAILED');
+  assert(!JSON.stringify(unknown).includes('/private/author/project'));
+  assert.strictEqual(require('../src/main/graph-index-service').publicGraphIndexFailure(new Error('x')), null);
+});
+
 test('returns an unchanged project from cache without analysis or rewrite', () => {
   const root = makeProject();
   try {

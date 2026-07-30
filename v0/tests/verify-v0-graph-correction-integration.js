@@ -21,6 +21,11 @@ function check(name, fn) {
 
 console.log('\nGraph correction IPC and renderer verification');
 
+check('Main preserves bounded Graph failures instead of misreporting them as filesystem errors', () => {
+  assert(main.includes('const graphFailure = graphIndexService.publicGraphIndexFailure(error)'));
+  assert(main.includes('if (graphFailure) return graphFailure'));
+});
+
 check('preload exposes only project identity plus an opaque correction command', () => {
   assert(preload.includes("applyGraphCorrection: (projectInstanceId, command) => ipcRenderer.invoke('writcraft:project:apply-graph-correction', projectInstanceId, command)"));
   assert(preload.includes("buildGraph: (projectInstanceId) => ipcRenderer.invoke('writcraft:project:build-graph', projectInstanceId)"));
@@ -64,4 +69,5 @@ check('renderer refreshes the authoritative corrected graph and never edits manu
   assert(!view.includes('setContent('));
 });
 
-console.log(`\n${passed}/5 graph-correction integration checks passed.`);
+assert.strictEqual(passed, 6);
+console.log(`\n${passed}/6 graph-correction integration checks passed.`);

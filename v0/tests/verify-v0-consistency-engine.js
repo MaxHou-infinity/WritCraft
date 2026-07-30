@@ -317,6 +317,7 @@ check('拒绝绝对路径、路径穿越和非字符串正文', () => {
   assert.throws(() => analyzeProject([{ path: '../secret.md', content: '', revision: '1' }]), /project-relative/);
   assert.throws(() => analyzeProject([{ path: '/secret.md', content: '', revision: '1' }]), /project-relative/);
   assert.throws(() => analyzeProject([{ path: 'C:/secret.md', content: '', revision: '1' }]), /project-relative/);
+  assert.throws(() => analyzeProject([{ path: 'chapter\\name.md', content: '', revision: '1' }]), /project-relative/);
   assert.throws(() => analyzeProject([{ path: 'ok.md', content: null, revision: '1' }]), /string/);
 });
 

@@ -201,6 +201,13 @@ console.log('\nGraph renderer dynamic stale verification');
     writCraft: { project: {
       buildGraph: async projectInstanceId => {
         graphAuthorityEvents.push(`build:${projectInstanceId}`);
+        if (buildMode === 'cache-too-large') {
+          return {
+            ok: false,
+            error: 'CACHE_TOO_LARGE',
+            message: '图谱分析未完成。正文没有变化，请点击“重新分析”再试',
+          };
+        }
         buildCalls += 1;
         if (buildMode === 'build-race') {
           racedBuildProjects.push(projectInstanceId);
@@ -263,12 +270,21 @@ console.log('\nGraph renderer dynamic stale verification');
             index: { status: 'rebuilt' },
           };
         }
-        if (buildCalls === 1) return { ok: false, message: '图谱 fixture 构建失败' };
+        if (buildCalls === 1) {
+          return { ok: false, error: 'INVALID_CACHE', message: '缓存证据路径无效' };
+        }
         const builtGraph = buildCalls === 2 ? sample : {
           ...sample,
           nodes: sample.nodes.map(node => ({ ...node })),
         };
-        return { ok: true, graph: builtGraph, index: { status: 'rebuilt' } };
+        return {
+          ok: true,
+          graph: builtGraph,
+          index: {
+            status: 'rebuilt',
+            cacheReason: buildCalls === 2 ? 'CACHE_INVALID' : null,
+          },
+        };
       },
       applyGraphCorrection: async () => {
         correctionCalls += 1;
@@ -306,11 +322,22 @@ console.log('\nGraph renderer dynamic stale verification');
     'flush:project-a',
     'build:project-a',
   ], 'Graph refresh must cross the Main-owned watcher barrier before building from project files');
-  assert.match(elements.get('graph-summary').textContent, /分析失败.*图谱 fixture 构建失败/);
-  pass('Graph refresh crosses the watcher barrier before Main build and announces build failure');
+  assert.match(elements.get('graph-summary').textContent, /图谱索引未能安全重建.*正文没有变化.*重新分析/);
+  assert.doesNotMatch(elements.get('graph-summary').textContent, /INVALID_CACHE|缓存证据路径无效/);
+  pass('Graph refresh crosses the watcher barrier and translates cache failures into a retryable terminal');
 
   await window.__graphView.refresh();
   assert.strictEqual(buildCalls, 2);
+  assert.match(elements.get('graph-summary').textContent, /旧图谱索引不可用.*安全重建.*正文未受影响/);
+  assert.doesNotMatch(elements.get('graph-summary').textContent, /CACHE_INVALID/);
+  pass('Graph explains automatic cache recovery without exposing internal codes');
+
+  buildMode = 'cache-too-large';
+  await window.__graphView.refresh();
+  assert.match(elements.get('graph-summary').textContent, /正文没有变化.*重新分析/);
+  assert.doesNotMatch(elements.get('graph-summary').textContent, /CACHE_TOO_LARGE/);
+  pass('Graph gives oversized rebuild failures the same bounded retry terminal');
+  buildMode = 'normal';
 
   const typeMatches = (type, selected) => selected === 'all'
     || selected === 'person' && type === 'person'

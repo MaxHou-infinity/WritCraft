@@ -1,6 +1,6 @@
 # Graph Extended Acceptance v1 Contract
 
-> Status: **product contract, performance revalidation, and Graph resilience fully signed as of 2026-07-26**. As historical focused evidence for this contract, the resilience source passed full `npm test`, Electron-enabled `npm run verify`, forced real-Electron 28/28, directed Graph suites, and independent review P0/P1/P2=0. Project-wide current totals live only in `v0/DEVELOPMENT-STATUS.md`. A real author project later exposed `INVALID_CACHE`; diagnosis and a user-understandable rebuild/recovery terminal are open under `RM-1.0 / 0.1.2` and are not closed by synthetic Graph evidence.
+> Status: **product contract, performance revalidation, and Graph resilience fully signed as of 2026-07-26; the `RM-1.0 / 0.1.2` Unicode-path `INVALID_CACHE` implementation and user-understandable rebuild/recovery terminal were independently signed on 2026-07-30**. The 0.1.2 batch proved the author-project root cause on an isolated diagnostic copy, kept the original project unchanged, and added a real-Electron compatibility-distinct path pair. Final five-journey author evidence on an eligible exact-candidate copy remains open. Project-wide current totals live only in `v0/DEVELOPMENT-STATUS.md`.
 > Graph schema: `writcraft.graph/v2`
 
 ## 1. Product truth and write boundary
@@ -8,6 +8,8 @@
 The Consistency Graph is a project diagnostic view for entities, variables, events, time, relationships, evidence, and writing constraints. It defaults to the current-file subgraph and exposes an explicit whole-project scope. Filters, author corrections, issue status, and evidence navigation must operate on the currently displayed project only.
 
 The Graph never edits manuscript bytes. Author correction writes only the bounded project correction ledger. “Generate reviewable fix” may create a Main-owned Issue→Changes review; only a complete, explicit Changes decision may modify manuscript files and History. Stale evidence, stale issue bindings, project switches, and late async results fail closed with zero manuscript/History writes and no reusable capability.
+
+For `RM-1.0 / 0.1.2`, a project-relative Markdown path is opaque filesystem identity, not prose. Graph analysis must preserve the exact path supplied by the authoritative public project-path contract; Unicode compatibility normalization such as NFKC must never rewrite full-width punctuation or other admitted filename characters. Inputs outside that public path contract must be rejected, never rewritten into another identity. An invalid, corrupt, oversized, or obsolete derived Graph cache must be ignored and rebuilt from authoritative Markdown without deleting author data or asking the author to clear `.writcraft` manually. A successful recovery must announce that the old index was safely rebuilt; every failed rebuild must end in a retryable, user-understandable state without exposing raw internal messages or `INVALID_CACHE` as the primary explanation.
 
 ## 2. Required real-Electron journeys
 
