@@ -1,4 +1,4 @@
-// DOM-free Renderer ownership, intent and recovery guards for Inline Rewrite v1.
+// DOM-free Renderer ownership, intent and recovery guards for Inline Rewrite.
 (function (root, factory) {
   const api = factory();
   if (typeof module === 'object' && module.exports) module.exports = api;
@@ -6,7 +6,7 @@
 })(typeof globalThis !== 'undefined' ? globalThis : this, function () {
   'use strict';
 
-  const REQUEST_SCHEMA = 'writcraft.inline-rewrite/v1';
+  const REQUEST_SCHEMA = 'writcraft.inline-rewrite/v2';
   const REVIEW_SCHEMA = 'writcraft.inline-rewrite-review/v1';
   const ACK_RESULT_SCHEMA = 'writcraft.inline-rewrite-ack-result/v1';
   const APPLY_RESULT_SCHEMA = 'writcraft.inline-rewrite-apply-result/v1';
@@ -20,6 +20,9 @@
   const BLOCK_ID = /^block_[a-f0-9]{8}$/;
   const FINGERPRINT = /^[a-f0-9]{8}$/;
   const STYLES = Object.freeze(['general', 'concise', 'vivid', 'academic', 'casual']);
+  const MAX_INSTRUCTION_CODE_POINTS = 500;
+  const MAX_INSTRUCTION_BYTES = 2 * 1024;
+  const FORBIDDEN_INSTRUCTION = /[\u0000-\u001f\u007f-\u009f\u2028\u2029\uFEFF\u200B\u2060\u202A-\u202E\u2066-\u2069]/;
   const PROOF_KEYS = Object.freeze([
     'schema', 'id', 'filePath', 'type', 'headingKey', 'ordinal',
     'blockFingerprint', 'quoteFingerprint', 'relativeStart', 'relativeEnd',
@@ -87,6 +90,25 @@
     return new TextEncoder().encode(String(value)).byteLength;
   }
 
+  function normalizeInstruction(value) {
+    if (typeof value !== 'string') return null;
+    const normalized = value.trim().normalize('NFC');
+    if (!normalized || normalized !== normalized.trim() || FORBIDDEN_INSTRUCTION.test(normalized) ||
+        Array.from(normalized).length > MAX_INSTRUCTION_CODE_POINTS ||
+        byteLength(normalized) > MAX_INSTRUCTION_BYTES) return null;
+    for (let index = 0; index < normalized.length; index += 1) {
+      const code = normalized.charCodeAt(index);
+      if (code >= 0xD800 && code <= 0xDBFF) {
+        const next = normalized.charCodeAt(index + 1);
+        if (!(next >= 0xDC00 && next <= 0xDFFF)) return null;
+        index += 1;
+      } else if (code >= 0xDC00 && code <= 0xDFFF) {
+        return null;
+      }
+    }
+    return normalized;
+  }
+
   function validPath(value) {
     if (typeof value !== 'string' || !value || byteLength(value) > 1024 || value !== value.normalize('NFC') ||
         value.startsWith('/') || value.includes('\\') || value.includes('//') ||
@@ -129,7 +151,7 @@
     });
   }
 
-  function captureIntent(workspaceState, selection, style) {
+  function captureIntent(workspaceState, selection, style, instruction) {
     const projectInstanceId = workspaceState?.project?.instanceId;
     const currentPath = workspaceState?.currentPath;
     const revision = workspaceState?.revision;
@@ -141,12 +163,14 @@
       ? workspaceState.dirtyGeneration
       : workspaceState?.editVersion;
     const normalized = normalizeSelection(selection, currentPath);
+    const normalizedInstruction = normalizeInstruction(instruction);
     if (typeof projectInstanceId !== 'string' || !projectInstanceId || !validPath(currentPath) ||
         !REVISION.test(revision || '') || !Number.isSafeInteger(openGeneration) || openGeneration < 0 ||
         !Number.isSafeInteger(editorSession) || editorSession < 0 ||
         !Number.isSafeInteger(workspaceState?.editVersion) || workspaceState.editVersion < 0 ||
         !Number.isSafeInteger(dirtyGeneration) || dirtyGeneration < 0 ||
-        typeof workspaceState?.dirty !== 'boolean' || !STYLES.includes(style) || !normalized) return null;
+        typeof workspaceState?.dirty !== 'boolean' || !STYLES.includes(style) || !normalized ||
+        !normalizedInstruction || instruction !== normalizedInstruction) return null;
     return Object.freeze({
       schema: REQUEST_SCHEMA,
       projectInstanceId,
@@ -158,11 +182,12 @@
       dirtyGeneration,
       dirty: workspaceState.dirty,
       style,
+      instruction: normalizedInstruction,
       selection: normalized,
     });
   }
 
-  function identityMatches(intent, workspaceState, selection, currentStyle) {
+  function identityMatches(intent, workspaceState, selection, currentStyle, currentInstruction) {
     if (!intent || !workspaceState?.project) return false;
     const current = normalizeSelection(selection, workspaceState.currentPath);
     const editorSession = Number.isSafeInteger(workspaceState.editorSession)
@@ -171,7 +196,8 @@
     const dirtyGeneration = Number.isSafeInteger(workspaceState.dirtyGeneration)
       ? workspaceState.dirtyGeneration
       : workspaceState.editVersion;
-    return Boolean(current && currentStyle === intent.style && intent.projectInstanceId === workspaceState.project.instanceId &&
+    return Boolean(current && currentStyle === intent.style && currentInstruction === intent.instruction &&
+      intent.projectInstanceId === workspaceState.project.instanceId &&
       intent.currentPath === workspaceState.currentPath && intent.openGeneration === workspaceState.openGeneration &&
       intent.editorSession === editorSession && intent.editVersion === workspaceState.editVersion &&
       intent.dirtyGeneration === dirtyGeneration && intent.selection.startOffset === current.startOffset &&
@@ -179,13 +205,16 @@
       intent.selection.rangeIdentity === current.rangeIdentity && sameProof(intent.selection.proof, current.proof));
   }
 
-  function initialBindingMatches(intent, workspaceState, selection, currentStyle) {
-    return identityMatches(intent, workspaceState, selection, currentStyle) && intent.revision === workspaceState.revision &&
+  function initialBindingMatches(intent, workspaceState, selection, currentStyle, currentInstruction) {
+    return identityMatches(intent, workspaceState, selection, currentStyle, currentInstruction) &&
+      intent.revision === workspaceState.revision &&
       intent.dirty === workspaceState.dirty;
   }
 
-  function preparedBindingMatches(binding, workspaceState, selection, currentStyle) {
-    return Boolean(binding && identityMatches(binding.intent, workspaceState, selection, currentStyle) &&
+  function preparedBindingMatches(binding, workspaceState, selection, currentStyle, currentInstruction) {
+    return Boolean(binding && identityMatches(
+      binding.intent, workspaceState, selection, currentStyle, currentInstruction,
+    ) &&
       workspaceState.dirty === false && workspaceState.revision === binding.persistedRevision);
   }
 
@@ -196,9 +225,12 @@
 
   async function prepareIntent(intent, adapters) {
     if (!intent || !adapters || typeof adapters.getState !== 'function' ||
-        typeof adapters.getSelection !== 'function' || typeof adapters.getStyle !== 'function' || typeof adapters.persist !== 'function' ||
+        typeof adapters.getSelection !== 'function' || typeof adapters.getStyle !== 'function' ||
+        typeof adapters.getInstruction !== 'function' || typeof adapters.persist !== 'function' ||
         typeof adapters.settleWatcher !== 'function') return Object.freeze({ ok: false, reason: 'INVALID_INTENT' });
-    if (!initialBindingMatches(intent, adapters.getState(), adapters.getSelection(), adapters.getStyle())) {
+    if (!initialBindingMatches(
+      intent, adapters.getState(), adapters.getSelection(), adapters.getStyle(), adapters.getInstruction(),
+    )) {
       return Object.freeze({ ok: false, reason: 'INTENT_STALE' });
     }
     const persisted = normalizePersistResult(await adapters.persist(intent.revision));
@@ -206,14 +238,18 @@
       return Object.freeze({ ok: false, reason: 'PERSIST_FAILED' });
     }
     const binding = Object.freeze({ intent, persistedRevision: persisted.revision });
-    if (!preparedBindingMatches(binding, adapters.getState(), adapters.getSelection(), adapters.getStyle())) {
+    if (!preparedBindingMatches(
+      binding, adapters.getState(), adapters.getSelection(), adapters.getStyle(), adapters.getInstruction(),
+    )) {
       return Object.freeze({ ok: false, reason: 'INTENT_STALE' });
     }
     try { await adapters.settleWatcher(); }
     catch (_) {
       return Object.freeze({ ok: false, reason: 'WATCHER_UNAVAILABLE' });
     }
-    if (!preparedBindingMatches(binding, adapters.getState(), adapters.getSelection(), adapters.getStyle())) {
+    if (!preparedBindingMatches(
+      binding, adapters.getState(), adapters.getSelection(), adapters.getStyle(), adapters.getInstruction(),
+    )) {
       return Object.freeze({ ok: false, reason: 'INTENT_STALE' });
     }
     return Object.freeze({ ok: true, binding });
@@ -226,6 +262,7 @@
       schema: REQUEST_SCHEMA,
       currentFilePath: intent.currentPath,
       expectedRevision: binding.persistedRevision,
+      instruction: intent.instruction,
       style: intent.style,
       selection: {
         startOffset: intent.selection.startOffset,
@@ -233,7 +270,7 @@
         proof: intent.selection.proof,
       },
     };
-    if (byteLength(JSON.stringify(request)) > 4 * 1024) return null;
+    if (byteLength(JSON.stringify(request)) > 8 * 1024) return null;
     return Object.freeze({ ...request, selection: Object.freeze(request.selection) });
   }
 
@@ -523,6 +560,9 @@
   return Object.freeze({
     STATES,
     STYLES,
+    MAX_INSTRUCTION_CODE_POINTS,
+    MAX_INSTRUCTION_BYTES,
+    normalizeInstruction,
     captureIntent,
     initialBindingMatches,
     preparedBindingMatches,

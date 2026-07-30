@@ -344,6 +344,28 @@
     .inline-diff-style { border: 0; border-right: 1px solid #e6ded2; background: transparent; color: var(--ink-soft); padding: 3px 6px 3px 3px; font: 10px/1.4 -apple-system, sans-serif; }
     .inline-diff-button:hover, .inline-diff-button:focus-visible { background: #f4efe8; color: var(--ink); outline: none; }
     .inline-diff-button.is-primary { background: var(--theme); color: white; }
+    .inline-rewrite-command {
+      position: fixed; z-index: 90; width: min(560px, calc(100vw - 32px)); padding: 10px 11px 9px;
+      border: 1px solid #caa376; border-left: 3px solid var(--theme); border-radius: 7px;
+      background: rgba(255, 253, 249, .98); box-shadow: 0 14px 38px rgba(56, 42, 25, .2);
+      color: var(--ink); font-family: -apple-system, BlinkMacSystemFont, "PingFang SC", sans-serif;
+    }
+    .inline-rewrite-command[hidden] { display: none; }
+    .inline-rewrite-command-head { display: flex; justify-content: space-between; margin-bottom: 7px; color: #8b5d32; font: 600 9px/1.3 "SF Mono", Menlo, monospace; letter-spacing: .04em; }
+    .inline-rewrite-command-row { display: grid; grid-template-columns: minmax(0, 1fr) 72px auto auto; gap: 6px; }
+    .inline-rewrite-command input, .inline-rewrite-command select, .inline-rewrite-command button {
+      min-height: 32px; border: 1px solid #d9cdbc; border-radius: 4px; background: #fffdfa; color: #40372d; font-size: 11px;
+    }
+    .inline-rewrite-command input { min-width: 0; padding: 0 10px; font-family: "Songti SC", "STSong", serif; font-size: 13px; }
+    .inline-rewrite-command select { padding: 0 6px; }
+    .inline-rewrite-command button { padding: 0 10px; cursor: pointer; }
+    #inline-rewrite-command-submit { border-color: var(--theme); background: var(--theme); color: #fff; font-weight: 600; }
+    .inline-rewrite-command input:focus-visible, .inline-rewrite-command select:focus-visible, .inline-rewrite-command button:focus-visible { outline: 2px solid #c98b48; outline-offset: 1px; }
+    .inline-rewrite-command p { margin: 6px 0 0; color: var(--ink-soft); font-size: 9px; line-height: 1.35; }
+    @media (max-width: 720px) {
+      .inline-rewrite-command-row { grid-template-columns: minmax(0, 1fr) 68px; }
+      .inline-rewrite-command button { grid-row: 2; }
+    }
 
     .status-bar { display: flex; align-items: center; justify-content: space-between; gap: 16px; padding: 0 13px; background: #eeeae3; border-top: 1px solid var(--line); color: var(--ink-soft); font-size: 9px; overflow: hidden; }
     /* AI Key 设置对话框（P1-4） */
@@ -1003,6 +1025,16 @@
           </section>
         </div>
         <div class="editor-scroll"><div id="editor"></div></div>
+        <section id="inline-rewrite-command" class="inline-rewrite-command" role="dialog" aria-labelledby="inline-rewrite-command-label" hidden>
+          <div class="inline-rewrite-command-head"><span id="inline-rewrite-command-label">⌘K · 修改选段</span><span id="inline-rewrite-command-count">0 / 500</span></div>
+          <div class="inline-rewrite-command-row">
+            <input id="inline-rewrite-command-input" type="text" autocomplete="off" spellcheck="false" aria-describedby="inline-rewrite-command-help" placeholder="例如：更简洁，但保留数据与原意">
+            <select id="inline-rewrite-command-style" aria-label="辅助风格"><option value="general">自然</option><option value="concise">简洁</option><option value="vivid">生动</option><option value="academic">严谨</option><option value="casual">通俗</option></select>
+            <button id="inline-rewrite-command-cancel" type="button">取消</button>
+            <button id="inline-rewrite-command-submit" type="button">生成</button>
+          </div>
+          <p id="inline-rewrite-command-help">Enter 生成 · Esc 取消；要求只用于本次改写，不写入历史记录。</p>
+        </section>
         <footer class="status-bar">
           <span id="tip-tap-status" role="status" aria-live="polite" aria-atomic="true">⏳ 初始化编辑器…</span>
           <span class="status-metrics"><span id="save-state">本地草稿</span><span class="conflict-actions" id="conflict-actions" hidden><button id="conflict-keep-local" type="button">用本地稿覆盖</button><button id="conflict-use-disk" type="button">使用磁盘版本</button></span><span id="char-count">字符: 0 · 词数: 0</span></span>

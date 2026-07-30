@@ -15,6 +15,12 @@
   const CHAT_SCOPE_BUTTONS = [...document.querySelectorAll('[data-chat-scope]')];
   const CHAT_CONVERSATION_STATUS = document.getElementById('chat-conversation-status');
   const CHAT_NEW_CONVERSATION = document.getElementById('chat-new-conversation');
+  const REWRITE_COMMAND = document.getElementById('inline-rewrite-command');
+  const REWRITE_COMMAND_INPUT = document.getElementById('inline-rewrite-command-input');
+  const REWRITE_COMMAND_STYLE = document.getElementById('inline-rewrite-command-style');
+  const REWRITE_COMMAND_SUBMIT = document.getElementById('inline-rewrite-command-submit');
+  const REWRITE_COMMAND_CANCEL = document.getElementById('inline-rewrite-command-cancel');
+  const REWRITE_COMMAND_COUNT = document.getElementById('inline-rewrite-command-count');
   const state = window.__rewriteState;
   const htmlSanitizer = window.WritCraftHtmlSanitizer;
   const chatContextState = window.WritCraftChatContextState;
@@ -34,6 +40,7 @@
   let rangeMarkerSequence = 0;
   let selectionEpoch = 0;
   let ignoreNextRewriteSelectionChange = false;
+  let rewriteCommand = null;
 
   function recordRewriteMetric(outcome, entry, afterChars) {
     if (!entry?.operationId) return;
@@ -541,7 +548,7 @@
     };
   }
 
-  function freezeRewriteIntent(style) {
+  function freezeRewriteIntent(style, instruction) {
     const workspaceState = window.__workspace?.state;
     const selected = getEditorSelection();
     if (!workspaceState?.project || !selected) return null;
@@ -564,8 +571,145 @@
       proof,
       rangeIdentity,
     });
-    const intent = rewriteTransaction?.captureIntent?.(workspaceState, selection, style);
+    const intent = rewriteTransaction?.captureIntent?.(workspaceState, selection, style, instruction);
     return intent ? { intent, selection, selectionEpoch, offsets, original, selectedRange: selected.range.cloneRange() } : null;
+  }
+
+  function closeRewriteCommand(restoreSelection = false) {
+    const command = rewriteCommand;
+    rewriteCommand = null;
+    REWRITE_COMMAND.hidden = true;
+    REWRITE_COMMAND_INPUT.value = '';
+    REWRITE_COMMAND_COUNT.textContent = '0 / 500';
+    if (!restoreSelection || !command?.range) return;
+    try {
+      if (!command.range.startContainer?.isConnected || !command.range.endContainer?.isConnected) return;
+      const selection = window.getSelection();
+      selection.removeAllRanges();
+      selection.addRange(command.range);
+      EDITOR_EL.focus();
+    } catch (_) {}
+  }
+
+  function rewriteCommandStillCurrent(command) {
+    const workspaceState = window.__workspace?.state;
+    if (!command || !workspaceState?.project || !command.range?.startContainer?.isConnected ||
+        !command.range?.endContainer?.isConnected || !EDITOR_EL.contains(command.range.commonAncestorContainer)) return false;
+    if (workspaceState.project.instanceId !== command.projectInstanceId ||
+        workspaceState.currentPath !== command.currentPath ||
+        workspaceState.openGeneration !== command.openGeneration ||
+        (Number.isSafeInteger(workspaceState.editorSession) ? workspaceState.editorSession : workspaceState.openGeneration) !== command.editorSession ||
+        workspaceState.editVersion !== command.editVersion ||
+        (Number.isSafeInteger(workspaceState.dirtyGeneration) ? workspaceState.dirtyGeneration : workspaceState.editVersion) !== command.dirtyGeneration ||
+        workspaceState.revision !== command.revision || workspaceState.dirty !== command.dirty) return false;
+    const stableText = getStableText();
+    const offsets = rangeOffsets(command.range, stableText);
+    if (!offsets || offsets.startOffset !== command.startOffset || offsets.endOffset !== command.endOffset ||
+        sha256Digest(stableText.slice(offsets.startOffset, offsets.endOffset)) !== command.digest ||
+        rangeIdentityFor(command.range) !== command.rangeIdentity) return false;
+    let proof;
+    try {
+      proof = compactBlockProof(window.WritCraftBlockAnchor.createBlockAnchor(
+        stableText, command.currentPath, offsets.startOffset, offsets.endOffset,
+      ));
+    } catch (_) { return false; }
+    return JSON.stringify(proof) === JSON.stringify(command.proof);
+  }
+
+  function openRewriteCommand() {
+    if (rewriteCommand) {
+      REWRITE_COMMAND_INPUT.focus();
+      return;
+    }
+    if (!window.__workspace?.state?.project || activeRewrite || pendingRewrite || rewritePreparing) {
+      setStatus(activeRewrite || pendingRewrite || rewritePreparing
+        ? '⚠️ 请先接受或拒绝当前校改'
+        : '⚠️ ⌘K 校改只在写作项目中可用', true);
+      return;
+    }
+    const workspaceState = window.__workspace.state;
+    const selected = getEditorSelection();
+    const stableText = getStableText();
+    const offsets = selected ? rangeOffsets(selected.range, stableText) : null;
+    const original = offsets ? stableText.slice(offsets.startOffset, offsets.endOffset) : '';
+    if (!selected || !offsets || !original.trim()) {
+      setStatus('⚠️ 请在同一个 Markdown 段落块内选中要改写的文字', true);
+      return;
+    }
+    let proof;
+    try {
+      proof = compactBlockProof(window.WritCraftBlockAnchor.createBlockAnchor(
+        stableText, workspaceState.currentPath, offsets.startOffset, offsets.endOffset,
+      ));
+    } catch (_) {
+      setStatus('⚠️ 请在同一个 Markdown 段落块内选中要改写的文字', true);
+      return;
+    }
+    const rangeIdentity = rangeIdentityFor(selected.range);
+    if (!rangeIdentity) {
+      setStatus('⚠️ 当前选段无法安全定位，请重新选择', true);
+      return;
+    }
+    const rect = selected.range.getBoundingClientRect();
+    rewriteCommand = {
+      range: selected.range.cloneRange(),
+      projectInstanceId: workspaceState.project.instanceId,
+      currentPath: workspaceState.currentPath,
+      openGeneration: workspaceState.openGeneration,
+      editorSession: Number.isSafeInteger(workspaceState.editorSession)
+        ? workspaceState.editorSession
+        : workspaceState.openGeneration,
+      editVersion: workspaceState.editVersion,
+      dirtyGeneration: Number.isSafeInteger(workspaceState.dirtyGeneration)
+        ? workspaceState.dirtyGeneration
+        : workspaceState.editVersion,
+      revision: workspaceState.revision,
+      dirty: workspaceState.dirty,
+      startOffset: offsets.startOffset,
+      endOffset: offsets.endOffset,
+      digest: sha256Digest(original),
+      rangeIdentity,
+      proof,
+    };
+    REWRITE_COMMAND.hidden = false;
+    const width = Math.min(560, window.innerWidth - 32);
+    const left = Math.max(16, Math.min(rect.left, window.innerWidth - width - 16));
+    const estimatedHeight = 100;
+    const top = rect.bottom + estimatedHeight + 12 < window.innerHeight
+      ? rect.bottom + 8
+      : Math.max(12, rect.top - estimatedHeight - 8);
+    REWRITE_COMMAND.style.left = `${Math.round(left)}px`;
+    REWRITE_COMMAND.style.top = `${Math.round(top)}px`;
+    REWRITE_COMMAND_INPUT.focus();
+    setStatus('✦ 输入本次改写要求；尚未调用 AI，也未修改文件');
+  }
+
+  function submitRewriteCommand() {
+    const command = rewriteCommand;
+    const instruction = rewriteTransaction?.normalizeInstruction?.(REWRITE_COMMAND_INPUT.value);
+    if (!instruction) {
+      setStatus('⚠️ 请输入 1–500 字的单行改写要求', true);
+      REWRITE_COMMAND_INPUT.focus();
+      return;
+    }
+    if (!rewriteCommandStillCurrent(command)) {
+      closeRewriteCommand(false);
+      setStatus('⚠️ 选段或文件已变化，请重新选择后再改写', true);
+      return;
+    }
+    const style = REWRITE_COMMAND_STYLE.value;
+    const range = command.range;
+    closeRewriteCommand(false);
+    try {
+      const selection = window.getSelection();
+      selection.removeAllRanges();
+      selection.addRange(range);
+      EDITOR_EL.focus();
+    } catch (_) {
+      setStatus('⚠️ 选段已失效，请重新选择', true);
+      return;
+    }
+    void beginRewrite(style, instruction);
   }
 
   function previewBindingCurrent(entry) {
@@ -670,6 +814,7 @@
       getState: () => window.__workspace?.state,
       getSelection: () => currentRewriteSelection(entry.frozen),
       getStyle: () => entry.style,
+      getInstruction: () => entry.instruction,
       persist: async () => {
         const saved = await window.__workspace?.persistCurrent?.(true);
         return { ok: saved === true, revision: window.__workspace?.state?.revision };
@@ -706,7 +851,7 @@
     }
     const selection = currentRewriteSelection(entry.frozen);
     const bindingCurrent = rewriteTransaction.preparedBindingMatches(
-      entry.binding, window.__workspace?.state, selection, entry.style,
+      entry.binding, window.__workspace?.state, selection, entry.style, entry.instruction,
     );
     const review = rewriteTransaction.normalizeReviewResult(rawResult);
     if (!review || !bindingCurrent) {
@@ -763,7 +908,7 @@
     updateCount();
   }
 
-  async function beginRewrite(style = 'general') {
+  async function beginRewrite(style, instruction) {
     if (!window.__workspace?.state?.project) {
       setStatus('⚠️ ⌘K 校改只在写作项目中可用', true);
       return;
@@ -782,7 +927,12 @@
     }
     // Everything below, through captureIntent/owner.begin, is synchronous and
     // therefore freezes the exact UTF-16 selection before the first await.
-    const frozen = freezeRewriteIntent(style);
+    const canonicalInstruction = rewriteTransaction.normalizeInstruction(instruction);
+    if (!canonicalInstruction || canonicalInstruction !== instruction) {
+      setStatus('⚠️ 改写要求无效，请重新输入', true);
+      return;
+    }
+    const frozen = freezeRewriteIntent(style, canonicalInstruction);
     if (!frozen) {
       setStatus('⚠️ 请在同一个 Markdown 段落块内选中要改写的文字', true);
       return;
@@ -796,6 +946,7 @@
       frozen,
       original: frozen.original,
       style,
+      instruction: canonicalInstruction,
       operationId: window.WritCraftAiMetrics?.createOperationId?.(),
       originProjectInstanceId: frozen.intent.projectInstanceId,
       startedAt: Date.now(),
@@ -838,7 +989,7 @@
       return false;
     }
     recordRewriteMetric('discarded', entry, entry.original.length);
-    await beginRewrite(nextStyle);
+    await beginRewrite(nextStyle, entry.instruction);
     return true;
   }
 
@@ -1363,6 +1514,7 @@
   EDITOR_EL.spellcheck = false;
   restoreDraft();
   EDITOR_EL.addEventListener('input', () => {
+    if (rewriteCommand) closeRewriteCommand(false);
     if (pendingRewrite && !pendingRewrite.locked) void rejectRewrite(false);
     updateCount();
     scheduleSave();
@@ -1436,11 +1588,34 @@
     // after disk drift. Only an explicit New Chat clears that evidence.
   });
   document.addEventListener('writcraft:project-entered', () => {
+    if (rewriteCommand) closeRewriteCommand(false);
     const requestToken = ++chatRequestSequence;
     window.__workspace?.supersedeChatRequest?.(requestToken);
     resetConversationUI('打开项目后，我会优先读取 edit.md，再从当前项目建立新对话。');
   });
   CHAT_NEW_CONVERSATION?.addEventListener('click', () => { void startNewConversation(); });
+  REWRITE_COMMAND_INPUT?.addEventListener('input', () => {
+    const codePoints = Array.from(REWRITE_COMMAND_INPUT.value);
+    if (codePoints.length > 500) REWRITE_COMMAND_INPUT.value = codePoints.slice(0, 500).join('');
+    REWRITE_COMMAND_COUNT.textContent = `${Array.from(REWRITE_COMMAND_INPUT.value).length} / 500`;
+  });
+  REWRITE_COMMAND_INPUT?.addEventListener('keydown', event => {
+    if (event.key === 'Escape') {
+      event.preventDefault();
+      event.stopPropagation();
+      closeRewriteCommand(true);
+      setStatus('已取消本次校改，未调用 AI');
+    } else if (event.key === 'Enter' && !event.isComposing) {
+      event.preventDefault();
+      event.stopPropagation();
+      submitRewriteCommand();
+    }
+  });
+  REWRITE_COMMAND_SUBMIT?.addEventListener('click', submitRewriteCommand);
+  REWRITE_COMMAND_CANCEL?.addEventListener('click', () => {
+    closeRewriteCommand(true);
+    setStatus('已取消本次校改，未调用 AI');
+  });
 
   document.addEventListener('click', event => {
     const anchor = event.target && event.target.closest ? event.target.closest('a') : null;
@@ -1474,11 +1649,12 @@
     }
     if (meta && event.key.toLowerCase() === 'k' && !event.shiftKey) {
       event.preventDefault();
-      beginRewrite();
+      openRewriteCommand();
       return;
     }
     if (meta && event.key.toLowerCase() === 'l') {
       event.preventDefault();
+      if (rewriteCommand) closeRewriteCommand(false);
       if (CHAT_PANEL.style.display === 'flex') hideChat();
       else showChat();
       return;
@@ -1536,6 +1712,7 @@
       clearTimeout(saveTimer);
     },
     loadDocument(content) {
+      if (rewriteCommand) closeRewriteCommand(false);
       cancelActiveRewriteForDocumentLoad();
       projectManaged = true;
       cachedEditorSelection = null;

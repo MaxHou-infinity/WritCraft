@@ -8,6 +8,7 @@ const R1 = '1'.repeat(64);
 const R2 = '2'.repeat(64);
 const REWRITE_ID = `ir_${'a'.repeat(32)}`;
 const CAPABILITY_ID = `irc_${'b'.repeat(32)}`;
+const INSTRUCTION = '压缩重复表达';
 const HISTORY_ID = 'change_12345678-1234-4123-8123-123456789abc';
 let passed = 0;
 
@@ -122,7 +123,7 @@ async function run() {
 
   await test('freezes every pre-await intent field without retaining selected text', async () => {
     const rangeIdentity = { id: 1 };
-    const intent = Transaction.captureIntent(state(), selection(rangeIdentity), 'concise');
+    const intent = Transaction.captureIntent(state(), selection(rangeIdentity), 'concise', INSTRUCTION);
     assert(intent && Object.isFrozen(intent) && Object.isFrozen(intent.selection) && Object.isFrozen(intent.selection.proof));
     assert.deepStrictEqual({
       project: intent.projectInstanceId,
@@ -142,31 +143,36 @@ async function run() {
       digest: `sha256:${'3'.repeat(64)}`, range: rangeIdentity,
     });
     assert.strictEqual('text' in intent.selection, false);
-    assert.strictEqual(Transaction.captureIntent(state(), selection(null), 'concise'), null);
-    assert.strictEqual(Transaction.captureIntent(state(), selection(rangeIdentity), 'unknown'), null);
+    assert.strictEqual(intent.instruction, INSTRUCTION);
+    assert.strictEqual(Transaction.captureIntent(state(), selection(null), 'concise', INSTRUCTION), null);
+    assert.strictEqual(Transaction.captureIntent(state(), selection(rangeIdentity), 'unknown', INSTRUCTION), null);
+    for (const invalid of ['', ' bad ', 'bad\nline', 'x'.repeat(501), '\u202Ehidden']) {
+      assert.strictEqual(Transaction.captureIntent(state(), selection(rangeIdentity), 'concise', invalid), null);
+    }
   });
 
   await test('rejects drift in each project, file, editor, dirty, selection, proof and range identity field', async () => {
     const rangeIdentity = { id: 1 };
     const originalState = state();
     const originalSelection = selection(rangeIdentity);
-    const intent = Transaction.captureIntent(originalState, originalSelection, 'general');
+    const intent = Transaction.captureIntent(originalState, originalSelection, 'general', INSTRUCTION);
     const stateDrifts = [
       { project: { instanceId: 'project-2' } }, { currentPath: 'chapters/02.md' },
       { revision: R2 }, { openGeneration: 8 }, { editorSession: 12 }, { editVersion: 20 },
       { dirtyGeneration: 24 }, { dirty: false },
     ];
     for (const drift of stateDrifts) {
-      assert.strictEqual(Transaction.initialBindingMatches(intent, state({ ...drift }), originalSelection, intent.style), false);
+      assert.strictEqual(Transaction.initialBindingMatches(intent, state({ ...drift }), originalSelection, intent.style, INSTRUCTION), false);
     }
     const selectionDrifts = [
       { startOffset: 13 }, { endOffset: 19 }, { digest: `sha256:${'4'.repeat(64)}` },
       { proof: proof({ quoteFingerprint: '00000000' }) }, { rangeIdentity: { id: 1 } },
     ];
     for (const drift of selectionDrifts) {
-      assert.strictEqual(Transaction.initialBindingMatches(intent, originalState, selection(rangeIdentity, drift), intent.style), false);
+      assert.strictEqual(Transaction.initialBindingMatches(intent, originalState, selection(rangeIdentity, drift), intent.style, INSTRUCTION), false);
     }
-    assert.strictEqual(Transaction.initialBindingMatches(intent, originalState, originalSelection, 'vivid'), false);
+    assert.strictEqual(Transaction.initialBindingMatches(intent, originalState, originalSelection, 'vivid', INSTRUCTION), false);
+    assert.strictEqual(Transaction.initialBindingMatches(intent, originalState, originalSelection, intent.style, '另一条要求'), false);
   });
 
   await test('accepts only NFC public Markdown paths in intent, apply truth and recovery markers', async () => {
@@ -180,7 +186,7 @@ async function run() {
       assert.strictEqual(Transaction.captureIntent(
         state({ currentPath }),
         selection(rangeIdentity, { proof: proof({ filePath: currentPath }) }),
-        'general',
+        'general', INSTRUCTION,
       ), null, `accepted unsafe path ${JSON.stringify(currentPath)}`);
       assert.strictEqual(Transaction.classifyApplyResponse(applied({ path: currentPath }), 'chapters/01.md').kind, 'outcome_unknown');
       assert.strictEqual(Transaction.normalizeReconciliation({
@@ -194,7 +200,7 @@ async function run() {
     assert(Transaction.captureIntent(
       state({ currentPath: markdownPath }),
       selection(rangeIdentity, { proof: proof({ filePath: markdownPath }) }),
-      'general',
+      'general', INSTRUCTION,
     ));
   });
 
@@ -202,12 +208,13 @@ async function run() {
     const rangeIdentity = { id: 1 };
     let currentState = state();
     let currentSelection = selection(rangeIdentity);
-    const intent = Transaction.captureIntent(currentState, currentSelection, 'general');
+    const intent = Transaction.captureIntent(currentState, currentSelection, 'general', INSTRUCTION);
     let settleCalls = 0;
     const prepared = await Transaction.prepareIntent(intent, {
       getState: () => currentState,
       getSelection: () => currentSelection,
       getStyle: () => 'general',
+      getInstruction: () => INSTRUCTION,
       persist: async expected => {
         assert.strictEqual(expected, R1);
         currentState = state({ revision: R2, dirty: false });
@@ -218,17 +225,18 @@ async function run() {
     assert.strictEqual(prepared.ok, true);
     assert.strictEqual(prepared.binding.persistedRevision, R2);
     assert.strictEqual(settleCalls, 1);
-    assert.strictEqual(Transaction.preparedBindingMatches(prepared.binding, currentState, currentSelection, 'general'), true);
-    assert.strictEqual(Transaction.preparedBindingMatches(prepared.binding, state({ revision: R1, dirty: false }), currentSelection, 'general'), false);
+    assert.strictEqual(Transaction.preparedBindingMatches(prepared.binding, currentState, currentSelection, 'general', INSTRUCTION), true);
+    assert.strictEqual(Transaction.preparedBindingMatches(prepared.binding, state({ revision: R1, dirty: false }), currentSelection, 'general', INSTRUCTION), false);
     assert.strictEqual(Transaction.createRequest(prepared.binding).expectedRevision, R2);
 
     currentState = state();
     currentSelection = selection(rangeIdentity);
-    const watcherFailureIntent = Transaction.captureIntent(currentState, currentSelection, 'general');
+    const watcherFailureIntent = Transaction.captureIntent(currentState, currentSelection, 'general', INSTRUCTION);
     const watcherFailure = await Transaction.prepareIntent(watcherFailureIntent, {
       getState: () => currentState,
       getSelection: () => currentSelection,
       getStyle: () => 'general',
+      getInstruction: () => INSTRUCTION,
       persist: async () => {
         currentState = state({ revision: R2, dirty: false });
         return { ok: true, revision: R2 };
@@ -242,11 +250,12 @@ async function run() {
     const rangeIdentity = { id: 1 };
     let currentState = state({ dirty: false });
     let currentSelection = selection(rangeIdentity);
-    const clean = Transaction.captureIntent(currentState, currentSelection, 'general');
+    const clean = Transaction.captureIntent(currentState, currentSelection, 'general', INSTRUCTION);
     const advanced = await Transaction.prepareIntent(clean, {
       getState: () => currentState,
       getSelection: () => currentSelection,
       getStyle: () => 'general',
+      getInstruction: () => INSTRUCTION,
       persist: async () => {
         currentState = state({ revision: R2, dirty: false });
         return { ok: true, revision: R2 };
@@ -256,11 +265,12 @@ async function run() {
     assert.deepStrictEqual(advanced, { ok: false, reason: 'PERSIST_FAILED' });
 
     currentState = state();
-    const dirtyIntent = Transaction.captureIntent(currentState, currentSelection, 'general');
+    const dirtyIntent = Transaction.captureIntent(currentState, currentSelection, 'general', INSTRUCTION);
     const drifted = await Transaction.prepareIntent(dirtyIntent, {
       getState: () => currentState,
       getSelection: () => currentSelection,
       getStyle: () => 'general',
+      getInstruction: () => INSTRUCTION,
       persist: async () => {
         currentState = state({ revision: R2, dirty: false });
         return { ok: true, revision: R2 };
@@ -276,12 +286,13 @@ async function run() {
       context => { context.currentSelection = selection({ id: 2 }); },
     ]) {
       const context = { currentState: state(), currentSelection: selection({ id: 1 }) };
-      const intent = Transaction.captureIntent(context.currentState, context.currentSelection, 'general');
+      const intent = Transaction.captureIntent(context.currentState, context.currentSelection, 'general', INSTRUCTION);
       const gate = deferred();
       const pending = Transaction.prepareIntent(intent, {
         getState: () => context.currentState,
         getSelection: () => context.currentSelection,
         getStyle: () => 'general',
+      getInstruction: () => INSTRUCTION,
         persist: () => gate.promise,
         settleWatcher: async () => {},
       });

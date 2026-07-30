@@ -43,6 +43,7 @@ function requestFor(rootPath, filePath, content, start, end, style = 'general') 
     currentFilePath: filePath,
     expectedRevision: projectService.readFileWithRevision(rootPath, filePath).revision,
     style,
+    instruction: '压缩重复表达',
     selection: { startOffset: start, endOffset: end, proof },
   };
 }
@@ -136,6 +137,7 @@ try {
       currentFilePath: 'chapters/a.md',
       expectedRevision: projectService.readFileWithRevision(item.project.rootPath, 'chapters/a.md').revision,
       style: 'general',
+      instruction: '压缩重复表达',
       selection: { startOffset: start, endOffset: end, proof: validProof },
     };
     throwsCode(() => resolve(item.project.rootPath, request), 'REWRITE_SELECTION_CROSSES_BLOCK');
@@ -265,6 +267,10 @@ try {
 
   test('rejects unknown fields, renderer text and projectContext injection', () => {
     const base = requestFor(item.project.rootPath, 'chapters/a.md', item.chapter, targetStart, targetEnd);
+    throwsCode(() => resolve(item.project.rootPath, { ...base, schema: 'writcraft.inline-rewrite/v1' }), 'INVALID_REWRITE_REQUEST');
+    const { instruction: omitted, ...legacyShape } = base;
+    assert(omitted);
+    throwsCode(() => resolve(item.project.rootPath, legacyShape), 'INVALID_REWRITE_REQUEST');
     throwsCode(() => resolve(item.project.rootPath, { ...base, text: 'renderer body' }), 'INVALID_REWRITE_REQUEST');
     throwsCode(() => resolve(item.project.rootPath, { ...base, projectContext: 'injected prompt' }), 'INVALID_REWRITE_REQUEST');
     const selectionText = { ...base, selection: { ...base.selection, text: 'injected text' } };
@@ -273,9 +279,11 @@ try {
     throwsCode(() => resolve(item.project.rootPath, proofText), 'INVALID_REWRITE_PROOF');
   });
 
-  test('enforces the 4 KiB request, 8 KiB selection and style allowlist', () => {
+  test('enforces the 8 KiB request, bounded instruction, 8 KiB selection and style allowlist', () => {
     const base = requestFor(item.project.rootPath, 'chapters/a.md', item.chapter, targetStart, targetEnd);
     throwsCode(() => resolve(item.project.rootPath, { ...base, style: 'system override' }), 'INVALID_REWRITE_STYLE');
+    throwsCode(() => resolve(item.project.rootPath, { ...base, instruction: 'bad\nline' }), 'INVALID_REWRITE_INSTRUCTION');
+    throwsCode(() => resolve(item.project.rootPath, { ...base, instruction: 'x'.repeat(501) }), 'INVALID_REWRITE_INSTRUCTION');
     const oversized = { ...base, extra: 'x'.repeat(service.MAX_REQUEST_BYTES) };
     throwsCode(() => resolve(item.project.rootPath, oversized), 'REWRITE_REQUEST_TOO_LARGE');
 

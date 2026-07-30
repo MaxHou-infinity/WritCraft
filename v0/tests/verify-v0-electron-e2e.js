@@ -17,6 +17,7 @@ const { spawn } = require('child_process');
 const projectService = require('../src/main/project-service');
 const changeHistoryService = require('../src/main/change-history-service');
 const changeSetService = require('../src/main/changeset-service');
+const aiMetricsService = require('../src/main/ai-metrics-service');
 const {
   createChangesHistoryTransaction,
 } = require('../src/main/changes-history-transaction');
@@ -1422,6 +1423,57 @@ async function run() {
       assert(richDom.content.includes('\n\n'), 'rendered div/br manuscript must retain Markdown block separators');
       let beforeDisk = projectService.readFile(project.rootPath, createdPath);
       assert.strictEqual(beforeDisk, richDom.content);
+      const lifecycleProviderCalls = (first.logRef.value.match(/INLINE_REWRITE_PROVIDER_CALL/g) || []).length;
+      const lifecycleMetricCount = aiMetricsService.loadMetrics(project.rootPath).events.length;
+      const lifecycleClosures = await first.client.evaluate(`(() => {
+        const editor = document.getElementById('editor');
+        const commandHost = document.getElementById('inline-rewrite-command');
+        const commandInput = document.getElementById('inline-rewrite-command-input');
+        const open = () => {
+          const walker = document.createTreeWalker(editor, NodeFilter.SHOW_TEXT);
+          let target = null;
+          while (walker.nextNode()) {
+            if (walker.currentNode.data.includes(${JSON.stringify(electronAiFixture.REWRITE_TARGET)})) {
+              target = walker.currentNode;
+              break;
+            }
+          }
+          if (!target) return false;
+          const start = target.data.indexOf(${JSON.stringify(electronAiFixture.REWRITE_TARGET)});
+          const range = document.createRange();
+          range.setStart(target, start);
+          range.setEnd(target, start + ${JSON.stringify(electronAiFixture.REWRITE_TARGET)}.length);
+          const selection = window.getSelection();
+          selection.removeAllRanges();
+          selection.addRange(range);
+          document.dispatchEvent(new KeyboardEvent('keydown', { bubbles: true, key: 'k', metaKey: true }));
+          commandInput.value = 'PRIVATE_LIFECYCLE_CANARY';
+          commandInput.dispatchEvent(new Event('input', { bubbles: true }));
+          return !commandHost.hidden;
+        };
+        if (!open()) return null;
+        document.dispatchEvent(new CustomEvent('writcraft:project-entered'));
+        const projectClosed = commandHost.hidden && commandInput.value === '';
+        if (!open()) return null;
+        editor.dispatchEvent(new InputEvent('input', { bubbles: true, inputType: 'insertText', data: null }));
+        const inputClosed = commandHost.hidden && commandInput.value === '';
+        if (!open()) return null;
+        window.__editor.loadDocument(window.__editor.getContent());
+        const fileClosed = commandHost.hidden && commandInput.value === '';
+        return { projectClosed, inputClosed, fileClosed };
+      })()`);
+      assert.deepStrictEqual(lifecycleClosures, {
+        projectClosed: true,
+        inputClosed: true,
+        fileClosed: true,
+      });
+      await delay(1100);
+      assert.strictEqual(projectService.readFile(project.rootPath, createdPath), beforeDisk);
+      assert.strictEqual(
+        (first.logRef.value.match(/INLINE_REWRITE_PROVIDER_CALL/g) || []).length,
+        lifecycleProviderCalls,
+      );
+      assert.strictEqual(aiMetricsService.loadMetrics(project.rootPath).events.length, lifecycleMetricCount);
       await first.client.evaluate(`(() => {
         window.__e2eInlineAckPending = null;
         const observer = new MutationObserver(() => {
@@ -1457,6 +1509,13 @@ async function run() {
         selection.removeAllRanges();
         selection.addRange(range);
         document.dispatchEvent(new KeyboardEvent('keydown', { bubbles: true, key: 'k', metaKey: true }));
+        const command = document.getElementById('inline-rewrite-command-input');
+        if (!command || document.getElementById('inline-rewrite-command').hidden) return false;
+        command.value = '精简表达，同时保留原意';
+        command.dispatchEvent(new Event('input', { bubbles: true }));
+        command.dispatchEvent(new KeyboardEvent('keydown', { bubbles: true, key: 'Enter', isComposing: true }));
+        if (document.getElementById('inline-rewrite-command').hidden) return false;
+        command.dispatchEvent(new KeyboardEvent('keydown', { bubbles: true, key: 'Enter' }));
         return true;
       })()`;
       assert.strictEqual(await first.client.evaluate(selectAndRewrite), true);
@@ -1546,9 +1605,14 @@ async function run() {
         selection.removeAllRanges();
         selection.addRange(range);
         document.dispatchEvent(new KeyboardEvent('keydown', { bubbles: true, key: 'k', metaKey: true }));
+        const command = document.getElementById('inline-rewrite-command-input');
+        if (!command || document.getElementById('inline-rewrite-command').hidden) return false;
         const wrapper = document.createElement('span');
-        target.replaceWith(wrapper);
+        target.parentNode.insertBefore(wrapper, target);
         wrapper.appendChild(target);
+        command.value = '精简表达，同时保留原意';
+        command.dispatchEvent(new Event('input', { bubbles: true }));
+        command.dispatchEvent(new KeyboardEvent('keydown', { bubbles: true, key: 'Enter' }));
         return true;
       })()`);
       assert.strictEqual(driftAttack, true);

@@ -4,9 +4,11 @@
 const assert = require('node:assert');
 const crypto = require('node:crypto');
 const fs = require('node:fs');
+const os = require('node:os');
 const path = require('node:path');
 const vm = require('node:vm');
 const { TextEncoder } = require('node:util');
+const aiMetricsService = require('../src/main/ai-metrics-service');
 
 const root = path.join(__dirname, '..');
 const editor = fs.readFileSync(path.join(root, 'src/renderer/editor.js'), 'utf8');
@@ -51,8 +53,83 @@ test('synchronous UTF-8 SHA-256 matches Node authority', () => {
 
 test('intent is frozen before the first rewrite await', () => {
   const begin = editor.slice(editor.indexOf('async function beginRewrite('), editor.indexOf('async function rejectRewrite('));
-  assert.ok(begin.indexOf('freezeRewriteIntent(style)') < begin.indexOf('await runRewrite(entry)'));
+  assert.ok(begin.indexOf('freezeRewriteIntent(style, canonicalInstruction)') >= 0);
+  assert.ok(begin.indexOf('freezeRewriteIntent(style, canonicalInstruction)') < begin.indexOf('await runRewrite(entry)'));
   assert.ok(begin.indexOf('rewriteOwner.begin(frozen.intent)') < begin.indexOf('await runRewrite(entry)'));
+});
+
+test('Cmd-K opens a private instruction composer before any AI work', () => {
+  for (const id of [
+    'inline-rewrite-command', 'inline-rewrite-command-input', 'inline-rewrite-command-style',
+    'inline-rewrite-command-submit', 'inline-rewrite-command-cancel',
+  ]) assert.ok(html.includes(`id="${id}"`), `missing ${id}`);
+  const open = extractFunction('openRewriteCommand');
+  assert.ok(open.includes('REWRITE_COMMAND.hidden = false'));
+  assert.ok(open.includes('REWRITE_COMMAND_INPUT.focus()'));
+  assert.ok(!open.includes('writCraft.rewrite'));
+  assert.ok(!open.includes('persistCurrent'));
+  assert.ok(!open.includes('recordRewriteMetric'));
+});
+
+test('instruction submit revalidates the frozen Range and Cmd-L cancels the local composer', () => {
+  const open = extractFunction('openRewriteCommand');
+  const submit = extractFunction('submitRewriteCommand');
+  const current = extractFunction('rewriteCommandStillCurrent');
+  assert.ok(open.includes('rangeIdentityFor(selected.range)'));
+  assert.ok(open.includes('createBlockAnchor'));
+  assert.ok(current.includes('rangeIdentityFor(command.range) !== command.rangeIdentity'));
+  assert.ok(current.includes('JSON.stringify(proof) === JSON.stringify(command.proof)'));
+  assert.ok(submit.includes('normalizeInstruction'));
+  assert.ok(submit.includes('rewriteCommandStillCurrent(command)'));
+  assert.ok(submit.includes('selection.addRange(range)'));
+  assert.ok(submit.includes('beginRewrite(style, instruction)'));
+  assert.ok(editor.includes("if (rewriteCommand) closeRewriteCommand(false);\n      if (CHAT_PANEL.style.display === 'flex')"));
+  assert.ok(editor.includes("event.key === 'Enter' && !event.isComposing"));
+  assert.ok(editor.includes('codePoints.slice(0, 500).join'));
+  assert.ok(editor.includes('if (rewriteCommand) closeRewriteCommand(false);\n      cancelActiveRewriteForDocumentLoad();'));
+});
+
+test('instruction dynamically crosses the Renderer metrics boundary without reaching disk', () => {
+  const metric = extractFunction('recordRewriteMetric');
+  assert.ok(!metric.includes('instruction'));
+  assert.ok(!metric.includes('digest'));
+  const scratch = fs.mkdtempSync(path.join(os.tmpdir(), 'writcraft-inline-metric-'));
+  const canary = 'PRIVATE_INSTRUCTION_CANARY_7f31';
+  try {
+    const context = {
+      Date,
+      Number,
+      window: {
+        WritCraftAiMetrics: {
+          record(projectInstanceId, payload) {
+            assert.equal(projectInstanceId, 'project-instance');
+            aiMetricsService.appendEvent(scratch, payload, {
+              now: new Date('2026-07-30T00:00:00.000Z'),
+            });
+          },
+        },
+      },
+      entry: {
+        operationId: '0123456789abcdef0123456789abcdef',
+        originProjectInstanceId: 'project-instance',
+        instruction: canary,
+        instructionDigest: `sha256:${canary}`,
+        style: 'concise',
+        original: '原文',
+        startedAt: Date.now(),
+      },
+    };
+    vm.runInNewContext(`${metric}; recordRewriteMetric('generated', entry, 2);`, context);
+    const persisted = fs.readFileSync(
+      path.join(scratch, aiMetricsService.METRICS_RELATIVE_PATH),
+      'utf8',
+    );
+    assert.ok(!persisted.includes(canary));
+    assert.ok(!persisted.includes('instruction'));
+    assert.equal(aiMetricsService.loadMetrics(scratch).events.length, 1);
+  } finally {
+    fs.rmSync(scratch, { recursive: true, force: true });
+  }
 });
 
 test('generation installs preview only after strict normalization', () => {

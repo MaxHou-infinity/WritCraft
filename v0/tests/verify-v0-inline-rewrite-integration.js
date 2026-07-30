@@ -51,6 +51,8 @@ test('generation seals Main authority and revalidates after the model before cap
     'inlineRewriteService.finalizeInlineRewrite({', 'mutationGeneration: projectMutationGeneration',
     'inlineRewriteStore.completeGeneration(generation.rewriteId, proposal)',
   ]) assert(route.includes(fragment), `missing ${fragment}`);
+  assert(route.indexOf('inlineRewriteContextService.validateRequest(request)') <
+    route.indexOf('inlineRewriteStore.beginGeneration(binding)'));
   assert(!route.includes('result.text'));
   assert(!route.includes('stylePrompts'));
 });
@@ -198,6 +200,7 @@ test('dynamic preview → ACK → marker → apply → History → undo preserve
       currentFilePath: 'chapters/01.md',
       expectedRevision: revision(before),
       style: 'concise',
+      instruction: 'PRIVATE_INSTRUCTION_CANARY_7f31',
       selection: {
         startOffset: start,
         endOffset: end,
@@ -230,6 +233,7 @@ test('dynamic preview → ACK → marker → apply → History → undo preserve
       mutationGeneration: 1,
     });
     const review = store.completeGeneration(generation.rewriteId, proposal);
+    assert(!JSON.stringify(review).includes('PRIVATE_INSTRUCTION_CANARY_7f31'));
     assert.equal(projectService.readFileWithRevision(project.rootPath, 'chapters/01.md').content, before);
     store.acknowledge(binding, {
       schema: 'writcraft.inline-rewrite-ack/v1', rewriteId: review.rewriteId, capabilityId: review.capabilityId,
@@ -253,6 +257,8 @@ test('dynamic preview → ACK → marker → apply → History → undo preserve
     assert.equal(projectService.readFileWithRevision(project.rootPath, 'chapters/01.md').content,
       before.replace('需要精简', replacement));
     const entry = historyService.listHistory(project.rootPath)[0];
+    assert(!JSON.stringify(entry).includes('PRIVATE_INSTRUCTION_CANARY_7f31'));
+    assert(!JSON.stringify(reconciliation.read(project.rootPath)).includes('PRIVATE_INSTRUCTION_CANARY_7f31'));
     assert.equal(entry.provenance.kind, 'inline_rewrite');
     assert.equal(entry.provenance.rewriteId, review.rewriteId);
     const undone = historyService.undoChange(projectService, project.rootPath, entry.id);

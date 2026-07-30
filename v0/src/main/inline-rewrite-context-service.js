@@ -6,14 +6,16 @@
 
 const blockAnchor = require('../renderer/block-anchor');
 
-const REQUEST_SCHEMA = 'writcraft.inline-rewrite/v1';
-const MAX_REQUEST_BYTES = 4 * 1024;
+const REQUEST_SCHEMA = 'writcraft.inline-rewrite/v2';
+const MAX_REQUEST_BYTES = 8 * 1024;
+const MAX_INSTRUCTION_CODE_POINTS = 500;
+const MAX_INSTRUCTION_BYTES = 2 * 1024;
 const MAX_SELECTION_BYTES = 8 * 1024;
 const MAX_MODEL_CONTEXT_BYTES = 32 * 1024;
 const MAX_PATH_BYTES = 1024;
 const STYLE_ALLOWLIST = Object.freeze(['general', 'concise', 'vivid', 'academic', 'casual']);
 const STYLE_SET = new Set(STYLE_ALLOWLIST);
-const REQUEST_KEYS = Object.freeze(['schema', 'currentFilePath', 'expectedRevision', 'style', 'selection']);
+const REQUEST_KEYS = Object.freeze(['schema', 'currentFilePath', 'expectedRevision', 'style', 'instruction', 'selection']);
 const SELECTION_KEYS = Object.freeze(['startOffset', 'endOffset', 'proof']);
 const PROOF_KEYS = Object.freeze([
   'schema', 'id', 'filePath', 'type', 'headingKey', 'ordinal',
@@ -81,9 +83,31 @@ function validateProof(proof, currentFilePath) {
   return proof;
 }
 
+function validateInstruction(value) {
+  if (typeof value !== 'string' || value !== value.normalize('NFC').trim() || !value) {
+    fail('INVALID_REWRITE_INSTRUCTION', '改写要求必须是已整理的单行文本');
+  }
+  const codePoints = [...value];
+  if (codePoints.length > MAX_INSTRUCTION_CODE_POINTS || utf8Bytes(value) > MAX_INSTRUCTION_BYTES ||
+      /[\u0000-\u001F\u007F-\u009F\u2028\u2029\uFEFF\u200B\u2060\u202A-\u202E\u2066-\u2069]/u.test(value)) {
+    fail('INVALID_REWRITE_INSTRUCTION', '改写要求包含不支持的字符或超过长度限制');
+  }
+  for (let index = 0; index < value.length; index += 1) {
+    const code = value.charCodeAt(index);
+    if (code >= 0xD800 && code <= 0xDBFF) {
+      const next = value.charCodeAt(index + 1);
+      if (!(next >= 0xDC00 && next <= 0xDFFF)) fail('INVALID_REWRITE_INSTRUCTION', '改写要求包含无效 Unicode');
+      index += 1;
+    } else if (code >= 0xDC00 && code <= 0xDFFF) {
+      fail('INVALID_REWRITE_INSTRUCTION', '改写要求包含无效 Unicode');
+    }
+  }
+  return value;
+}
+
 function validateRequest(request) {
   if (serializedBytes(request) > MAX_REQUEST_BYTES) {
-    fail('REWRITE_REQUEST_TOO_LARGE', '结构化改写请求不能超过 4 KiB');
+    fail('REWRITE_REQUEST_TOO_LARGE', '结构化改写请求不能超过 8 KiB');
   }
   if (!exactKeys(request, REQUEST_KEYS) || request.schema !== REQUEST_SCHEMA) {
     fail('INVALID_REWRITE_REQUEST', '结构化改写请求格式无效');
@@ -93,6 +117,7 @@ function validateRequest(request) {
     fail('INVALID_REWRITE_REVISION', '文件 revision 无效');
   }
   if (!STYLE_SET.has(request.style)) fail('INVALID_REWRITE_STYLE', '不支持该改写风格');
+  validateInstruction(request.instruction);
   if (!exactKeys(request.selection, SELECTION_KEYS)) {
     fail('INVALID_REWRITE_SELECTION', '选段范围格式无效');
   }
@@ -454,6 +479,8 @@ function resolveInlineRewriteContext({ projectService, rootPath, request }) {
 module.exports = {
   REQUEST_SCHEMA,
   MAX_REQUEST_BYTES,
+  MAX_INSTRUCTION_CODE_POINTS,
+  MAX_INSTRUCTION_BYTES,
   MAX_SELECTION_BYTES,
   MAX_MODEL_CONTEXT_BYTES,
   STYLE_ALLOWLIST,
@@ -461,5 +488,6 @@ module.exports = {
   InlineRewriteContextError,
   compactProof,
   validateRequest,
+  validateInstruction,
   resolveInlineRewriteContext,
 };

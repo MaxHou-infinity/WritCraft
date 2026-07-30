@@ -297,6 +297,7 @@ function rewriteAnswer(prompt) {
       count(REWRITE_AFTER) !== 1 ||
       count('<project-prompt>') !== 1 ||
       count('<rewrite-selection>') !== 1 ||
+      !prompt.includes('作者改写要求："精简表达，同时保留原意"') ||
       !prompt.includes('<previous-block>') || !prompt.includes('<next-block>') ||
       prompt.includes(REWRITE_FAR) || prompt.includes('[当前编辑器上下文]') ||
       prompt.includes('[权威项目 Prompt · edit.md]')) {

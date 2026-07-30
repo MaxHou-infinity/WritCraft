@@ -96,7 +96,7 @@ npx writ-craft@preview --profile "$HOME/WritCraft-Preview-Profile"
 
 1. 打开 `edit.md`，确认主旨、读者和结构；
 2. 用项目对话让 AI 复述它对作品的理解；
-3. 打开一个章节，选中一段文字发起改写；
+3. 打开一个章节，选中一段文字后按 `⌘K`，输入本次改写要求并按 Enter 生成预览；用 Tab 接受、Esc 拒绝，或在预览中重载；
 4. 在差异视图中逐项接受或拒绝；
 5. 对复杂任务先使用 Plan，再生成 Changes；
 6. 打开一致性图谱，检查概念、人物、变量和时间关系；

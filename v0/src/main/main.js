@@ -1585,6 +1585,9 @@ ipcMain.handle('writcraft:rewrite', async (event, projectInstanceId, request) =>
     if (!matchesAiProjectOrigin(projectInstanceId)) {
       throw new inlineRewriteService.InlineRewriteError('INLINE_REWRITE_STALE', '项目状态已变化，请重新发起改写');
     }
+    // Reject malformed or legacy requests before replacing an active
+    // generation. Validation itself must not spend tokens or mutate state.
+    inlineRewriteContextService.validateRequest(request);
     const origin = captureAiProjectOrigin();
     const binding = inlineRewriteBinding(event, project);
     generation = inlineRewriteStore.beginGeneration(binding);

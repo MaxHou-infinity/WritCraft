@@ -41,6 +41,7 @@ function requestFor(item, filePath = 'chapters/01.md', content = item.chapter, s
     currentFilePath: filePath,
     expectedRevision: projectService.readFileWithRevision(item.project.rootPath, filePath).revision,
     style: 'concise',
+    instruction: '压缩重复表达',
     selection: { startOffset, endOffset, proof },
   };
 }
@@ -108,8 +109,14 @@ test('Main 重建 target/edit/neighbors，冻结依赖和隐私有界 provenance
   const item = fixture();
   try {
     const prepared = prepare(item);
+    assert.match(prepared.messages[0].content, /安全规则与输出 JSON 契约/);
+    assert.match(prepared.messages[0].content, /作者改写要求/);
+    assert.match(prepared.messages[0].content, /冲突.*作者改写要求为准/);
     assert.match(prepared.messages[0].content, /不可信写作资料/);
+    assert(prepared.messages[0].content.indexOf('作者改写要求：') <
+      prepared.messages[0].content.indexOf('辅助风格：'));
     assert(prepared.messages[0].content.includes('需要改写'));
+    assert.equal(prepared.dependencies.instruction, '压缩重复表达');
     assert.equal(prepared.dependencies.target.path, 'chapters/01.md');
     assert.match(prepared.dependencies.selection.digest, /^sha256:[a-f0-9]{64}$/);
     assert.equal(prepared.dependencies.projectPrompt.path, 'edit.md');
@@ -128,6 +135,7 @@ test('Main 重建 target/edit/neighbors，冻结依赖和隐私有界 provenance
     assert(!serialized.includes(item.project.rootPath));
     assert(!serialized.includes('需要改写'));
     assert(!serialized.includes('应改写'));
+    assert(!serialized.includes('压缩重复表达'));
     assert(!serialized.includes('irc_'));
     assert(Buffer.byteLength(serialized) <= service.MAX_PROVENANCE_BYTES);
   } finally { fs.rmSync(item.parent, { recursive: true, force: true }); }
@@ -170,6 +178,7 @@ test('references/sources/symlink/hard-link edit alias 与 path identity fail clo
       currentFilePath: 'chapters/link.md',
       expectedRevision: revision(item.chapter),
       style: 'concise',
+      instruction: '压缩重复表达',
       selection: {
         startOffset: linkStart,
         endOffset: linkStart + '需要改写'.length,

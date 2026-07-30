@@ -1,19 +1,20 @@
 # Inline Rewrite v1 Contract
 
-> Status: product chain signed. The 21/21 forced-Electron result below is this contract's historical focused evidence; it is not the current project-wide total. Project-wide current totals and restart order live only in `v0/DEVELOPMENT-STATUS.md`.
-> Request schema: `writcraft.inline-rewrite/v1`
+> Status: **0.1.2 P1 amendment implemented and independently signed P0=0/P1=0/P2=0; exact-candidate commit pending**. The historical v1 write/capability chain remains signed. Real-author acceptance proved that `⌘K` had skipped the original natural-language rewrite instruction; request v2 and the command composer now implement that missing boundary. Current directed/full/real-Electron evidence and retained red runs live in `v0/DEVELOPMENT-STATUS.md`; the older 21/21 figure below is historical focused evidence only.
+> Request schema: `writcraft.inline-rewrite/v2`
 > Result schema: `writcraft.inline-rewrite-result/v1`
 
 ## 1. Product journey and terminal truth
 
-1. The user selects non-empty text inside one Markdown block and chooses a rewrite style.
-2. Before its first `await`, Renderer freezes project instance, path, open generation, editor session, editVersion, dirty generation/state, DOM Range identity, UTF-16 offsets, selected-text digest, block proof, and allowlisted style. It then persists the document.
-3. That persist may advance the target revision exactly once as the direct result of this save. After persist, after watcher settle, and immediately before IPC, Renderer rechecks every frozen field and the exact selection; selection-only movement, unsaved typing, or file/session drift terminates the request.
-4. Main reconstructs `edit.md`, the exact target selection, and bounded neighboring context from authoritative disk snapshots.
-5. Main accepts only a strict model result, locally assembles the complete proposed file, and returns a preview plus a one-time capability in `REVIEW_PENDING_ACK`. Disk is unchanged.
-6. Renderer safely installs and binds the preview, then acknowledges the exact rewrite within 30 seconds. Only an acknowledged `REVIEW` may be accepted.
-7. The user may accept, reject, regenerate, change style, switch file/project, or close the preview. Only explicit accept may write.
-8. Main burns the capability, revalidates every dependency, applies one ChangeSet, writes History, and returns authoritative committed truth. Renderer then reloads the file from disk and places a collapsed caret at the replacement end only if the original binding is still current.
+1. The user selects non-empty text inside one Markdown block and presses `⌘K`. Renderer synchronously freezes the selection Range, project/file/editor identity, offsets, selected-text digest and block proof, then opens one compact command composer beside the selection. Opening the composer performs no save, IPC, metric, Main admission or AI call.
+2. The author enters a required natural-language instruction and may choose one allowlisted rewrite style. Enter submits once unless an IME composition is active; Escape cancels locally with zero side effects. Repeated `⌘K` focuses the same composer. `⌘L` remains Chat; opening it locally cancels an unsubmitted `⌘K` composer.
+3. On submit, Renderer revalidates the cloned Range against project instance, path, open generation, editor session, editVersion, dirty generation/state, exact UTF-16 offsets, selected-text digest and block proof. It restores the validated Range, freezes the canonical instruction into a new immutable intent before its first `await`, and only then persists the document.
+4. That persist may advance the target revision exactly once as the direct result of this save. After persist, after watcher settle, immediately before IPC, and before preview installation, Renderer rechecks every frozen field, cloned Range and instruction identity; selection, instruction, unsaved typing, file/session or project drift terminates the request.
+5. Main strictly validates request v2 before admitting/canceling any live generation, then reconstructs `edit.md`, the exact target selection, and bounded neighboring context from authoritative disk snapshots.
+6. Main accepts only a strict model result, locally assembles the complete proposed file, and returns a preview plus a one-time capability in `REVIEW_PENDING_ACK`. Disk is unchanged.
+7. Renderer safely installs and binds the preview, then acknowledges the exact rewrite within 30 seconds. Only an acknowledged `REVIEW` may be accepted.
+8. The user may accept, reject, regenerate, change style, switch file/project, or close the preview. Regenerate/style change first discards the old capability and reuses the same immutable canonical instruction; changing the instruction requires discarding and starting a new generation. Only explicit accept may write.
+9. Main burns the capability, revalidates every dependency, applies one ChangeSet, writes History, and returns authoritative committed truth. Renderer then reloads the file from disk and places a collapsed caret at the replacement end only if the original binding is still current.
 
 An empty `replacement` is an explicit deletion. An identical replacement is a no-op: no capability, write, or History entry. Reject/cancel/expiry/stale and every pre-commit failure preserve disk bytes. Post-write failure follows the truth matrix in §6 and never invites an unsafe retry.
 
@@ -24,22 +25,24 @@ An empty `replacement` is an explicit deletion. An identical replacement is a no
 | Project | current instance ID | canonical root/session, mutation generation |
 | Target | relative path, expected revision | canonical path, realpath/inode, content/revision |
 | Selection | UTF-16 range, compact block proof | exact selected bytes, block and neighbor locators |
-| Style | one allowlisted identifier | system prompt and model request |
+| Instruction | one canonical bounded author instruction | strict validation, private prompt binding and request priority |
+| Style | one allowlisted identifier | style rule and model request |
 | Context | nothing else | saved `edit.md`, target and bounded neighbors |
 | Proposal | ACK/reject/cancel associated rewrite + capability IDs | strict parsing, full after-content, ChangeSet |
 | Write | associated rewrite + one-time capability IDs | revalidation, rollback-capable write, History and undo |
 
-Renderer must never submit root paths, file contents, replacement text for application, ChangeSet contents, dependency revisions other than the initial target revision, or claimed model metadata.
+Renderer must never submit root paths, file contents, replacement text for application, ChangeSet contents, dependency revisions other than the initial target revision, or claimed model metadata. Raw instruction and any instruction digest remain private to the live request/proposal; neither may enter public review, metrics, History, recovery markers, diagnostics, errors or logs.
 
 ## 3. Exact request and model result
 
-The existing public request remains exact-key and at most 4 KiB:
+The v2 public request is exact-key and at most 8 KiB:
 
 ```json
 {
-  "schema": "writcraft.inline-rewrite/v1",
+  "schema": "writcraft.inline-rewrite/v2",
   "currentFilePath": "chapters/01.md",
   "expectedRevision": "64-lowercase-hex",
+  "instruction": "压缩重复表达，但保留案例中的事实与数字。",
   "style": "concise",
   "selection": {
     "startOffset": 120,
@@ -60,7 +63,9 @@ The existing public request remains exact-key and at most 4 KiB:
 }
 ```
 
-The request, selection, and proof are plain exact-key objects. Proof keys are exactly `schema,id,filePath,type,headingKey,ordinal,blockFingerprint,quoteFingerprint,relativeStart,relativeEnd`: `id` matches `^block_[a-f0-9]{8}$`; other strings are non-empty except `headingKey`; `ordinal >= 1`; relative offsets are safe integers with `0 <= relativeStart <= relativeEnd`; both fingerprints are eight lowercase hex characters. `filePath` must equal `currentFilePath`. Paths are POSIX-relative and path identity is exactly `value.normalize('NFC').toLocaleLowerCase('en-US')`. Request selection is at most 8 KiB; Main-built model context is at most 32 KiB.
+The request, selection, and proof are plain exact-key objects. Runtime v1 requests, missing/extra keys and optional-instruction shapes fail closed. `instruction` is already `normalize('NFC').trim()`, is non-empty, contains 1–500 Unicode code points and at most 2 KiB UTF-8, and is a single visible line. It rejects C0/C1 controls (including NUL, CR, LF and TAB), U+2028/U+2029, BOM, zero-width space, word joiner, bidi override/isolate controls and isolated UTF-16 surrogates; internal ordinary spaces are preserved. Proof keys are exactly `schema,id,filePath,type,headingKey,ordinal,blockFingerprint,quoteFingerprint,relativeStart,relativeEnd`: `id` matches `^block_[a-f0-9]{8}$`; other strings are non-empty except `headingKey`; `ordinal >= 1`; relative offsets are safe integers with `0 <= relativeStart <= relativeEnd`; both fingerprints are eight lowercase hex characters. `filePath` must equal `currentFilePath`. Paths are POSIX-relative and path identity is exactly `value.normalize('NFC').toLocaleLowerCase('en-US')`. Request selection is at most 8 KiB; Main-built source context is at most 32 KiB and the complete model message serialization is at most 40 KiB.
+
+The model request separates priority explicitly: immutable safety and strict-JSON rules override the author instruction; the author instruction overrides the selected style; `edit.md`, selected manuscript text and neighboring text are delimited untrusted writing material and can never alter those rules. Main keeps the canonical instruction only inside the live private proposal bound to the one-time capability. Apply never accepts the instruction or replacement from Renderer.
 
 The model must return exactly one JSON object, with no fences or outer text:
 
@@ -139,7 +144,7 @@ Main accepts clear only from the trusted BrowserWindow, current matching project
 
 Inline Rewrite writes exactly one public Markdown target. The requested path must resolve to exactly one current tree entry under `value.normalize('NFC').toLocaleLowerCase('en-US')`. `.writcraft/**`, `references/**`, `sources/**`, hidden paths, symlinks, aliases, case-only or Unicode-equivalent collisions, and hard-link overlap with any internal/hidden/source/reference file fail closed. A non-`edit.md` target whose inode equals root `edit.md` also fails. Main re-enumerates canonical and protected identities before model, after model, and before apply. `edit.md` is allowed only when it is the explicit target, but the selection may not intersect its Front Matter. The complete before/after Front Matter byte slice, including delimiters, must be identical; `inspectEditFrontMatter(after).data.schema` must equal `writcraft.edit/v1` and no diagnostic may have `severity === "error"`. Warnings and unknown fields therefore remain byte-for-byte preserved.
 
-The frozen internal proposal records project instance/root, mutation generation, target path/revision/realpath/inode, exact range and selected-text digest, block proof, bounded neighbor locators/digests, `edit.md` revision when it is a separate dependency, full after-content, ChangeSet, style, expiry, and owner webContents/navigation epoch. Public provenance is bounded and excludes file contents, selected text, prompt, model output, absolute paths, and keys.
+The frozen internal proposal records project instance/root, mutation generation, target path/revision/realpath/inode, exact range and selected-text digest, block proof, bounded neighbor locators/digests, `edit.md` revision when it is a separate dependency, canonical instruction, full after-content, ChangeSet, style, expiry, and owner webContents/navigation epoch. Public provenance remains the historical `writcraft.inline-rewrite/v1` shape for backward-compatible History and excludes instruction, instruction digest, file contents, selected text, prompt, model output, absolute paths, capabilities and keys.
 
 Validation runs before the model, after the model, and immediately before apply. Accept-time drift in project, target revision/path/inode, `edit.md`, proof, selection, or frozen neighbor dependency returns `INLINE_REWRITE_STALE` and performs zero writes.
 
