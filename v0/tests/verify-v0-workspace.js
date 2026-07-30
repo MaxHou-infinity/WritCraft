@@ -55,6 +55,14 @@ check('项目卡作为项目级图标常驻左侧活动栏，不占用文件工�
   assert.ok(workspace.includes("startOnboardingButton.disabled = !state.project || state.projectPromptMissing"));
   assert.ok(workspace.includes("startOnboardingButton?.setAttribute('aria-pressed', 'true')"));
 });
+check('项目卡 NO_KEY 设置跳转按项目保留草稿并在成功或切项目时清除', () => {
+  assert.ok(workspace.includes('onboardingDraft: null'));
+  assert.ok(workspace.includes('state.onboardingDraft?.projectInstanceId === state.project.instanceId'));
+  assert.ok(workspace.includes('onSessionChange: session =>'));
+  assert.ok(workspace.includes('onOpenSettings: session =>'));
+  assert.ok(workspace.includes("document.getElementById('activity-settings')?.click()"));
+  assert.ok(workspace.includes('state.onboardingDraft = null'));
+});
 check('edit.md 被定义为项目启动上下文', () => {
   assert.ok(html.includes('每个 WritCraft 项目都从一个可见的 edit.md 开始'));
   assert.ok(workspace.includes("state.projectPromptMissing ? markdownPaths()[0] || '' : 'edit.md'"));

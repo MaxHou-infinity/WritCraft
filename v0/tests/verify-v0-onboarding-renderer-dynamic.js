@@ -526,6 +526,36 @@ function extractFunction(source, name) {
     }
   });
 
+  await test('NO_KEY explains the pre-provider block and opens Settings without losing answers', async () => {
+    const document = new FakeDocument();
+    const host = document.createElement('section');
+    document.root.append(host);
+    const originalAnimationFrame = global.requestAnimationFrame;
+    global.requestAnimationFrame = callback => callback();
+    let settingsSession = null;
+    try {
+      const controller = onboardingView.mount(host, {
+        stateApi: onboardingState,
+        session: {
+          status: 'review', currentIndex: 9,
+          answers: { premise: '需要继续保留的项目主旨' }, skipped: [],
+        },
+        onGenerate: async () => ({ ok: false, error: 'NO_KEY' }),
+        onOpenSettings: session => { settingsSession = session; },
+      });
+      await findByText(host, '生成 edit.md 提案').click();
+      assert(allText(host).includes('这次没有调用 AI'));
+      assert(allText(host).includes('当前 App 尚未配置 MiniMax Key'));
+      assert(allText(host).includes('项目文件没有变化'));
+      assert(!allText(host).includes('AI 暂时没有完成整理'));
+      await findByText(host, '打开设置').click();
+      assert.strictEqual(settingsSession.answers.premise, '需要继续保留的项目主旨');
+      controller.destroy();
+    } finally {
+      global.requestAnimationFrame = originalAnimationFrame;
+    }
+  });
+
   await test('changed proposal applies edit only, then enters a separate confirmation', async () => {
     const harness = loadChangesHarness({
       applyResult: { ok: true, applied: [{ path: 'edit.md', revision: 'b'.repeat(64) }], onboardingConfirmation: confirmation('review') },

@@ -1,10 +1,10 @@
 # 笔触 · WritCraft · V0 开发状态与续作入口
 
-> 最后更新：2026-07-30（Asia/Shanghai，0.0BA · 第二个 fresh 副本的精确 Safe Undo 写盘链通过，同时发现并修复撤销终态伪装成 AI 长等待的 Renderer P1）
+> 最后更新：2026-07-30（Asia/Shanghai，0.0BB · 项目卡 NO_KEY 可操作恢复与跨设置草稿保留 P1 已关闭）
 > 当前状态：**`writ-craft@0.1.1` 已从 exact candidate `c65981e` 发布到 npm `preview`；registry 时间 `2026-07-29T14:30:16.176Z`，shasum `d370c500666e25cfb373852deafa21b232d2bc18` 与本地候选一致。公网隔离安装/启动/退出为 2/2。annotated tag `v0.1.1` 指向同一提交，GitHub prerelease 已公开：`https://github.com/MaxHou-infinity/WritCraft/releases/tag/v0.1.1`。**
 > 发布判断：**0.1.1 Developer Preview 已完成版本、自动化、双架构安装、独立复审、npm 发布、公网安装和 GitHub prerelease。registry 标签保持 `preview: 0.1.1`、`latest: 0.1.0`，因此本次没有把 Preview 冒充稳定版，也没有执行 unpublish、占位发布或上传未签名 App/ZIP。**
 > 当前目标版本：**`docs/ROADMAP.md` 的 `RM-1.0 / writ-craft@0.1.2` 真实作者可用性闭环。必须使用 `edit.md`、5+ 个 `chapters/` 章节、2000+ 可见中文字符和至少 1 个来源文件的作者隔离副本，完成五段旅程，并关闭现场 `Graph INVALID_CACHE` 的诊断/恢复终态。0.1.2 签字前不得插入驾驶舱、新 AI 模式或其他后续版本功能。**
-> 当前源码证据：**旧的未发布 0.1.2 candidate `45b1815` 已被 0.0AU 的生产界面修复失效；candidate `9a05c44` 又被 0.0BA 的安全撤销进度修复失效，二者都不得发布或复用受影响验收证据。当前 exact intermediate candidate 是 `89658f0 fix(history): end undo progress truthfully`：在精确目标/最新标记/双重确认基础上，把 Safe Undo 进度明确为“不调用 AI”，并在所有终态停止计时、清除生成态；Changes UX 8/8、语法检查、完整 `npm test`、批准 GUI 环境完整 `npm run verify` 和强制真实 Electron 37/37 均通过。沙箱 `npm run verify` 在真实 DOM Electron 以 `code=null` 退出，原样非沙箱重跑转绿，红运行保留。它仍不是最终发布候选：0.0AW 登记的项目卡 `NO_KEY` 通用文案 P1 尚未关闭；修复后还须独立复审、fresh-tarball 矩阵和第三个 fresh 作者副本。npm/GitHub 未发布 0.1.2。公开 0.1.1 的 registry 证据保持不变。**
+> 当前源码证据：**旧的未发布 0.1.2 candidates `45b1815`、`9a05c44` 与 intermediate `89658f0` 均已被后续生产修复失效，不得发布或复用受影响验收证据。当前工作树已同时关闭 Safe Undo 假 AI 长等待和项目卡 `NO_KEY` 通用重试 P1：`NO_KEY` 明示未调用 AI/未改文件，提供“打开设置”，并按 project instance 保留项目卡草稿；项目切换或成功完成会清除草稿。定向项目卡 UI 12/12、Renderer 27/27、Main/Preload 14/14、Workspace 22/22，完整 `npm test`、批准 GUI 环境 `npm run verify` 和强制真实 Electron 37/37 均通过。0.0BB 提交后，以包含本里程碑的 HEAD 为下一 exact candidate；仍须独立复审、fresh-tarball 矩阵和第三个 fresh 作者副本。npm/GitHub 未发布 0.1.2。公开 0.1.1 的 registry 证据保持不变。**
 > 当前作者验收进度：**第二个 fresh 副本已完成项目卡、Inline 拒绝、Inline 接受与精确 Safe Undo。Safe Undo 的磁盘/History 事务通过：最新正文记录变为 `undone`，正文恢复 `1bdb3a5…`，`edit.md` 保持 `e9bacec…`。但撤销后界面错误地继续显示“正在生成跨文件修改”，计时达到 159 秒；代码审计证明没有跨文件请求，只是 `undoHistory()` 复用了 AI 进度卡且未清理 timer。0.0BA 已修复并用真实 Electron 37/37 验证。由于这是旅程后的生产代码变化，按验收合同，第二个副本只保留为功能/缺陷证据，不能作为新 candidate 的最终发布签字；下一步是提交新 candidate、完成全链验证与独立复审，然后从未变验收源创建第三个 fresh 副本重跑五段旅程。**
 > 0.0AA 历史保留红灯：**首轮真实 Electron 暴露 Inspector 在上下文失效时被清空、旧 5-chip 断言和项目 Chat 等待诊断；完整 test 又暴露 Plan 测试把 generation 函数正文写死。独立复审发现新请求预检窗口可提交不可见旧轮、同项目重开 UI/Main 串话、失败重开提前清会话及两项测试/错误文案缺口，均转为生产边界和回归后关闭。真实 Electron 曾连续两次在旧 Graph 恢复阶段超时；加入只读失败快照后该阶段连续四次通过，未改 Graph 产品逻辑，按重复同源证据关闭 timing P2。另一次 Chat preflight 红灯证明测试在恢复 `edit.md` 后未等待权威 watcher barrier；改为生产 `flushExternalChanges()` 收敛，而未放宽 Chat guard。该里程碑所有红运行保留，最终源码连续两次 34/34；后续 0.0AB 当时推进到 35/35，当前总链只看本文顶部当前里程碑。**
 > Graph 历史签字基线：**性能修复前的既有源码曾完整 `npm test`、Electron-enabled `npm run verify`、强制真实 Electron 26/26 exit 0；Graph Filter 15/15、Workbench 14/14、dynamic 5/5、Large 5/5、Watcher 15/15、Network 11/11、Intelligence 17/17，第二轮复审 P0=0/P1=0/P2=2。该数字只保留为历史过程；0.0AB 后来推进到 35/35，当前总链只看顶部当前里程碑。**
@@ -32,6 +32,14 @@ Chat 的三级 scope/context、Main-owned 多轮连续性、Chapter、Onboarding
 4. 不重写已经签字的 Onboarding v2 service、capability store、batch、Main/preload 与 Renderer 契约；Main 动态 admission、single-flight 和 Renderer 生命周期 authority 清理均已关闭。
 5. 每批合入后重跑定向测试；阶段完成时再运行完整 `npm test`、`npm run verify` 与 `WRITCRAFT_E2E_FORCE=1 npm run e2e:electron`，保存当次证据。
 6. 真实 API 只使用用户显式配置的 Key；记录延迟、限流、超时、故障和费用，不记录 Key、Prompt、模型原文或正文。Key 前缀只表示凭据/计费类型，不能代替官方能力与现场门禁。首发按 npm Developer Preview 合同执行；独立 App 发布才需要 Developer ID、公证与 Gatekeeper。
+
+### 0.0BB 2026-07-30 · 项目卡 NO_KEY 可操作恢复与草稿保留
+
+- **现场缺口来源**：0.0AW 已证明隔离 App profile 不继承稳定 profile 的 Key，Main 在 0–24 ms 内返回稳定 `NO_KEY` 且零 provider/零写入；旧 Renderer 却把它折叠成“AI 暂时没有完成整理”，主按钮继续显示“重新整理 edit.md”，导致无效重试。
+- **产品修复**：项目卡现在明确显示“这次没有调用 AI”“当前 App 尚未配置 MiniMax Key”“项目文件没有变化”；主按钮改为 **“打开设置”**。设置跳转使用既有 Settings 界面，不读取、复制或迁移 Key。
+- **草稿连续性**：项目卡通过既有 `onSessionChange` 把无内容泄漏的本地 session 绑定到 exact project instance；点击“打开设置”前再次保存 session，关闭项目卡后打开设置。配置完成并重新打开项目卡时恢复答案；成功完成或切换项目会清除草稿，避免 A 项目答案进入 B。
+- **验证证据**：项目卡 UI **12/12**、Onboarding Renderer dynamic **27/27**（动态证明 `NO_KEY` 文案、设置动作与答案保留）、Main/Preload **14/14**、Workspace **22/22**；完整 `npm test` exit 0、批准 GUI 环境完整 `npm run verify` exit 0、强制真实 Electron **37/37**。
+- **候选/下一步**：`89658f0` 因本次生产 Renderer/Workspace 变化失效。提交包含源码、测试、指引、合同与状态的下一 exact candidate 后，先做独立复审与 fresh-tarball 矩阵；若无 P0/P1，再从同一未变验收源创建第三个 fresh 副本，五段作者旅程从项目卡重新开始。
 
 ### 0.0BA 2026-07-30 · 精确 Safe Undo 通过并关闭伪 AI 长等待
 

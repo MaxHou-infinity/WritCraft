@@ -65,6 +65,9 @@ check('submits only normalized state answers through the injected callback', () 
 });
 check('keeps answers after failure and exposes an explicit retry action', () => {
   assert(source.includes("generationFailed ? '重新整理 edit.md'"));
+  assert(source.includes("generationFailureCode === 'NO_KEY' ? '打开设置'"));
+  assert(source.includes('当前 App 尚未配置 MiniMax Key'));
+  assert(source.includes('options.onOpenSettings'));
   assert(source.includes('你在本页填写的内容仍保留'));
   assert(source.includes('本次没有修改任何项目文件'));
   assert(!source.includes('不会自动修复或猜测 AI JSON'));

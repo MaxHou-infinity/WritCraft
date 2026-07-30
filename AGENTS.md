@@ -103,6 +103,8 @@ Real-author acceptance is an explicit privacy boundary. Validate only an author-
 
 An isolated npm/App profile also isolates credential configuration. Before a real AI acceptance journey, preflight only the public configured/not-configured status for the exact profile that will launch the App; never read, copy, print, or silently migrate the Key. A sub-100 ms `NO_KEY` failure is pre-provider evidence, not a provider/model-quality failure. Preserve zero-write evidence, switch to an already authorized configured profile or let the owner configure it, and record any generic Renderer fallback that hides the stable error code as a UX defect.
 
+A stable pre-provider error must lead to an executable recovery action, not a generic retry. For `NO_KEY`, state that no AI call or file write occurred, open the existing Settings surface, and preserve the in-progress author form across that detour. Test the error copy, action routing, and retained draft together.
+
 A fresh author copy may legitimately inherit private `.writcraft` History and metrics from its source. Bind journey evidence to the copy manifest `createdAt`: only later events and History entries count as the fresh run. Report inherited totals separately or omit them; never inflate a real-author sample with pre-copy activity.
 
 Destructive History UX must identify the exact target at the decision point. Mark the newest record, name single-file paths directly, and warn separately when an author selects a non-latest record or `edit.md` because that changes the Project Prompt used by later AI calls. A generic file count, identical button labels, or a confirmation that omits the target is a P1 anti-misoperation gap; a green storage transaction does not make the user journey safe.

@@ -50,6 +50,7 @@
     let busy = false;
     let feedback = '';
     let generationFailed = false;
+    let generationFailureCode = '';
     let generationStartedAt = 0;
     let progressTimer = null;
     let destroyed = false;
@@ -141,6 +142,9 @@
       }
       if (code === 'ONBOARDING_DEPENDENCY_STALE') {
         return '整理期间项目内容发生了变化。为避免覆盖你的新内容，笔触已停止且没有修改文件；请检查项目后重新整理。';
+      }
+      if (code === 'NO_KEY') {
+        return '这次没有调用 AI：当前 App 尚未配置 MiniMax Key。点击“打开设置”保存并检测 Key；重新打开项目卡后，你在本页填写的内容仍会保留。项目文件没有变化。';
       }
       return 'AI 暂时没有完成整理，本次没有修改任何项目文件。你在本页填写的内容仍保留，可以稍后重新整理。';
     }
@@ -327,9 +331,14 @@
       }, busy));
       const generateLabel = busy
         ? 'AI 整理中'
+        : generationFailureCode === 'NO_KEY' ? '打开设置'
         : generationFailed ? '重新整理 edit.md' : '生成 edit.md 提案';
       actions.appendChild(button(generateLabel, 'onboarding-button onboarding-button-primary', async () => {
         if (busy) return;
+        if (generationFailureCode === 'NO_KEY' && typeof options.onOpenSettings === 'function') {
+          options.onOpenSettings(stateApi.createSession(session));
+          return;
+        }
         const attempt = {
           operationId: root.WritCraftAiMetrics?.createOperationId?.(),
           originProjectInstanceId: root.__workspace?.state?.project?.instanceId || null,
@@ -354,6 +363,7 @@
           stopGenerationProgress();
           busy = false;
           generationFailed = result?.ok === false;
+          generationFailureCode = generationFailed ? (result?.error || result?.code || '') : '';
           recordOnboardingMetric(generationFailed ? onboardingFailureOutcome(result) : 'generated', attempt);
           announce(generationFailed
             ? recoverableGenerationMessage(result)
@@ -365,6 +375,7 @@
           stopGenerationProgress();
           busy = false;
           generationFailed = true;
+          generationFailureCode = error?.error || error?.code || '';
           recordOnboardingMetric(onboardingFailureOutcome(error), attempt);
           announce(recoverableGenerationMessage(error));
           render();

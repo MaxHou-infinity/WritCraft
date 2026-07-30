@@ -96,6 +96,7 @@
     loading: false,
     openGeneration: 0,
     onboardingController: null,
+    onboardingDraft: null,
     inlineMutationBlocked: false,
     inlineMutationBlockReason: '',
     mutationBlockers: {},
@@ -1891,6 +1892,7 @@
       return;
     }
     closeProjectOnboarding();
+    state.onboardingDraft = null;
     resetMarkdownTrash();
     externalSyncState?.reset();
     window.__assistantDock?.close?.();
@@ -2016,8 +2018,16 @@
     onboardingHost.hidden = false;
     startOnboardingButton?.classList.add('is-active');
     startOnboardingButton?.setAttribute('aria-pressed', 'true');
+    const onboardingDraft = state.onboardingDraft?.projectInstanceId === state.project.instanceId
+      ? state.onboardingDraft.session
+      : undefined;
     state.onboardingController = window.WritCraftProjectOnboarding.mount(onboardingHost, {
       stateApi: window.WritCraftOnboardingState,
+      session: onboardingDraft,
+      onSessionChange: session => {
+        if (!state.project) return;
+        state.onboardingDraft = { projectInstanceId: state.project.instanceId, session };
+      },
       onGenerate: async (request, _session, onboardingAttempt) => {
         const projectInstanceId = state.project?.instanceId || null;
         const controller = state.onboardingController;
@@ -2037,7 +2047,17 @@
         }
         return result;
       },
-      onComplete: () => closeProjectOnboarding(),
+      onComplete: () => {
+        state.onboardingDraft = null;
+        closeProjectOnboarding();
+      },
+      onOpenSettings: session => {
+        if (state.project) {
+          state.onboardingDraft = { projectInstanceId: state.project.instanceId, session };
+        }
+        closeProjectOnboarding();
+        document.getElementById('activity-settings')?.click();
+      },
       onCancel: () => closeProjectOnboarding(),
     });
     return true;
