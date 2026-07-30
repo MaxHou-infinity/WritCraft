@@ -1,11 +1,11 @@
 # 笔触 · WritCraft · V0 开发状态与续作入口
 
-> 最后更新：2026-07-30（Asia/Shanghai，0.0BL · 第五副本 Inline 接受与拒绝通过，待 Safe Undo）
+> 最后更新：2026-07-30（Asia/Shanghai，0.0BM · 第五副本 Inline 接受、拒绝与 Safe Undo 全部通过）
 > 当前状态：**`writ-craft@0.1.1` 已从 exact candidate `c65981e` 发布到 npm `preview`；registry 时间 `2026-07-29T14:30:16.176Z`，shasum `d370c500666e25cfb373852deafa21b232d2bc18` 与本地候选一致。公网隔离安装/启动/退出为 2/2。annotated tag `v0.1.1` 指向同一提交，GitHub prerelease 已公开：`https://github.com/MaxHou-infinity/WritCraft/releases/tag/v0.1.1`。**
 > 发布判断：**0.1.1 Developer Preview 已完成版本、自动化、双架构安装、独立复审、npm 发布、公网安装和 GitHub prerelease。registry 标签保持 `preview: 0.1.1`、`latest: 0.1.0`，因此本次没有把 Preview 冒充稳定版，也没有执行 unpublish、占位发布或上传未签名 App/ZIP。**
 > 当前目标版本：**`docs/ROADMAP.md` 的 `RM-1.0 / writ-craft@0.1.2` 真实作者可用性闭环。必须使用 `edit.md`、5+ 个 `chapters/` 章节、2000+ 可见中文字符和至少 1 个来源文件的作者隔离副本，完成五段旅程，并关闭现场 `Graph INVALID_CACHE` 的诊断/恢复终态。0.1.2 签字前不得插入驾驶舱、新 AI 模式或其他后续版本功能。**
 > 当前源码证据：**exact production candidate 为 `9b21a9d fix(inline): require author rewrite instruction`；旧 `5ed4147` 已失效，不得发布，也不得复用其受影响的 Inline 人工验收。`⌘K` 已从“按默认风格立即生成”补齐为“冻结选区 → 选区旁输入必填作者要求 → 提交后才生成”；`⌘L` 仍只负责项目/文件/选区 Chat。请求升级为 exact `writcraft.inline-rewrite/v2`，Main 在 generation admission 前校验私有指令，History/recovery/metrics 继续兼容公开 v1 且不保存指令或其 hash。完整 `npm test` exit 0；沙箱 `npm run verify` 在真实 DOM Electron 以 `code=null` 退出，原样在批准 GUI 环境 exit 0；强制真实 Electron 首轮在改写阶段暴露 MiniMax 适配器不允许 `system` role，改回安全规则优先的单 `user` 消息后该阶段通过；随后一次在无关 Graph 阶段出现 `Input.dispatchMouseEvent` CDP timeout，最终源码完整复跑 **37/37**。这些红灯必须保留。第三轮独立复审 **P0=0/P1=0/P2=0**；`9b21a9d` 已作为 `origin/main` 的祖先推送，npm/GitHub Release 仍未发布 0.1.2。**
-> 当前作者验收进度：**第四副本项目卡已通过且不再重复。第五 fresh 副本已在 exact candidate `9b21a9d` 完成两个独立 Inline operation：第一次 `generated → accepted`，唯一新增 applied History `change_6516ccbc…` 与第一章磁盘从 `1bdb3a5c…` 到 `f9b89aac…` 精确一致；第二次 `generated → rejected`，没有再次改变目标 mtime/hash，也没有新增 History，界面显示“原文已恢复”。原始验收源 digest 仍为 `9d089886…`。当前唯一下一步是从修改历史撤销明确标记为最新且精确指向该第一章的 `change_6516ccbc…`，完成 Safe Undo 后再进入 Chapter/Plan。**
+> 当前作者验收进度：**第四副本项目卡已通过且不再重复。第五 fresh 副本已在 exact candidate `9b21a9d` 完成 Inline 接受、独立拒绝与精确 Safe Undo：接受时 applied History `change_6516ccbc…` 与磁盘一致；拒绝零额外写入；Safe Undo 后该 History 为 `undone`，第一章恢复 `1bdb3a5c…`，14 个 Markdown 的字节数与组合摘要精确回到操作前基线，界面显示“原文已恢复”和“安全撤销已结束”。原始验收源 digest 仍为 `9d089886…`。Inline 子旅程关闭，当前进入 Chapter proposal 与 Plan handoff。**
 > 0.0AA 历史保留红灯：**首轮真实 Electron 暴露 Inspector 在上下文失效时被清空、旧 5-chip 断言和项目 Chat 等待诊断；完整 test 又暴露 Plan 测试把 generation 函数正文写死。独立复审发现新请求预检窗口可提交不可见旧轮、同项目重开 UI/Main 串话、失败重开提前清会话及两项测试/错误文案缺口，均转为生产边界和回归后关闭。真实 Electron 曾连续两次在旧 Graph 恢复阶段超时；加入只读失败快照后该阶段连续四次通过，未改 Graph 产品逻辑，按重复同源证据关闭 timing P2。另一次 Chat preflight 红灯证明测试在恢复 `edit.md` 后未等待权威 watcher barrier；改为生产 `flushExternalChanges()` 收敛，而未放宽 Chat guard。该里程碑所有红运行保留，最终源码连续两次 34/34；后续 0.0AB 当时推进到 35/35，当前总链只看本文顶部当前里程碑。**
 > Graph 历史签字基线：**性能修复前的既有源码曾完整 `npm test`、Electron-enabled `npm run verify`、强制真实 Electron 26/26 exit 0；Graph Filter 15/15、Workbench 14/14、dynamic 5/5、Large 5/5、Watcher 15/15、Network 11/11、Intelligence 17/17，第二轮复审 P0=0/P1=0/P2=2。该数字只保留为历史过程；0.0AB 后来推进到 35/35，当前总链只看顶部当前里程碑。**
 > Graph 动态边界：**300 文件/1279 节点 cold-to-interactive、cache/incremental、筛选/内存/布局、AX/键鼠、三类纠错、stale/Issue→Changes、failure live、重启与项目隔离均进入真实 Electron；正文/History/ledger 的零写入门禁通过。**  
@@ -32,6 +32,15 @@ Chat 的三级 scope/context、Main-owned 多轮连续性、Chapter、Onboarding
 4. 不重写已经签字的 Onboarding v2 service、capability store、batch、Main/preload 与 Renderer 契约；Main 动态 admission、single-flight 和 Renderer 生命周期 authority 清理均已关闭。
 5. 每批合入后重跑定向测试；阶段完成时再运行完整 `npm test`、`npm run verify` 与 `WRITCRAFT_E2E_FORCE=1 npm run e2e:electron`，保存当次证据。
 6. 真实 API 只使用用户显式配置的 Key；记录延迟、限流、超时、故障和费用，不记录 Key、Prompt、模型原文或正文。Key 前缀只表示凭据/计费类型，不能代替官方能力与现场门禁。首发按 npm Developer Preview 合同执行；独立 App 发布才需要 Developer ID、公证与 Gatekeeper。
+
+### 0.0BM 2026-07-30 · 第五副本 Inline Safe Undo 通过
+
+- **作者动作**：作者只撤销了界面最上方、明确标记“最新”且精确指向 `chapters/01-cope-origin/chapter-01-why-cope.md` 的 **`change_6516ccbc…`**；没有触碰旧 `manuscript/...` 或任何 `edit.md` 记录。
+- **History 真相**：同一 application History 保留原 `appliedAt = 2026-07-30T14:59:34.329Z`，状态变为 **`undone`**，`undoneAt = 2026-07-30T15:06:45.243Z`；before/after revision 继续封存 `1bdb3a5c… → f9b89aac…`，没有伪造新 application。
+- **磁盘恢复**：第一章当前 SHA-256 精确恢复为 **`1bdb3a5c646b61dc01dcc1328f6e0039a34d6986cbb17230164591f4d947ef8b`**。14 个 Markdown 回到 **97,313 bytes**，组合摘要精确恢复操作前基线 **`7ead5eaa21d1432a2ac6c27ee24913c03b68a495b2bc9daa3c3796a0c3a6d362`**；相对验收源逐文件差异为 **0**。
+- **真实 UI**：当前第一章状态栏显示 **“原文已恢复 · 已按磁盘、文件树和修改历史确认本次操作”**；Changes 显示 **“安全撤销已结束”** 与 **“已撤销 1 个文件”**，不再把已撤销记录作为可撤销的最新卡片。
+- **原稿与指标**：原始验收源继续 eligible，snapshot digest 仍为 **`9d0898863636da74615481a669c3e40362a60176249870e6d1793380c85b4380`**。接受/拒绝四条内容无关指标保持原样；Safe Undo 不伪造 AI operation。
+- **结论与下一步**：`9b21a9d` 的 Inline v2 真实作者子旅程完成并关闭，不再重跑。下一段只做 Chapter proposal 与 Plan handoff；完成写盘与对应安全恢复核验后再进入 Research。
 
 ### 0.0BL 2026-07-30 · 第五副本 Inline 接受与拒绝通过
 

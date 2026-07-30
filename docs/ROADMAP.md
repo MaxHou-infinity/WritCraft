@@ -75,7 +75,7 @@
 5. 修复旅程中发现的 P0/P1 阻断项；P2 必须明确记录、分级并决定是否允许发版。
 6. 记录内容无关的私有指标：Inline 接受率、Plan 采用、Research 匹配判断、图片评分/采纳、耗时和稳定错误码。
 
-当前执行注记（2026-07-30）：真实作者验收发现旧候选把 `⌘K` 直接执行为默认改写，缺少原产品要求的自然语言指令输入。该 P1 属于 0.1.2 可理解性门禁，已按 Inline request v2 实现，并在 exact production candidate `9b21a9d` 完成自动化、真实 Electron 37/37 与第三轮独立复审 P0=0/P1=0/P2=0。项目卡证据不受影响；第五个 fresh 合格副本已用两个独立 operation 完成 Inline 接受写盘与随后拒绝零额外写入，当前只剩精确目标 Safe Undo，不重复已关闭的项目卡。
+当前执行注记（2026-07-30）：真实作者验收发现旧候选把 `⌘K` 直接执行为默认改写，缺少原产品要求的自然语言指令输入。该 P1 属于 0.1.2 可理解性门禁，已按 Inline request v2 实现，并在 exact production candidate `9b21a9d` 完成自动化、真实 Electron 37/37 与第三轮独立复审 P0=0/P1=0/P2=0。项目卡证据不受影响；第五个 fresh 合格副本已完成 Inline 接受、拒绝与精确 Safe Undo，正文和全部 Markdown 恢复操作前基线，原始源保持不变。当前进入 Chapter proposal 与 Plan handoff，不重复已关闭的项目卡或 Inline。
 
 ### 4.3 明确不做
 
