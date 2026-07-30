@@ -34,6 +34,7 @@ const MAX_BLOCK_MODEL_OUTPUT_BYTES = 40 * 1024;
 const MAX_GENERATED_CHARS = 96_000;
 const MAX_GENERATED_BYTES = 384 * 1024;
 const MAX_CONTINUITY_BYTES = 8 * 1024;
+const MAX_BLOCK_RETRIES = 1;
 const PLAN_MAX_TOKENS = 4096;
 const BLOCK_MAX_TOKENS = 8192;
 const REVISION_RE = /^[a-f0-9]{64}$/;
@@ -45,6 +46,14 @@ class ChapterProposalError extends Error {
     super(message);
     this.name = 'ChapterProposalError';
     this.code = code;
+  }
+}
+
+class ChapterBlockContentError extends ChapterProposalError {
+  constructor(reason, message) {
+    super('INVALID_MODEL_OUTPUT', message);
+    this.name = 'ChapterBlockContentError';
+    this.reason = reason;
   }
 }
 
@@ -404,7 +413,7 @@ function blockTokenBudget(block) {
   return Math.min(BLOCK_MAX_TOKENS, Math.max(1024, Math.ceil(outputChars * 1.25) + 512));
 }
 
-function blockMessages(prepared, plan, block, blockIndex, completed) {
+function blockMessages(prepared, plan, block, blockIndex, completed, retryReason = null) {
   const continuity = completed.length
     ? tailByUtf8(completed.map(item => item.content).join('\n\n'), MAX_CONTINUITY_BYTES)
     : '（这是本章第一个区块。）';
@@ -420,6 +429,9 @@ function blockMessages(prepared, plan, block, blockIndex, completed) {
     `Main 权威完整计划：${JSON.stringify(plan)}`,
     `当前区块序号：${blockIndex + 1}/${plan.blocks.length}`,
     `当前区块：${JSON.stringify(block)}`,
+    retryReason
+      ? `这是本章唯一一次区块重试；上次 content 未通过 ${retryReason} 门禁。必须重新生成当前区块，返回非空、完整且严格落在上述字符与字节上限内的 Markdown。`
+      : '首次生成当前区块；content 必须包含实际 Markdown 正文，不能返回空字符串或只返回空白。',
     `上一已生成区块末尾（仅作衔接）：\n${continuity}`,
     '',
     prepared.sourceBundle,
@@ -431,6 +443,30 @@ function blockMessages(prepared, plan, block, blockIndex, completed) {
   return messages;
 }
 
+function normalizeBlockContent(value, expectedBlock) {
+  const label = `章节区块 ${expectedBlock.id}.content`;
+  if (typeof value !== 'string') {
+    throw new ChapterBlockContentError('type', `${label}必须是 Markdown 文本`);
+  }
+  if (value.includes('\0')) {
+    throw new ChapterBlockContentError('nul', `${label}包含禁止的空字符`);
+  }
+  // Outer line breaks and CRLF are transport formatting, not authored
+  // chapter meaning. Canonicalize those only; never repair JSON or invent text.
+  const normalized = value.replace(/\r\n?/g, '\n').replace(/^\n+|\n+$/g, '');
+  if (!normalized.trim()) {
+    throw new ChapterBlockContentError('empty', `${label}为空，未产生可审阅正文`);
+  }
+  const maxChars = blockContentCharLimit(expectedBlock);
+  if (normalized.length > maxChars) {
+    throw new ChapterBlockContentError('character_limit', `${label}超过 ${maxChars} 字符安全上限`);
+  }
+  if (bytes(normalized) > MAX_BLOCK_OUTPUT_BYTES) {
+    throw new ChapterBlockContentError('byte_limit', `${label}超过 ${MAX_BLOCK_OUTPUT_BYTES} 字节安全上限`);
+  }
+  return normalized;
+}
+
 function parseBlockModel(model, expectedBlock) {
   const incomplete = requireCompleteModel(model, `章节区块 ${expectedBlock.id}`);
   if (incomplete) return incomplete;
@@ -439,7 +475,7 @@ function parseBlockModel(model, expectedBlock) {
   if (parsed.schema !== BLOCK_SCHEMA || parsed.blockId !== expectedBlock.id) {
     fail('INVALID_MODEL_OUTPUT', `章节区块 ${expectedBlock.id} 与 Main 计划不匹配`);
   }
-  const content = boundedText(parsed.content, `章节区块 ${expectedBlock.id}.content`, blockContentCharLimit(expectedBlock), MAX_BLOCK_OUTPUT_BYTES);
+  const content = normalizeBlockContent(parsed.content, expectedBlock);
   return Object.freeze({ blockId: expectedBlock.id, content });
 }
 
@@ -463,11 +499,32 @@ async function proposeChapter({ projectService, rootPath, request, callLLM, chan
   validateChapterDependencies({ projectService, rootPath, dependencies: prepared.dependencies });
 
   const completed = [];
+  let blockRetryCount = 0;
   for (const [index, block] of plan.blocks.entries()) {
     validateChapterDependencies({ projectService, rootPath, dependencies: prepared.dependencies });
     const messages = blockMessages(prepared, plan, block, index, completed);
     const model = await callLLM(messages, 'MiniMax-M3', blockTokenBudget(block));
-    const generated = parseBlockModel(model, block);
+    let generated;
+    try {
+      generated = parseBlockModel(model, block);
+    } catch (error) {
+      if (!(error instanceof ChapterBlockContentError) || blockRetryCount >= MAX_BLOCK_RETRIES) throw error;
+      blockRetryCount += 1;
+      validateChapterDependencies({ projectService, rootPath, dependencies: prepared.dependencies });
+      const retryMessages = blockMessages(prepared, plan, block, index, completed, error.reason);
+      const retryModel = await callLLM(retryMessages, 'MiniMax-M3', blockTokenBudget(block));
+      try {
+        generated = parseBlockModel(retryModel, block);
+      } catch (retryError) {
+        if (retryError instanceof ChapterBlockContentError) {
+          fail(
+            'INVALID_MODEL_OUTPUT',
+            `AI 连续两次未生成可安全审阅的章节区块 ${block.id}；本次没有修改任何项目文件`
+          );
+        }
+        throw retryError;
+      }
+    }
     if (generated?.ok === false) return generated;
     completed.push(generated);
     const partial = completed.map(item => item.content).join('\n\n');
@@ -495,6 +552,7 @@ async function proposeChapter({ projectService, rootPath, request, callLLM, chan
       planSchema: PLAN_SCHEMA,
       blockSchema: BLOCK_SCHEMA,
       blockCount: plan.blocks.length,
+      blockRetryCount,
     }),
   });
   const contextManifest = Object.freeze({
@@ -505,6 +563,7 @@ async function proposeChapter({ projectService, rootPath, request, callLLM, chan
     contextBytes: prepared.contextBytes,
     planPromptBytes: prepared.promptBytes,
     blockCount: plan.blocks.length,
+    blockRetryCount,
     generatedBytes: bytes(after),
   });
   if (!changeSet.changes.length) {
@@ -542,9 +601,11 @@ module.exports = {
   MAX_BLOCK_MODEL_OUTPUT_BYTES,
   MAX_GENERATED_CHARS,
   MAX_GENERATED_BYTES,
+  MAX_BLOCK_RETRIES,
   PLAN_MAX_TOKENS,
   BLOCK_MAX_TOKENS,
   ChapterProposalError,
+  ChapterBlockContentError,
   publicMarkdownPath,
   isReservedReadonlyPath,
   markdownPaths,
@@ -553,6 +614,7 @@ module.exports = {
   validateChapterDependencies,
   parsePlanModel,
   parseBlockModel,
+  normalizeBlockContent,
   blockContentCharLimit,
   blockTokenBudget,
   assembleBlocks,

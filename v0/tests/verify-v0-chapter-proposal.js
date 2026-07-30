@@ -118,6 +118,8 @@ async function run() {
       assert.strictEqual(result.provenance.kind, 'chapter_generation');
       assert.strictEqual(result.provenance.generation.strategy, 'planned_blocks');
       assert.strictEqual(result.provenance.generation.blockCount, 2);
+      assert.strictEqual(result.provenance.generation.blockRetryCount, 0);
+      assert.strictEqual(result.contextManifest.blockRetryCount, 0);
       assert.deepStrictEqual(calls.map(item => item.maxTokens), [
         service.PLAN_MAX_TOKENS,
         service.blockTokenBudget({ targetChars: 900 }),
@@ -128,6 +130,77 @@ async function run() {
       assert(calls[1].messages[0].content.includes('完整章节区块生成器'));
       assert(calls[2].messages[0].content.includes('新的开场。'));
       assert(calls.every(item => item.model === 'MiniMax-M3'));
+    } finally { fs.rmSync(root, { recursive: true, force: true }); }
+  });
+
+  await test('canonicalizes transport line endings and outer blank lines without retrying or changing Markdown meaning', async () => {
+    const root = makeProject();
+    try {
+      const llm = queuedLLM([
+        response(plan()),
+        response(block('b1', '\r\n# 第一章\r\n\r\n精简正文。  \r\n')),
+      ]);
+      const result = await propose(root, llm);
+      assert.strictEqual(result.changeSet.changes[0].after, '# 第一章\n\n精简正文。  \n');
+      assert.strictEqual(result.contextManifest.blockRetryCount, 0);
+      assert.strictEqual(llm.calls(), 2);
+    } finally { fs.rmSync(root, { recursive: true, force: true }); }
+  });
+
+  await test('retries one content-boundary failure without echoing rejected model output', async () => {
+    const root = makeProject();
+    try {
+      const calls = [];
+      const privateRejectedOutput = `DO_NOT_ECHO_${'中'.repeat(service.MAX_BLOCK_OUTPUT_CHARS + 1)}`;
+      const llm = queuedLLM([
+        response(plan()),
+        response(block('b1', privateRejectedOutput)),
+        response(block('b1', '# 第一章\n\n重新生成的精简正文。')),
+      ], calls);
+      const result = await propose(root, llm);
+      assert.strictEqual(result.ok, true);
+      assert.strictEqual(result.changeSet.changes[0].after, '# 第一章\n\n重新生成的精简正文。\n');
+      assert.strictEqual(result.provenance.generation.blockRetryCount, 1);
+      assert.strictEqual(result.contextManifest.blockRetryCount, 1);
+      assert.strictEqual(llm.calls(), 3);
+      assert(calls[2].messages[0].content.includes('唯一一次区块重试'));
+      assert(calls[2].messages[0].content.includes('character_limit'));
+      assert(!calls[2].messages[0].content.includes('DO_NOT_ECHO'));
+    } finally { fs.rmSync(root, { recursive: true, force: true }); }
+  });
+
+  await test('fails closed after the single bounded retry and never creates a partial ChangeSet', async () => {
+    const root = makeProject();
+    try {
+      const before = projectService.readFileWithRevision(root, 'chapters/one.md');
+      const llm = queuedLLM([
+        response(plan()),
+        response(block('b1', '')),
+        response(block('b1', '   \n')),
+      ]);
+      await assert.rejects(
+        () => propose(root, llm),
+        error => error?.code === 'INVALID_MODEL_OUTPUT' &&
+          /连续两次未生成可安全审阅/.test(error.message)
+      );
+      assert.strictEqual(llm.calls(), 3);
+      assert.deepStrictEqual(projectService.readFileWithRevision(root, 'chapters/one.md'), before);
+    } finally { fs.rmSync(root, { recursive: true, force: true }); }
+  });
+
+  await test('revalidates frozen dependencies before the content retry', async () => {
+    const root = makeProject();
+    try {
+      const llm = queuedLLM([
+        response(plan()),
+        async () => {
+          const current = projectService.readFileWithRevision(root, 'chapters/one.md');
+          projectService.atomicWriteFile(root, 'chapters/one.md', `${current.content}\n外部变化`, current.revision);
+          return response(block('b1', ''));
+        },
+      ]);
+      await expectCode('CHAPTER_DEPENDENCY_STALE', () => propose(root, llm));
+      assert.strictEqual(llm.calls(), 2);
     } finally { fs.rmSync(root, { recursive: true, force: true }); }
   });
 
@@ -355,9 +428,11 @@ async function run() {
       await expectCode('INVALID_MODEL_OUTPUT', () => propose(root, queuedLLM([
         response(plan(undefined, '中'.repeat(400))),
       ])));
+      const oversizedBlock = response(block('b1', '中'.repeat(5500)));
       await expectCode('INVALID_MODEL_OUTPUT', () => propose(root, queuedLLM([
         response(plan([{ id: 'b1', heading: '正文', goal: '生成长区块', targetChars: service.MAX_BLOCK_TARGET_CHARS }])),
-        response(block('b1', '中'.repeat(5500))),
+        oversizedBlock,
+        oversizedBlock,
       ])));
     } finally { fs.rmSync(root, { recursive: true, force: true }); }
   });
@@ -413,7 +488,7 @@ async function run() {
     assert(route.indexOf("classified.kind === 'no_changes'") < route.indexOf('replaceGeneratedChapterReview'));
   });
 
-  console.log(`\n${passed}/17 chapter-generation checks passed.\n`);
+  console.log(`\n${passed}/21 chapter-generation checks passed.\n`);
 }
 
 run().catch(error => {

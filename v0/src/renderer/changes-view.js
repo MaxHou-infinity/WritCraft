@@ -1732,7 +1732,7 @@
     setStatus(`正在依据 edit.md${contextLabel} 生成 ${targetPath} 的完整提案…`);
     const progressOwner = startGenerationProgress(
       `正在生成 ${targetPath}`,
-      `笔触正在依据 edit.md${contextLabel}组织完整章节；完成后会进入逐项审阅，不会自动写入。`
+      `笔触正在依据 edit.md${contextLabel}组织完整章节；单个区块不合格时最多重试一次，完成后进入逐项审阅，不会自动写入。`
     );
     setBusy(true, 'chapter', progressOwner);
     try {

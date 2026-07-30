@@ -495,6 +495,7 @@ function graphIssueChangesAnswer(prompt) {
 function createElectronAiProvider() {
   let onboardingCalls = 0;
   let planStrictRetryCalls = 0;
+  let chapterBlockCalls = 0;
   return Object.freeze({
     apiKey: API_KEY,
     async textFetch(url, options) {
@@ -555,7 +556,18 @@ function createElectronAiProvider() {
       } else if (prompt.includes('WritCraft 的完整章节生成规划器')) {
         output = JSON.stringify(chapterPlanAnswer(prompt));
       } else if (prompt.includes('WritCraft 的完整章节区块生成器')) {
-        output = JSON.stringify(chapterBlockAnswer(prompt));
+        chapterBlockCalls += 1;
+        const answer = chapterBlockAnswer(prompt);
+        if (chapterBlockCalls === 1) {
+          if (prompt.includes('唯一一次区块重试')) throw new Error('E2E_FIXTURE_PREMATURE_CHAPTER_RETRY');
+          output = JSON.stringify({ ...answer, content: '' });
+        } else {
+          if (chapterBlockCalls !== 2 || !prompt.includes('唯一一次区块重试') ||
+              !prompt.includes('empty 门禁')) {
+            throw new Error('E2E_FIXTURE_MISSING_CHAPTER_CONTENT_RETRY');
+          }
+          output = JSON.stringify(answer);
+        }
       } else if (prompt.includes(`问题：${STALE_CHAT_QUESTION}`)) {
         await new Promise(resolve => setTimeout(resolve, 700));
         chatAnswer(prompt);

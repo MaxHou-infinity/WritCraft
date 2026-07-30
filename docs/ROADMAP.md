@@ -75,7 +75,7 @@
 5. 修复旅程中发现的 P0/P1 阻断项；P2 必须明确记录、分级并决定是否允许发版。
 6. 记录内容无关的私有指标：Inline 接受率、Plan 采用、Research 匹配判断、图片评分/采纳、耗时和稳定错误码。
 
-当前执行注记（2026-07-30）：真实作者验收发现旧候选把 `⌘K` 直接执行为默认改写，缺少原产品要求的自然语言指令输入。该 P1 属于 0.1.2 可理解性门禁，已按 Inline request v2 实现，并在 exact production candidate `9b21a9d` 完成自动化、真实 Electron 37/37 与第三轮独立复审 P0=0/P1=0/P2=0。项目卡证据不受影响；第五个 fresh 合格副本已完成 Inline 接受、拒绝与精确 Safe Undo，正文和全部 Markdown 恢复操作前基线，原始源保持不变。当前进入 Chapter proposal 与 Plan handoff，不重复已关闭的项目卡或 Inline。
+当前执行注记（2026-07-30）：项目卡与 Inline 作者旅程已经关闭，不再重复。第五副本的首次 Chapter 生成在 `b5.content` 边界失败，安全地保持正文/History 零写入，但暴露了正常模型输出兼容与失败恢复 P1。修复候选仅规范化 CRLF/外层换行，并只对内容边界做全章最多一次的当前区块重生；严格 JSON/schema/id 继续不修补，retry 前重验依赖且不回显失败模型正文。Chapter 21/21、完整 test、批准 GUI verify 和强制真实 Electron 37/37 已通过；待形成新 exact candidate 和 fresh 副本后，只重跑 Chapter/Plan，再进入 Research。
 
 ### 4.3 明确不做
 
