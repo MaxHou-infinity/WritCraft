@@ -58,6 +58,11 @@ class Node {
   }
   click() { return this.dispatch('click'); }
   focus() { this.ownerDocument.activeElement = this; }
+  setSelectionRange(start, end, direction = 'none') {
+    this.selectionStart = start;
+    this.selectionEnd = end;
+    this.selectionDirection = direction;
+  }
   querySelectorAll(selector) {
     const output = [];
     const matches = node => {
@@ -247,7 +252,7 @@ async function flush() {
     const title = host.querySelector('[data-chapter-field="title"]');
     title.value = '作者标题';
     await title.dispatch('input');
-    await byText(host, '预览章节骨架').click();
+    await byText(host, '查看创建预览').click();
     await flush();
     assert.strictEqual(calls.prepare, 1);
     assert(text(host).includes('只创建骨架，不会写章节正文'));
@@ -261,6 +266,69 @@ async function flush() {
     await byText(host, '进入写作导航').click();
     assert.strictEqual(controller.getState().phase, 'idle');
     assert(text(host).includes('生成写作导航'));
+  });
+
+  await test('goal and chapter inputs keep the same DOM node, focus and caret while typing', async () => {
+    const document = new Document();
+    const host = document.createElement('div');
+    document.body.append(host);
+    const controller = View.mount(host, {
+      stateApi: State,
+      createAttemptId: nextId,
+      onGenerate: async () => structure(),
+    });
+    controller.updateProject(PROJECT, [{ type: 'file', path: 'edit.md' }]);
+
+    let goal = host.querySelector('[data-navigation-focus="goal"]');
+    const originalGoal = goal;
+    goal.focus();
+    goal.value = 'C';
+    goal.setSelectionRange(1, 1);
+    await goal.dispatch('input');
+    goal = host.querySelector('[data-navigation-focus="goal"]');
+    assert.strictEqual(goal, originalGoal);
+    assert.strictEqual(document.activeElement, goal);
+    assert.strictEqual(goal.selectionStart, 1);
+    goal.value = 'COPE方';
+    goal.setSelectionRange(5, 5);
+    await goal.dispatch('input', { isComposing: true });
+    goal = host.querySelector('[data-navigation-focus="goal"]');
+    assert.strictEqual(goal, originalGoal);
+    assert.strictEqual(document.activeElement, goal);
+    assert.strictEqual(controller.getState().goal, 'COPE方');
+    assert.strictEqual(goal.selectionStart, 5);
+
+    await byText(host, '生成结构方案').click();
+    await flush();
+    let title = host.querySelector('[data-navigation-focus="chapter-alternative_1-0-title"]');
+    const originalTitle = title;
+    title.focus();
+    title.value = '作者';
+    title.setSelectionRange(2, 2);
+    await title.dispatch('input');
+    title = host.querySelector('[data-navigation-focus="chapter-alternative_1-0-title"]');
+    assert.strictEqual(title, originalTitle);
+    assert.strictEqual(document.activeElement, title);
+    title.value = '作者标题';
+    title.setSelectionRange(4, 4);
+    await title.dispatch('input');
+    title = host.querySelector('[data-navigation-focus="chapter-alternative_1-0-title"]');
+    assert.strictEqual(title, originalTitle);
+    assert.strictEqual(document.activeElement, title);
+    assert.strictEqual(controller.getState().chapterDrafts.alternative_1[0].title, '作者标题');
+    assert.strictEqual(title.selectionStart, 4);
+    let purpose = host.querySelector('[data-navigation-focus="chapter-alternative_1-0-purpose"]');
+    const originalPurpose = purpose;
+    purpose.focus();
+    purpose.value = '说明';
+    purpose.setSelectionRange(2, 2);
+    await purpose.dispatch('input', { isComposing: true });
+    purpose = host.querySelector('[data-navigation-focus="chapter-alternative_1-0-purpose"]');
+    assert.strictEqual(purpose, originalPurpose);
+    assert.strictEqual(document.activeElement, purpose);
+    assert.strictEqual(controller.getState().chapterDrafts.alternative_1[0].purpose, '说明');
+    assert.strictEqual(purpose.selectionStart, 2);
+    assert(text(host).includes('下一步：预览即将创建的文件，确认无误后再创建章节骨架。'));
   });
 
   await test('generation cancellation is attempt-bound and preserves the goal', async () => {

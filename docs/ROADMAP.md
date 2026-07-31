@@ -76,7 +76,7 @@
 5. 修复旅程中发现的 P0/P1 阻断项；P2 必须明确记录、分级并决定是否允许发版。
 6. 记录内容无关的私有指标：Inline 接受率、导航建议帮助度/动作、Research 匹配判断、图片评分/采纳、耗时和稳定错误码。
 
-当前执行注记（2026-07-31）：项目卡、Inline 与 Chapter 已关闭。旧 Plan 九次真实零写入失败保留为历史证据，不再复测；其公开 Main/preload/Renderer 入口已由“结构规划 / 写作导航”替代。当前纵切已完成双模式 UI、骨架三态事务、open/Research/Changes 动作、取消与恢复，完整 `npm test`、批准 GUI `npm run verify`、真实 Electron 36/36、Persistent Main/IPC 3/3 通过，独立复审 P0/P1=0。下一顺序是空项目结构验收、合格作者副本导航验收，再完成 Research、image-01、Graph/recovery 作者旅程；尚未进入 0.1.2 发布授权。
+当前执行注记（2026-07-31，0.0CD）：项目卡、Inline 与 Chapter 已关闭。旧 Plan 九次真实零写入失败保留为历史证据，不再复测；其公开 Main/preload/Renderer 入口已由“结构规划 / 写作导航”替代。当前纵切已完成双模式 UI、骨架三态事务、open/Research/Changes 动作、取消与恢复；首次空项目操作暴露的输入每字符失焦和创建动作不可发现两项 P1 已修复。完整 `npm test`、批准 GUI `npm run verify`、真实 Electron 36/36、Persistent Main/IPC 3/3 通过，独立复审 P0/P1/P2=0。下一顺序是用当前源码重走受影响的空项目结构验收、合格作者副本导航验收，再完成 Research、image-01、Graph/recovery 作者旅程；尚未进入 0.1.2 发布授权。
 
 历史检查点（0.0BZ）：只读 Main/IPC 基础已独立签收，包括严格结构/导航工具协议、证据锚点、8 条/30 分钟隔离缓存、watcher barrier、真实 deadline abort 和零写入门禁；专项 53/53、Network 15/15，独立复审 P0/P1=0。其当时未覆盖的 Renderer、动作、骨架与 Electron 已由上方 0.0CC 当前注记覆盖，不得从本段派发旧“下一阶段”。
 

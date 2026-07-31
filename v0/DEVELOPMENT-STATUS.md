@@ -1,11 +1,11 @@
 # 笔触 · WritCraft · V0 开发状态与续作入口
 
-> 最后更新：2026-07-31（Asia/Shanghai，0.0CC · Writing Navigation 公共纵切与真实 Electron 签收）
+> 最后更新：2026-07-31（Asia/Shanghai，0.0CD · 结构规划连续输入与创建动作可发现性修复）
 > 当前状态：**`writ-craft@0.1.1` 已从 exact candidate `c65981e` 发布到 npm `preview`；registry 时间 `2026-07-29T14:30:16.176Z`，shasum `d370c500666e25cfb373852deafa21b232d2bc18` 与本地候选一致。公网隔离安装/启动/退出为 2/2。annotated tag `v0.1.1` 指向同一提交，GitHub prerelease 已公开：`https://github.com/MaxHou-infinity/WritCraft/releases/tag/v0.1.1`。**
 > 发布判断：**0.1.1 Developer Preview 已完成版本、自动化、双架构安装、独立复审、npm 发布、公网安装和 GitHub prerelease。registry 标签保持 `preview: 0.1.1`、`latest: 0.1.0`，因此本次没有把 Preview 冒充稳定版，也没有执行 unpublish、占位发布或上传未签名 App/ZIP。**
 > 当前目标版本：**`docs/ROADMAP.md` 的 `RM-1.1 / writ-craft@0.1.2` 真实作者可用性闭环。必须以 `WRITING-NAVIGATION-V1-CONTRACT.md` 的结构规划/写作导航替代旧 Plan，再完成 Research、image-01、Graph/recovery 和完整签字。不得插入驾驶舱或其他后续版本功能。**
-> 当前源码证据：**旧 Plan 的 Main/preload/Renderer 公共入口已移除，现行右栏固定为 Chat / 导航 / Context / Changes。空项目可比较、编辑和精确预览 2–3 个结构方案，确认后只创建标题与写作目的骨架；已有稿件提供带原文证据的写作导航，并把动作交给打开章节、Research 或 Changes。生成/动作取消、项目/文件切换、提交三态恢复、NO_KEY/待审恢复动作和 committed truth 均完成所有权门禁。`npm test`、非沙箱 `npm run verify` exit 0；Navigation Renderer 12/12、dynamic 7/7、production integration 5/5，完整 Navigation/Structure 全绿；真实 Electron 36/36、Persistent Main/IPC 3/3。独立复审 P0=0/P1=0。**
-> 当前作者验收进度：**项目卡、Inline 与 Chapter 已关闭。结构规划/写作导航已经具备当前 App 公共纵切和自动化/真实 Electron 技术证据；下一步是在新的空项目验收结构骨架，在新的合格作者隔离副本验收导航的 open/Research/Changes，然后完成 Research、已授权 image-01 与 Graph/recovery 作者旅程。不得再运行旧 Plan canary。**
+> 当前源码证据：**旧 Plan 的 Main/preload/Renderer 公共入口已移除，现行右栏固定为 Chat / 导航 / Context / Changes。空项目可比较、连续编辑和精确预览 2–3 个结构方案；“查看创建预览”只准备零写入预览，“确认创建章节骨架”才提交标题与写作目的骨架。已有稿件提供带原文证据的写作导航，并把动作交给打开章节、Research 或 Changes。生成/动作取消、项目/文件切换、提交三态恢复、NO_KEY/待审恢复动作和 committed truth 均完成所有权门禁。`npm test`、非沙箱 `npm run verify` exit 0；Navigation Renderer 12/12、dynamic 8/8、production integration 5/5，完整 Navigation/Structure 全绿；真实 Electron 36/36、Persistent Main/IPC 3/3。独立复审 P0=0/P1=0/P2=0。**
+> 当前作者验收进度：**项目卡、Inline 与 Chapter 已关闭。第一次空项目结构验收暴露“每字符失焦”和创建动作不可发现两项 P1，已在 0.0CD 修复并通过完整回归；由于生产 Renderer 已变化，该次人工证据不能签字，下一步在同一仍只有 `edit.md` 的空项目重新完成“连续输入 → 编辑方案 → 查看创建预览 → 确认创建 → 进入导航”。随后在新的合格作者隔离副本验收 open/Research/Changes，再完成 Research、已授权 image-01 与 Graph/recovery。不得再运行旧 Plan canary。**
 > 0.0AA 历史保留红灯：**首轮真实 Electron 暴露 Inspector 在上下文失效时被清空、旧 5-chip 断言和项目 Chat 等待诊断；完整 test 又暴露 Plan 测试把 generation 函数正文写死。独立复审发现新请求预检窗口可提交不可见旧轮、同项目重开 UI/Main 串话、失败重开提前清会话及两项测试/错误文案缺口，均转为生产边界和回归后关闭。真实 Electron 曾连续两次在旧 Graph 恢复阶段超时；加入只读失败快照后该阶段连续四次通过，未改 Graph 产品逻辑，按重复同源证据关闭 timing P2。另一次 Chat preflight 红灯证明测试在恢复 `edit.md` 后未等待权威 watcher barrier；改为生产 `flushExternalChanges()` 收敛，而未放宽 Chat guard。该里程碑所有红运行保留，最终源码连续两次 34/34；后续 0.0AB 当时推进到 35/35，当前总链只看本文顶部当前里程碑。**
 > Graph 历史签字基线：**性能修复前的既有源码曾完整 `npm test`、Electron-enabled `npm run verify`、强制真实 Electron 26/26 exit 0；Graph Filter 15/15、Workbench 14/14、dynamic 5/5、Large 5/5、Watcher 15/15、Network 11/11、Intelligence 17/17，第二轮复审 P0=0/P1=0/P2=2。该数字只保留为历史过程；0.0AB 后来推进到 35/35，当前总链只看顶部当前里程碑。**
 > Graph 动态边界：**300 文件/1279 节点 cold-to-interactive、cache/incremental、筛选/内存/布局、AX/键鼠、三类纠错、stale/Issue→Changes、failure live、重启与项目隔离均进入真实 Electron；正文/History/ledger 的零写入门禁通过。**  
@@ -33,6 +33,14 @@ Chat 的三级 scope/context、Main-owned 多轮连续性、Onboarding v2、Rese
 4. 不重写已经签字的 Onboarding v2 service、capability store、batch、Main/preload 与 Renderer 契约；Main 动态 admission、single-flight 和 Renderer 生命周期 authority 清理均已关闭。
 5. 每批合入后重跑定向测试；阶段完成时再运行完整 `npm test`、`npm run verify` 与 `WRITCRAFT_E2E_FORCE=1 npm run e2e:electron`，保存当次证据。
 6. 真实 API 只使用用户显式配置的 Key；记录延迟、限流、超时、故障和费用，不记录 Key、Prompt、模型原文或正文。Key 前缀只表示凭据/计费类型，不能代替官方能力与现场门禁。首发按 npm Developer Preview 合同执行；独立 App 发布才需要 Developer ID、公证与 Gatekeeper。
+
+### 0.0CD 2026-07-31 · 结构规划连续输入与创建动作可发现性
+
+- **真实作者 P1｜输入失焦**：结构规划顶部目标与章节标题/写作目的共用 `dispatch → render → host.replaceChildren()`。每个 `input` 都替换当前控件，所以作者每输入一个字符就失去焦点；旧动态测试每个字段只触发一次，未验证 DOM identity、焦点、光标或中文 composition。
+- **生产修复**：文本编辑改为仍经 reducer 和 `onStateChange`、但不重建 DOM 的窄更新路径；本地同步生成/预览按钮禁用态并隐藏已清除错误。连续输入保持同一节点、焦点、selection 和 IME，不改变项目切换、epoch、异步 finally 或 Main authority。
+- **真实作者 P1｜动作不可发现**：原能力并未缺失，但第一屏只显示“预览章节骨架”，最终创建按钮藏在下一状态。现在明确展示“预览 → 确认 → 创建”两步说明；第一步 `查看创建预览` 只取得 capability 和精确预览，第二步 `确认创建章节骨架` 才写文件，确认前零写入合同不变。
+- **测试补洞**：Renderer dynamic 新增目标、标题、写作目的的连续输入、同一 DOM 节点、activeElement、selection 和 `isComposing` 证明，专项由 7/7 更新为 **8/8**。`npm run verify:navigation` 全绿；完整 `npm test`、批准 GUI `npm run verify` exit 0；真实 Electron **36/36**。独立终审 **P0=0/P1=0/P2=0**。
+- **验收与发布边界**：本批改变了生产 Renderer，先前未完成的空项目人工操作不能作为候选签字；必须从当前仍只有 `edit.md` 的空项目重新走一次受影响旅程。没有发布 npm、移动 dist-tag、推送 GitHub Release 或分发 App/ZIP。
 
 ### 0.0CC 2026-07-31 · Writing Navigation 公共纵切与真实 Electron
 

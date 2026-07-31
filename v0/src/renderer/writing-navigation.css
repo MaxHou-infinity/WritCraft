@@ -64,6 +64,13 @@
   margin-top: 12px;
 }
 
+.writing-navigation__next-step {
+  margin: 14px 0 8px;
+  color: var(--navigation-muted);
+  font-size: 12px;
+  line-height: 1.6;
+}
+
 .writing-navigation__primary,
 .writing-navigation__secondary,
 .writing-navigation__alternative,

@@ -66,6 +66,24 @@
       return state;
     }
 
+    function dispatchEditable(action) {
+      if (destroyed) return state;
+      const next = State.reduce(state, action);
+      if (next === state) return state;
+      state = next;
+      const generate = host.querySelector('[data-navigation-action="generate"]');
+      if (generate) generate.disabled = !State.requestPayload(state);
+      const preview = host.querySelector('[data-navigation-action="preview"]');
+      if (preview) {
+        preview.disabled = state.selectedAlternativeId === null ||
+          State.selectedChapters(state).some(chapter => !State.validateChapter(chapter));
+      }
+      host.querySelectorAll('.writing-navigation__status.is-error')
+        .forEach(error => { error.hidden = true; });
+      options.onStateChange?.(state);
+      return state;
+    }
+
     function failure(raw) {
       return State.publicFailure(raw || {});
     }
@@ -363,13 +381,14 @@
       const label = element(document, 'label', '', heading);
       const goal = element(document, 'textarea', 'writing-navigation__goal');
       goal.value = view.goal;
+      goal.dataset.navigationFocus = 'goal';
       goal.disabled = Boolean(view.generation) || view.phase === 'recovery';
       goal.setAttribute('maxlength', '2000');
       goal.setAttribute('placeholder', view.mode === 'structure'
         ? '例如：比较几种适合这篇作品的组织方式'
         : '例如：找出当前最值得继续推进的一步');
       goal.addEventListener('input', event => {
-        dispatch({ type: 'goal-change', value: event.target.value });
+        dispatchEditable({ type: 'goal-change', value: event.target.value });
       });
       label.append(goal);
       section.append(label);
@@ -414,6 +433,7 @@
           'writing-navigation__primary',
           request
         );
+        generate.dataset.navigationAction = 'generate';
         generate.disabled = !State.requestPayload(state) ||
           ['recovery', 'recovery-querying', 'structure-confirming'].includes(view.phase);
         row.append(generate);
@@ -482,7 +502,7 @@
         const card = element(document, 'article', 'writing-navigation__chapter');
         card.append(element(document, 'strong', '', `章节 ${index + 1} · chapters/${String(index + 1).padStart(2, '0')}.md`));
         const titleLabel = element(document, 'label', '', '标题');
-        const title = input(document, chapter.title, '', event => dispatch({
+        const title = input(document, chapter.title, '', event => dispatchEditable({
           type: 'chapter-edit',
           alternativeId: view.selectedAlternativeId,
           chapterIndex: index,
@@ -490,9 +510,11 @@
           value: event.target.value,
         }));
         title.dataset.chapterField = 'title';
+        title.dataset.navigationFocus =
+          `chapter-${view.selectedAlternativeId}-${index}-title`;
         titleLabel.append(title);
         const purposeLabel = element(document, 'label', '', '写作目的');
-        const purpose = input(document, chapter.purpose, '', event => dispatch({
+        const purpose = input(document, chapter.purpose, '', event => dispatchEditable({
           type: 'chapter-edit',
           alternativeId: view.selectedAlternativeId,
           chapterIndex: index,
@@ -500,16 +522,25 @@
           value: event.target.value,
         }));
         purpose.dataset.chapterField = 'purpose';
+        purpose.dataset.navigationFocus =
+          `chapter-${view.selectedAlternativeId}-${index}-purpose`;
         purposeLabel.append(purpose);
         card.append(titleLabel, purposeLabel);
         chapters.append(card);
       });
       section.append(chapters);
+      section.append(element(
+        document,
+        'p',
+        'writing-navigation__next-step',
+        '下一步：预览即将创建的文件，确认无误后再创建章节骨架。'
+      ));
       const preview = button(document,
-        view.phase === 'structure-preparing' ? '正在准备预览…' : '预览章节骨架',
+        view.phase === 'structure-preparing' ? '正在准备预览…' : '查看创建预览',
         'writing-navigation__primary',
         prepareStructure
       );
+      preview.dataset.navigationAction = 'preview';
       preview.disabled = view.phase === 'structure-preparing' ||
         view.selectedChapters.some(chapter => !State.validateChapter(chapter));
       section.append(preview);
