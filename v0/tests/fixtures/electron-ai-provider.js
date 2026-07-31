@@ -368,7 +368,8 @@ function chapterPlanAnswer(prompt) {
 
 function chapterBlockAnswer(prompt) {
   if (!prompt.includes(`用户指令：${CHAPTER_GOAL}`) ||
-      !prompt.includes('"id":"whole"') || !prompt.includes('当前区块序号：1/1')) {
+      !prompt.includes('"id":"whole"') || !prompt.includes('当前区块序号：1/1') ||
+      !prompt.includes('"schema":"writcraft.chapter-generation-block/v1","blockId":"whole"')) {
     throw new Error('E2E_FIXTURE_INVALID_CHAPTER_BLOCK');
   }
   const escapedPath = CHAT_CURRENT_PATH.replace(/[.*+?^${}()|[\]\\]/g, '\\$&');

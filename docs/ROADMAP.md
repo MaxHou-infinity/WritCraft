@@ -75,7 +75,7 @@
 5. 修复旅程中发现的 P0/P1 阻断项；P2 必须明确记录、分级并决定是否允许发版。
 6. 记录内容无关的私有指标：Inline 接受率、Plan 采用、Research 匹配判断、图片评分/采纳、耗时和稳定错误码。
 
-当前执行注记（2026-07-30）：项目卡与 Inline 作者旅程已经关闭，不再重复。第五副本的首次 Chapter 生成在 `b5.content` 边界失败，安全地保持正文/History 零写入，但暴露了正常模型输出兼容与失败恢复 P1。exact candidate `5eb11bd` 仅规范化 CRLF/外层换行，并只对内容边界做全章最多一次的当前区块重生；严格 JSON/schema/id 继续不修补，retry 前重验依赖且不回显失败模型正文。Chapter 21/21、完整 test、批准 GUI verify 和强制真实 Electron 37/37 已通过；候选已推送，第六 fresh 副本已经就绪，当前只重跑 Chapter/Plan，再进入 Research。
+当前执行注记（2026-07-31）：项目卡与 Inline 作者旅程已经关闭，不再重复。第五副本的 `b5.content` 红灯已关闭内容边界恢复；第六副本继续暴露区块提示示例把动态 `blockId` 写死为 `b1`，导致模型返回与 Main 的 `b2` 计划冲突。该 P1 已改为从当前 Main block 权威动态生成示例，strict 校验未放宽；非默认 ID 单元 canary、完整 test、批准 GUI verify 和强制真实 Electron 37/37 通过。第六副本安全零写入并转为诊断证据；待新 exact candidate 与第七 fresh 副本只重跑 Chapter/Plan，再进入 Research。
 
 ### 4.3 明确不做
 

@@ -128,6 +128,14 @@ async function run() {
       assert(calls[1].maxTokens < calls[2].maxTokens && calls[2].maxTokens <= service.BLOCK_MAX_TOKENS);
       assert(calls[0].messages[0].content.includes('完整章节生成规划器'));
       assert(calls[1].messages[0].content.includes('完整章节区块生成器'));
+      assert(calls[1].messages[0].content.includes(
+        '"schema":"writcraft.chapter-generation-block/v1","blockId":"opening"'
+      ));
+      assert(calls[2].messages[0].content.includes(
+        '"schema":"writcraft.chapter-generation-block/v1","blockId":"turn"'
+      ));
+      assert(!calls[1].messages[0].content.includes('"blockId":"b1"'));
+      assert(!calls[2].messages[0].content.includes('"blockId":"b1"'));
       assert(calls[2].messages[0].content.includes('新的开场。'));
       assert(calls.every(item => item.model === 'MiniMax-M3'));
     } finally { fs.rmSync(root, { recursive: true, force: true }); }
