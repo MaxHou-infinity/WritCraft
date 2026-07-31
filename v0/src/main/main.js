@@ -2103,6 +2103,7 @@ const writingNavigationHandlers = writingNavigationHandlerService.createWritingN
   projectCallLLM: writingNavigationProjectCallLLM,
   staleAiProjectResult,
   projectFailure,
+  recordFailure: code => diagnosticRecorder.record('project', code),
 });
 
 ipcMain.handle('writcraft:project:propose-writing-navigation',

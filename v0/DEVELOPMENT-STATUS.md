@@ -1,11 +1,11 @@
 # 笔触 · WritCraft · V0 开发状态与续作入口
 
-> 最后更新：2026-07-31（Asia/Shanghai，0.0CE · 空项目结构规划真实作者验收签字）
+> 最后更新：2026-07-31（Asia/Shanghai，0.0CF · 已有稿件导航 evidenceRef 协议修复）
 > 当前状态：**`writ-craft@0.1.1` 已从 exact candidate `c65981e` 发布到 npm `preview`；registry 时间 `2026-07-29T14:30:16.176Z`，shasum `d370c500666e25cfb373852deafa21b232d2bc18` 与本地候选一致。公网隔离安装/启动/退出为 2/2。annotated tag `v0.1.1` 指向同一提交，GitHub prerelease 已公开：`https://github.com/MaxHou-infinity/WritCraft/releases/tag/v0.1.1`。**
 > 发布判断：**0.1.1 Developer Preview 已完成版本、自动化、双架构安装、独立复审、npm 发布、公网安装和 GitHub prerelease。registry 标签保持 `preview: 0.1.1`、`latest: 0.1.0`，因此本次没有把 Preview 冒充稳定版，也没有执行 unpublish、占位发布或上传未签名 App/ZIP。**
 > 当前目标版本：**`docs/ROADMAP.md` 的 `RM-1.1 / writ-craft@0.1.2` 真实作者可用性闭环。必须以 `WRITING-NAVIGATION-V1-CONTRACT.md` 的结构规划/写作导航替代旧 Plan，再完成 Research、image-01、Graph/recovery 和完整签字。不得插入驾驶舱或其他后续版本功能。**
-> 当前源码证据：**旧 Plan 的 Main/preload/Renderer 公共入口已移除，现行右栏固定为 Chat / 导航 / Context / Changes。空项目可比较、连续编辑和精确预览 2–3 个结构方案；“查看创建预览”只准备零写入预览，“确认创建章节骨架”才提交标题与写作目的骨架。已有稿件提供带原文证据的写作导航，并把动作交给打开章节、Research 或 Changes。生成/动作取消、项目/文件切换、提交三态恢复、NO_KEY/待审恢复动作和 committed truth 均完成所有权门禁。`npm test`、非沙箱 `npm run verify` exit 0；Navigation Renderer 12/12、dynamic 8/8、production integration 5/5，完整 Navigation/Structure 全绿；真实 Electron 36/36、Persistent Main/IPC 3/3。独立复审 P0=0/P1=0/P2=0。**
-> 当前作者验收进度：**项目卡、Inline、Chapter 与空项目结构规划已关闭。结构旅程绑定生产提交 `2f9f714`：作者连续输入目标、编辑方案、查看创建预览并明确确认；磁盘只新增 `chapters/01.md` 至 `06.md`，恢复记录为 0、History 不存在。下一步只创建新的合格作者隔离副本验收已有稿件导航的 open/Research/Changes，然后完成 Research、已授权 image-01 与 Graph/recovery。不得重复结构旅程或运行旧 Plan canary。**
+> 当前源码证据：**旧 Plan 的 Main/preload/Renderer 公共入口已移除，现行右栏固定为 Chat / 导航 / Context / Changes。空项目结构规划仍绑定已签字提交 `2f9f714`。已有稿件导航不再要求模型逐字复制路径、标题层级和 quote；Main 先用每请求 CSPRNG nonce 从本次 revision-bound 正文 snapshot 生成有界 `evidenceRef` catalog，模型只能从动态 enum 选择 1–3 个不重复引用，Main 再恢复 canonical path/heading/quote/locator/revision。unknown/duplicate/cross-request 引用 fail-closed，文首无标题区块与 CRLF/伪标记已有动态证明，后续 open/Research/Changes authority 未放宽。`npm run verify:navigation` 当前 service **29/29**、store **16/16**、handler **12/12**、handoff **6/6**、action handler **11/11**、Main wiring **4/4**、zero-write **2/2** 及结构全链全绿；稳定源码完整 `npm test`、非沙箱 `npm run verify` 均 exit 0，强制真实 Electron **36/36**。真实作者仍需在新隔离副本复验。**
+> 当前作者验收进度：**项目卡、Inline、Chapter 与空项目结构规划已关闭。已有稿件第八副本的两次真实导航调用在约 19.0 秒与 17.1 秒后均以 `INVALID_MODEL_EVIDENCE` 零公开 Markdown 改动失败，证明逐字 evidence 协议不可用；原始验收源保持不变、recovery=0。第八副本只作为红灯证据，不得用于最终签字。协议修复完成技术回归后，必须从同一作者授权源创建全新第九副本，只重跑受影响的已有稿件 Navigation；不得重复结构旅程或旧 Plan canary。**
 > 0.0AA 历史保留红灯：**首轮真实 Electron 暴露 Inspector 在上下文失效时被清空、旧 5-chip 断言和项目 Chat 等待诊断；完整 test 又暴露 Plan 测试把 generation 函数正文写死。独立复审发现新请求预检窗口可提交不可见旧轮、同项目重开 UI/Main 串话、失败重开提前清会话及两项测试/错误文案缺口，均转为生产边界和回归后关闭。真实 Electron 曾连续两次在旧 Graph 恢复阶段超时；加入只读失败快照后该阶段连续四次通过，未改 Graph 产品逻辑，按重复同源证据关闭 timing P2。另一次 Chat preflight 红灯证明测试在恢复 `edit.md` 后未等待权威 watcher barrier；改为生产 `flushExternalChanges()` 收敛，而未放宽 Chat guard。该里程碑所有红运行保留，最终源码连续两次 34/34；后续 0.0AB 当时推进到 35/35，当前总链只看本文顶部当前里程碑。**
 > Graph 历史签字基线：**性能修复前的既有源码曾完整 `npm test`、Electron-enabled `npm run verify`、强制真实 Electron 26/26 exit 0；Graph Filter 15/15、Workbench 14/14、dynamic 5/5、Large 5/5、Watcher 15/15、Network 11/11、Intelligence 17/17，第二轮复审 P0=0/P1=0/P2=2。该数字只保留为历史过程；0.0AB 后来推进到 35/35，当前总链只看顶部当前里程碑。**
 > Graph 动态边界：**300 文件/1279 节点 cold-to-interactive、cache/incremental、筛选/内存/布局、AX/键鼠、三类纠错、stale/Issue→Changes、failure live、重启与项目隔离均进入真实 Electron；正文/History/ledger 的零写入门禁通过。**  
@@ -33,6 +33,15 @@ Chat 的三级 scope/context、Main-owned 多轮连续性、Onboarding v2、Rese
 4. 不重写已经签字的 Onboarding v2 service、capability store、batch、Main/preload 与 Renderer 契约；Main 动态 admission、single-flight 和 Renderer 生命周期 authority 清理均已关闭。
 5. 每批合入后重跑定向测试；阶段完成时再运行完整 `npm test`、`npm run verify` 与 `WRITCRAFT_E2E_FORCE=1 npm run e2e:electron`，保存当次证据。
 6. 真实 API 只使用用户显式配置的 Key；记录延迟、限流、超时、故障和费用，不记录 Key、Prompt、模型原文或正文。Key 前缀只表示凭据/计费类型，不能代替官方能力与现场门禁。首发按 npm Developer Preview 合同执行；独立 App 发布才需要 Developer ID、公证与 Gatekeeper。
+
+### 0.0CF 2026-07-31 · 已有稿件导航 evidenceRef 协议修复
+
+- **真实红灯**：第八隔离副本中，作者以当前正文与 1/8 Context 连续两次生成写作导航。请求均真实到达 provider，约 **19,010 ms** 与 **17,102 ms** 后由 Main 以稳定码 `INVALID_MODEL_EVIDENCE` 拒绝；公开 Markdown 与验收源字节不变、recovery=0。失败不是 NO_KEY、网络未发出或作者目标为空。
+- **根因**：旧工具 input 要模型重新抄写 `relativePath + sectionHeading + quote`，Main 再要求完整标题层级和引文逐字、同区块且唯一。Schema 只能约束字符串形态，不能保证模型复制正文时不改标点、空格或层级；连续真实失败证明继续强化提示词会重复消耗作者额度。
+- **生产修复**：Main 用每请求 CSPRNG nonce，对本次已读、revision-bound 的非代码正文区块建立最多 4096 项的临时 `evidenceRef` catalog，并把完整不可预测 ID 冻结进动态 tool enum；正文中的类标记不能进入 enum。模型 suggestion 只返回 schema/runtime 均声明不重复的 1–3 个 `evidenceRefs`；Main 从 catalog 恢复 path、heading、quote、locator 与 revision。未知、重复、跨请求或伪造引用继续 fail-closed，模型仍无写 capability，Renderer 不生成引用或原文 authority。
+- **用户反馈与诊断**：极少数后续引用核验失败不再只显示“调整目标或上下文”，而明确说明“原文依据没有通过核对”，同时确认本次未修改项目文件；provider/tool/protocol 返回失败会向 Main 诊断环记录固定枚举码，项目漂移时不误记旧失败。两条链均不暴露 JSON、Schema、路径、Prompt、quote、正文或远端错误正文。
+- **验证与边界**：`npm run verify:navigation` 为 service **29/29**、store **16/16**、provider adapter **1/1**、handler **12/12**、handoff **6/6**、action handler **11/11**、Main wiring **4/4**、zero-write **2/2**，结构全链亦全绿；稳定源码完整 `npm test`、非沙箱 `npm run verify` 均 exit 0，强制真实 Electron **36/36**，`node --check` 与 `git diff --check` 通过。一次完整测试在源码仍继续变化时被主动以 exit 130 终止，不计作产品红灯；以上结果均来自冻结后的同一源码。独立终审 **P0=0/P1=0/P2=2，可进入新副本作者验收**。
+- **保留 P2**：① 生产已有 1 MiB 完整 provider request 门禁和 4097 候选 fail-closed 测试，但尚缺一个同时填满真实 evidence markers 与动态 enum 的“最大合法 Navigation 请求”精确字节边界 fixture；② 失败码已进入内容无关 Diagnostic Export/控制台环，但私有 metrics 仍沿用历史 `plan/failed/duration` 维度，尚未迁移为 Navigation 专用 action/failureClass。这两项不放宽 authority，也不阻断第九副本单次验收；后续必须单独关闭，不能写成已完成。没有发布 npm、移动 dist-tag、推送 GitHub Release 或分发 App/ZIP。
 
 ### 0.0CE 2026-07-31 · 空项目结构规划真实作者验收
 
@@ -961,7 +970,7 @@ Onboarding v2 已取代上述“容错解析完整 `editContent` + 部分创建�
 | 普通 Markdown 回收区恢复 UI | ✅ | Explorer 列表/刷新/单项恢复、窄 IPC、opaque token、watcher barrier、native journal recovery、冲突与替换 fail-closed 均已签字；真实 Electron 35/35 |
 | Chapter 生成/整体重写 | ✅ | strict plan/block、整文件审阅、撤销、完整异步所有权、no-op/provenance/result/capability 运行态门禁均已接入；最终复审 P0/P1/P2=0 |
 | Changes 分块审阅与历史 Plan→Changes 安全链 | ✅ | Changes 默认 pending、逐块/整文件决策、residual、审计/撤销和目标 revision 锁定仍有效；Plan→Changes 只算历史安全证据，不是现行入口 |
-| 结构规划 / 写作导航 | 🟡 | 空项目结构规划已在 `2f9f714` 完成真实作者签字；Main/IPC/Renderer、三态骨架事务、三种动作、取消/恢复、专项与真实 Electron 36/36 已签收；待新的真实作者隔离副本验收已有稿件 open/Research/Changes |
+| 结构规划 / 写作导航 | 🟡 | 空项目结构规划已在 `2f9f714` 完成真实作者签字；第八副本暴露逐字 evidence 协议的 `INVALID_MODEL_EVIDENCE` P1，0.0CF 已改为 Main-owned evidenceRefs，专项、完整 test/verify、Electron 36/36 与独立终审均通过；下一步只创建第九副本验收已有稿件建议及 open/Research/Changes |
 | Graph v2 核心与扩展验收 | ✅ | 300 文件/1279 节点、纠错/stale/failure live、AX/键鼠、布局/性能、重启/A→B 均有行为证据；韧性批关闭语义权威、不可变快照与异步所有权，复审 P0/P1/P2=0；0.0AB 当时总链为 35/35，当前见顶部当前里程碑 |
 | Diagnostic Preview / Export | ✅ | 设置页精确预览、递归脱敏 allowlist、token-only IPC、原生保存和不可覆盖 0600 写入均已接入；Service 13/13、Handler 10/10、Renderer 7/7、真实 Electron 可见旅程通过 |
 | 来源、PDF、脚注 | ✅ | 本地证据地基和可审查建议已接入 |
@@ -978,7 +987,7 @@ Onboarding v2 已取代上述“容错解析完整 `editContent` + 部分创建�
 ### RM-1.1 / 0.1.2：当前唯一目标
 
 - [x] 由作者显式指定满足合同的真实项目，完成只读预检与隔离副本；0.0AQ 的正式事务证明源不变，fresh 副本已合格创建并在当前 App 打开。
-- [ ] 项目卡、Inline、Chapter 与空项目结构规划已完成；旧 Plan 已退役，结构规划/写作导航技术纵切和真实 Electron 36/36 已签收。下一步只用新的合格隔离副本验收已有稿件导航，再完成 Research、image-01、Graph/恢复。
+- [ ] 项目卡、Inline、Chapter 与空项目结构规划已完成；第八副本的两次真实 `INVALID_MODEL_EVIDENCE` 红灯已推动 Main-owned evidenceRef 协议修复。0.0CF 非沙箱 verify、真实 Electron 36/36 和独立终审已关闭；只创建第九合格副本复验已有稿件导航，再完成 Research、image-01、Graph/恢复。
 - [x] 复现并诊断作者项目 `Graph INVALID_CACHE`；0.0AN / `a72a179` 已提供不删除作者数据、不手工清缓存的可理解诊断、自动重建与失败恢复终态，最终独立复审 P0/P1/P2=0。
 - [ ] 收集内容无关的 Inline 接受率、导航帮助度/动作、Research 匹配判断、图片评分/采纳和耗时样本。
 - [ ] 只修复验收中发现的 P0/P1 与决定阻断发版的 P2；`⌘K` 必填作者指令 P1 已实现、完成自动化与独立复审，并作为 exact candidate `9b21a9d` 提交推送；不得插入 `0.2.0+` 功能。
@@ -1114,7 +1123,7 @@ Graph Extended Acceptance v1 已签字。首轮复审曾以 P1=3 回退 watcher�
 - [x] 真实作者 Inline 拒绝：第五副本 operation `8f093bb9…` 记录 `generated → rejected`，没有新增 History，目标 mtime 和磁盘内容保持在前一笔已接受真相；界面明确显示“原文已恢复”。
 - [x] 真实作者 Inline 接受：第五副本 operation `cd20e785…` 产生唯一 post-manifest application/applied History `change_6516ccbc…`，目标 before/after revision 与磁盘 SHA-256 精确一致。
 - [x] 真实作者 Inline Safe Undo：第五副本最新正文 History 已变为 `undone`，正文 SHA-256 恢复到 beforeHash `1bdb3a5c…`，14 个 Markdown 的组合摘要精确回到基线 `7ead5eaa…`，原始验收源保持不变。
-- [ ] 项目卡、Inline、第七副本 Chapter 与新空项目结构规划已关闭；旧 Plan 不再复测。下一步以新的合格隔离副本验收已有稿件写作导航，再继续 Research、image-01、Graph/恢复，最终完成六段真实旅程。
+- [ ] 项目卡、Inline、第七副本 Chapter 与新空项目结构规划已关闭；旧 Plan 不再复测。第八副本只保留两次 `INVALID_MODEL_EVIDENCE` 零写入红灯，0.0CF 已以 Main-owned evidenceRefs 完成技术终验；下一步仅以第九副本验收已有稿件写作导航，再继续 Research、image-01、Graph/恢复。
 
 ### P2：Main 网络与安全审计
 

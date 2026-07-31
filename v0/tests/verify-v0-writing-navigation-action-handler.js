@@ -68,7 +68,7 @@ async function setup(action, overrides = {}) {
       currentFilePath: 'chapters/01.md',
       contextPaths: [],
     },
-    callLLM: async () => ({
+    callLLM: async (_messages, _model, _tokens, options) => ({
       ok: true,
       stopReason: 'tool_use',
       toolUseBlockCount: 1,
@@ -78,11 +78,10 @@ async function setup(action, overrides = {}) {
           mode: 'navigation',
           suggestions: [{
             finding: '当前段落还缺少具体例子。',
-            evidence: [{
-              relativePath: 'chapters/01.md',
-              sectionHeading: '第一章',
-              quote: '作者已经写下的正文证据',
-            }],
+            evidenceRefs: [
+              options.tools[0].input_schema.properties.suggestions.items.properties
+                .evidenceRefs.items.enum[0],
+            ],
             whyNow: '现在补充便于后文展开。',
             recommendedAction: '补充一个具体例子。',
             expectedResult: '读者更容易理解。',

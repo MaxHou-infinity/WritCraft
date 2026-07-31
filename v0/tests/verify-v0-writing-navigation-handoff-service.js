@@ -25,10 +25,10 @@ function revision(content) {
   return crypto.createHash('sha256').update(content).digest('hex');
 }
 
-function fakeProject() {
+function fakeProject(chapter = CHAPTER) {
   const files = new Map([
     ['edit.md', '# 项目说明\n\n这是项目 Prompt。\n'],
-    ['chapters/01.md', CHAPTER],
+    ['chapters/01.md', chapter],
   ]);
   return {
     files,
@@ -48,8 +48,8 @@ function fakeProject() {
   };
 }
 
-async function authority(action) {
-  const project = fakeProject();
+async function authority(action, chapter = CHAPTER) {
+  const project = fakeProject(chapter);
   const proposal = await navigationService.proposeWritingNavigation({
     projectService: project,
     rootPath: ROOT,
@@ -61,7 +61,7 @@ async function authority(action) {
       contextPaths: [],
     },
     randomBytes: size => Buffer.alloc(size, action === 'open' ? 1 : action === 'research' ? 2 : 3),
-    callLLM: async () => ({
+    callLLM: async (_messages, _model, _tokens, options) => ({
       ok: true,
       stopReason: 'tool_use',
       toolUseBlockCount: 1,
@@ -71,11 +71,10 @@ async function authority(action) {
           mode: 'navigation',
           suggestions: [{
             finding: '当前段落还缺少具体例子。',
-            evidence: [{
-              relativePath: 'chapters/01.md',
-              sectionHeading: '第一章',
-              quote: '作者已经写下的正文证据',
-            }],
+            evidenceRefs: [
+              options.tools[0].input_schema.properties.suggestions.items.properties
+                .evidenceRefs.items.enum[0],
+            ],
             whyNow: '现在补充能让后文更容易展开。',
             recommendedAction: '补充一个具体例子。',
             expectedResult: '读者更容易理解。',
@@ -113,6 +112,32 @@ async function authority(action) {
     }), error => error.code === 'NAVIGATION_STALE');
   });
 
+  await test('headingless evidence keeps its display label separate from the empty anchor key', async () => {
+    const headingless = '这是没有 Markdown 标题的文首正文证据。\n';
+    for (const action of ['open', 'research', 'changes']) {
+      const item = await authority(action, headingless);
+      assert.strictEqual(item.value.suggestion.evidence[0].sectionHeading, '文首');
+      assert.strictEqual(
+        item.value.suggestion.evidence[0].locator.blockAnchor.headingKey,
+        ''
+      );
+      assert.strictEqual(handoffService.revalidateAuthority({
+        projectService: item.project,
+        rootPath: ROOT,
+        authority: item.value,
+      }), true);
+      if (action === 'open') assert.strictEqual(handoffService.openHandoff(item.value).ok, true);
+      if (action === 'research') assert.strictEqual(handoffService.researchHandoff(item.value).ok, true);
+      if (action === 'changes') {
+        assert(handoffService.prepareChangesHandoff({
+          projectService: item.project,
+          rootPath: ROOT,
+          authority: item.value,
+        }).prepared);
+      }
+    }
+  });
+
   await test('open handoff exposes one exact local locator and no write request', async () => {
     const item = await authority('open');
     const result = handoffService.openHandoff(item.value);
@@ -121,7 +146,7 @@ async function authority(action) {
     assert.strictEqual(result.handoff.path, 'chapters/01.md');
     assert.strictEqual(
       CHAPTER.slice(result.handoff.locator.offset, result.handoff.locator.endOffset),
-      '作者已经写下的正文证据'
+      '这是作者已经写下的正文证据。'
     );
   });
 
@@ -182,7 +207,7 @@ async function authority(action) {
     );
   });
 
-  console.log(`\n${passed}/5 writing-navigation handoff service checks passed.`);
+  console.log(`\n${passed}/6 writing-navigation handoff service checks passed.`);
 })().catch(error => {
   console.error(error);
   process.exitCode = 1;

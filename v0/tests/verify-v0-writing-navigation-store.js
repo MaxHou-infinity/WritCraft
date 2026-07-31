@@ -51,7 +51,7 @@ async function record(index = 1, action = 'changes', goal = `下一步 ${index}`
       contextPaths: [],
     },
     randomBytes: size => Buffer.alloc(size, index),
-    callLLM: async () => ({
+    callLLM: async (_messages, _model, _tokens, options) => ({
       ok: true,
       stopReason: 'tool_use',
       toolUseBlockCount: 1,
@@ -61,11 +61,10 @@ async function record(index = 1, action = 'changes', goal = `下一步 ${index}`
           mode: 'navigation',
           suggestions: [{
             finding: '这里需要继续推进。',
-            evidence: [{
-              relativePath: 'chapters/01.md',
-              sectionHeading: '第一章',
-              quote: '作者已经写下的正文证据',
-            }],
+            evidenceRefs: [
+              options.tools[0].input_schema.properties.suggestions.items.properties
+                .evidenceRefs.items.enum[0],
+            ],
             whyNow: '现在处理最清晰。',
             recommendedAction: '继续处理。',
             expectedResult: '结构更清楚。',

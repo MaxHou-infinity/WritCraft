@@ -5,6 +5,25 @@ const {
 } = require('./writing-navigation-service');
 
 const ATTEMPT_ID_RE = /^wno_[a-f0-9]{32}$/;
+const DIAGNOSTIC_FAILURE_CODES = new Set([
+  'LLM_FAILED',
+  'NO_KEY',
+  'NO_TEXT_BLOCK',
+  'TIMEOUT',
+  'REQUEST_ABORTED',
+  'AUTH_FAILED',
+  'RATE_LIMITED',
+  'SERVICE_UNAVAILABLE',
+  'REQUEST_FAILED',
+  'INVALID_RESPONSE',
+  'RESPONSE_TOO_LARGE',
+  'API_FAILED',
+  'INVALID_TOOL_USE',
+  'INVALID_MODEL_OUTPUT',
+  'INVALID_MODEL_EVIDENCE',
+  'MODEL_OUTPUT_TOO_LARGE',
+  'MODEL_OUTPUT_TRUNCATED',
+]);
 
 function createWritingNavigationHandlers(options = {}) {
   const {
@@ -20,6 +39,7 @@ function createWritingNavigationHandlers(options = {}) {
     projectCallLLM,
     staleAiProjectResult,
     projectFailure,
+    recordFailure = () => {},
   } = options;
   const active = new Map();
 
@@ -96,9 +116,13 @@ function createWritingNavigationHandlers(options = {}) {
           signal: lease.controller.signal,
         });
         if (!proposal.ok) {
-          return isCurrent(project, mutationGeneration, navigationEpoch)
-            ? proposal
-            : staleAiProjectResult();
+          if (!isCurrent(project, mutationGeneration, navigationEpoch)) {
+            return staleAiProjectResult();
+          }
+          recordFailure(DIAGNOSTIC_FAILURE_CODES.has(proposal.error)
+            ? proposal.error
+            : 'LLM_FAILED');
+          return proposal;
         }
         await settleProjectAuthority(project);
         if (!isCurrent(project, mutationGeneration, navigationEpoch)) {

@@ -72,8 +72,9 @@ function validateEvidence(snapshot, evidence) {
   } catch (_) {
     fail('NAVIGATION_STALE', '导航证据位置已经变化，请重新生成导航');
   }
+  const publicHeading = rebuilt.headingKey || '文首';
   if (!sameJson(rebuilt, evidence.locator.blockAnchor) ||
-      rebuilt.headingKey !== evidence.sectionHeading) {
+      publicHeading !== evidence.sectionHeading) {
     fail('NAVIGATION_STALE', '导航证据章节已经变化，请重新生成导航');
   }
 }

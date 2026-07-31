@@ -49,6 +49,7 @@ function setup(overrides = {}) {
   let generation = 5;
   let navigationEpoch = 2;
   const installed = [];
+  const recordedFailures = [];
   let settleCalls = 0;
   let serviceCalls = 0;
   let attemptCounter = 0;
@@ -79,6 +80,7 @@ function setup(overrides = {}) {
       error: /^[A-Z][A-Z0-9_]*$/.test(error?.code || '') ? error.code : 'NAVIGATION_FAILED',
       message: '写作导航没有完成；本次没有修改任何项目文件',
     }),
+    recordFailure: code => recordedFailures.push(code),
     ...overrides,
   };
   const handlers = handlerModule.createWritingNavigationHandlers(options);
@@ -90,6 +92,7 @@ function setup(overrides = {}) {
     cancel: (event, projectInstanceId, attemptId) =>
       handlers.cancel(event, projectInstanceId, attemptId),
     installed,
+    recordedFailures,
     get settleCalls() { return settleCalls; },
     get serviceCalls() { return serviceCalls; },
     setProject(value) { currentProject = value; },
@@ -160,6 +163,22 @@ function setup(overrides = {}) {
     assert.strictEqual(result.error, 'RATE_LIMITED');
     assert.strictEqual(state.installed.length, 0);
     assert.strictEqual(state.settleCalls, 1);
+    assert.deepStrictEqual(state.recordedFailures, ['RATE_LIMITED']);
+  });
+
+  await test('diagnostics record only an allowlisted content-free failure class', async () => {
+    const state = setup({
+      writingNavigationService: {
+        proposeWritingNavigation: async () => ({
+          ok: false,
+          error: 'PRIVATE_PROVIDER_DETAIL',
+          message: 'must not enter diagnostics',
+        }),
+      },
+    });
+    const result = await state.handler(EVENT, PROJECT.instanceId, {});
+    assert.strictEqual(result.error, 'PRIVATE_PROVIDER_DETAIL');
+    assert.deepStrictEqual(state.recordedFailures, ['LLM_FAILED']);
   });
 
   await test('same owner and project are single-flight while another owner remains isolated', async () => {
@@ -341,6 +360,7 @@ function setup(overrides = {}) {
     const result = await state.handler(EVENT, PROJECT.instanceId, {});
     assert.strictEqual(result.error, 'PROJECT_CHANGED');
     assert.strictEqual(state.installed.length, 0);
+    assert.deepStrictEqual(state.recordedFailures, []);
   });
 
   await test('unexpected exceptions are content-free at the handler boundary', async () => {

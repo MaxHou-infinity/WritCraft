@@ -194,6 +194,13 @@
         action: 'retry',
       });
     }
+    if (code === 'INVALID_MODEL_EVIDENCE') {
+      return Object.freeze({
+        code,
+        message: 'AI 选择的原文依据没有通过核对；本次没有修改项目文件。请重新生成。',
+        action: 'retry',
+      });
+    }
     return Object.freeze({
       code,
       message: 'AI 没有完成本次整理；没有修改项目文件。请调整目标或上下文后重试。',

@@ -341,6 +341,9 @@ test('public error mapping never exposes structured transport vocabulary', () =>
   const noKey = State.publicFailure({ error: 'NO_KEY' });
   assert.strictEqual(noKey.action, 'settings');
   assert(noKey.message.includes('未联网'));
+  const evidence = State.publicFailure({ error: 'INVALID_MODEL_EVIDENCE' });
+  assert(evidence.message.includes('原文依据没有通过核对'));
+  assert.strictEqual(evidence.action, 'retry');
 });
 
 console.log(`\nWriting Navigation Renderer state passed: ${passed}/${passed}.`);
