@@ -76,7 +76,7 @@
 5. 修复旅程中发现的 P0/P1 阻断项；P2 必须明确记录、分级并决定是否允许发版。
 6. 记录内容无关的私有指标：Inline 接受率、导航建议帮助度/动作、Research 匹配判断、图片评分/采纳、耗时和稳定错误码。
 
-当前执行注记（2026-07-31，0.0CF）：项目卡、Inline、Chapter 与空项目结构规划已关闭；结构旅程继续绑定生产提交 `2f9f714`，不得重复。已有稿件第八隔离副本连续两次在真实 provider 返回后触发 `INVALID_MODEL_EVIDENCE`，约 19.0 秒与 17.1 秒，公开 Markdown 零变化、验收源不变、recovery=0。根因是旧协议要求模型逐字复制路径、完整标题层级与 quote；0.0CF 已改为 Main 用每请求 CSPRNG nonce 对本次 revision-bound 非代码区块建立临时 evidenceRef catalog，模型只能从动态 enum 选不重复引用，Main 再恢复 canonical evidence；文首无标题、CRLF、伪标记、跨请求和 4096 项上限均新增动态门禁。专项 Navigation 已通过；完成当前完整 test/非沙箱 verify、真实 Electron和独立终审后，必须创建第九合格副本只重跑受影响的已有稿件 Navigation，再继续 Research、image-01、Graph/recovery；尚未进入 0.1.2 发布授权。
+当前执行注记（2026-07-31，0.0CF）：项目卡、Inline、Chapter 与空项目结构规划已关闭；结构旅程继续绑定生产提交 `2f9f714`，不得重复。已有稿件第八隔离副本连续两次在真实 provider 返回后触发 `INVALID_MODEL_EVIDENCE`，约 19.0 秒与 17.1 秒，公开 Markdown 零变化、验收源不变、recovery=0。根因是旧协议要求模型逐字复制路径、完整标题层级与 quote；生产提交 `d28c440` 已改为 Main 用每请求 CSPRNG nonce 对本次 revision-bound 非代码区块建立临时 evidenceRef catalog，模型只能从动态 enum 选不重复引用，Main 再恢复 canonical evidence；文首无标题、CRLF、伪标记、跨请求和 4096 项上限均新增动态门禁。专项、完整 test/非沙箱 verify、真实 Electron 36/36 与独立终审 P0=0/P1=0 已通过。第九合格副本已由生产 author-copy 事务创建并加载，只重跑受影响的已有稿件 Navigation，再继续 Research、image-01、Graph/recovery；尚未进入 0.1.2 发布授权。
 
 历史检查点（0.0BZ）：只读 Main/IPC 基础已独立签收，包括严格结构/导航工具协议、证据锚点、8 条/30 分钟隔离缓存、watcher barrier、真实 deadline abort 和零写入门禁；专项 53/53、Network 15/15，独立复审 P0/P1=0。其当时未覆盖的 Renderer、动作、骨架与 Electron 已由上方 0.0CC 当前注记覆盖，不得从本段派发旧“下一阶段”。
 
