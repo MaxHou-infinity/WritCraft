@@ -8,8 +8,8 @@
 
 > **历史工程交接（2026-07-29，0.0AC npm Developer Preview 本地签字收口）**：0.0AC 新增 macOS CLI、窄 npm 包、Node `>=22.12.0`、npm 10/11 fail-closed、Electron `43.2.0`、Main 观测 `did-finish-load` 后的 CLI readiness IPC 和零网络 `--check`；同时让 `sk-cp-` 图片能力进入 provider 现场门禁。该 readiness 只证明页面加载完成，不单独证明全部 workspace/bootstrap 逻辑成功。该批历史证据为 Persistent **3/3**、npm Preview **10/10**、installed **2/2**、真实 Electron **35/35**；当前候选只看下条。
 > **下一阶段合同**：`docs/AUTHOR-ACCEPTANCE-V1-CONTRACT.md` 已冻结，明确付费网络门禁、允许记录的隐私安全证据、真实长文旅程与发布前签字顺序。
-> **当前实现停点**：`writ-craft@0.1.1` 已公开到 npm `preview`，`latest` 仍为 `0.1.0`；唯一目标仍是 `RM-1.0 / 0.1.2` 真实作者闭环。项目卡、Inline 与 Chapter 已完成。0.0BW candidate `c6d8c44` 关闭 Plan 输出容量后，真实 operation `b915291982d14f8bb5520674280b3d0d` 在 13,590 ms 暴露首任务 `dependsOn` 被填入自然语言；before/after 0，项目零写入。0.0BX 将 ID/依赖统一为不 trim 的精确短 ASCII ID，在 Schema 内补字段说明和唯一性，并让依赖结构错误共享既有一次重试预算；第二次失败终止、绝不第三次调用。Plan 26/26、handoff 15/15、UI 16/16、完整 test/verify 与强制真实 Electron 37/37 通过，独立终审 P0/P1/P2=0。Exact candidate `1c7f178` 已重启，只待一次新 provider canary。默认模型仍为 MiniMax-M3，显式 8 文件/240 KiB 上下文门禁不变。0.1.2 尚未发布；精确红绿只看 `v0/DEVELOPMENT-STATUS.md`。
-> **路线图入口**：Phase A 已是工程地基，不再负责后续版本排期。当前唯一目标是 `docs/ROADMAP.md` 的 `RM-1.0 / writ-craft@0.1.2` 真实作者可用性闭环。
+> **当前实现停点**：`writ-craft@0.1.1` 已公开到 npm `preview`，`latest` 仍为 `0.1.0`；唯一目标是 `RM-1.1 / 0.1.2` 真实作者闭环。项目卡、Inline 与 Chapter 已完成。旧 Plan 在九次真实零写入失败后停止 canary，其任务图产品假设已由 `WRITING-NAVIGATION-V1-CONTRACT.md` 的“结构规划 / 写作导航”取代；替代实现尚未开始，旧安全代码仅作迁移保护。0.1.2 尚未发布；精确红绿只看 `v0/DEVELOPMENT-STATUS.md`。
+> **路线图入口**：Phase A 已是工程地基，不再负责后续版本排期。当前唯一目标是 `docs/ROADMAP.md` 的 `RM-1.1 / writ-craft@0.1.2` 真实作者可用性闭环。
 
 ## 1. 阶段目标
 
@@ -332,7 +332,7 @@ Main 为当前窗口保存不可伪造的 project session，不允许 renderer �
 
 ### 11.4 反返工开发门禁（强制）
 
-2026-07-19 至 2026-07-22，项目建立链经历了“修 JSON 容错 → 修 Changes 提交语义 → 修部分创建 → 重构 Onboarding v2 → 补 Renderer 跨层缺口 → 重跑真实 Electron”的连续返工。根因不是单个解析 Bug，而是最初没有同时冻结**用户验收场景、权威写入边界、完整状态机、原子性和跨层签字标准**。后续 Research→Changes、Inline Rewrite、Plan 及任何新的 AI 写入链必须执行以下门禁。
+2026-07-19 至 2026-07-22，项目建立链经历了“修 JSON 容错 → 修 Changes 提交语义 → 修部分创建 → 重构 Onboarding v2 → 补 Renderer 跨层缺口 → 重跑真实 Electron”的连续返工。根因不是单个解析 Bug，而是最初没有同时冻结**用户验收场景、权威写入边界、完整状态机、原子性和跨层签字标准**。后续 Research→Changes、Inline Rewrite、写作导航及任何新的 AI 写入链必须执行以下门禁。
 
 #### 11.4.1 编码前必须冻结的五项契约
 
@@ -375,8 +375,8 @@ Main 为当前窗口保存不可伪造的 project session，不允许 renderer �
 - **Inline Rewrite**：已冻结并实现 selection/block anchor、target revision、`end_turn`、输出边界、保留路径禁写、Main capability/ACK、接受时依赖复核、durable reconciliation 和 Change History。0.1.2 真实作者验收进一步证明“快捷键存在”不等于用户旅程完整：`⌘K` 必须先冻结选区并打开本次改写要求输入框，提交前零保存/IPC/AI/指标；提交时再次校验 Range 与项目/文件/编辑会话身份。请求使用 exact v2 私有指令，公开 History/recovery/metrics 保持 v1 且不得保存原始指令或其 hash。`⌘L` 只负责项目/文件/选区 Chat。
 - **Chapter 生成**：真实作者的 `b5.content` 红灯证明 strict envelope 通过不等于每个内容区块可用。只允许把 CRLF/外层换行规范化为传输格式；strict JSON/schema/block id 不修补、不重试。内容为空、NUL、字符或字节越界时，全章最多原位重生当前区块一次；retry 前必须重验 `edit.md`、目标与上下文 revision，不得携带失败模型正文。第二次失败零写入终止，不得拼出部分 ChangeSet。协议 prompt 中的 schema、blockId 和边界示例必须从当前 Main 权威对象动态生成；测试必须读取实际 prompt，并以非默认 ID 证明示例与后置校验一致，禁止 fixture 只返回预期答案而不验证收到的协议。
 - **Changes 提交终态**：hunk 的“尚未写入”只属于预提交审阅态。Main/History 已确认可信提交且无 residual 后，Renderer 必须销毁全部旧 Diff、决定按钮和预提交文案，只发布一个与权威结果一致的完成终态；不得同时显示“尚未写入”和“已安全应用”。动态测试和真实 Electron 都必须断言旧 hunk DOM 为 0。
-- **Plan 生成**：`docs/PLAN-STRICT-V1-CONTRACT.md` 已从文本 JSON 更新为工具协议。生产定义唯一 `submit_project_plan` 工具，以完整 `input_schema` 重复声明顶层/里程碑/任务的 required、array bounds、短 ASCII ID/依赖与 `additionalProperties:false`，并使用 named tool choice；Main 只接受 `stop_reason=tool_use` 且原始响应恰有一个同名、合法、plain-JSON 工具 input。thinking/text 不得成为 authority，旧 `end_turn` 文本 JSON、错误/多个/畸形 tool call 均失败关闭，绝不本地截取、剥围栏、trim ID、猜数组或静默回退。数组 shape/count 与 ID/依赖引用结构错误共享至多一次重试预算；重试不得携带失败 input，必须在第二次调用前重验文件树、`edit.md` 与全部显式上下文，第二次失败即终止。真实 Electron fixture 必须断言 forced tool/schema；Plan 定向门禁统一使用 `npm run verify:plan`。named forced 形态和本轮依赖字段仍必须通过一次真实 MiniMax canary，自动化不得冒充 provider 签字。
-- **Plan 输出容量**：provider token 预算必须与最大合法工具 input 闭合，不能依赖 `thinking` 默认值或提示词“保持简洁”。Plan 的生成/Main/Renderer 合同共同限制一次迭代为两个里程碑、每个两个任务、每任务两个目标/两个依赖和短字段；禁止 C0/孤立 surrogate 并统一按 Unicode code point 计数后，填满全部计数、ID、唯一 80 字符 Emoji 路径与所有唯一 Emoji 列表/叙述字段的确定性 fixture 为精确 6,120 bytes，低于 6 KiB。路径上限必须覆盖当前验收项目，唯一目标上限必须等于结构真实可达的 8。保持既有 8192-token/90-second 上限；`max_tokens` 是终态失败，不进入结构重试，不得自动再付费、扩大所有工作流的全局预算，或接受截断响应中的部分/看似完整工具 input。
+- **写作导航**：当前唯一合同为 `docs/WRITING-NAVIGATION-V1-CONTRACT.md`。空项目只比较 2–3 个可解释结构并在显式确认后全有或全无地创建空白骨架；已有稿件只给 1–3 张带证据、时机、动作和预期结果的下一步建议。模型永不持有写 capability，正文只经 Changes/Diff 落盘；打开章节不调用 AI，补充来源和修改建议分别通过 Main opaque identifier 路由到 Research/Changes。
+- **旧 Plan 历史边界**：`docs/PLAN-STRICT-V1-CONTRACT.md` 及 `submit_project_plan` 的工具协议、6,120-byte envelope、fail-closed 校验与测试只保留为九次真实零写入失败的安全证据。0.0BY 已终止其产品路线；不得再运行 provider canary、延长字段、扩大 token、增加重试或把旧任务图重新暴露给作者。
 - **Graph 扩展验收**：`docs/GRAPH-ACCEPTANCE-V1-CONTRACT.md` 已签字；筛选/双证据/stale/作者纠错、failure live、键盘/AX、布局及大图性能已覆盖。后续韧性批又关闭 deferred async ownership、缓存/分析器完整语义权威、有界不可变 Renderer 快照与 Unicode quote 边界，独立二审 P0/P1/P2=0；0.0AB 当时总链为真实 Electron 35/35，当前证据见文首“当前实现停点”与 `v0/DEVELOPMENT-STATUS.md` 顶部。
 - **Diagnostic Export**：`docs/DIAGNOSTIC-EXPORT-V1-CONTRACT.md` 已实现；Main 构造递归 allowlist JSON，Renderer 只显示精确预览并回传 token，原生保存拒绝覆盖并在失败时只清理由本次创建且 inode 相同的文件；取消、项目/导航漂移、TTL 跨 fsync 与并发替换均有动态门禁。
 - **Image Review**：`docs/IMAGE-REVIEW-V1-CONTRACT.md` 已实现自动化主链与 Trash 扩展；Main 绑定窗口/项目/代际/资产，Renderer 只回传 token、评分、终态、可选费用及 Trash opaque capability。恢复/清空使用 transaction quarantine、inode/digest 双复核和 committed-state 精确重试，不修改 Markdown 或既有评审证据。

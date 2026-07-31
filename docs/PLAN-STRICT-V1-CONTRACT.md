@@ -1,6 +1,6 @@
-# Project Plan Strict Output Contract
+# Project Plan Strict Output Contract（历史）
 
-> Status: the strict-text protocol was superseded by the 0.0BU single-tool boundary. 0.0BW then closed the output envelope at two milestones × two tasks and a 6,120-byte maximum fixture. Real operation `b915291982d14f8bb5520674280b3d0d` exposed the next narrower contract gap: MiniMax placed natural-language prose in the first task's `dependsOn` array and Main rejected it after 13,590 ms with zero writes. 0.0BX makes milestone/task IDs and dependencies exact short ASCII identifiers in both Schema and Main, forbids local trim/coercion, marks repeated arrays unique, and states that the first task has no dependency. Dependency ID/reference failures share the existing one-retry structural budget, never echo rejected input, and never permit a third call. Plan 26/26, handoff 15/15, UI 16/16, full test/verify and forced Electron 37/37 pass; independent review is P0/P1/P2=0. Exact candidate `1c7f178` is restarted; one new provider canary remains required. Authoritative current status remains `v0/DEVELOPMENT-STATUS.md`.
+> Status: **已由 `WRITING-NAVIGATION-V1-CONTRACT.md` 取代，不再是现行产品或验收合同。** 本文件只保存 `writcraft.plan/v2`、九次真实零写入失败及其安全工程证据，禁止据此派发新修复、provider canary 或作者验收。旧 Plan 的 fail-closed 代码在替代入口完成前可作为迁移保护存在，但不得继续作为用户能力宣传或 0.1.2 发版门禁。权威当前状态见 `v0/DEVELOPMENT-STATUS.md`。
 > Public plan schema: `writcraft.plan/v2`
 
 ## 1. Product and authority boundary

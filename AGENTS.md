@@ -53,6 +53,8 @@ Before resuming work, read `docs/ROADMAP.md`, `v0/DEVELOPMENT-STATUS.md`, the re
 
 Do not use one green row or “module complete” sentence for a composite experience when any required sub-capability is absent. Split status by user-visible boundary—for example single-turn Chat versus conversation continuity, conflict recovery versus trash restore UI, and `edit.md` onboarding versus section-aware context compilation. A Main service without preload/IPC/Renderer access is not an App feature.
 
+For the current `RM-1.1 / 0.1.2` target, `docs/WRITING-NAVIGATION-V1-CONTRACT.md` replaces the public Plan task graph. `docs/PLAN-STRICT-V1-CONTRACT.md`, `submit_project_plan`, and all old Plan canary instructions are historical evidence only: do not lengthen fields, add retries, spend another provider canary, or re-expose milestones/tasks/dependencies. Implement only the two replacement journeys—empty-project structure planning and existing-manuscript writing navigation—while keeping cross-file execution planning private to Main and all text writes behind Changes/Diff.
+
 At each durable closeout, compare current `main`, test evidence, `README.md`, PRD, Phase A, feature contracts, PDCA, and the status ledger. Search for the superseded milestone and test totals, run `git diff --check`, then update and re-query the same Nowledge authority memory. Separate the next locally executable task from external gates such as paid API keys or real-author evidence.
 
 When a shell search pattern contains Markdown backticks, `$()`, or other substitution syntax, use a single-quoted fixed string or pass the pattern as a literal argument. Never place such documentation text inside a double-quoted shell command; an audit must not execute the content it is searching for.
