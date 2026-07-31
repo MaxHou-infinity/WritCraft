@@ -30,6 +30,10 @@ const NATIVE_HELPERS = Object.freeze({
     sourceName: 'author-copy-helper.c',
     outputName: 'author-copy-helper',
   }),
+  writingStructure: Object.freeze({
+    sourceName: 'writing-structure-helper.c',
+    outputName: 'writing-structure-helper',
+  }),
   projectHash: Object.freeze({
     sourceName: 'project-hash-helper.c',
     outputName: 'project-hash-helper',

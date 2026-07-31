@@ -16,11 +16,23 @@ class ChangesHistoryMutationGuardError extends Error {
   }
 }
 
+class WritingStructureMutationGuardError extends Error {
+  constructor(message) {
+    super(message);
+    this.name = 'WritingStructureMutationGuardError';
+    this.code = 'WRITING_STRUCTURE_RECOVERY_PENDING';
+  }
+}
+
 function createInlineRewriteMutationGuard(options = {}) {
   if (typeof options.readMarker !== 'function') throw new TypeError('readMarker is required');
   const readChangesMarker = options.readChangesMarker;
+  const readStructureMarker = options.readStructureMarker;
   if (readChangesMarker !== undefined && typeof readChangesMarker !== 'function') {
     throw new TypeError('readChangesMarker must be a function');
+  }
+  if (readStructureMarker !== undefined && typeof readStructureMarker !== 'function') {
+    throw new TypeError('readStructureMarker must be a function');
   }
 
   function assertAvailable(rootPath) {
@@ -45,6 +57,16 @@ function createInlineRewriteMutationGuard(options = {}) {
         throw new ChangesHistoryMutationGuardError('Changes 提交状态待恢复；请先完成恢复核对');
       }
     }
+    if (readStructureMarker) {
+      let structureMarker;
+      try { structureMarker = readStructureMarker(rootPath); }
+      catch (_) {
+        throw new WritingStructureMutationGuardError('章节骨架提交状态无法核对；请先完成恢复');
+      }
+      if (structureMarker) {
+        throw new WritingStructureMutationGuardError('章节骨架提交状态待恢复；请先完成恢复核对');
+      }
+    }
     return true;
   }
 
@@ -54,5 +76,6 @@ function createInlineRewriteMutationGuard(options = {}) {
 module.exports = {
   InlineRewriteMutationGuardError,
   ChangesHistoryMutationGuardError,
+  WritingStructureMutationGuardError,
   createInlineRewriteMutationGuard,
 };

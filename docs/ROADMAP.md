@@ -82,6 +82,8 @@
 
 实现进度（0.0CA）：三种 Main-owned 动作交接已独立签收。open 为零模型本地定位；Research 携带 canonical evidence 进入研究页；Changes 重新读取依赖并生成待审 Diff，已有审阅时 fail-closed 且保留同一建议。失败/超时/取消可在有效建议上重试，每次执行使用独立 attempt ID，旧 A cancel 不得影响新 B。专项 73/73、Pending 13/13、Network 15/15，独立复审 P0/P1=0。结构骨架事务、Renderer、真实 Electron 与作者验收仍未完成；下一阶段只推进这些既定缺口。
 
+实现进度（0.0CB）：结构预览 capability、Main/IPC、共享 mutation guard 与章节骨架三态事务已独立签收。确认前零写入，确认后只生成作者逐项确认的标题与写作目的注释；stage I/O、验证、清理与 no-clobber publish 由签名 universal helper 在 trusted root fd 下完成。authoritative file state、generation 与 tree 未全部安装时保留 committed marker 和同一写锁。Structure 73/73、macOS package 8/8、npm Preview 10/10、release 7/7，独立复审 P0=0/P1=0/P2=3。保留边界为排除主动同 UID 最终 rename 替换、controls 部分清理可能需人工恢复、极端未 ack 进度淘汰；不得写成已关闭。Renderer、公开旧 Plan 移除、真实 Electron 与作者验收仍未完成，下一阶段只接双模式 UI 和既定动作。
+
 ### 4.3 明确不做
 
 - 不新增项目驾驶舱或命令面板；结构规划/写作导航只替代当前失效 Plan，不扩成第二套 AI 系统。

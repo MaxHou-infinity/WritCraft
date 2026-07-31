@@ -195,6 +195,24 @@ contextBridge.exposeInMainWorld('writCraft', {
         actionId,
         attemptId
       ),
+    prepareWritingStructure: (projectInstanceId, navigationId, alternativeId, chapters) =>
+      ipcRenderer.invoke(
+        'writcraft:project:prepare-writing-structure',
+        projectInstanceId,
+        navigationId,
+        alternativeId,
+        chapters
+      ),
+    confirmWritingStructure: capabilityId =>
+      ipcRenderer.invoke('writcraft:project:confirm-writing-structure', capabilityId),
+    queryWritingStructureRecovery: projectInstanceId =>
+      ipcRenderer.invoke('writcraft:project:query-writing-structure-recovery', projectInstanceId),
+    acknowledgeWritingStructureRecovery: (projectInstanceId, operationId) =>
+      ipcRenderer.invoke(
+        'writcraft:project:ack-writing-structure-recovery',
+        projectInstanceId,
+        operationId
+      ),
     proposePlan: (projectInstanceId, goal, contextPaths) => ipcRenderer.invoke('writcraft:project:propose-plan', projectInstanceId, goal, contextPaths),
     handoffPlanTask: (projectInstanceId, request) => ipcRenderer.invoke('writcraft:project:handoff-plan-task', projectInstanceId, request),
     handoffGraphIssue: (projectInstanceId, request) => ipcRenderer.invoke('writcraft:project:handoff-graph-issue', projectInstanceId, request),

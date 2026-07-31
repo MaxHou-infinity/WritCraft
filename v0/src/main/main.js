@@ -38,6 +38,10 @@ const writingNavigationHandlerService = require('./writing-navigation-handler');
 const writingNavigationProviderAdapter = require('./writing-navigation-provider-adapter');
 const writingNavigationHandoffService = require('./writing-navigation-handoff-service');
 const writingNavigationActionHandlerService = require('./writing-navigation-action-handler');
+const writingStructureService = require('./writing-structure-service');
+const writingStructureCapabilityStoreService = require('./writing-structure-capability-store');
+const writingStructureHandlerService = require('./writing-structure-handler');
+const writingStructureTransactionService = require('./writing-structure-transaction-service');
 const projectChangesProposalService = require('./project-changes-proposal-service');
 const localizedEditService = require('./localized-edit-service');
 const graphIndexService = require('./graph-index-service');
@@ -161,6 +165,8 @@ pendingChangeSets = pendingChangeSetStoreService.createPendingChangeSetStore({
 });
 const pendingPlanRecords = projectPlanHandoffService.createPlanHandoffStore();
 const writingNavigationStore = writingNavigationStoreService.createWritingNavigationStore();
+const writingStructureCapabilityStore =
+  writingStructureCapabilityStoreService.createWritingStructureCapabilityStore();
 const writingNavigationProjectCallLLM =
   writingNavigationProviderAdapter.createWritingNavigationProviderAdapter({
     runAiRequest,
@@ -182,6 +188,19 @@ const changesHistoryTransaction = changesHistoryTransactionService.createChanges
   historyService: changeHistoryService,
   reviewService: changeSetReviewService,
 });
+const writingStructureTransaction =
+  writingStructureTransactionService.createWritingStructureTransactionService();
+function readWritingStructureRecoveryMarker(rootPath) {
+  if (!writingStructureTransaction.hasPending(rootPath)) return null;
+  const marker = writingStructureTransaction.readMarker(rootPath);
+  if (!marker) {
+    throw new writingStructureTransactionService.WritingStructureTransactionError(
+      'STRUCTURE_RECOVERY_CORRUPT',
+      '章节骨架提交状态无法核对；请先完成恢复'
+    );
+  }
+  return marker;
+}
 const inlineRewriteStore = inlineRewriteCapabilityStoreService.createInlineRewriteCapabilityStore();
 const researchApplyTransaction = researchApplyTransactionService.createResearchApplyTransaction({
   changeSetReviewService,
@@ -221,14 +240,22 @@ const inlineRewriteReconciliation = inlineRewriteService.createInlineRewriteReco
 const inlineRewriteApplyService = inlineRewriteApplyServiceModule.createInlineRewriteApplyService();
 const inlineRewriteOnlyMutationGuard = inlineRewriteMutationGuardService.createInlineRewriteMutationGuard({
   readMarker: rootPath => inlineRewriteReconciliation.read(rootPath),
+  readStructureMarker: readWritingStructureRecoveryMarker,
 });
 const inlineRewriteMutationGuard = inlineRewriteMutationGuardService.createInlineRewriteMutationGuard({
   readMarker: rootPath => inlineRewriteReconciliation.read(rootPath),
   readChangesMarker: rootPath => changesHistoryTransaction.reconciliation.readMarker(rootPath),
+  readStructureMarker: readWritingStructureRecoveryMarker,
 });
 const changesHistoryOnlyMutationGuard = inlineRewriteMutationGuardService.createInlineRewriteMutationGuard({
   readMarker: () => null,
   readChangesMarker: rootPath => changesHistoryTransaction.reconciliation.readMarker(rootPath),
+  readStructureMarker: readWritingStructureRecoveryMarker,
+});
+const writingStructureRecoveryMutationGuard =
+  inlineRewriteMutationGuardService.createInlineRewriteMutationGuard({
+    readMarker: rootPath => inlineRewriteReconciliation.read(rootPath),
+    readChangesMarker: rootPath => changesHistoryTransaction.reconciliation.readMarker(rootPath),
 });
 const pendingLegacyEditMigrations = new Map();
 const pendingLegacyDraftImports = new Map();
@@ -327,6 +354,10 @@ function projectFailure(error) {
     error instanceof writingNavigationService.WritingNavigationError ||
     error instanceof writingNavigationStoreService.WritingNavigationStoreError ||
     error instanceof writingNavigationHandoffService.WritingNavigationHandoffError ||
+    error instanceof writingStructureService.WritingStructureError ||
+    error instanceof writingStructureCapabilityStoreService.WritingStructureCapabilityStoreError ||
+    error instanceof writingStructureHandlerService.WritingStructureHandlerError ||
+    error instanceof writingStructureTransactionService.WritingStructureTransactionError ||
     error instanceof projectChangesProposalService.ProjectChangesProposalError ||
     error instanceof localizedEditService.LocalizedEditError ||
     error instanceof changeSetService.ChangeSetError ||
@@ -346,6 +377,7 @@ function projectFailure(error) {
     error instanceof inlineRewriteContextService.InlineRewriteContextError ||
     error instanceof inlineRewriteMutationGuardService.InlineRewriteMutationGuardError ||
     error instanceof inlineRewriteMutationGuardService.ChangesHistoryMutationGuardError ||
+    error instanceof inlineRewriteMutationGuardService.WritingStructureMutationGuardError ||
     error instanceof changesHistoryHandlerService.ChangesHistoryHandlerError ||
     error instanceof changesHistoryReconciliationService.ChangesHistoryRecoveryError ||
     error instanceof referenceImportService.ReferenceImportError ||
@@ -395,6 +427,20 @@ function assertChangesHistoryRecoveryAvailable(project) {
   // an unresolved Inline Rewrite transaction.
   markdownTrashService.assertMutationAvailable(project);
   inlineRewriteOnlyMutationGuard.assertAvailable(project.rootPath);
+  return project;
+}
+
+function assertWritingStructureRecoveryAvailable(project, allowedLease = null) {
+  if (!project || typeof project.rootPath !== 'string') {
+    throw new projectService.ProjectServiceError('NO_PROJECT', '请先创建或打开一个写作项目');
+  }
+  // Structure reconciliation may bypass only its own marker. It still refuses
+  // to race Trash, Inline Rewrite, Changes, another internal mutation, or a
+  // degraded watcher.
+  assertInternalMutationAvailable(project, allowedLease);
+  assertProjectWatcherAvailable(project);
+  markdownTrashService.assertMutationAvailable(project);
+  writingStructureRecoveryMutationGuard.assertAvailable(project.rootPath);
   return project;
 }
 
@@ -517,6 +563,10 @@ function advanceRendererNavigationEpoch() {
       ownerId,
       projectInstanceId: currentProject.instanceId,
     });
+    writingStructureCapabilityStore.invalidateProject({
+      ownerId,
+      projectInstanceId: currentProject.instanceId,
+    });
   }
   rendererNavigationEpoch += 1;
   if (currentProject) onboardingAdmission.invalidateProject(currentProject);
@@ -583,6 +633,10 @@ function advanceAiContextGeneration(options = {}) {
   if (ownerId) chatConversationStore.invalidateOwner(ownerId, 'context_changed');
   if (ownerId && currentProject) {
     writingNavigationStore.invalidateProject({
+      ownerId,
+      projectInstanceId: currentProject.instanceId,
+    });
+    writingStructureCapabilityStore.invalidateProject({
       ownerId,
       projectInstanceId: currentProject.instanceId,
     });
@@ -714,6 +768,72 @@ function publicContextFingerprint(project) {
   };
   visit(projectService.listTree(project.rootPath));
   return crypto.createHash('sha256').update(records.join('\n')).digest('hex');
+}
+
+function writingStructureTreeFingerprint(project, tree) {
+  const records = [];
+  const stack = [...tree].reverse();
+  while (stack.length) {
+    const node = stack.pop();
+    if (!node || typeof node.path !== 'string' || typeof node.type !== 'string') {
+      throw new projectService.ProjectServiceError(
+        'INVALID_PROJECT_TREE',
+        '项目文件树无法用于结构确认'
+      );
+    }
+    if (node.type === 'directory') {
+      records.push(`d\0${node.path}`);
+      if (!Array.isArray(node.children)) {
+        throw new projectService.ProjectServiceError(
+          'INVALID_PROJECT_TREE',
+          '项目目录节点无法用于结构确认'
+        );
+      }
+      stack.push(...[...node.children].reverse());
+    } else if (node.type === 'file') {
+      if (/\.(?:md|markdown)$/i.test(node.path)) {
+        const snapshot = projectService.readFileWithRevision(project.rootPath, node.path);
+        records.push(`m\0${node.path}\0${snapshot.revision}`);
+      } else {
+        records.push(`f\0${node.path}\0${node.size}`);
+      }
+    } else {
+      records.push(`x\0${node.path}\0${node.type}`);
+    }
+  }
+  return crypto.createHash('sha256').update(records.join('\n')).digest('hex');
+}
+
+function deriveWritingStructureAuthority(project) {
+  if (!project || typeof project.rootPath !== 'string') {
+    throw new projectService.ProjectServiceError('PROJECT_CHANGED', '项目状态已变化');
+  }
+  const tree = projectService.listTree(project.rootPath);
+  const bodyPaths = writingNavigationService.markdownPaths(tree);
+  let chaptersAbsent = true;
+  const stack = [...tree];
+  while (stack.length) {
+    const node = stack.pop();
+    if (!node || typeof node.path !== 'string') {
+      throw new projectService.ProjectServiceError(
+        'INVALID_PROJECT_TREE',
+        '项目文件树无法用于结构确认'
+      );
+    }
+    if (node.path.normalize('NFC').toLocaleLowerCase('en-US') === 'chapters') {
+      chaptersAbsent = false;
+    }
+    if (node.type === 'directory' && Array.isArray(node.children)) {
+      stack.push(...node.children);
+    }
+  }
+  const edit = projectService.readFileWithRevision(project.rootPath, projectService.EDIT_FILE);
+  return Object.freeze({
+    editRevision: edit.revision,
+    emptyTreeDigest: writingStructureTreeFingerprint(project, tree),
+    emptyBody: bodyPaths.length === 0,
+    chaptersAbsent,
+  });
 }
 
 function beginInternalMutation(project) {
@@ -849,6 +969,10 @@ function setCurrentProject(project) {
       const navigationOwnerId = currentChatConversationOwnerId();
       if (navigationOwnerId) {
         writingNavigationStore.invalidateProject({
+          ownerId: navigationOwnerId,
+          projectInstanceId: currentProject.instanceId,
+        });
+        writingStructureCapabilityStore.invalidateProject({
           ownerId: navigationOwnerId,
           projectInstanceId: currentProject.instanceId,
         });
@@ -2031,6 +2155,47 @@ ipcMain.handle('writcraft:project:cancel-writing-navigation-action',
     staleAiProjectResult,
     projectFailure,
   })
+);
+
+const writingStructureHandlers = writingStructureHandlerService.createWritingStructureHandlers({
+  assertTrustedSender,
+  requireCurrentProject,
+  getCurrentProject: () => currentProject,
+  getMutationGeneration: () => projectMutationGeneration,
+  getRendererNavigationEpoch: () => rendererNavigationEpoch,
+  settleProjectAuthority: settleWritingNavigationAuthority,
+  deriveAuthority: deriveWritingStructureAuthority,
+  writingStructureService,
+  writingNavigationStore,
+  capabilityStore: writingStructureCapabilityStore,
+  transaction: writingStructureTransaction,
+  assertMutationAvailable: assertInlineRewriteMutationAvailable,
+  assertCommitAvailable: assertWritingStructureRecoveryAvailable,
+  assertRecoveryAvailable: assertWritingStructureRecoveryAvailable,
+  beginMutation: beginInternalMutation,
+  endMutation: endInternalMutation,
+  rememberCommittedFile: rememberOwnFileMutation,
+  advanceGeneration: advanceAiContextGeneration,
+  listTree: project => projectService.listTree(project.rootPath),
+  staleProjectResult: staleAiProjectResult,
+  projectFailure,
+});
+
+ipcMain.handle(
+  'writcraft:project:prepare-writing-structure',
+  writingStructureHandlers.prepare
+);
+ipcMain.handle(
+  'writcraft:project:confirm-writing-structure',
+  writingStructureHandlers.confirm
+);
+ipcMain.handle(
+  'writcraft:project:query-writing-structure-recovery',
+  writingStructureHandlers.queryRecovery
+);
+ipcMain.handle(
+  'writcraft:project:ack-writing-structure-recovery',
+  writingStructureHandlers.acknowledgeRecovery
 );
 
 ipcMain.handle('writcraft:project:propose-plan', projectPlanHandler.createProposePlanHandler({

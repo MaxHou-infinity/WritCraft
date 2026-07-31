@@ -59,6 +59,11 @@ test('ad-hoc signs, verifies, archives and records a SHA-256 release manifest', 
     'the build must sign the helper before creating its attestation');
   assert.match(script, /assertPackagedHelperBinding\(nativeHelperBuild, packagedNativeHelper\)/,
     'the package must reject a copied author helper whose bytes differ from the build attestation');
+  assert.match(
+    script,
+    /assertPackagedHelperBinding\(writingStructureHelperBuild, packagedWritingStructureHelper\)/,
+    'the package must reject a copied writing-structure helper whose bytes differ from the build attestation'
+  );
   assert.match(script, /assertPackagedHelperBinding\(projectHashHelperBuild, packagedProjectHashHelper\)/,
     'the package must reject a copied project-hash helper whose bytes differ from its build attestation');
   assert.match(script, /assertPackagedHelperBinding\(markdownTrashHelperBuild, packagedMarkdownTrashHelper\)/,
@@ -74,6 +79,11 @@ test('ad-hoc signs, verifies, archives and records a SHA-256 release manifest', 
   );
   assert.match(
     releaseVerifyScript,
+    /assertArtifactHelperBinding\(\s*info\.nativeHelperBuilds\.writingStructure,\s*packagedWritingStructureHelper\s*\)/,
+    'release verification must bind the App writing-structure helper to its build digest'
+  );
+  assert.match(
+    releaseVerifyScript,
     /assertArtifactHelperBinding\(info\.nativeHelperBuilds\.projectHash, packagedProjectHashHelper\)/,
     'release verification must bind the App project-hash helper to its build digest'
   );
@@ -86,6 +96,11 @@ test('ad-hoc signs, verifies, archives and records a SHA-256 release manifest', 
     releaseVerifyScript,
     /assertArtifactHelperBinding\(info\.nativeHelperBuilds\.authorCopy, extractedHelper\)/,
     'release verification must bind the extracted ZIP author helper to the same build digest'
+  );
+  assert.match(
+    releaseVerifyScript,
+    /assertArtifactHelperBinding\(\s*info\.nativeHelperBuilds\.writingStructure,\s*extractedWritingStructureHelper\s*\)/,
+    'release verification must bind the extracted ZIP writing-structure helper to the same build digest'
   );
   assert.match(
     releaseVerifyScript,
@@ -135,8 +150,15 @@ test('bundles the self-contained PDF runtime (pdfjs legacy build + standard font
   assert(!fs.existsSync(path.join(root, 'src', 'main', 'pdf-extract-helper.py')));
 });
 
-test('bundles universal executable author-copy, project-hash and Markdown-trash helpers', () => {
+test('bundles universal executable author-copy, writing-structure, project-hash and Markdown-trash helpers', () => {
   const authorHelper = path.join(root, 'src', 'main', 'native', 'author-copy-helper');
+  const writingStructureHelper = path.join(
+    root,
+    'src',
+    'main',
+    'native',
+    'writing-structure-helper'
+  );
   const projectHashHelper = path.join(root, 'src', 'main', 'native', 'project-hash-helper');
   const markdownTrashSource = path.join(root, 'native', 'markdown-trash-helper.c');
   const service = fs.readFileSync(
@@ -148,13 +170,16 @@ test('bundles universal executable author-copy, project-hash and Markdown-trash 
     'utf8'
   );
   fs.accessSync(authorHelper, fs.constants.R_OK | fs.constants.X_OK);
+  fs.accessSync(writingStructureHelper, fs.constants.R_OK | fs.constants.X_OK);
   fs.accessSync(projectHashHelper, fs.constants.R_OK | fs.constants.X_OK);
   fs.accessSync(markdownTrashSource, fs.constants.R_OK);
   assert.match(script, /Author acceptance native helper/);
+  assert.match(script, /Writing structure native helper/);
   assert.match(script, /Project hash native helper/);
   assert.match(script, /Markdown trash native helper/);
   assert.match(script, /Contents', 'Helpers'/);
   assert.match(script, /author-copy-helper/);
+  assert.match(script, /writing-structure-helper/);
   assert.match(script, /project-hash-helper/);
   assert.match(script, /markdown-trash-helper/);
   assert.match(script, /fs\.rmSync\(path\.join\(packagedApp, 'src', 'main', 'native'/);
@@ -175,6 +200,14 @@ test('direct package path owns all current signed native build attestations and 
   const output = path.join(temporary, 'src', 'main', 'native', 'author-copy-helper');
   const projectSource = path.join(temporary, 'native', 'project-hash-helper.c');
   const projectOutput = path.join(temporary, 'src', 'main', 'native', 'project-hash-helper');
+  const structureSource = path.join(temporary, 'native', 'writing-structure-helper.c');
+  const structureOutput = path.join(
+    temporary,
+    'src',
+    'main',
+    'native',
+    'writing-structure-helper'
+  );
   const markdownSource = path.join(temporary, 'native', 'markdown-trash-helper.c');
   const markdownOutput = path.join(temporary, 'src', 'main', 'native', 'markdown-trash-helper');
   try {
@@ -184,12 +217,18 @@ test('direct package path owns all current signed native build attestations and 
     fs.writeFileSync(output, 'compiled-native-helper');
     fs.writeFileSync(projectSource, 'int main(void) { return 0; }\n');
     fs.writeFileSync(projectOutput, 'compiled-project-hash-helper');
+    fs.writeFileSync(structureSource, 'int main(void) { return 0; }\n');
+    fs.writeFileSync(structureOutput, 'compiled-writing-structure-helper');
     fs.writeFileSync(markdownSource, 'int main(void) { return 0; }\n');
     fs.writeFileSync(markdownOutput, 'compiled-markdown-trash-helper');
     const attestation = nativeHelperBuild.createNativeHelperAttestation({ source, output });
     const projectAttestation = nativeHelperBuild.createNativeHelperAttestation({
       source: projectSource,
       output: projectOutput,
+    });
+    const structureAttestation = nativeHelperBuild.createNativeHelperAttestation({
+      source: structureSource,
+      output: structureOutput,
     });
     const markdownAttestation = nativeHelperBuild.createNativeHelperAttestation({
       source: markdownSource,
@@ -227,6 +266,28 @@ test('direct package path owns all current signed native build attestations and 
     assert.strictEqual(projectCalls, 1, 'package must invoke the project-hash builder exactly once');
     assert.deepStrictEqual(preparedProject, projectAttestation);
 
+    let structureCalls = 0;
+    const preparedStructure = packageMac.prepareWritingStructureHelper({
+      root: temporary,
+      source: structureSource,
+      output: structureOutput,
+      buildNativeHelper(options) {
+        structureCalls += 1;
+        assert.deepStrictEqual(options, {
+          root: temporary,
+          source: structureSource,
+          output: structureOutput,
+        });
+        return structureAttestation;
+      },
+    });
+    assert.strictEqual(
+      structureCalls,
+      1,
+      'package must invoke the writing-structure builder exactly once'
+    );
+    assert.deepStrictEqual(preparedStructure, structureAttestation);
+
     let markdownCalls = 0;
     const preparedMarkdown = packageMac.prepareMarkdownTrashHelper({
       root: temporary,
@@ -251,17 +312,19 @@ test('direct package path owns all current signed native build attestations and 
         coordinatorCalls += 1;
         return Object.freeze({
           authorCopy: attestation,
+          writingStructure: structureAttestation,
           projectHash: projectAttestation,
           markdownTrash: markdownAttestation,
         });
       },
     }), {
       authorCopy: attestation,
+      writingStructure: structureAttestation,
       projectHash: projectAttestation,
       markdownTrash: markdownAttestation,
     });
     assert.strictEqual(coordinatorCalls, 1,
-      'the production package coordinator must obtain exactly one three-helper attestation set');
+      'the production package coordinator must obtain exactly one four-helper attestation set');
 
     assert.throws(() => packageMac.prepareNativeHelper({
       root: temporary,
@@ -328,18 +391,19 @@ test('full package coordinator builds all native helpers before writing its mani
       };
       return Object.freeze({
         authorCopy: packageMac.prepareNativeHelper({ buildNativeHelper }),
+        writingStructure: packageMac.prepareWritingStructureHelper({ buildNativeHelper }),
         projectHash: packageMac.prepareProjectHashHelper({ buildNativeHelper }),
         markdownTrash: packageMac.prepareMarkdownTrashHelper({ buildNativeHelper }),
       });
     },
   });
-  assert.strictEqual(builds, 3,
+  assert.strictEqual(builds, 4,
     'one complete package invocation must build each native helper exactly once');
   assert.strictEqual(info.schema, 'writcraft.release/v4');
   assert.strictEqual(info.product, '笔触 · WritCraft');
   assert.strictEqual(info.version, packageJson.version);
   assert.deepStrictEqual(Object.keys(info.nativeHelperBuilds).sort(),
-    ['authorCopy', 'markdownTrash', 'projectHash']);
+    ['authorCopy', 'markdownTrash', 'projectHash', 'writingStructure']);
   assert.strictEqual(info.signing, 'ad-hoc (local testing only)');
   assert.strictEqual(info.notarized, false);
 });

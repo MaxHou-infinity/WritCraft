@@ -1,11 +1,11 @@
 # 笔触 · WritCraft · V0 开发状态与续作入口
 
-> 最后更新：2026-07-31（Asia/Shanghai，0.0CA · 写作导航 Main 动作交接独立签收）
+> 最后更新：2026-07-31（Asia/Shanghai，0.0CB · 结构确认与章节骨架三态事务独立签收）
 > 当前状态：**`writ-craft@0.1.1` 已从 exact candidate `c65981e` 发布到 npm `preview`；registry 时间 `2026-07-29T14:30:16.176Z`，shasum `d370c500666e25cfb373852deafa21b232d2bc18` 与本地候选一致。公网隔离安装/启动/退出为 2/2。annotated tag `v0.1.1` 指向同一提交，GitHub prerelease 已公开：`https://github.com/MaxHou-infinity/WritCraft/releases/tag/v0.1.1`。**
 > 发布判断：**0.1.1 Developer Preview 已完成版本、自动化、双架构安装、独立复审、npm 发布、公网安装和 GitHub prerelease。registry 标签保持 `preview: 0.1.1`、`latest: 0.1.0`，因此本次没有把 Preview 冒充稳定版，也没有执行 unpublish、占位发布或上传未签名 App/ZIP。**
 > 当前目标版本：**`docs/ROADMAP.md` 的 `RM-1.1 / writ-craft@0.1.2` 真实作者可用性闭环。必须以 `WRITING-NAVIGATION-V1-CONTRACT.md` 的结构规划/写作导航替代旧 Plan，再完成 Research、image-01、Graph/recovery 和完整签字。不得插入驾驶舱或其他后续版本功能。**
-> 当前源码证据：**旧 Plan 的公开产品假设已经失效且不再付费复测。替代功能已完成两个内部检查点：0.0BZ 的只读生成/缓存/IPC 底座，以及 0.0CA 的 open/Research/Changes Main-owned 动作交接。打开章节为零模型本地定位；Research 保留证据进入研究页；Changes 重新读取 authority、最多一次调用并创建待审 Diff。已有待审 Changes 返回 `REVIEW_IN_PROGRESS` 且同一建议可重试；失败/超时/取消不再消费仍有效建议。每次执行绑定独立 `wno_` attempt，A 的迟到取消不能 abort B。专项 73/73、Pending 13/13、Network 15/15，独立终审 P0=0/P1=0。当前 Renderer 尚未接入，结构确认与骨架写入事务也未实现，因此不能称为用户可用、不能移除旧 runtime、不能进入作者验收。**
-> 当前作者验收进度：**项目卡、Inline 与 Chapter 已关闭。旧 Plan 九次失败只作为历史证据，不再要求作者复测。下一内部动作是完成结构确认 capability 与章节骨架三态事务，再接 Navigation Renderer、贯通 attempt/busy/cancel 并移除公开旧 Plan；之后才创建新的空项目与合格作者隔离副本做两段验收。Research、已授权 image-01 和 Graph/recovery 仍开放。**
+> 当前源码证据：**旧 Plan 的公开产品假设已经失效且不再付费复测。替代功能已完成三个内部检查点：0.0BZ 的只读生成/缓存/IPC 底座、0.0CA 的 open/Research/Changes Main-owned 动作交接，以及 0.0CB 的结构预览 capability、Main/IPC、共享写锁和章节骨架三态事务。作者确认前零写入；确认后只创建精确标题与写作目的注释，不生成正文。UNCOMMITTED、COMMITTED、UNKNOWN 均由 durable marker/receipt 与磁盘身份重建；authoritative watcher/generation/tree 未安装完整时不清恢复记录。Structure 73/73、macOS package 8/8、npm Preview 10/10、release 7/7，独立终审 P0=0/P1=0/P2=3。当前 Renderer 尚未接入，旧 Plan 公开入口仍存在，因此替代功能还不是用户可用闭环、不能进入作者验收或申请发布。**
+> 当前作者验收进度：**项目卡、Inline 与 Chapter 已关闭。旧 Plan 九次失败只作为历史证据，不再要求作者复测。下一内部动作是接入 Navigation 双模式 Renderer、贯通生成/取消/busy/recovery 与三种动作，并移除公开旧 Plan；之后才创建新的空项目与合格作者隔离副本做两段验收。Research、已授权 image-01 和 Graph/recovery 仍开放。**
 > 0.0AA 历史保留红灯：**首轮真实 Electron 暴露 Inspector 在上下文失效时被清空、旧 5-chip 断言和项目 Chat 等待诊断；完整 test 又暴露 Plan 测试把 generation 函数正文写死。独立复审发现新请求预检窗口可提交不可见旧轮、同项目重开 UI/Main 串话、失败重开提前清会话及两项测试/错误文案缺口，均转为生产边界和回归后关闭。真实 Electron 曾连续两次在旧 Graph 恢复阶段超时；加入只读失败快照后该阶段连续四次通过，未改 Graph 产品逻辑，按重复同源证据关闭 timing P2。另一次 Chat preflight 红灯证明测试在恢复 `edit.md` 后未等待权威 watcher barrier；改为生产 `flushExternalChanges()` 收敛，而未放宽 Chat guard。该里程碑所有红运行保留，最终源码连续两次 34/34；后续 0.0AB 当时推进到 35/35，当前总链只看本文顶部当前里程碑。**
 > Graph 历史签字基线：**性能修复前的既有源码曾完整 `npm test`、Electron-enabled `npm run verify`、强制真实 Electron 26/26 exit 0；Graph Filter 15/15、Workbench 14/14、dynamic 5/5、Large 5/5、Watcher 15/15、Network 11/11、Intelligence 17/17，第二轮复审 P0=0/P1=0/P2=2。该数字只保留为历史过程；0.0AB 后来推进到 35/35，当前总链只看顶部当前里程碑。**
 > Graph 动态边界：**300 文件/1279 节点 cold-to-interactive、cache/incremental、筛选/内存/布局、AX/键鼠、三类纠错、stale/Issue→Changes、failure live、重启与项目隔离均进入真实 Electron；正文/History/ledger 的零写入门禁通过。**  
@@ -33,6 +33,15 @@ Chat 的三级 scope/context、Main-owned 多轮连续性、Onboarding v2、Rese
 4. 不重写已经签字的 Onboarding v2 service、capability store、batch、Main/preload 与 Renderer 契约；Main 动态 admission、single-flight 和 Renderer 生命周期 authority 清理均已关闭。
 5. 每批合入后重跑定向测试；阶段完成时再运行完整 `npm test`、`npm run verify` 与 `WRITCRAFT_E2E_FORCE=1 npm run e2e:electron`，保存当次证据。
 6. 真实 API 只使用用户显式配置的 Key；记录延迟、限流、超时、故障和费用，不记录 Key、Prompt、模型原文或正文。Key 前缀只表示凭据/计费类型，不能代替官方能力与现场门禁。首发按 npm Developer Preview 合同执行；独立 App 发布才需要 Developer ID、公证与 Gatekeeper。
+
+### 0.0CB 2026-07-31 · 结构确认与章节骨架三态事务
+
+- **确认前只预览**：新增 `writing-structure-service` 与一次性 `wsc_` capability。作者可以在 AI 方案上修改 1–8 个章节标题和写作目的；Main 用同一 raw validator 重验并生成精确 `chapters/01.md` 至 `08.md` 字节。Renderer 不能提交 revision、root、文件内容或自称可信的空项目状态。
+- **三态提交**：新增 durable marker/receipt、独立 universal `writing-structure-helper` 与 `writing-structure-transaction-service`。stage 文件写入、验证、fsync、清理和 no-clobber 发布均经 trusted root fd 的 descriptor-relative helper；precommit 失败只有在 stage 与 controls 精确清理并 fsync 后才返回 `UNCOMMITTED`，发布响应丢失则从磁盘重建 `COMMITTED` 或保持 `UNKNOWN`，绝不诱导重复确认。
+- **Main 与共享写锁**：prepare 前 watcher full settle，confirm 只接收 capability ID，并在最终 publish 前同步重验 project instance、generation、epoch、`edit.md` revision、空正文、空树摘要和 `chapters` 不存在。结构 marker 已加入所有其他写路径的共享 guard。提交后依次安装 committed file state、generation 和权威树；任一步失败都保留同一 recovery lease，三步完整后才自动 acknowledge。
+- **独立复审推动的修复**：首轮虽然 focused 全绿，复审仍发现 stage 绝对路径 I/O、检查后按路径删除、receipt 元数据不足、authoritative refresh 失败仍 ack、恢复目录非私有五项 P1。修复后 stage→外部 symlink 证明外部零写入，迟到替换证明不误删，marker/receipt 强制 regular/euid/0600/nlink=1，`.writcraft` 拒绝 group/world writable，`recovery` 强制当前 euid/0700；最终复审 **P0=0/P1=0/P2=3**。
+- **保留 P2**：macOS 没有按已打开目录 fd 原子绑定 source identity 的 rename 原语，V0 明确不承诺抵御主动同 UID 在最终检查与 rename 间替换；controls 部分清理失败会安全保持锁定但可能需要人工恢复；极端 64 个长期未 ack operation 的内存进度淘汰策略可继续改善。三者均不得在后续文档中写成已关闭。
+- **验证与发布边界**：Structure **73/73**、macOS package **8/8**、npm Preview **10/10**、release **7/7**；四个 helper 的源码、签名 universal binary、App 与标准 unzip 摘要链重新建立。未发布 npm、未移动 dist-tag、未创建 GitHub Release。本批仍没有 Renderer 或真实 Electron/作者证据，下一步只接双模式 UI 并移除旧 Plan 公开入口。
 
 ### 0.0CA 2026-07-31 · 写作导航 Main 动作交接
 

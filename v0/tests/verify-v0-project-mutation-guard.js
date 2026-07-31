@@ -26,10 +26,11 @@ function expectCode(code, fn) {
 
 console.log('\nComposite project mutation guard verification');
 
-test('allows mutation only when both recovery authorities are empty', () => {
+test('allows mutation only when all recovery authorities are empty', () => {
   const guard = createInlineRewriteMutationGuard({
     readMarker: () => null,
     readChangesMarker: () => null,
+    readStructureMarker: () => null,
   });
   assert.strictEqual(guard.assertAvailable('/project'), true);
 });
@@ -50,7 +51,16 @@ test('blocks every Changes marker without exposing marker contents', () => {
   expectCode('CHANGES_RECOVERY_PENDING', () => guard.assertAvailable('/project'));
 });
 
-test('fails closed when either marker cannot be read', () => {
+test('blocks every structure marker without exposing marker contents', () => {
+  const guard = createInlineRewriteMutationGuard({
+    readMarker: () => null,
+    readChangesMarker: () => null,
+    readStructureMarker: () => ({ operationId: 'secret', files: ['chapters/01.md'] }),
+  });
+  expectCode('WRITING_STRUCTURE_RECOVERY_PENDING', () => guard.assertAvailable('/project'));
+});
+
+test('fails closed when any marker cannot be read', () => {
   const inline = createInlineRewriteMutationGuard({
     readMarker: () => { throw new Error('/private/secret'); },
     readChangesMarker: () => null,
@@ -62,6 +72,13 @@ test('fails closed when either marker cannot be read', () => {
     readChangesMarker: () => { throw new Error('/private/secret'); },
   });
   expectCode('CHANGES_RECOVERY_PENDING', () => changes.assertAvailable('/project'));
+
+  const structure = createInlineRewriteMutationGuard({
+    readMarker: () => null,
+    readChangesMarker: () => null,
+    readStructureMarker: () => { throw new Error('/private/secret'); },
+  });
+  expectCode('WRITING_STRUCTURE_RECOVERY_PENDING', () => structure.assertAvailable('/project'));
 });
 
 test('rejects an invalid root before invoking either reader', () => {
@@ -74,4 +91,4 @@ test('rejects an invalid root before invoking either reader', () => {
   assert.strictEqual(reads, 0);
 });
 
-console.log(`\n${passed}/5 composite mutation guard checks passed.\n`);
+console.log(`\n${passed}/${passed} composite mutation guard checks passed.\n`);

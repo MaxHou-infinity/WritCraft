@@ -92,12 +92,13 @@ test('uses a narrow publish allowlist that excludes tests, releases and secrets'
   }
 });
 
-test('ships the complete runtime and three executable universal helper artifacts', () => {
+test('ships the complete runtime and four executable universal helper artifacts', () => {
   for (const relative of [
     'src/main/main.js',
     'src/main/preload.js',
     'src/renderer/index.html',
     'src/main/native/author-copy-helper',
+    'src/main/native/writing-structure-helper',
     'src/main/native/project-hash-helper',
     'src/main/native/markdown-trash-helper',
   ]) {
@@ -243,6 +244,7 @@ test('actual npm tarball has the shrinkwrap, notices, safe paths and executable 
     'bin/writcraft.js',
     'src/main/main.js',
     'src/main/native/author-copy-helper',
+    'src/main/native/writing-structure-helper',
     'src/main/native/project-hash-helper',
     'src/main/native/markdown-trash-helper',
     'src/renderer/index.html',
@@ -255,12 +257,14 @@ test('actual npm tarball has the shrinkwrap, notices, safe paths and executable 
   for (const executable of [
     'bin/writcraft.js',
     'src/main/native/author-copy-helper',
+    'src/main/native/writing-structure-helper',
     'src/main/native/project-hash-helper',
     'src/main/native/markdown-trash-helper',
   ]) assert.strictEqual(files.get(executable).mode, 0o755, executable);
   const executablePaths = new Set([
     'bin/writcraft.js',
     'src/main/native/author-copy-helper',
+    'src/main/native/writing-structure-helper',
     'src/main/native/project-hash-helper',
     'src/main/native/markdown-trash-helper',
   ]);

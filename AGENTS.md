@@ -133,6 +133,8 @@ For filesystem copy/publish workflows, freeze the complete read/copy/commit matr
 
 Treat an external filesystem helper as a three-state transaction: proven uncommitted, proven committed, or unknown. If both the primary result and independent reconciliation are unavailable, report committed-risk and never enter precommit cleanup. Moving work into a native helper does not make `mkdir→open` atomic; attack the exact syscall gap or document the residual explicitly. Random names reduce likelihood but do not prove inode ownership.
 
+The private recovery directory is part of transaction authority, not incidental storage. Validate its owner and permissions in both Main and the native helper; validate marker/receipt identity and metadata before reading or removing them. Return `UNCOMMITTED` only after stage and control cleanup plus directory fsync all succeed. After a committed mutation, acknowledge and release the shared write lease only after authoritative file state, generation, and tree state are installed; a warning is not permission to discard recovery truth.
+
 Never erase a red integration run with a green retry. Record both, inspect the failed boundary, and keep a flake as an explicit P2/TODO until its timing cause is explained or repeated clean runs justify closing it. A retry is evidence about nondeterminism, not proof that the first failure was harmless.
 
 ## Commit & Pull Request Guidelines
