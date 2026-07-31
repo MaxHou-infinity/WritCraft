@@ -95,6 +95,8 @@ When an integration assertion fails after the product boundary already succeeded
 
 When replacing a production synchronization primitive, search the test harness and diagnostics for every old wait/read before sign-off. Tests must call the new authority boundary; waiting on a removed private queue can overlap later work and create false performance or stale-state failures.
 
+When retiring a public workflow, update real-Electron selectors, tab matrices, fixture routes, stage names, and the fixed expected-stage count in the same change set. Preserve the first red run as test-drift evidence, but do not repeatedly rerun a harness that still targets removed UI. Any unreachable legacy journey must be explicitly historical and excluded from current sign-off.
+
 For macOS packages, sign nested executable code before the outer App and verify each nested executable independently after ZIP extraction. `codesign --deep` on the outer bundle is not evidence that code stored in an unexpected location is signed. Keep `LSMinimumSystemVersion` aligned with every Mach-O slice, and bind generated native binaries to their source hash in release evidence. Create ZIPs with `ditto --norsrc`, assert there are no `._*` AppleDouble entries, and verify an App extracted by standard `unzip`; a `ditto`-only round trip can hide a broken archive.
 
 For fd-backed preflight, validate the opened descriptor's access mode as well as identity and permissions; adversarial tests must also attack failures after the private artifact is created, not only the pre-create path.

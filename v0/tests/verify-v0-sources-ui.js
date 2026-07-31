@@ -136,4 +136,17 @@ test('a new Research run first cancels any dedicated handoff in Changes', () => 
   assert.match(sourceView, /await window\.__changesView\?\.cancelResearchForRerun\?\.\(\)/);
 });
 
-console.log(`\n${passed}/16 sources UI checks passed.`);
+test('Writing Navigation hands Research a strict question-and-evidence preview without auto-running it', () => {
+  assert.match(sourceView, /writcraft\.writing-navigation-research\/v1/);
+  assert.match(sourceView, /function openWritingNavigation\(value\)/);
+  assert.match(sourceView, /window\.__workspace\?\.setSidebarView\?\.\('sources'\)/);
+  assert.match(sourceView, /researchQuestion\.value = handoff\.question/);
+  assert.match(sourceView, /renderNavigationHandoff\(\)/);
+  assert.match(sourceView, /researchRequestSequence \+= 1/);
+  assert.match(sourceView, /researching = false/);
+  assert.match(sourceView, /只用于保留写作现场/);
+  assert.doesNotMatch(sourceView, /function openWritingNavigation[\s\S]{0,900}runResearch\(\)/);
+  assert.match(sourceView, /window\.__sourcesView = \{ activate: open, openWritingNavigation \}/);
+});
+
+console.log(`\n${passed}/17 sources UI checks passed.`);

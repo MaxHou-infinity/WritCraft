@@ -3,7 +3,7 @@
 > 状态：`RM-1.1 / writ-craft@0.1.2` 当前冻结合同
 > 生效日期：2026-07-31
 > 取代：面向用户的 `writcraft.plan/v2` 里程碑、任务和依赖图
-> 实现进度：0.0CB 已完成只读 Main 服务、缓存、生成 IPC、open/Research/Changes 动作交接，以及结构确认 capability 与章节骨架三态事务；Renderer、旧 Plan 公开入口移除、真实 Electron 与作者验收仍未完成。
+> 实现进度：0.0CC 已完成 Main/IPC/Renderer 公共纵切、旧 Plan 入口移除、结构确认与章节骨架三态事务、open/Research/Changes 动作、取消/恢复，以及真实 Electron 36/36；待空项目与真实作者隔离副本人工验收。
 
 ## 1. 产品判断
 

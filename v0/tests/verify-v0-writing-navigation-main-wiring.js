@@ -31,10 +31,13 @@ console.log('\nWriting navigation Main/preload wiring verification');
 
 test('trusted IPC uses the dedicated handler and abort-aware provider adapter', () => {
   assert.match(main, /ipcMain\.handle\('writcraft:project:propose-writing-navigation'/);
-  assert.match(main, /writingNavigationHandlerService\.createProposeWritingNavigationHandler\(\{/);
+  assert.match(main, /writingNavigationHandlerService\.createWritingNavigationHandlers\(\{/);
+  assert.match(main, /ipcMain\.handle\(\s*'writcraft:project:cancel-writing-navigation',\s*writingNavigationHandlers\.cancel/);
   assert.match(main, /projectCallLLM: writingNavigationProjectCallLLM/);
   assert.match(main, /createWritingNavigationProviderAdapter\(\{\s*runAiRequest,\s*callLLM,/);
-  assert.match(preload, /proposeWritingNavigation: \(projectInstanceId, request\) =>\s*ipcRenderer\.invoke\('writcraft:project:propose-writing-navigation'/);
+  assert.match(preload, /proposeWritingNavigation: \(projectInstanceId, request, attemptId\) =>[\s\S]{0,220}'writcraft:project:propose-writing-navigation',[\s\S]{0,120}attemptId/);
+  assert.match(preload, /cancelWritingNavigation: \(projectInstanceId, attemptId\) =>[\s\S]{0,220}'writcraft:project:cancel-writing-navigation',[\s\S]{0,120}attemptId/);
+  assert(!/proposeWritingNavigation: \([^)]*(?:content|revision|rootPath)/.test(preload));
 });
 
 test('opaque actions use one Main-owned handler and the preload exposes no trusted content', () => {

@@ -9,7 +9,6 @@ const root = path.join(__dirname, '..');
 const read = relative => fs.readFileSync(path.join(root, relative), 'utf8');
 const main = read('src/main/main.js');
 const changesHistoryHandler = read('src/main/changes-history-handler.js');
-const projectPlanHandler = read('src/main/project-plan-handler.js');
 const writingNavigationHandler = read('src/main/writing-navigation-handler.js');
 const projectOnboardingHandler = read('src/main/project-onboarding-handler.js');
 const diagnosticExportHandler = read('src/main/diagnostic-export-handler.js');
@@ -29,14 +28,9 @@ function test(name, fn) {
 function handler(channel) {
   const start = main.indexOf(`ipcMain.handle('${channel}'`);
   assert(start >= 0, `${channel} handler missing`);
-  if (channel === 'writcraft:project:propose-plan') {
-    assert(main.slice(start, start + 320).includes('projectPlanHandler.createProposePlanHandler({'));
-    return projectPlanHandler;
-  }
   if (channel === 'writcraft:project:propose-writing-navigation') {
-    assert(main.slice(start, start + 900).includes(
-      'writingNavigationHandlerService.createProposeWritingNavigationHandler({'
-    ));
+    assert(main.includes('writingNavigationHandlerService.createWritingNavigationHandlers({'));
+    assert(main.slice(start, start + 240).includes('writingNavigationHandlers.propose'));
     return writingNavigationHandler;
   }
   if (channel === 'writcraft:project:propose-onboarding') {
@@ -179,8 +173,6 @@ test('renderer context IPC is schema-checked and byte-bounded before project rea
 test('every project AI generation handler rejects a foreign instance before model work', () => {
   for (const channel of [
     'writcraft:project:propose-writing-navigation',
-    'writcraft:project:propose-plan',
-    'writcraft:project:handoff-plan-task',
     'writcraft:project:propose-chapter',
     'writcraft:project:propose-onboarding',
     'writcraft:project:propose-edit-prompt-repair',
@@ -194,11 +186,6 @@ test('every project AI generation handler rejects a foreign instance before mode
     assert(gate >= 0, `${channel} lacks origin gate`);
     assert(model < 0 || gate < model, `${channel} gates after model work`);
   }
-  const handoff = handler('writcraft:project:handoff-plan-task');
-  assert(handoff.indexOf('projectInstanceId !== project.instanceId') < handoff.indexOf('preparePlanTaskHandoff({'));
-  assert(handoff.indexOf('preparePlanTaskHandoff({') < handoff.indexOf('callLLM('));
-  assert(handoff.indexOf('callLLM(') < handoff.indexOf('isAiProjectOriginCurrent(origin)'));
-  assert(handoff.indexOf('isAiProjectOriginCurrent(origin)') < handoff.indexOf('finalizePlanTaskHandoff({'));
   assert.match(main, /abortActiveAiRequests\(\)[\s\S]{0,500}request\.controller\.abort\(\)/);
   const advanceStart = main.indexOf('function advanceAiContextGeneration(options = {})');
   const advanceEnd = main.indexOf('\n}', advanceStart);
@@ -208,7 +195,6 @@ test('every project AI generation handler rejects a foreign instance before mode
     "chatConversationStore.invalidateOwner(ownerId, 'context_changed')",
     'projectMutationGeneration += 1;',
     'lastContextResponse = null;',
-    'pendingPlanRecords.clear();',
     'invalidatePendingOnboardingReviews(options.preserveOnboardingChangeSetId || null);',
   ]) assert(advance.includes(operation), `AI generation advance is missing ${operation}`);
   assert(advance.indexOf('abortActiveAiRequests();') < advance.indexOf('projectMutationGeneration += 1;'));

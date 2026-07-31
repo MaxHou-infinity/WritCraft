@@ -29,9 +29,6 @@ const projectOnboardingV2Service = require('./project-onboarding-v2-service');
 const onboardingCapabilityStoreService = require('./onboarding-capability-store');
 const onboardingBatchService = require('./onboarding-batch-service');
 const projectOnboardingHandler = require('./project-onboarding-handler');
-const projectPlanService = require('./project-plan-service');
-const projectPlanHandler = require('./project-plan-handler');
-const projectPlanHandoffService = require('./project-plan-handoff-service');
 const writingNavigationService = require('./writing-navigation-service');
 const writingNavigationStoreService = require('./writing-navigation-store');
 const writingNavigationHandlerService = require('./writing-navigation-handler');
@@ -163,7 +160,6 @@ pendingChangeSets = pendingChangeSetStoreService.createPendingChangeSetStore({
     } catch (_) {}
   },
 });
-const pendingPlanRecords = projectPlanHandoffService.createPlanHandoffStore();
 const writingNavigationStore = writingNavigationStoreService.createWritingNavigationStore();
 const writingStructureCapabilityStore =
   writingStructureCapabilityStoreService.createWritingStructureCapabilityStore();
@@ -349,8 +345,6 @@ function projectFailure(error) {
     error instanceof projectOnboardingV2Service.ProjectOnboardingV2Error ||
     error instanceof onboardingCapabilityStoreService.OnboardingCapabilityError ||
     error instanceof onboardingBatchService.OnboardingBatchError ||
-    error instanceof projectPlanService.ProjectPlanError ||
-    error instanceof projectPlanHandoffService.ProjectPlanHandoffError ||
     error instanceof writingNavigationService.WritingNavigationError ||
     error instanceof writingNavigationStoreService.WritingNavigationStoreError ||
     error instanceof writingNavigationHandoffService.WritingNavigationHandoffError ||
@@ -643,7 +637,6 @@ function advanceAiContextGeneration(options = {}) {
   }
   projectMutationGeneration += 1;
   lastContextResponse = null;
-  pendingPlanRecords.clear();
   invalidatePendingOnboardingReviews(options.preserveOnboardingChangeSetId || null);
 }
 
@@ -979,7 +972,6 @@ function setCurrentProject(project) {
       }
     }
     pendingChangeSets.clear();
-    pendingPlanRecords.clear();
     invalidatePendingOnboardingReviews();
     ownMarkdownWatcherStates.clear();
     lastContextResponse = null;
@@ -1025,13 +1017,6 @@ function invalidateProjectDerivedState(options = {}) {
 }
 
 function validateOrdinaryChangesDependencies({ project, pending }) {
-  if (pending.planDependencies) {
-    projectPlanHandoffService.validatePlanDependencies({
-      projectService,
-      rootPath: project.rootPath,
-      dependencies: pending.planDependencies,
-    });
-  }
   if (pending.projectDependencies) {
     projectChangesProposalService.validateProjectDependencies({
       projectService,
@@ -1654,7 +1639,6 @@ function reviewMetadata(changeSet, options = {}) {
     fileSelectionPolicies[projectService.EDIT_FILE] = 'file';
   }
   return {
-    planDependencies: options.planDependencies || null,
     projectDependencies: options.projectDependencies || null,
     issueDependencies: options.issueDependencies || null,
     researchDependencies: options.researchDependencies || null,
@@ -2106,21 +2090,27 @@ ipcMain.handle('writcraft:chat:cancel-pending', async (event, projectInstanceId)
   }
 });
 
+const writingNavigationHandlers = writingNavigationHandlerService.createWritingNavigationHandlers({
+  assertTrustedSender,
+  requireCurrentProject,
+  getCurrentProject: () => currentProject,
+  getMutationGeneration: () => projectMutationGeneration,
+  getRendererNavigationEpoch: () => rendererNavigationEpoch,
+  settleProjectAuthority: settleWritingNavigationAuthority,
+  writingNavigationService,
+  writingNavigationStore,
+  projectService,
+  projectCallLLM: writingNavigationProjectCallLLM,
+  staleAiProjectResult,
+  projectFailure,
+});
+
 ipcMain.handle('writcraft:project:propose-writing-navigation',
-  writingNavigationHandlerService.createProposeWritingNavigationHandler({
-    assertTrustedSender,
-    requireCurrentProject,
-    getCurrentProject: () => currentProject,
-    getMutationGeneration: () => projectMutationGeneration,
-    getRendererNavigationEpoch: () => rendererNavigationEpoch,
-    settleProjectAuthority: settleWritingNavigationAuthority,
-    writingNavigationService,
-    writingNavigationStore,
-    projectService,
-    projectCallLLM: writingNavigationProjectCallLLM,
-    staleAiProjectResult,
-    projectFailure,
-  })
+  writingNavigationHandlers.propose
+);
+ipcMain.handle(
+  'writcraft:project:cancel-writing-navigation',
+  writingNavigationHandlers.cancel
 );
 
 ipcMain.handle('writcraft:project:run-writing-navigation-action',
@@ -2197,63 +2187,6 @@ ipcMain.handle(
   'writcraft:project:ack-writing-structure-recovery',
   writingStructureHandlers.acknowledgeRecovery
 );
-
-ipcMain.handle('writcraft:project:propose-plan', projectPlanHandler.createProposePlanHandler({
-  assertTrustedSender,
-  requireCurrentProject,
-  getCurrentProject: () => currentProject,
-  getMutationGeneration: () => projectMutationGeneration,
-  projectPlanService,
-  projectService,
-  projectCallLLM,
-  pendingPlanRecords,
-  staleAiProjectResult,
-  projectFailure,
-}));
-
-ipcMain.handle('writcraft:project:handoff-plan-task', async (event, projectInstanceId, request) => {
-  try {
-    assertTrustedSender(event);
-    const project = requireCurrentProject();
-    if (projectInstanceId !== project.instanceId) return staleAiProjectResult();
-    const origin = captureAiProjectOrigin();
-    const prepared = projectPlanHandoffService.preparePlanTaskHandoff({
-      store: pendingPlanRecords,
-      projectService,
-      projectInstanceId: project.instanceId,
-      rootPath: project.rootPath,
-      mutationGeneration: projectMutationGeneration,
-      request,
-    });
-    const model = await runAiRequest(project.instanceId, signal => callLLM(
-      prepared.messages,
-      'MiniMax-M3',
-      minimaxTextService.MAX_MAX_TOKENS,
-      signal
-    ));
-    if (!isAiProjectOriginCurrent(origin)) return staleAiProjectResult();
-    projectPlanHandoffService.validatePlanDependencies({
-      projectService,
-      rootPath: project.rootPath,
-      dependencies: prepared.dependencies,
-    });
-    const result = projectPlanHandoffService.finalizePlanTaskHandoff({
-      prepared,
-      model,
-      changeSetService,
-    });
-    if (!result.ok) return result;
-    if (result.noChanges) return result;
-    const cached = cacheReviewedChangeSet(result.changeSet, project, {
-      planDependencies: prepared.dependencies,
-      provenance: result.provenance,
-    });
-    const { changeSet, changeSetId: _contentId, preview: _preview, ...publicResult } = result;
-    return { ...publicResult, changeSetId: cached.capability, review: cached.review };
-  } catch (error) {
-    return projectFailure(error);
-  }
-});
 
 ipcMain.handle('writcraft:project:handoff-graph-issue', async (event, projectInstanceId, request) => {
   try {

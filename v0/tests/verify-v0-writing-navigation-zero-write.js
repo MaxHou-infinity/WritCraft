@@ -23,6 +23,7 @@ const PROJECT = Object.freeze({
   rootPath: '/tmp/writcraft-zero-write',
 });
 const EVENT = Object.freeze({ sender: Object.freeze({ id: 7 }) });
+const ATTEMPT_ID = `wno_${'a'.repeat(32)}`;
 const REQUEST = Object.freeze({
   schema: service.REQUEST_SCHEMA,
   mode: 'structure',
@@ -76,7 +77,7 @@ function createHarness(modelFactory) {
       throw new Error('WRITE_MUST_NOT_BE_REACHED');
     },
   };
-  const handler = handlerModule.createProposeWritingNavigationHandler({
+  const handler = handlerModule.createWritingNavigationHandlers({
     assertTrustedSender() {},
     requireCurrentProject: () => PROJECT,
     getCurrentProject: () => PROJECT,
@@ -93,7 +94,7 @@ function createHarness(modelFactory) {
       error: error?.code || 'PROJECT_OPERATION_FAILED',
       message: '本次没有修改任何项目文件',
     }),
-  });
+  }).propose;
   return { state, handler };
 }
 
@@ -118,7 +119,7 @@ function snapshot(state) {
       toolUse: { name: service.TOOL_NAME, input: STRUCTURE },
     }));
     const before = snapshot(harness.state);
-    const result = await harness.handler(EVENT, PROJECT.instanceId, REQUEST);
+    const result = await harness.handler(EVENT, PROJECT.instanceId, REQUEST, ATTEMPT_ID);
     assert.strictEqual(result.ok, true);
     assert.match(result.result.navigationId, /^nav_[a-f0-9]{32}$/);
     assert.deepStrictEqual(snapshot(harness.state), before);
@@ -135,7 +136,7 @@ function snapshot(state) {
       },
     }));
     const before = snapshot(harness.state);
-    const result = await harness.handler(EVENT, PROJECT.instanceId, REQUEST);
+    const result = await harness.handler(EVENT, PROJECT.instanceId, REQUEST, ATTEMPT_ID);
     assert.strictEqual(result.ok, false);
     assert.strictEqual(result.error, 'INVALID_MODEL_OUTPUT');
     assert.deepStrictEqual(snapshot(harness.state), before);

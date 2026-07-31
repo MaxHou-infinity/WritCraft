@@ -76,13 +76,13 @@
 5. 修复旅程中发现的 P0/P1 阻断项；P2 必须明确记录、分级并决定是否允许发版。
 6. 记录内容无关的私有指标：Inline 接受率、导航建议帮助度/动作、Research 匹配判断、图片评分/采纳、耗时和稳定错误码。
 
-当前执行注记（2026-07-31）：项目卡、Inline 与 Chapter 已关闭。旧 Plan 在六轮协议修补后累计九次真实零写入失败；最新 operation `db1c6915ed38430aa827e441666b8218` 在 22,312 ms 后仍因假设字段不合格而失败，before/after 0，`changes.json` 未变化。安全门禁有效，但继续追逐模型字段只提高格式服从率，不能证明作者价值。RM-1.1 因而冻结产品假设变更：停止旧 Plan canary，以 `WRITING-NAVIGATION-V1-CONTRACT.md` 的“结构规划 / 写作导航”替代公开里程碑任务图。旧红灯完整保留，但不再要求作者复测。
+当前执行注记（2026-07-31）：项目卡、Inline 与 Chapter 已关闭。旧 Plan 九次真实零写入失败保留为历史证据，不再复测；其公开 Main/preload/Renderer 入口已由“结构规划 / 写作导航”替代。当前纵切已完成双模式 UI、骨架三态事务、open/Research/Changes 动作、取消与恢复，完整 `npm test`、批准 GUI `npm run verify`、真实 Electron 36/36、Persistent Main/IPC 3/3 通过，独立复审 P0/P1=0。下一顺序是空项目结构验收、合格作者副本导航验收，再完成 Research、image-01、Graph/recovery 作者旅程；尚未进入 0.1.2 发布授权。
 
-实现进度（0.0BZ）：只读 Main/IPC 基础已独立签收，包括严格结构/导航工具协议、证据锚点、8 条/30 分钟隔离缓存、watcher barrier、真实 deadline abort 和零写入门禁；专项 53/53、Network 15/15，独立复审 P0/P1=0。该证据不包含 Renderer、动作交接、骨架事务或真实 Electron，不能把“基础接线”写成“替代功能完成”。下一阶段先闭合三种动作与骨架事务，再接双模式 UI 并移除公开旧 Plan。
+历史检查点（0.0BZ）：只读 Main/IPC 基础已独立签收，包括严格结构/导航工具协议、证据锚点、8 条/30 分钟隔离缓存、watcher barrier、真实 deadline abort 和零写入门禁；专项 53/53、Network 15/15，独立复审 P0/P1=0。其当时未覆盖的 Renderer、动作、骨架与 Electron 已由上方 0.0CC 当前注记覆盖，不得从本段派发旧“下一阶段”。
 
-实现进度（0.0CA）：三种 Main-owned 动作交接已独立签收。open 为零模型本地定位；Research 携带 canonical evidence 进入研究页；Changes 重新读取依赖并生成待审 Diff，已有审阅时 fail-closed 且保留同一建议。失败/超时/取消可在有效建议上重试，每次执行使用独立 attempt ID，旧 A cancel 不得影响新 B。专项 73/73、Pending 13/13、Network 15/15，独立复审 P0/P1=0。结构骨架事务、Renderer、真实 Electron 与作者验收仍未完成；下一阶段只推进这些既定缺口。
+历史检查点（0.0CA）：三种 Main-owned 动作交接已独立签收。open 为零模型本地定位；Research 携带 canonical evidence 进入研究页；Changes 重新读取依赖并生成待审 Diff，已有审阅时 fail-closed 且保留同一建议。失败/超时/取消可在有效建议上重试，每次执行使用独立 attempt ID，旧 A cancel 不得影响新 B。专项 73/73、Pending 13/13、Network 15/15，独立复审 P0/P1=0；后续完成度只看上方 0.0CC。
 
-实现进度（0.0CB）：结构预览 capability、Main/IPC、共享 mutation guard 与章节骨架三态事务已独立签收。确认前零写入，确认后只生成作者逐项确认的标题与写作目的注释；stage I/O、验证、清理与 no-clobber publish 由签名 universal helper 在 trusted root fd 下完成。authoritative file state、generation 与 tree 未全部安装时保留 committed marker 和同一写锁。Structure 73/73、macOS package 8/8、npm Preview 10/10、release 7/7，独立复审 P0=0/P1=0/P2=3。保留边界为排除主动同 UID 最终 rename 替换、controls 部分清理可能需人工恢复、极端未 ack 进度淘汰；不得写成已关闭。Renderer、公开旧 Plan 移除、真实 Electron 与作者验收仍未完成，下一阶段只接双模式 UI 和既定动作。
+历史检查点（0.0CB）：结构预览 capability、Main/IPC、共享 mutation guard 与章节骨架三态事务已独立签收。确认前零写入，确认后只生成作者逐项确认的标题与写作目的注释；stage I/O、验证、清理与 no-clobber publish 由签名 universal helper 在 trusted root fd 下完成。authoritative file state、generation 与 tree 未全部安装时保留 committed marker 和同一写锁。Structure 73/73、macOS package 8/8、npm Preview 10/10、release 7/7，独立复审 P0=0/P1=0/P2=3。保留边界为排除主动同 UID 最终 rename 替换、controls 部分清理可能需人工恢复、极端未 ack 进度淘汰；不得写成已关闭。其 Renderer 与旧入口缺口已由 0.0CC 关闭，作者验收仍开放。
 
 ### 4.3 明确不做
 

@@ -1,4 +1,4 @@
-// WritCraft right-side Chat / Plan / Context / Changes book-tab controller.
+// WritCraft right-side Chat / Navigation / Context / Changes book-tab controller.
 (function (root, factory) {
   const api = factory();
   if (typeof module === 'object' && module.exports) module.exports = api;
@@ -6,7 +6,7 @@
 })(typeof globalThis !== 'undefined' ? globalThis : this, function () {
   'use strict';
 
-  const MODES = Object.freeze(['chat', 'plan', 'context', 'changes']);
+  const MODES = Object.freeze(['chat', 'navigation', 'context', 'changes']);
 
   function mount(options = {}) {
     const workArea = options.workArea;

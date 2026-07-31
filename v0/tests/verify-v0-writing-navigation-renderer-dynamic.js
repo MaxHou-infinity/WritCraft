@@ -1,0 +1,491 @@
+'use strict';
+
+const assert = require('assert');
+const State = require('../src/renderer/writing-navigation-state');
+const View = require('../src/renderer/writing-navigation-view');
+
+class ClassList {
+  constructor(node) { this.node = node; }
+  list() { return new Set(String(this.node.className || '').split(/\s+/).filter(Boolean)); }
+  write(values) { this.node.className = [...values].join(' '); }
+  add(...names) { const values = this.list(); names.forEach(name => values.add(name)); this.write(values); }
+  remove(...names) { const values = this.list(); names.forEach(name => values.delete(name)); this.write(values); }
+  contains(name) { return this.list().has(name); }
+  toggle(name, force) {
+    const values = this.list();
+    const enabled = force === undefined ? !values.has(name) : Boolean(force);
+    if (enabled) values.add(name); else values.delete(name);
+    this.write(values);
+    return enabled;
+  }
+}
+
+class Node {
+  constructor(document, tag = 'div') {
+    this.ownerDocument = document;
+    this.tagName = tag.toUpperCase();
+    this.children = [];
+    this.parentElement = null;
+    this.listeners = new Map();
+    this.attributes = new Map();
+    this.dataset = {};
+    this.className = '';
+    this.classList = new ClassList(this);
+    this.textContent = '';
+    this.value = '';
+    this.type = '';
+    this.disabled = false;
+    this.hidden = false;
+  }
+  append(...nodes) { nodes.forEach(node => this.appendChild(node)); }
+  appendChild(node) { node.parentElement = this; this.children.push(node); return node; }
+  replaceChildren(...nodes) {
+    this.children.forEach(node => { node.parentElement = null; });
+    this.children = [];
+    this.textContent = '';
+    this.append(...nodes);
+  }
+  setAttribute(name, value) { this.attributes.set(name, String(value)); }
+  getAttribute(name) { return this.attributes.get(name) || null; }
+  addEventListener(name, listener) {
+    const list = this.listeners.get(name) || [];
+    list.push(listener);
+    this.listeners.set(name, list);
+  }
+  async dispatch(name, detail = {}) {
+    const event = { target: this, preventDefault() {}, ...detail };
+    for (const listener of this.listeners.get(name) || []) await listener(event);
+  }
+  click() { return this.dispatch('click'); }
+  focus() { this.ownerDocument.activeElement = this; }
+  querySelectorAll(selector) {
+    const output = [];
+    const matches = node => {
+      if (selector.startsWith('.')) return node.classList.contains(selector.slice(1));
+      if (selector.startsWith('[data-')) {
+        const match = selector.match(/^\[data-([a-z-]+)(?:="([^"]+)")?\]$/);
+        if (!match) return false;
+        const key = match[1].replace(/-([a-z])/g, (_, letter) => letter.toUpperCase());
+        return match[2] === undefined ? key in node.dataset : node.dataset[key] === match[2];
+      }
+      return node.tagName === selector.toUpperCase();
+    };
+    const visit = node => {
+      for (const child of node.children) {
+        if (matches(child)) output.push(child);
+        visit(child);
+      }
+    };
+    visit(this);
+    return output;
+  }
+  querySelector(selector) { return this.querySelectorAll(selector)[0] || null; }
+}
+
+class Document {
+  constructor() {
+    this.body = new Node(this, 'body');
+    this.activeElement = this.body;
+  }
+  createElement(tag) { return new Node(this, tag); }
+}
+
+function text(node) {
+  return [node.textContent, ...node.children.map(text)].filter(Boolean).join(' ');
+}
+
+function byText(node, value) {
+  if (node.textContent === value) return node;
+  for (const child of node.children) {
+    const found = byText(child, value);
+    if (found) return found;
+  }
+  return null;
+}
+
+function deferred() {
+  let resolve;
+  let reject;
+  const promise = new Promise((done, fail) => {
+    resolve = done;
+    reject = fail;
+  });
+  return { promise, resolve, reject };
+}
+
+const PROJECT = { instanceId: 'instance_0123456789abcdef01234567' };
+const NAVIGATION_ID = `nav_${'a'.repeat(32)}`;
+const CAPABILITY_ID = `wsc_${'b'.repeat(32)}`;
+const ACTION_ID = `wna_${'c'.repeat(32)}`;
+let id = 0;
+const nextId = () => `wno_${String(++id).padStart(32, '0')}`;
+
+function structure() {
+  return {
+    ok: true,
+    result: {
+      schema: 'writcraft.writing-navigation/v1',
+      navigationId: NAVIGATION_ID,
+      mode: 'structure',
+      alternatives: [
+        {
+          alternativeId: 'alternative_1', organizingLogic: '沿问题推进',
+          audienceBenefit: '快速理解', tradeoff: '案例较少',
+          chapters: [{ path: 'chapters/01.md', title: '问题', purpose: '说明问题' }],
+        },
+        {
+          alternativeId: 'alternative_2', organizingLogic: '沿案例推进',
+          audienceBenefit: '容易代入', tradeoff: '框架较晚',
+          chapters: [{ path: 'chapters/01.md', title: '案例', purpose: '建立场景' }],
+        },
+      ],
+      contextManifest: {
+        usedBodyCount: 0, availableBodyCount: 0, omittedBodyCount: 0,
+        totalBodyBytes: 0, limitedProjectIntent: true,
+        files: [{ path: 'edit.md', role: 'project_prompt', revision: '1'.repeat(64), bytes: 0 }],
+        omissionReason: null, truncationReason: null, disclosure: '已读取当前项目全部正文',
+      },
+    },
+  };
+}
+
+function navigation(action = 'open') {
+  return {
+    ok: true,
+    result: {
+      schema: 'writcraft.writing-navigation/v1',
+      navigationId: NAVIGATION_ID,
+      mode: 'navigation',
+      suggestions: [{
+        suggestionId: 'suggestion_1', actionId: ACTION_ID,
+        finding: '开篇缺少边界',
+        evidence: [{
+          relativePath: 'chapters/01.md', revision: '2'.repeat(64),
+          sectionHeading: '开篇', quote: '先定义问题。',
+          locator: {
+            filePath: 'chapters/01.md', revision: '2'.repeat(64),
+            offset: 8, endOffset: 14, line: 3, column: 1,
+            blockAnchor: { schema: 'writcraft.block-anchor/v1' },
+          },
+        }],
+        whyNow: '影响后续章节', recommendedAction: '补充范围',
+        expectedResult: '读者更容易跟随', action,
+      }],
+      contextManifest: {
+        usedBodyCount: 1, availableBodyCount: 3, omittedBodyCount: 2,
+        totalBodyBytes: 1200, limitedProjectIntent: false,
+        files: [
+          { path: 'edit.md', role: 'project_prompt', revision: '1'.repeat(64), bytes: 200 },
+          { path: 'chapters/01.md', role: 'current_file', revision: '2'.repeat(64), bytes: 1000 },
+        ],
+        omissionReason: 'not_selected', truncationReason: null,
+        disclosure: '只基于本次已读取的 1/3 个正文文件',
+      },
+    },
+  };
+}
+
+async function flush() {
+  await Promise.resolve();
+  await Promise.resolve();
+}
+
+(async () => {
+  console.log('\nWriting Navigation Renderer dynamic verification');
+  let passed = 0;
+  async function test(name, fn) {
+    await fn();
+    passed += 1;
+    console.log(`  ✓ ${name}`);
+  }
+
+  await test('structure journey compares, edits, previews exact bytes and confirms once', async () => {
+    const document = new Document();
+    const host = document.createElement('div');
+    document.body.append(host);
+    const calls = { generate: 0, prepare: 0, confirm: 0 };
+    let controller;
+    controller = View.mount(host, {
+      stateApi: State,
+      createAttemptId: nextId,
+      onGenerate: async () => { calls.generate += 1; return structure(); },
+      onPrepareStructure: async (_projectId, _navigationId, _alternativeId, chapters) => {
+        calls.prepare += 1;
+        assert.strictEqual(chapters[0].title, '作者标题');
+        return {
+          ok: true, capabilityId: CAPABILITY_ID, expiresAt: 99,
+          preview: {
+            schema: 'writcraft.writing-structure-preview/v1',
+            navigationId: NAVIGATION_ID, alternativeId: 'alternative_1',
+            chapterCount: 1, createsProse: false,
+            disclosure: '只创建章节标题与写作目的注释，不会生成正文。',
+            files: [{
+              path: 'chapters/01.md', title: '作者标题', purpose: '说明问题',
+              content: '# 作者标题\n\n<!-- 写作目的：说明问题 -->\n',
+              bytes: 60, sha256: '4'.repeat(64),
+            }],
+            proposalDigest: '5'.repeat(64),
+          },
+        };
+      },
+      onConfirmStructure: async capabilityId => {
+        calls.confirm += 1;
+        assert.strictEqual(capabilityId, CAPABILITY_ID);
+        return { ok: true, state: 'COMMITTED', operationId: 'wst_1', files: [{ path: 'chapters/01.md' }] };
+      },
+      onStructureCommitted: () => controller.updateTree([
+        { type: 'file', path: 'edit.md' },
+        { type: 'file', path: 'chapters/01.md' },
+      ], 'chapters/01.md'),
+    });
+    controller.updateProject(PROJECT, [{ type: 'file', path: 'edit.md' }]);
+    host.querySelector('textarea').value = '规划新文章';
+    await host.querySelector('textarea').dispatch('input');
+    await byText(host, '生成结构方案').click();
+    await flush();
+    assert.strictEqual(calls.generate, 1);
+    const title = host.querySelector('[data-chapter-field="title"]');
+    title.value = '作者标题';
+    await title.dispatch('input');
+    await byText(host, '预览章节骨架').click();
+    await flush();
+    assert.strictEqual(calls.prepare, 1);
+    assert(text(host).includes('只创建骨架，不会写章节正文'));
+    assert(text(host).includes('# 作者标题'));
+    await byText(host, '确认创建章节骨架').click();
+    await flush();
+    assert.strictEqual(calls.confirm, 1);
+    assert(text(host).includes('已创建 1 个章节骨架'));
+    assert.strictEqual(controller.getState().mode, 'navigation');
+    assert.strictEqual(controller.getState().phase, 'structure-committed');
+    await byText(host, '进入写作导航').click();
+    assert.strictEqual(controller.getState().phase, 'idle');
+    assert(text(host).includes('生成写作导航'));
+  });
+
+  await test('generation cancellation is attempt-bound and preserves the goal', async () => {
+    const document = new Document();
+    const host = document.createElement('div');
+    document.body.append(host);
+    const pending = deferred();
+    let attempted;
+    const controller = View.mount(host, {
+      stateApi: State,
+      createAttemptId: nextId,
+      onGenerate: (_request, attemptId) => { attempted = attemptId; return pending.promise; },
+      onCancelGeneration: async (_projectId, attemptId) => {
+        assert.strictEqual(attemptId, attempted);
+        return { ok: true, cancelled: true };
+      },
+    });
+    controller.updateProject(PROJECT, [{ type: 'file', path: 'edit.md' }]);
+    const goal = host.querySelector('textarea');
+    goal.value = '规划新文章';
+    await goal.dispatch('input');
+    void byText(host, '生成结构方案').click();
+    await flush();
+    assert(text(host).includes('正在整理结构方案'));
+    await byText(host, '停止整理').click();
+    await flush();
+    assert.strictEqual(controller.getState().goal, '规划新文章');
+    assert.strictEqual(controller.getState().phase, 'idle');
+    pending.resolve({ ok: false, error: 'REQUEST_ABORTED' });
+    await flush();
+    assert.strictEqual(controller.getState().phase, 'idle');
+  });
+
+  await test('navigation discloses X/Y and runs only the card action callback', async () => {
+    const document = new Document();
+    const host = document.createElement('div');
+    document.body.append(host);
+    let actionCalls = 0;
+    const controller = View.mount(host, {
+      stateApi: State,
+      createAttemptId: nextId,
+      onGenerate: async () => navigation('open'),
+      onRunAction: async (_projectId, actionId, attemptId) => {
+        actionCalls += 1;
+        assert.strictEqual(actionId, ACTION_ID);
+        assert.match(attemptId, /^wno_[a-f0-9]{32}$/);
+        return { ok: true, kind: 'open', handoff: { path: 'chapters/01.md' } };
+      },
+      onOpenEvidence: async value => {
+        assert.strictEqual(value.filePath, 'chapters/01.md');
+      },
+    });
+    controller.updateProject(PROJECT, [
+      { type: 'file', path: 'edit.md' },
+      { type: 'file', path: 'chapters/01.md' },
+      { type: 'file', path: 'chapters/02.md' },
+      { type: 'file', path: 'chapters/03.md' },
+    ], 'chapters/01.md');
+    const goal = host.querySelector('textarea');
+    goal.value = '找下一步';
+    await goal.dispatch('input');
+    await byText(host, '生成写作导航').click();
+    await flush();
+    assert(text(host).includes('基于本次已读取的 1/3 个正文文件'));
+    assert(text(host).includes('以下建议仅在本次已读范围内优先'));
+    assert(text(host).includes('开篇缺少边界'));
+    await byText(host, '打开章节').click();
+    await flush();
+    assert.strictEqual(actionCalls, 1);
+    assert(text(host).includes('再次打开'));
+    await byText(host, '再次打开').click();
+    await flush();
+    assert.strictEqual(actionCalls, 2);
+  });
+
+  await test('NO_KEY and REVIEW_IN_PROGRESS expose executable recovery actions', async () => {
+    const document = new Document();
+    const host = document.createElement('div');
+    document.body.append(host);
+    let settings = 0;
+    let review = 0;
+    const controller = View.mount(host, {
+      stateApi: State,
+      createAttemptId: nextId,
+      onGenerate: async request => request.mode === 'structure'
+        ? { ok: false, error: 'NO_KEY' }
+        : navigation('changes'),
+      onRunAction: async () => ({
+        ok: false,
+        error: 'REVIEW_IN_PROGRESS',
+        message: 'internal copy must not be rendered',
+      }),
+      onOpenSettings: () => { settings += 1; },
+      onOpenReview: () => { review += 1; },
+    });
+    controller.updateProject(PROJECT, [{ type: 'file', path: 'edit.md' }]);
+    let goal = host.querySelector('textarea');
+    goal.value = '规划新文章';
+    await goal.dispatch('input');
+    await byText(host, '生成结构方案').click();
+    await flush();
+    assert(text(host).includes('未联网'));
+    await byText(host, '打开 AI 设置').click();
+    assert.strictEqual(settings, 1);
+
+    controller.updateProject(PROJECT, [
+      { type: 'file', path: 'edit.md' },
+      { type: 'file', path: 'chapters/01.md' },
+    ], 'chapters/01.md');
+    goal = host.querySelector('textarea');
+    goal.value = '找下一步';
+    await goal.dispatch('input');
+    await byText(host, '生成写作导航').click();
+    await flush();
+    await byText(host, '生成修改建议').click();
+    await flush();
+    assert(text(host).includes('现有审阅保持不变'));
+    assert(!text(host).includes('internal copy'));
+    await byText(host, '前往当前审阅').click();
+    assert.strictEqual(review, 1);
+  });
+
+  await test('UNKNOWN recovery blocks normal operations and only queries before acknowledgement', async () => {
+    const document = new Document();
+    const host = document.createElement('div');
+    document.body.append(host);
+    let queries = 0;
+    let acknowledgements = 0;
+    const controller = View.mount(host, {
+      stateApi: State,
+      createAttemptId: nextId,
+      onQueryRecovery: async () => {
+        queries += 1;
+        return queries === 1
+          ? { ok: true, state: 'UNKNOWN', operationId: 'wst_1', recoveryRequired: true }
+          : { ok: true, state: 'COMMITTED', operationId: 'wst_1', files: [{ path: 'chapters/01.md' }], recoveryRequired: true };
+      },
+      onAcknowledgeRecovery: async () => {
+        acknowledgements += 1;
+        return { ok: true, state: 'COMMITTED', operationId: 'wst_1', acknowledged: true };
+      },
+    });
+    controller.updateProject(PROJECT, [{ type: 'file', path: 'edit.md' }]);
+    await controller.recover();
+    assert(text(host).includes('提交状态正在核对'));
+    assert.strictEqual(acknowledgements, 0);
+    await byText(host, '重新核对提交状态').click();
+    await flush();
+    assert(text(host).includes('章节骨架已经创建'));
+    await byText(host, '完成恢复').click();
+    await flush();
+    assert.strictEqual(acknowledgements, 1);
+    assert(text(host).includes('已创建 1 个章节骨架'));
+  });
+
+  await test('late recovery acknowledgement failure cannot mutate the next project', async () => {
+    const document = new Document();
+    const host = document.createElement('div');
+    document.body.append(host);
+    const pending = deferred();
+    const controller = View.mount(host, {
+      stateApi: State,
+      createAttemptId: nextId,
+      onQueryRecovery: async () => ({
+        ok: true,
+        state: 'COMMITTED',
+        operationId: 'wst_late',
+        files: [{ path: 'chapters/01.md' }],
+        recoveryRequired: true,
+      }),
+      onAcknowledgeRecovery: () => pending.promise,
+    });
+    controller.updateProject(PROJECT, [{ type: 'file', path: 'edit.md' }]);
+    await controller.recover();
+    void byText(host, '完成恢复').click();
+    await flush();
+    controller.updateProject({ instanceId: 'instance_abcdef0123456789abcdef01' }, [
+      { type: 'file', path: 'edit.md' },
+      { type: 'file', path: 'chapters/01.md' },
+    ], 'chapters/01.md');
+    pending.reject(Object.assign(new Error('late'), { code: 'RECOVERY_FAILED' }));
+    await flush();
+    assert.strictEqual(controller.getState().projectInstanceId, 'instance_abcdef0123456789abcdef01');
+    assert.strictEqual(controller.getState().phase, 'idle');
+    assert.strictEqual(controller.getState().error, null);
+  });
+
+  await test('project switch and old finally cannot clear the new busy owner', async () => {
+    const document = new Document();
+    const host = document.createElement('div');
+    document.body.append(host);
+    const first = deferred();
+    const second = deferred();
+    let calls = 0;
+    const controller = View.mount(host, {
+      stateApi: State,
+      createAttemptId: nextId,
+      onGenerate: () => (++calls === 1 ? first.promise : second.promise),
+    });
+    controller.updateProject(PROJECT, [{ type: 'file', path: 'edit.md' }]);
+    let goal = host.querySelector('textarea');
+    goal.value = '规划 A';
+    await goal.dispatch('input');
+    void byText(host, '生成结构方案').click();
+    await flush();
+    controller.updateProject({ instanceId: 'instance_abcdef0123456789abcdef01' }, [
+      { type: 'file', path: 'edit.md' },
+      { type: 'file', path: 'chapters/01.md' },
+    ], 'chapters/01.md');
+    goal = host.querySelector('textarea');
+    goal.value = '导航 B';
+    await goal.dispatch('input');
+    void byText(host, '生成写作导航').click();
+    await flush();
+    first.resolve(structure());
+    await flush();
+    assert.strictEqual(controller.getState().generation.attemptId.startsWith('wno_'), true);
+    assert.strictEqual(controller.getState().projectInstanceId, 'instance_abcdef0123456789abcdef01');
+    second.resolve(navigation());
+    await flush();
+    assert.strictEqual(controller.getState().phase, 'navigation-ready');
+  });
+
+  console.log(`\nWriting Navigation Renderer dynamic passed: ${passed}/${passed}.`);
+})().catch(error => {
+  console.error(error);
+  process.exitCode = 1;
+});

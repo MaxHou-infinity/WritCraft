@@ -19,6 +19,45 @@
   let researchRequestSequence = 0;
   let indexRequestSequence = 0;
   let importRequestSequence = 0;
+  let navigationHandoff = null;
+
+  function exactKeys(value, keys) {
+    if (!value || typeof value !== 'object' || Array.isArray(value)) return false;
+    const actual = Object.keys(value).sort();
+    const expected = [...keys].sort();
+    return actual.length === expected.length &&
+      actual.every((key, index) => key === expected[index]);
+  }
+
+  function validNavigationEvidence(value) {
+    return exactKeys(value, ['path', 'revision', 'sectionHeading', 'quote', 'locator']) &&
+      typeof value.path === 'string' &&
+      typeof value.sectionHeading === 'string' &&
+      typeof value.quote === 'string' &&
+      value.locator?.filePath === value.path;
+  }
+
+  function normalizeNavigationHandoff(value) {
+    if (!exactKeys(value, [
+      'schema', 'navigationId', 'suggestionId', 'question', 'finding', 'evidence',
+    ]) || value.schema !== 'writcraft.writing-navigation-research/v1' ||
+        typeof value.question !== 'string' || !value.question ||
+        typeof value.finding !== 'string' || !value.finding ||
+        !Array.isArray(value.evidence) || value.evidence.length < 1 ||
+        value.evidence.length > 3 || !value.evidence.every(validNavigationEvidence)) {
+      return null;
+    }
+    return Object.freeze({
+      question: value.question,
+      finding: value.finding,
+      evidence: Object.freeze(value.evidence.map(item => Object.freeze({
+        path: item.path,
+        sectionHeading: item.sectionHeading,
+        quote: item.quote,
+        locator: item.locator,
+      }))),
+    });
+  }
 
   function setStatus(text, error = false) {
     status.textContent = text;
@@ -79,6 +118,45 @@
     node.textContent = text;
     if (error) node.style.color = '#a3473e';
     researchResults.appendChild(node);
+  }
+
+  function renderNavigationHandoff() {
+    if (!researchResults || !navigationHandoff) return;
+    researchResults.hidden = false;
+    researchResults.replaceChildren();
+    const card = document.createElement('article');
+    card.className = 'research-card navigation-research-handoff';
+    const label = document.createElement('span');
+    label.className = 'research-card-label';
+    label.textContent = '写作导航带来的研究线索';
+    const finding = document.createElement('p');
+    finding.className = 'research-claim';
+    finding.textContent = navigationHandoff.finding;
+    const note = document.createElement('p');
+    note.className = 'research-boundary';
+    note.textContent = '以下摘录只用于保留写作现场。请在来源列表中选择要研究的资料，再由你明确启动 Research。';
+    card.append(label, finding, note);
+    for (const evidence of navigationHandoff.evidence) {
+      const open = document.createElement('button');
+      open.type = 'button';
+      open.className = 'research-source';
+      const heading = document.createElement('strong');
+      heading.textContent = `${evidence.path} · ${evidence.sectionHeading}`;
+      const quote = document.createElement('small');
+      quote.textContent = `“${evidence.quote}”`;
+      open.append(heading, quote);
+      open.addEventListener('click', async () => {
+        const opened = await window.__workspace?.openFile?.(evidence.path);
+        if (opened !== false) {
+          window.__workspace?.revealContextChip?.({
+            revision: evidence.locator?.revision || null,
+            locator: evidence.locator,
+          });
+        }
+      });
+      card.appendChild(open);
+    }
+    researchResults.appendChild(card);
   }
 
   function renderResearchCards(cards, warnings = []) {
@@ -374,6 +452,21 @@
     renderResearchCards(result.cards, result.warnings);
   }
 
+  function openWritingNavigation(value) {
+    const handoff = normalizeNavigationHandoff(value);
+    if (!handoff) return { ok: false, message: '这条研究线索已经失效，请重新生成写作导航。' };
+    researchRequestSequence += 1;
+    researching = false;
+    navigationHandoff = handoff;
+    if (researchQuestion) researchQuestion.value = handoff.question;
+    window.__workspace?.setSidebarView?.('sources');
+    active = true;
+    syncResearchControls();
+    renderNavigationHandoff();
+    researchQuestion?.focus?.();
+    return { ok: true };
+  }
+
   async function refresh() {
     if (indexLoading || !active) return;
     if (!window.__workspace?.state?.project) {
@@ -452,6 +545,7 @@
     importButton.disabled = false;
     selectedSourceIds = [];
     currentIndex = null;
+    navigationHandoff = null;
     researching = false;
     clearResearchResults();
     syncResearchControls();
@@ -461,5 +555,5 @@
     active = event.detail === 'sources';
   });
 
-  window.__sourcesView = { activate: open };
+  window.__sourcesView = { activate: open, openWritingNavigation };
 })();

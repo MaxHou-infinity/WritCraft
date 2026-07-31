@@ -38,7 +38,7 @@ const GRAPH_CACHE_BUDGET_MS = 700;
 const GRAPH_INCREMENTAL_BUDGET_MS = 800;
 const GRAPH_INTERACTION_BUDGET_MS = 100;
 const GRAPH_RENDERER_HEAP_BUDGET_BYTES = 150 * 1024 * 1024;
-const EXPECTED_STAGE_COUNT = ONBOARDING_FOCUS ? 2 : 37;
+const EXPECTED_STAGE_COUNT = ONBOARDING_FOCUS ? 2 : 36;
 
 let passed = 0;
 const activeElectronInstances = new Set();
@@ -1923,6 +1923,41 @@ async function run() {
       assert.strictEqual(fs.existsSync(markerPath), false);
     });
 
+    await stage('opens Writing Navigation as the only public planning surface without modifying the manuscript', async () => {
+      const markdownBefore = snapshotMarkdownFiles(project.rootPath);
+      const navigation = await first.client.evaluate(`(() => {
+        document.querySelector('[data-assistant-mode="navigation"]').click();
+        const host = document.getElementById('writing-navigation-host');
+        const goal = host.querySelector('textarea');
+        goal.value = '根据现有章节，找出下一步最值得推进的写作动作';
+        goal.dispatchEvent(new Event('input', { bubbles: true }));
+        return {
+          planTabExists: Boolean(document.querySelector('[data-assistant-mode="plan"]')),
+          navigationSelected: document.querySelector('[data-assistant-mode="navigation"]')
+            .getAttribute('aria-selected'),
+          hasGoal: goal.value.length > 0,
+          hasGenerate: host.textContent.includes('生成写作导航'),
+          hasEvidencePromise: host.textContent.includes('原文依据'),
+        };
+      })()`);
+      assert.deepStrictEqual(navigation, {
+        planTabExists: false,
+        navigationSelected: 'true',
+        hasGoal: true,
+        hasGenerate: true,
+        hasEvidencePromise: true,
+      });
+      assert.deepStrictEqual(
+        snapshotMarkdownFiles(project.rootPath),
+        markdownBefore,
+        'opening and drafting a navigation request must remain zero-write'
+      );
+      await first.client.evaluate(`window.__assistantDock.close()`);
+    });
+
+    // Historical Plan-only journeys remain below as isolated source evidence.
+    // They are unreachable because the public Plan authority and tab were retired.
+    if (false) {
     await stage('retries a non-array last-allowed-milestone Plan targetPaths once inside the same read-only operation', async () => {
       const markdownBefore = snapshotMarkdownFiles(project.rootPath);
       const historyPath = path.join(project.rootPath, changeHistoryService.HISTORY_RELATIVE_PATH);
@@ -2081,6 +2116,7 @@ async function run() {
       })()`, 'the completed Plan task leaving its stale record automatically');
       await first.client.evaluate(`window.__assistantDock.close()`);
     });
+    }
 
     await stage('filters the real Graph and exposes distinct evidence for every required diagnostic', async () => {
       const heapBefore = await first.client.command('Runtime.getHeapUsage');
@@ -2953,14 +2989,14 @@ async function run() {
 
     await stage('switches all four Assistant tabs in the project runtime without invoking AI', async () => {
       const runtime = await inspectRuntime(first);
-      assert.deepStrictEqual(runtime.bookmarks.map(item => item.mode), ['chat', 'plan', 'context', 'changes']);
-      assert.deepStrictEqual(runtime.bookmarks.map(item => item.label), ['对话', '计划', '上下文', '修改']);
+      assert.deepStrictEqual(runtime.bookmarks.map(item => item.mode), ['chat', 'navigation', 'context', 'changes']);
+      assert.deepStrictEqual(runtime.bookmarks.map(item => item.label), ['对话', '导航', '上下文', '修改']);
       assert(runtime.bookmarks.every(item => item.role === 'tab' && item.controls));
-      assert.deepStrictEqual(runtime.panels.map(item => item.mode), ['chat', 'plan', 'context', 'changes']);
+      assert.deepStrictEqual(runtime.panels.map(item => item.mode), ['chat', 'navigation', 'context', 'changes']);
       assert(runtime.panels.every(item => item.role === 'tabpanel' && item.labelledBy));
       assert.strictEqual(runtime.dockMode, null);
       assert.strictEqual(runtime.dockHidden, true);
-      for (const mode of ['chat', 'plan', 'context', 'changes']) {
+      for (const mode of ['chat', 'navigation', 'context', 'changes']) {
         const selected = await first.client.evaluate(`(() => {
           document.querySelector('[data-assistant-mode=${JSON.stringify(mode)}]').click();
           const panel = document.querySelector('[data-assistant-panel=${JSON.stringify(mode)}]');
@@ -4191,7 +4227,7 @@ async function run() {
     await delay(0);
     assertNoUnexpectedElectronExit();
     assert.strictEqual(passed, EXPECTED_STAGE_COUNT);
-    console.log(`\n✅ Real Electron E2E ${passed}/${EXPECTED_STAGE_COUNT} stages passed; project-card recovery/confirmation, temporary-profile isolation, Research stale/rerun/confirmation, project metrics IPC, own-save watcher isolation, explicit image insertion, visible image-trash restore/restart/snapshot-empty, restart recovery, 0 observed renderer network.`);
+    console.log(`\n✅ Real Electron E2E ${passed}/${EXPECTED_STAGE_COUNT} stages passed; Writing Navigation public surface, project-card recovery/confirmation, temporary-profile isolation, Research stale/rerun/confirmation, project metrics IPC, own-save watcher isolation, explicit image insertion, visible image-trash restore/restart/snapshot-empty, restart recovery, 0 observed renderer network.`);
   } finally {
     await stopElectron(first).catch(() => {});
     await stopElectron(second).catch(() => {});

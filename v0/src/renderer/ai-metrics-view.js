@@ -54,7 +54,7 @@
       ['已记录', `${metrics.sampleSize} 次`],
       ['建议接受率', percent(metrics.acceptanceRate)],
       ['Inline', evidenceValue(metrics.authorEvidence?.inline)],
-      ['Plan 生成', evidenceValue(metrics.authorEvidence?.planRun, 'failure')],
+      ['导航生成', evidenceValue(metrics.authorEvidence?.planRun, 'failure')],
       ['Plan task', evidenceValue(metrics.authorEvidence?.planTask)],
       ['Research 修改', evidenceValue(metrics.authorEvidence?.research)],
       ['Research 主张', researchAccuracyValue(metrics.authorEvidence?.researchAccuracy)],

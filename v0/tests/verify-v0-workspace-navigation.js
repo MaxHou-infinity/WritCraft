@@ -45,7 +45,7 @@ check('secondary renderers expose lifecycle hooks instead of competing click own
   assert(!sources.includes("button?.addEventListener('click'"));
   assert(!graph.includes("graphButton?.addEventListener('click'"));
   assert(search.includes('window.__searchView = { activate: openSearch }'));
-  assert(sources.includes('window.__sourcesView = { activate: open }'));
+  assert(sources.includes('window.__sourcesView = { activate: open, openWritingNavigation }'));
   assert(graph.includes('activate: activateGraph'));
   assert(graph.includes('deactivate: deactivateGraph'));
 });

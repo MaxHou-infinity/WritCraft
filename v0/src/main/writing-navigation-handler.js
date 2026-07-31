@@ -4,7 +4,9 @@ const {
   WritingNavigationError,
 } = require('./writing-navigation-service');
 
-function createProposeWritingNavigationHandler(options = {}) {
+const ATTEMPT_ID_RE = /^wno_[a-f0-9]{32}$/;
+
+function createWritingNavigationHandlers(options = {}) {
   const {
     assertTrustedSender,
     requireCurrentProject,
@@ -32,7 +34,14 @@ function createProposeWritingNavigationHandler(options = {}) {
     return JSON.stringify([owner, project.instanceId, project.rootPath, navigationEpoch]);
   }
 
-  function acquire(owner, project, navigationEpoch) {
+  function requireAttemptId(value) {
+    if (typeof value !== 'string' || !ATTEMPT_ID_RE.test(value)) {
+      throw new WritingNavigationError('INVALID_ATTEMPT_ID', '写作导航请求标识无效');
+    }
+    return value;
+  }
+
+  function acquire(owner, project, navigationEpoch, attemptId) {
     const key = leaseKey(owner, project, navigationEpoch);
     if (active.has(key)) {
       throw new WritingNavigationError(
@@ -40,7 +49,15 @@ function createProposeWritingNavigationHandler(options = {}) {
         '写作导航正在整理中，请等待当前请求完成'
       );
     }
-    const lease = Object.freeze({ key });
+    const lease = Object.freeze({
+      key,
+      ownerId: owner,
+      projectInstanceId: project.instanceId,
+      rootPath: project.rootPath,
+      navigationEpoch,
+      attemptId: requireAttemptId(attemptId),
+      controller: new AbortController(),
+    });
     active.set(key, lease);
     return lease;
   }
@@ -58,14 +75,14 @@ function createProposeWritingNavigationHandler(options = {}) {
       getRendererNavigationEpoch() === navigationEpoch);
   }
 
-  return async function proposeWritingNavigationHandler(event, projectInstanceId, request) {
+  async function propose(event, projectInstanceId, request, attemptId) {
     try {
       assertTrustedSender(event);
       const project = requireCurrentProject();
       if (projectInstanceId !== project.instanceId) return staleAiProjectResult();
       const owner = ownerId(event);
       const entryNavigationEpoch = getRendererNavigationEpoch();
-      const lease = acquire(owner, project, entryNavigationEpoch);
+      const lease = acquire(owner, project, entryNavigationEpoch, attemptId);
       try {
         await settleProjectAuthority(project);
         if (getRendererNavigationEpoch() !== entryNavigationEpoch) return staleAiProjectResult();
@@ -76,6 +93,7 @@ function createProposeWritingNavigationHandler(options = {}) {
           rootPath: project.rootPath,
           request,
           callLLM: projectCallLLM(project.instanceId),
+          signal: lease.controller.signal,
         });
         if (!proposal.ok) {
           return isCurrent(project, mutationGeneration, navigationEpoch)
@@ -105,7 +123,49 @@ function createProposeWritingNavigationHandler(options = {}) {
     } catch (error) {
       return projectFailure(error);
     }
-  };
+  }
+
+  async function cancel(event, projectInstanceId, attemptId) {
+    try {
+      assertTrustedSender(event);
+      const project = requireCurrentProject();
+      if (projectInstanceId !== project.instanceId) return staleAiProjectResult();
+      const owner = ownerId(event);
+      const navigationEpoch = getRendererNavigationEpoch();
+      const selectedAttemptId = requireAttemptId(attemptId);
+      const key = leaseKey(owner, project, navigationEpoch);
+      const lease = active.get(key);
+      if (!lease ||
+          lease.ownerId !== owner ||
+          lease.projectInstanceId !== project.instanceId ||
+          lease.rootPath !== project.rootPath ||
+          lease.navigationEpoch !== navigationEpoch ||
+          lease.attemptId !== selectedAttemptId) {
+        throw new WritingNavigationError(
+          'NAVIGATION_ATTEMPT_NOT_FOUND',
+          '当前写作导航请求不存在或已结束'
+        );
+      }
+      lease.controller.abort();
+      release(lease);
+      return Object.freeze({
+        ok: true,
+        cancelled: true,
+        attemptId: selectedAttemptId,
+      });
+    } catch (error) {
+      return projectFailure(error);
+    }
+  }
+
+  return Object.freeze({ propose, cancel });
 }
 
-module.exports = Object.freeze({ createProposeWritingNavigationHandler });
+function createProposeWritingNavigationHandler(options = {}) {
+  return createWritingNavigationHandlers(options).propose;
+}
+
+module.exports = Object.freeze({
+  createWritingNavigationHandlers,
+  createProposeWritingNavigationHandler,
+});

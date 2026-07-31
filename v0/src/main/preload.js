@@ -179,8 +179,19 @@ contextBridge.exposeInMainWorld('writCraft', {
     proposeChapter: (projectInstanceId, request) => ipcRenderer.invoke('writcraft:project:propose-chapter', projectInstanceId, request),
     proposeOnboarding: (projectInstanceId, request) => ipcRenderer.invoke('writcraft:project:propose-onboarding', projectInstanceId, request),
     proposeEditPromptRepair: (projectInstanceId) => ipcRenderer.invoke('writcraft:project:propose-edit-prompt-repair', projectInstanceId),
-    proposeWritingNavigation: (projectInstanceId, request) =>
-      ipcRenderer.invoke('writcraft:project:propose-writing-navigation', projectInstanceId, request),
+    proposeWritingNavigation: (projectInstanceId, request, attemptId) =>
+      ipcRenderer.invoke(
+        'writcraft:project:propose-writing-navigation',
+        projectInstanceId,
+        request,
+        attemptId
+      ),
+    cancelWritingNavigation: (projectInstanceId, attemptId) =>
+      ipcRenderer.invoke(
+        'writcraft:project:cancel-writing-navigation',
+        projectInstanceId,
+        attemptId
+      ),
     runWritingNavigationAction: (projectInstanceId, actionId, attemptId) =>
       ipcRenderer.invoke(
         'writcraft:project:run-writing-navigation-action',
@@ -213,8 +224,6 @@ contextBridge.exposeInMainWorld('writCraft', {
         projectInstanceId,
         operationId
       ),
-    proposePlan: (projectInstanceId, goal, contextPaths) => ipcRenderer.invoke('writcraft:project:propose-plan', projectInstanceId, goal, contextPaths),
-    handoffPlanTask: (projectInstanceId, request) => ipcRenderer.invoke('writcraft:project:handoff-plan-task', projectInstanceId, request),
     handoffGraphIssue: (projectInstanceId, request) => ipcRenderer.invoke('writcraft:project:handoff-graph-issue', projectInstanceId, request),
     confirmOnboardingFiles: (projectInstanceId, token, proposalDigest, selectedPaths) =>
       ipcRenderer.invoke('writcraft:project:confirm-onboarding-files', projectInstanceId, token, proposalDigest, selectedPaths),

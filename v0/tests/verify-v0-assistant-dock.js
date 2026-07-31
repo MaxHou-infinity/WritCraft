@@ -14,7 +14,7 @@ function test(name, fn) {
 }
 
 console.log('WritCraft Assistant Dock verification\n');
-test('只定义四个权威模式', () => assert.deepStrictEqual(dock.MODES, ['chat', 'plan', 'context', 'changes']));
+test('只定义四个权威模式', () => assert.deepStrictEqual(dock.MODES, ['chat', 'navigation', 'context', 'changes']));
 test('模块不访问 Node、网络或 preload', () => {
   assert.ok(!/require\(['"](?:fs|path|electron|https?)/.test(source));
   assert.ok(!/fetch\s*\(|XMLHttpRequest|ipcRenderer/.test(source));

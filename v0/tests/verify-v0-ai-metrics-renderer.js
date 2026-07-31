@@ -431,7 +431,7 @@ console.log('════════ WritCraft V0 · AI metrics renderer verify
       },
     });
     const text = nodeText(host);
-    for (const label of ['Inline', 'Plan 生成', 'Plan task', 'Research 修改', 'Research 主张', '图片', 'Onboarding', '结构失败率', '人工重试']) assert(text.includes(label));
+    for (const label of ['Inline', '导航生成', 'Plan task', 'Research 修改', 'Research 主张', '图片', 'Onboarding', '结构失败率', '人工重试']) assert(text.includes(label));
     assert(text.includes('2 次判断 · 匹配 50%'));
     assert(text.includes('作者判断，不是平台事实评分'));
     assert(text.includes('样本少于 20'));
@@ -449,24 +449,24 @@ console.log('════════ WritCraft V0 · AI metrics renderer verify
     assert(!unknownBranch.match(/route\.kind === 'outcome_unknown'[\s\S]{0,300}recordRewriteMetric\('failed'/));
   });
 
-  await check('Changes 记录生成、应用、丢弃与失败，Plan 记录生成和失败', () => {
+  await check('Changes 记录生成、应用、丢弃与失败，导航记录生成和失败', () => {
     for (const outcome of ['generated', 'accepted', 'discarded', 'failed']) assert(changes.includes(`recordChangeMetric('${outcome}'`));
-    assert.match(plan, /recordPlanMetric\(result\?\.ok \? 'generated' : 'failed',[\s\S]*originProjectInstanceId/);
-    assert.match(plan, /requestEpoch === projectEpoch \? result : \{ canceled: true \}/);
+    assert.match(plan, /recordNavigationMetric\(result\?\.ok === true \? 'generated' : 'failed', metric\)/);
+    assert.match(plan, /bridge\.proposeWritingNavigation\([\s\S]*projectInstanceId,[\s\S]*request,[\s\S]*attemptId/);
   });
 
-  await check('Inline、Changes、Plan 都在操作创建时捕获 origin 并贯穿所有 outcome', () => {
+  await check('Inline、Changes、导航都在操作创建时捕获 origin 并贯穿所有 outcome', () => {
     assert.match(clientSource, /async function record\(originProjectInstanceId, input\)/);
     assert.match(clientSource, /currentProjectInstanceId !== originProjectInstanceId/);
     assert.match(editor, /originProjectInstanceId: frozen\.intent\.projectInstanceId/);
     assert.match(editor, /record\(entry\.originProjectInstanceId, \{/);
     assert.match(changes, /record\?\.\(metric\.originProjectInstanceId, \{/);
     assert((changes.match(/originProjectInstanceId: window\.__workspace\?\.state\?\.project\?\.instanceId/g) || []).length >= 3);
-    const planCapture = plan.indexOf('const originProjectInstanceId = window.__workspace?.state?.project?.instanceId');
-    assert(planCapture >= 0 && planCapture < plan.indexOf('await window.__workspace.persistCurrent(true)'));
-    assert.match(plan, /record\?\.\(originProjectInstanceId, \{/);
+    const navigationCapture = plan.indexOf('originProjectInstanceId: projectInstanceId');
+    assert(navigationCapture >= 0 && navigationCapture < plan.indexOf('await window.__workspace.persistCurrent(true)'));
+    assert.match(plan, /record\?\.\(metric\.originProjectInstanceId, \{/);
     for (const outcome of ['generated', 'accepted', 'rejected', 'discarded', 'failed']) {
-      assert(editor.includes(`recordRewriteMetric('${outcome}'`) || changes.includes(`recordChangeMetric('${outcome}'`) || plan.includes(`recordPlanMetric('${outcome}'`));
+      assert(editor.includes(`recordRewriteMetric('${outcome}'`) || changes.includes(`recordChangeMetric('${outcome}'`) || plan.includes(`recordNavigationMetric('${outcome}'`));
     }
   });
 

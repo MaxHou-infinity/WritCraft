@@ -4,116 +4,153 @@
 
   const workArea = document.getElementById('work-area');
   const dockElement = document.getElementById('assistant-dock');
-  const planHost = document.getElementById('plan-mode-host');
+  const navigationHost = document.getElementById('writing-navigation-host');
   const contextHost = document.getElementById('context-inspector-host');
-  const planGoal = document.getElementById('plan-goal');
-  const planGenerate = document.getElementById('plan-generate');
-  const planContextToggle = document.getElementById('plan-context-toggle');
-  const planContextList = document.getElementById('plan-context-list');
   const bridge = window.writCraft?.project;
-  let selectedPlanContext = [];
-  let planController = null;
+  let navigationController = null;
   let contextController = null;
-  let projectEpoch = 0;
 
-  function recordPlanMetric(outcome, startedAt, operationId, originProjectInstanceId) {
-    if (!operationId || !originProjectInstanceId) return;
-    void window.WritCraftAiMetrics?.record?.(originProjectInstanceId, {
-      operationId,
-      action: 'plan', outcome, style: 'none', scope: 'project',
-      durationMs: Math.max(0, Date.now() - startedAt),
-      beforeChars: 0, afterChars: 0,
+  function recordNavigationMetric(outcome, metric) {
+    if (!metric?.operationId || !metric.originProjectInstanceId) return;
+    void window.WritCraftAiMetrics?.record?.(metric.originProjectInstanceId, {
+      operationId: metric.operationId,
+      action: 'plan',
+      outcome,
+      style: 'none',
+      scope: 'project',
+      durationMs: Math.max(0, Date.now() - metric.startedAt),
+      beforeChars: 0,
+      afterChars: 0,
     });
   }
 
-  function markdownPaths(nodes, output = []) {
-    for (const node of nodes || []) {
-      if (node?.type === 'directory') markdownPaths(node.children, output);
-      else if (node?.type === 'file' && /\.(?:md|markdown)$/i.test(String(node.path || '')) && node.path !== 'edit.md') output.push(node.path);
+  async function openLocator(locator, path) {
+    const filePath = typeof path === 'string' && path ? path : locator?.filePath;
+    if (!filePath) return false;
+    const opened = await window.__workspace?.openFile?.(filePath);
+    if (opened === false) return false;
+    if (locator) {
+      return window.__workspace?.revealContextChip?.({
+        revision: locator.revision || null,
+        locator,
+      }) || false;
     }
-    return output;
+    return true;
   }
 
-  function availablePlanContext() {
-    return markdownPaths(window.__workspace?.state?.tree || []);
-  }
-
-  function renderPlanContext() {
-    if (!planContextList || !planContextToggle) return;
-    const available = availablePlanContext();
-    selectedPlanContext = selectedPlanContext.filter(path => available.includes(path)).slice(0, 8);
-    planContextToggle.textContent = `补充上下文 · ${selectedPlanContext.length}/8`;
-    planContextList.replaceChildren();
-    if (!available.length) {
-      const empty = document.createElement('div');
-      empty.className = 'plan-context-empty';
-      empty.textContent = '项目里还没有可选的正文 Markdown。';
-      planContextList.append(empty);
-      return;
+  async function generateNavigation(request, attemptId, projectInstanceId) {
+    const metric = {
+      operationId: window.WritCraftAiMetrics?.createOperationId?.(),
+      originProjectInstanceId: projectInstanceId,
+      startedAt: Date.now(),
+    };
+    if (!bridge?.proposeWritingNavigation) {
+      recordNavigationMetric('failed', metric);
+      return { ok: false, error: 'NAVIGATION_UNAVAILABLE' };
     }
-    for (const filePath of available) {
-      const label = document.createElement('label');
-      label.className = 'plan-context-option';
-      const input = document.createElement('input');
-      input.type = 'checkbox';
-      input.checked = selectedPlanContext.includes(filePath);
-      input.disabled = selectedPlanContext.length >= 8 && !input.checked;
-      input.addEventListener('change', () => {
-        if (input.checked && selectedPlanContext.length < 8) selectedPlanContext.push(filePath);
-        if (!input.checked) selectedPlanContext = selectedPlanContext.filter(path => path !== filePath);
-        renderPlanContext();
-      });
-      const text = document.createElement('span');
-      text.textContent = filePath;
-      label.append(input, text);
-      planContextList.append(label);
+    if (!window.__workspace?.canUseAI?.()) {
+      recordNavigationMetric('failed', metric);
+      return { ok: false, error: 'PROJECT_CHANGED' };
     }
-  }
-
-  async function requestPlan() {
-    const requestEpoch = projectEpoch;
-    const startedAt = Date.now();
-    const operationId = window.WritCraftAiMetrics?.createOperationId?.();
-    const originProjectInstanceId = window.__workspace?.state?.project?.instanceId || null;
-    const goal = planGoal?.value.trim() || '';
-    if (!goal) return { ok: false, message: '先写下这次想完成的目标' };
-    if (!bridge?.proposePlan) return { ok: false, message: 'Plan Mode 尚未连接 Main' };
-    if (!window.__workspace?.canUseAI?.()) return { ok: false, message: '请先恢复 edit.md 或处理文件冲突' };
     const saved = await window.__workspace.persistCurrent(true);
-    if (!saved) return { ok: false, message: '当前文件未能安全保存，计划生成已停止' };
+    if (!saved) {
+      recordNavigationMetric('failed', metric);
+      return { ok: false, error: 'PROJECT_SAVE_FAILED' };
+    }
+    if (projectInstanceId !== window.__workspace?.state?.project?.instanceId) {
+      recordNavigationMetric('failed', metric);
+      return { ok: false, error: 'PROJECT_CHANGED' };
+    }
     try {
-      const result = await bridge.proposePlan(originProjectInstanceId, goal, selectedPlanContext);
-      const currentResult = requestEpoch === projectEpoch ? result : { canceled: true };
-      if (!currentResult.canceled) recordPlanMetric(result?.ok ? 'generated' : 'failed', startedAt, operationId, originProjectInstanceId);
-      return currentResult;
+      const result = await bridge.proposeWritingNavigation(
+        projectInstanceId,
+        request,
+        attemptId
+      );
+      recordNavigationMetric(result?.ok === true ? 'generated' : 'failed', metric);
+      return result;
     } catch (error) {
-      if (requestEpoch === projectEpoch) recordPlanMetric('failed', startedAt, operationId, originProjectInstanceId);
-      return { ok: false, message: error.message || '项目计划生成中断' };
+      recordNavigationMetric('failed', metric);
+      throw error;
     }
   }
 
-  async function handoffPlanTask(payload) {
-    if (!payload || payload.schema !== 'writcraft.plan-task-handoff/v1') {
-      return { ok: false, message: '任务卡交接数据无效' };
+  async function confirmStructure(capabilityId) {
+    if (!bridge?.confirmWritingStructure) {
+      return { ok: false, state: 'UNKNOWN', recoveryRequired: true };
     }
-    if (!window.__changesView?.openPlanTask) return { ok: false, message: 'Changes 执行器尚未连接' };
-    return window.__changesView.openPlanTask(payload);
+    return bridge.confirmWritingStructure(capabilityId);
   }
 
-  async function openLocator(locator) {
-    if (!locator?.filePath) return false;
-    return window.__workspace?.revealContextChip?.({
-      revision: locator.revision || null,
-      locator,
-    }) || false;
+  async function queryStructureRecovery(projectInstanceId) {
+    if (!bridge?.queryWritingStructureRecovery) {
+      return { ok: false, error: 'RECOVERY_UNAVAILABLE' };
+    }
+    return bridge.queryWritingStructureRecovery(projectInstanceId);
   }
 
-  if (window.WritCraftPlanModeView && planHost) {
-    planController = window.WritCraftPlanModeView.mount(planHost, {
-      stateApi: window.WritCraftPlanModeState,
-      onRequestPlan: requestPlan,
-      onHandoff: handoffPlanTask,
-      onOpenPath: path => window.__workspace?.openFile?.(path),
+  async function runNavigationAction(projectInstanceId, actionId, attemptId) {
+    if (!bridge?.runWritingNavigationAction) {
+      return { ok: false, error: 'ACTION_UNAVAILABLE' };
+    }
+    const result = await bridge.runWritingNavigationAction(
+      projectInstanceId,
+      actionId,
+      attemptId
+    );
+    if (projectInstanceId !== window.__workspace?.state?.project?.instanceId) {
+      if (result?.kind === 'changes' && result.changeSetId) {
+        try { await bridge.discardChanges?.(projectInstanceId, result.changeSetId); } catch (_) {}
+      }
+      return { ok: false, error: 'PROJECT_CHANGED' };
+    }
+    if (result?.ok !== true) return result;
+    if (result.kind === 'research') {
+      const routed = window.__sourcesView?.openWritingNavigation?.(result.handoff);
+      return routed?.ok === true
+        ? result
+        : { ok: false, error: 'RESEARCH_ROUTE_FAILED' };
+    }
+    if (result.kind === 'changes' && result.noChanges !== true) {
+      const accepted = window.__changesView?.acceptProposal?.(result);
+      if (accepted?.ok !== true) {
+        try { await bridge.discardChanges?.(projectInstanceId, result.changeSetId); } catch (_) {}
+        return {
+          ok: false,
+          error: accepted?.error || 'REVIEW_IN_PROGRESS',
+          message: accepted?.message,
+        };
+      }
+    }
+    return result;
+  }
+
+  if (window.WritCraftWritingNavigationView && navigationHost) {
+    navigationController = window.WritCraftWritingNavigationView.mount(navigationHost, {
+      stateApi: window.WritCraftWritingNavigationState,
+      onGenerate: generateNavigation,
+      onCancelGeneration: (projectInstanceId, attemptId) =>
+        bridge?.cancelWritingNavigation?.(projectInstanceId, attemptId),
+      onPrepareStructure: (projectInstanceId, navigationId, alternativeId, chapters) =>
+        bridge?.prepareWritingStructure?.(
+          projectInstanceId,
+          navigationId,
+          alternativeId,
+          chapters
+        ),
+      onConfirmStructure: confirmStructure,
+      onQueryRecovery: queryStructureRecovery,
+      onStructureCommitted: async () => {
+        try { await window.__workspace?.refreshTree?.(); } catch (_) {}
+      },
+      onAcknowledgeRecovery: (projectInstanceId, operationId) =>
+        bridge?.acknowledgeWritingStructureRecovery?.(projectInstanceId, operationId),
+      onRunAction: runNavigationAction,
+      onCancelAction: (projectInstanceId, actionId, attemptId) =>
+        bridge?.cancelWritingNavigationAction?.(projectInstanceId, actionId, attemptId),
+      onOpenEvidence: openLocator,
+      onOpenSettings: () => document.getElementById('activity-settings')?.click(),
+      onOpenReview: () => window.__changesView?.open?.(),
     });
   }
 
@@ -128,7 +165,7 @@
   const dockController = window.WritCraftAssistantDock?.mount({
     workArea,
     dock: dockElement,
-    beforeOpen(mode) {
+    beforeOpen() {
       if (!window.__workspace?.state?.project) {
         const status = document.getElementById('save-state');
         if (status) status.textContent = '请先创建或打开写作项目';
@@ -141,7 +178,12 @@
     onOpen(mode) {
       document.getElementById('activity-ai')?.setAttribute('aria-pressed', String(mode === 'chat'));
       document.getElementById('activity-changes')?.setAttribute('aria-pressed', String(mode === 'changes'));
-      if (mode === 'plan') renderPlanContext();
+      if (mode === 'navigation') {
+        navigationController?.updateTree?.(
+          window.__workspace?.state?.tree || [],
+          window.__workspace?.getCurrentPath?.() || null
+        );
+      }
     },
     onClose() {
       document.getElementById('activity-ai')?.setAttribute('aria-pressed', 'false');
@@ -149,26 +191,34 @@
     },
   });
 
-  planGenerate?.addEventListener('click', () => planController?.request?.());
-  planContextToggle?.addEventListener('click', () => {
-    const open = planContextList.hidden;
-    planContextList.hidden = !open;
-    planContextToggle.setAttribute('aria-expanded', String(open));
-    if (open) renderPlanContext();
-  });
-
   document.addEventListener('writcraft:project-entered', () => {
-    projectEpoch += 1;
-    selectedPlanContext = [];
-    if (planGoal) planGoal.value = '';
-    planController?.update?.({ status: 'empty' });
-    contextController?.update?.({ scope: 'file', budgetChars: 10000, usedChars: 0, usedBytes: 0, chips: [] }, []);
-    renderPlanContext();
+    const workspace = window.__workspace;
+    navigationController?.updateProject?.(
+      workspace?.state?.project || null,
+      workspace?.state?.tree || [],
+      workspace?.getCurrentPath?.() || null
+    );
+    void navigationController?.recover?.();
+    contextController?.update?.(
+      { scope: 'file', budgetChars: 10000, usedChars: 0, usedBytes: 0, chips: [] },
+      []
+    );
   });
-  document.addEventListener('writcraft:tree-changed', renderPlanContext);
+  document.addEventListener('writcraft:tree-changed', () => {
+    navigationController?.updateTree?.(
+      window.__workspace?.state?.tree || [],
+      window.__workspace?.getCurrentPath?.() || null
+    );
+  });
+  document.addEventListener('writcraft:current-file-changed', () => {
+    navigationController?.updateTree?.(
+      window.__workspace?.state?.tree || [],
+      window.__workspace?.getCurrentPath?.() || null
+    );
+  });
 
   window.__assistantDock = dockController;
-  window.__planModeView = planController;
+  window.__writingNavigationView = navigationController;
   window.__contextInspectorView = Object.freeze({
     open: () => dockController?.open('context'),
     update(manifest, errors) {

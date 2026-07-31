@@ -20,6 +20,8 @@ const PROJECT = Object.freeze({
   rootPath: '/tmp/writcraft-project',
 });
 const EVENT = Object.freeze({ sender: Object.freeze({ id: 7 }) });
+const ATTEMPT_A = `wno_${'a'.repeat(32)}`;
+const ATTEMPT_B = `wno_${'b'.repeat(32)}`;
 const RECORD = Object.freeze({
   schema: 'writcraft.writing-navigation/v1',
   navigationId: `nav_${'a'.repeat(32)}`,
@@ -49,6 +51,7 @@ function setup(overrides = {}) {
   const installed = [];
   let settleCalls = 0;
   let serviceCalls = 0;
+  let attemptCounter = 0;
   const options = {
     assertTrustedSender() {},
     requireCurrentProject: () => currentProject,
@@ -78,8 +81,14 @@ function setup(overrides = {}) {
     }),
     ...overrides,
   };
+  const handlers = handlerModule.createWritingNavigationHandlers(options);
+  const nextAttempt = () =>
+    `wno_${(++attemptCounter).toString(16).padStart(32, '0')}`;
   return {
-    handler: handlerModule.createProposeWritingNavigationHandler(options),
+    handler: (event, projectInstanceId, request, attemptId = nextAttempt()) =>
+      handlers.propose(event, projectInstanceId, request, attemptId),
+    cancel: (event, projectInstanceId, attemptId) =>
+      handlers.cancel(event, projectInstanceId, attemptId),
     installed,
     get settleCalls() { return settleCalls; },
     get serviceCalls() { return serviceCalls; },
@@ -172,6 +181,117 @@ function setup(overrides = {}) {
     release();
     assert.strictEqual((await first).ok, true);
     assert.strictEqual((await other).ok, true);
+  });
+
+  await test('same bound generation attempt aborts the provider and never installs late truth', async () => {
+    let capturedSignal = null;
+    let calls = 0;
+    const state = setup({
+      writingNavigationService: {
+        proposeWritingNavigation: async ({ signal }) => {
+          calls += 1;
+          if (calls === 2) return { ok: true, record: RECORD };
+          capturedSignal = signal;
+          return new Promise(resolve => {
+            signal.addEventListener('abort', () => resolve({
+              ok: false,
+              error: 'REQUEST_ABORTED',
+              message: '写作导航未完成；本次没有修改任何项目文件',
+            }), { once: true });
+          });
+        },
+      },
+    });
+    const running = state.handler(EVENT, PROJECT.instanceId, {}, ATTEMPT_A);
+    await Promise.resolve();
+    await Promise.resolve();
+    assert(capturedSignal);
+    assert.strictEqual(capturedSignal.aborted, false);
+    assert.deepStrictEqual(
+      await state.cancel(EVENT, PROJECT.instanceId, ATTEMPT_A),
+      { ok: true, cancelled: true, attemptId: ATTEMPT_A }
+    );
+    assert.strictEqual(capturedSignal.aborted, true);
+    assert.strictEqual((await running).error, 'REQUEST_ABORTED');
+    assert.strictEqual(state.installed.length, 0);
+    assert.strictEqual(
+      (await state.handler(EVENT, PROJECT.instanceId, {}, ATTEMPT_B)).ok,
+      true,
+      'cancel acknowledgement must mean the old single-flight lease is already released'
+    );
+  });
+
+  await test('an old attempt cancel cannot abort a newer retry', async () => {
+    let firstSignal = null;
+    let secondSignal = null;
+    let releaseSecond;
+    const secondGate = new Promise(resolve => { releaseSecond = resolve; });
+    let calls = 0;
+    const state = setup({
+      writingNavigationService: {
+        proposeWritingNavigation: async ({ signal }) => {
+          calls += 1;
+          if (calls === 1) {
+            firstSignal = signal;
+            return new Promise(resolve => signal.addEventListener('abort', () => resolve({
+              ok: false,
+              error: 'REQUEST_ABORTED',
+              message: 'cancelled',
+            }), { once: true }));
+          }
+          secondSignal = signal;
+          await secondGate;
+          return { ok: true, record: RECORD };
+        },
+      },
+    });
+    const first = state.handler(EVENT, PROJECT.instanceId, {}, ATTEMPT_A);
+    await Promise.resolve();
+    await state.cancel(EVENT, PROJECT.instanceId, ATTEMPT_A);
+    assert.strictEqual((await first).error, 'REQUEST_ABORTED');
+    assert.strictEqual(firstSignal.aborted, true);
+
+    const second = state.handler(EVENT, PROJECT.instanceId, {}, ATTEMPT_B);
+    await Promise.resolve();
+    await Promise.resolve();
+    const oldCancel = await state.cancel(EVENT, PROJECT.instanceId, ATTEMPT_A);
+    assert.strictEqual(oldCancel.error, 'NAVIGATION_ATTEMPT_NOT_FOUND');
+    assert.strictEqual(secondSignal.aborted, false);
+    releaseSecond();
+    assert.strictEqual((await second).ok, true);
+  });
+
+  await test('generation cancel is isolated by owner, project and navigation epoch', async () => {
+    let capturedSignal = null;
+    let release;
+    const gate = new Promise(resolve => { release = resolve; });
+    const state = setup({
+      writingNavigationService: {
+        proposeWritingNavigation: async ({ signal }) => {
+          capturedSignal = signal;
+          await gate;
+          return { ok: true, record: RECORD };
+        },
+      },
+    });
+    const running = state.handler(EVENT, PROJECT.instanceId, {}, ATTEMPT_A);
+    await Promise.resolve();
+    assert.strictEqual(
+      (await state.cancel({ sender: { id: 8 } }, PROJECT.instanceId, ATTEMPT_A)).error,
+      'NAVIGATION_ATTEMPT_NOT_FOUND'
+    );
+    assert.strictEqual(
+      (await state.cancel(EVENT, 'instance_abcdef0123456789abcdef01', ATTEMPT_A)).error,
+      'PROJECT_CHANGED'
+    );
+    state.setNavigationEpoch(3);
+    assert.strictEqual(
+      (await state.cancel(EVENT, PROJECT.instanceId, ATTEMPT_A)).error,
+      'NAVIGATION_ATTEMPT_NOT_FOUND'
+    );
+    assert.strictEqual(capturedSignal.aborted, false);
+    release();
+    assert.strictEqual((await running).error, 'PROJECT_CHANGED');
   });
 
   await test('a new navigation epoch is not blocked or released by the old page owner', async () => {
