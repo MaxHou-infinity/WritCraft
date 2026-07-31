@@ -1,11 +1,11 @@
 # 笔触 · WritCraft · V0 开发状态与续作入口
 
-> 最后更新：2026-07-31（Asia/Shanghai，0.0BU · Plan 改用协议级结构化工具，待真实 MiniMax canary）
+> 最后更新：2026-07-31（Asia/Shanghai，0.0BW · Plan 结构化工具已获真实响应，生成 envelope 二次收敛后待单次复验）
 > 当前状态：**`writ-craft@0.1.1` 已从 exact candidate `c65981e` 发布到 npm `preview`；registry 时间 `2026-07-29T14:30:16.176Z`，shasum `d370c500666e25cfb373852deafa21b232d2bc18` 与本地候选一致。公网隔离安装/启动/退出为 2/2。annotated tag `v0.1.1` 指向同一提交，GitHub prerelease 已公开：`https://github.com/MaxHou-infinity/WritCraft/releases/tag/v0.1.1`。**
 > 发布判断：**0.1.1 Developer Preview 已完成版本、自动化、双架构安装、独立复审、npm 发布、公网安装和 GitHub prerelease。registry 标签保持 `preview: 0.1.1`、`latest: 0.1.0`，因此本次没有把 Preview 冒充稳定版，也没有执行 unpublish、占位发布或上传未签名 App/ZIP。**
 > 当前目标版本：**`docs/ROADMAP.md` 的 `RM-1.0 / writ-craft@0.1.2` 真实作者可用性闭环。必须使用 `edit.md`、5+ 个 `chapters/` 章节、2000+ 可见中文字符和至少 1 个来源文件的作者隔离副本，完成五段旅程，并关闭现场 `Graph INVALID_CACHE` 的诊断/恢复终态。0.1.2 签字前不得插入驾驶舱、新 AI 模式或其他后续版本功能。**
-> 当前源码证据：**0.0BT 的 prompt + 一次重试已被真实 operation `ef44ed234ceb417d9d8723fa918e3173` 推翻。exact production candidate `054ce2b` 把 Plan 改为 MiniMax Anthropic-compatible 单工具 `submit_project_plan`：请求携带完整 `input_schema` 与 named `tool_choice`，Main 只接受 `stop_reason=tool_use` 和恰好一个同名工具 input；thinking/text 永不成为计划 authority，旧文本 JSON 明确拒绝，字符串也绝不本地转数组。MiniMax 边界 **17/17**、Plan service **22/22**、Plan UI **16/16**、Plan handoff **15/15 + 5/5**、Assistant **11/11**、完整 `npm test`、批准 GUI `npm run verify` 均通过。真实 Electron 保留一次 Plan 已成功后的后段 CDP timeout 和一次 Plan 前项目卡进度 timeout 红灯；两者同源码单次确认均未复现，最终完整 **37/37**。独立复审已关闭 **P0=0/P1=0/P2=0**；真实 MiniMax named-tool canary 尚未完成，npm/GitHub Release 仍未发布 0.1.2。**
-> 当前作者验收进度：**项目卡、Inline 与 Chapter 已关闭。第七副本的 Plan 已累计六次真实失败：三次外围文本、两次里程碑 1 任务 2数组错误，以及最新一次里程碑 7 任务 1数组错误。最新 operation `ef44ed234ceb417d9d8723fa918e3173` 为 `plan/failed`、107,623 ms、before/after 0，说明初次与唯一重试都已调用但晚位重复字段仍错。六次均没有计划、任务卡、正文或 History 写入；`changes.json` 最后修改时间仍为 `2026-07-31T00:17:15.835Z`。独立复审已关闭；提交并重启新候选后，作者只做一次真实 MiniMax tool canary，成功再选择一张绑定目标文件的任务卡“交给 AI”。**
+> 当前源码证据：**exact candidate `054ce2b` 已让真实 MiniMax 接受 named tool 请求，但 operation `706fa3e5529d4cda9cf0e2c3ecfe211c` 返回 `stop_reason=max_tokens`。这证明工具请求形态已过 provider admission，却暴露原生成 schema 最多允许 12×12（Main 总 60）任务、合法最大 input 可达约 419 KiB，与本地 8192-token 输出预算不闭合。0.0BW 把一次迭代的生成与 Main 接收合同共同收敛为最多 **2 个里程碑 × 每个 2 个任务**、每任务最多 2 个目标文件和短字段；Schema 与 Main 同时拒绝会造成 JSON escape 膨胀的 C0 控制字符和孤立 surrogate，Main/Renderer 与 Schema 统一按 Unicode code point 计数并保留正常中文与 Emoji。填满全部计数、ID、80 字符唯一 Emoji 路径与所有唯一全 Emoji 列表/叙述字段的最大合法 fixture 为精确 **6,120 bytes**，低于 6 KiB，并为工具响应 envelope 保留超过 2 KiB 的字节余量。80 字符路径门禁覆盖当前作者验收项目的全部 Markdown 路径。全局/Plan token 上限仍为 **8192**，不增加等待、费用或 `max_tokens` 自动重试。默认写作模型早已统一为 **MiniMax-M3**；当前中国区公开文档尚未给出 M3/1M 上下文合同，因此本轮不把未验证的 1M 宣称转化为放宽本地上下文门禁。MiniMax 边界 **17/17**、Plan service **25/25**、Plan UI **16/16**、Plan handoff **15/15 + 5/5**、Assistant **11/11**、完整 `npm test`、批准 GUI 的 `npm run verify` 与强制真实 Electron **37/37** 均通过；独立终审 **P0=0/P1=0/P2=0**。provider 复验与当前候选提交/重启尚待完成，npm/GitHub Release 仍未发布 0.1.2。**
+> 当前作者验收进度：**项目卡、Inline 与 Chapter 已关闭。第七副本的 Plan 已累计七次真实零写入失败；最新 operation `706fa3e5529d4cda9cf0e2c3ecfe211c` 为 `plan/failed`、54,660 ms、before/after 0，UI 报“项目计划达到模型输出上限”。`changes.json` 最后修改时间仍为 `2026-07-31T00:17:15.835Z`，没有计划、任务卡、正文或 History 写入。提交并重启 0.0BW 后，作者只对收敛后的生成 envelope 做一次真实 canary；成功再选择一张绑定目标文件的任务卡“交给 AI”。**
 > 0.0AA 历史保留红灯：**首轮真实 Electron 暴露 Inspector 在上下文失效时被清空、旧 5-chip 断言和项目 Chat 等待诊断；完整 test 又暴露 Plan 测试把 generation 函数正文写死。独立复审发现新请求预检窗口可提交不可见旧轮、同项目重开 UI/Main 串话、失败重开提前清会话及两项测试/错误文案缺口，均转为生产边界和回归后关闭。真实 Electron 曾连续两次在旧 Graph 恢复阶段超时；加入只读失败快照后该阶段连续四次通过，未改 Graph 产品逻辑，按重复同源证据关闭 timing P2。另一次 Chat preflight 红灯证明测试在恢复 `edit.md` 后未等待权威 watcher barrier；改为生产 `flushExternalChanges()` 收敛，而未放宽 Chat guard。该里程碑所有红运行保留，最终源码连续两次 34/34；后续 0.0AB 当时推进到 35/35，当前总链只看本文顶部当前里程碑。**
 > Graph 历史签字基线：**性能修复前的既有源码曾完整 `npm test`、Electron-enabled `npm run verify`、强制真实 Electron 26/26 exit 0；Graph Filter 15/15、Workbench 14/14、dynamic 5/5、Large 5/5、Watcher 15/15、Network 11/11、Intelligence 17/17，第二轮复审 P0=0/P1=0/P2=2。该数字只保留为历史过程；0.0AB 后来推进到 35/35，当前总链只看顶部当前里程碑。**
 > Graph 动态边界：**300 文件/1279 节点 cold-to-interactive、cache/incremental、筛选/内存/布局、AX/键鼠、三类纠错、stale/Issue→Changes、failure live、重启与项目隔离均进入真实 Electron；正文/History/ledger 的零写入门禁通过。**  
@@ -32,6 +32,18 @@ Chat 的三级 scope/context、Main-owned 多轮连续性、Onboarding v2、Rese
 4. 不重写已经签字的 Onboarding v2 service、capability store、batch、Main/preload 与 Renderer 契约；Main 动态 admission、single-flight 和 Renderer 生命周期 authority 清理均已关闭。
 5. 每批合入后重跑定向测试；阶段完成时再运行完整 `npm test`、`npm run verify` 与 `WRITCRAFT_E2E_FORCE=1 npm run e2e:electron`，保存当次证据。
 6. 真实 API 只使用用户显式配置的 Key；记录延迟、限流、超时、故障和费用，不记录 Key、Prompt、模型原文或正文。Key 前缀只表示凭据/计费类型，不能代替官方能力与现场门禁。首发按 npm Developer Preview 合同执行；独立 App 发布才需要 Developer ID、公证与 Gatekeeper。
+
+### 0.0BW 2026-07-31 · 真实 tool 请求命中输出上限与 Plan 生成 envelope 二次收敛
+
+- **真实红灯**：作者使用权威目标只生成一次 Plan。operation **`706fa3e5529d4cda9cf0e2c3ecfe211c`** 在 **54,660 ms** 后返回 `MODEL_OUTPUT_TRUNCATED`，UI 显示“项目计划达到模型输出上限”。before/after 均为 0；`changes.json` 仍停在 Chapter 接受时间，未产生计划、任务卡、正文或 History 写入。
+- **边界判断**：错误来自 provider 的稳定 `stop_reason=max_tokens`，不是 Renderer 文案误报、schema/request 过大或本地 parser 猜测。当前真实响应也证明 MiniMax 接受了 named tool 请求形态。现有隐私指标未记录 usage/block counts，因此“默认 thinking 消耗了多少 token”只能作为强推断，不冒充精确证据。
+- **根因复核**：原工具 schema 仍沿用历史宽接收上限，理论允许 12 个里程碑、每个 12 个任务、Main 总 60 个任务和长说明/列表；独立复审构造的完全合法输入达 **418,984 bytes**。因此 8192-token provider 预算与合法生成空间没有闭合，一句“保持紧凑”不能成为容量门禁。
+- **中国区文档纠偏**：笔触调用 `api.minimaxi.com/anthropic/v1`。当前公开中国区 Anthropic 文档尚未列出 M3，且对 `thinking` 同时出现“完全支持”与“部分兼容参数可能忽略”的冲突说明；不得采用国际站默认 adaptive 的说明来推断本次根因，也不得把显式 disabled 冒充修复。0.0BW 不新增 thinking 请求字段。
+- **生产修复**：生成与 Main 接收使用同一个更小 schema：一次迭代最多 **2** 个里程碑、每个最多 **2** 个任务、总计 **4** 个任务；每任务最多 **2** 个目标文件和 **2** 个依赖，标题/摘要/目标/说明/列表同步缩短，路径保留 80 字符以覆盖当前作者项目。Renderer 同步限制总数和每里程碑任务数。Schema 与 Main 共同拒绝 C0 控制字符和孤立 UTF-16 surrogate，避免一个 JS 字符被 JSON 转义膨胀为 6 bytes；合法 surrogate pair/Emoji 保留，Main/Renderer 改按 code point 计数。填满全部 ID、80 字符唯一 Emoji 路径/叙述、所有唯一列表、双目标与前序依赖的最大合法 input 为精确 **6,120 bytes**，低于 6 KiB；跨文件双目标能力与 handoff 去重合同保留。唯一目标上限同步为结构真实可达的 8 个。0.0BV 的 13,758-byte 初稿只算显著收敛，不能证明 8192-token 闭合，已被本节取代。
+- **默认模型与上下文边界**：网络适配器、Main 默认参数以及 Plan/项目卡/章节/研究调用均已使用 **MiniMax-M3**，不需要再次改名。模型名不等于应用会把 1M 材料直接发送；Plan 仍只读取作者显式选择的最多 8 个文件并受 240 KiB 聚合上下文门禁保护。中国区当前公开 Anthropic 文档尚未列出 M3 或 1M 上下文合同，本轮不在缺少官方/现场容量证据时放宽该安全门禁。
+- **费用与失败策略**：全局与 Plan `max_tokens` 均保持 **8192**，90 秒 deadline 不变；不因一次截断盲目扩到 16K/32K，也不对 `max_tokens` 自动重试。即使截断响应带有看似完整的 tool input，Main 仍拒绝、只调用一次并保持零写入。
+- **最终自动化与复审**：MiniMax adapter **17/17**；Plan **25/25 + 15/15 + 5/5 + 16/16 + 11/11**；最大合法 envelope、控制字符/孤立 surrogate 拒绝、完整 tool input 截断仍只调用一次/零写入、双目标 handoff 均有定向覆盖。最终精确源码完整 `npm test` exit 0；批准 GUI 的 `npm run verify` exit 0；强制真实 Electron **37/37**。独立终审 **P0=0/P1=0/P2=0，可提交**。
+- **下一动作**：提交并重启同一第七副本。作者随后只做一次相同目标 Plan；不得点击旧错误页的“重新生成”或扩大付费重试。
 
 ### 0.0BU 2026-07-31 · 晚位重复字段再次失败与 Plan 工具协议迁移
 
@@ -928,7 +940,7 @@ Onboarding v2 已取代上述“容错解析完整 `editContent` + 部分创建�
 - [x] Research→Changes 产品链：建立 `writcraft.research-handoff/v1`，Main 按 card ID 重建 source revision/quote/locator，把来源绑定为只读依赖并进入 provenance；独立实现复审 P0/P1=0、全量 verify exit 0；**20/20** 是含 reject/A→B 的历史专项 Electron 证据，0.0AB 当时总链为 **35/35**，当前见顶部当前里程碑。
 - [x] Inline Rewrite 自动化链：既有写入/恢复链保持签字；0.0BJ 新增必填作者指令 composer 与 exact request v2，定向 Context 15/15、Main 11/11、transaction 14/14、integration 7/7、Renderer 11/11，完整 test/批准 GUI verify 与最终 Electron 37/37 通过，第三轮独立复审 P0=0/P1=0/P2=0。
 - [x] Inline Rewrite 当前候选真实作者旅程：第五副本已完成接受、独立拒绝与精确 Safe Undo，正文、History 和全项目 Markdown 摘要均回到操作前基线；项目卡与 Inline 均不再重跑。
-- [ ] Plan 生成当前迁移到单一 named tool input，保留错误脱敏、目标/Prompt 资源与零写入门禁；自动化已覆盖第七里程碑结构失败→同操作重试，独立复审 P0/P1/P2=0，仍待一次真实 MiniMax named-tool canary。
+- [ ] Plan 生成当前迁移到单一 named tool input，保留错误脱敏、目标/Prompt 资源与零写入门禁；自动化已覆盖最后一个允许里程碑的结构失败→同操作重试，仍待 0.0BW 独立复审与一次真实 MiniMax named-tool canary。
 
 ### P2：Chat/Chapter 独立复审保留的非阻塞测试增强
 

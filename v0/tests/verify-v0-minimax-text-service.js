@@ -119,6 +119,7 @@ async function run() {
     const result = await service.callMessages({
       apiKey: API_KEY,
       messages: [{ role: 'user', content: '生成项目计划' }],
+      maxTokens: 8_192,
       tools: [TEST_TOOL],
       toolChoice: TEST_TOOL_CHOICE,
       fetchImpl: async (_url, options) => {
@@ -136,7 +137,7 @@ async function run() {
     });
     assert.deepStrictEqual(captured, {
       model: 'MiniMax-M3',
-      max_tokens: 1024,
+      max_tokens: 8_192,
       messages: [{ role: 'user', content: '生成项目计划' }],
       tools: [TEST_TOOL],
       tool_choice: TEST_TOOL_CHOICE,
@@ -339,6 +340,7 @@ async function run() {
       [service.callMessages, { apiKey: API_KEY, messages: [{ role: 'user', content: 'x', apiKey: API_KEY }], fetchImpl }, 'INVALID_MESSAGES'],
       [service.callMessages, { apiKey: API_KEY, messages: [{ role: 'user', content: 'x' }], model: '../escape', fetchImpl }, 'INVALID_MODEL'],
       [service.callMessages, { apiKey: API_KEY, messages: [{ role: 'user', content: 'x' }], maxTokens: 0, fetchImpl }, 'INVALID_MAX_TOKENS'],
+      [service.callMessages, { apiKey: API_KEY, messages: [{ role: 'user', content: 'x' }], maxTokens: service.MAX_MAX_TOKENS + 1, fetchImpl }, 'INVALID_MAX_TOKENS'],
       [service.callMessages, {
         apiKey: API_KEY, messages: [{ role: 'user', content: 'x' }],
         tools: [{ ...TEST_TOOL, name: '../escape' }], toolChoice: TEST_TOOL_CHOICE, fetchImpl,

@@ -457,10 +457,11 @@ function assertPlanToolRequest(request) {
   const tool = request.tools?.[0];
   const targetPathsSchema = tool?.input_schema?.properties?.milestones?.items
     ?.properties?.tasks?.items?.properties?.targetPaths;
-  if (request.tools?.length !== 1 || tool?.name !== 'submit_project_plan' ||
+  if (request.max_tokens !== 8_192 || request.thinking !== undefined ||
+      request.tools?.length !== 1 || tool?.name !== 'submit_project_plan' ||
       request.tool_choice?.type !== 'tool' || request.tool_choice?.name !== 'submit_project_plan' ||
       tool?.input_schema?.type !== 'object' || tool?.input_schema?.additionalProperties !== false ||
-      targetPathsSchema?.type !== 'array' || targetPathsSchema?.maxItems !== 8) {
+      targetPathsSchema?.type !== 'array' || targetPathsSchema?.maxItems !== 2) {
     throw new Error('E2E_FIXTURE_INVALID_PLAN_TOOL_PROTOCOL');
   }
 }
@@ -558,7 +559,7 @@ function createElectronAiProvider() {
           }
           const strictAnswer = planStrictRetryAnswer(prompt);
           if (planStrictRetryCalls === 1) {
-            strictAnswer.milestones = Array.from({ length: 7 }, (_, index) => ({
+            strictAnswer.milestones = Array.from({ length: 2 }, (_, index) => ({
               id: `strict_retry_m${index + 1}`,
               title: `复核里程碑 ${index + 1}`,
               objective: '验证长计划中每一个重复任务字段都受结构约束。',
@@ -566,11 +567,11 @@ function createElectronAiProvider() {
               tasks: [{
                 id: `strict_retry_t${index + 1}`,
                 title: `复核任务 ${index + 1}`,
-                description: index === 6
-                  ? '故意模拟真实供应商把第七个里程碑的目标路径返回成字符串。'
-                  : '验证前置任务保持标准数组结构。',
+                description: index === 1
+                  ? '末里程碑目标路径故意为字符串'
+                  : '验证前置任务保持数组结构',
                 scope: 'file',
-                targetPaths: index === 6 ? CHAT_CURRENT_PATH : [CHAT_CURRENT_PATH],
+                targetPaths: index === 1 ? CHAT_CURRENT_PATH : [CHAT_CURRENT_PATH],
                 dependsOn: [],
                 acceptanceCriteria: ['结构正确且磁盘保持不变'],
               }],

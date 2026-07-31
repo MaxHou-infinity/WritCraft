@@ -70,6 +70,7 @@ check('renderer schema and safety caps match the authoritative Plan backend', ()
   assert.strictEqual(State.PLAN_SCHEMA, backend.PLAN_SCHEMA);
   assert.strictEqual(State.MAX_MILESTONES, backend.MAX_MILESTONES);
   assert.strictEqual(State.MAX_TASKS, backend.MAX_TASKS);
+  assert.strictEqual(State.MAX_TASKS_PER_MILESTONE, backend.MAX_TASKS_PER_MILESTONE);
   assert.deepStrictEqual([...State.TASK_SCOPES], backend.TASK_SCOPES);
 });
 

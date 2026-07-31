@@ -11,26 +11,32 @@ const MAX_GOAL_CHARS = 4000;
 const MAX_CONTEXT_FILES = 8;
 const MAX_CONTEXT_BYTES = 240 * 1024;
 const MAX_MODEL_OUTPUT_BYTES = 512 * 1024;
-const MAX_MILESTONES = 12;
-const MAX_TASKS = 60;
-const MAX_TASKS_PER_MILESTONE = 12;
-const MAX_LIST_ITEMS = 20;
-const MAX_UNIQUE_TARGETS = 60;
+const MAX_MILESTONES = 2;
+const MAX_TASKS = 4;
+const MAX_TASKS_PER_MILESTONE = 2;
+const MAX_LIST_ITEMS = 2;
+const MAX_TASK_TARGETS = 2;
+const MAX_DEPENDENCIES = 2;
+const MAX_UNIQUE_TARGETS = 8;
 const MAX_TARGET_SNAPSHOT_BYTES = 16 * 1024 * 1024;
 const MAX_PROVIDER_REQUEST_BYTES = 1024 * 1024;
+const PLAN_MAX_TOKENS = 8_192;
 const MAX_JSON_DEPTH = 32;
 const MAX_JSON_NODES = 4096;
 const TASK_SCOPES = Object.freeze(['project', 'file', 'paragraph', 'research']);
 const PLAN_TOOL_NAME = 'submit_project_plan';
 const DANGEROUS_KEYS = new Set(['__proto__', 'prototype', 'constructor']);
 const PROVIDER_ERROR_PATTERN = /^[A-Z][A-Z0-9_]{0,63}$/;
+const SAFE_TEXT_PATTERN = /^(?:[^\u0000-\u001f\uD800-\uDFFF]|[\uD800-\uDBFF][\uDC00-\uDFFF])*$/;
 
 const LIMITS = Object.freeze({
-  title: 120,
-  summary: 2000,
-  objective: 2000,
-  description: 2000,
-  listItem: 500,
+  id: 32,
+  title: 24,
+  summary: 48,
+  objective: 24,
+  description: 24,
+  listItem: 16,
+  path: 80,
 });
 
 const ID_PATTERN = /^[a-z][a-z0-9_-]{0,63}$/;
@@ -38,7 +44,9 @@ const ID_PATTERN = /^[a-z][a-z0-9_-]{0,63}$/;
 const STRING_LIST_SCHEMA = Object.freeze({
   type: 'array',
   maxItems: MAX_LIST_ITEMS,
-  items: { type: 'string', minLength: 1, maxLength: LIMITS.listItem },
+  items: {
+    type: 'string', minLength: 1, maxLength: LIMITS.listItem, pattern: SAFE_TEXT_PATTERN.source,
+  },
 });
 
 const PLAN_INPUT_SCHEMA = Object.freeze({
@@ -46,8 +54,12 @@ const PLAN_INPUT_SCHEMA = Object.freeze({
   additionalProperties: false,
   required: ['title', 'summary', 'assumptions', 'openQuestions', 'milestones'],
   properties: {
-    title: { type: 'string', minLength: 1, maxLength: LIMITS.title },
-    summary: { type: 'string', minLength: 1, maxLength: LIMITS.summary },
+    title: {
+      type: 'string', minLength: 1, maxLength: LIMITS.title, pattern: SAFE_TEXT_PATTERN.source,
+    },
+    summary: {
+      type: 'string', minLength: 1, maxLength: LIMITS.summary, pattern: SAFE_TEXT_PATTERN.source,
+    },
     assumptions: STRING_LIST_SCHEMA,
     openQuestions: STRING_LIST_SCHEMA,
     milestones: {
@@ -59,14 +71,23 @@ const PLAN_INPUT_SCHEMA = Object.freeze({
         additionalProperties: false,
         required: ['id', 'title', 'objective', 'acceptanceCriteria', 'tasks'],
         properties: {
-          id: { type: 'string', pattern: ID_PATTERN.source, maxLength: 64 },
-          title: { type: 'string', minLength: 1, maxLength: LIMITS.title },
-          objective: { type: 'string', minLength: 1, maxLength: LIMITS.objective },
+          id: { type: 'string', pattern: ID_PATTERN.source, maxLength: LIMITS.id },
+          title: {
+            type: 'string', minLength: 1, maxLength: LIMITS.title, pattern: SAFE_TEXT_PATTERN.source,
+          },
+          objective: {
+            type: 'string', minLength: 1, maxLength: LIMITS.objective, pattern: SAFE_TEXT_PATTERN.source,
+          },
           acceptanceCriteria: {
             type: 'array',
             minItems: 1,
             maxItems: MAX_LIST_ITEMS,
-            items: { type: 'string', minLength: 1, maxLength: LIMITS.listItem },
+            items: {
+              type: 'string',
+              minLength: 1,
+              maxLength: LIMITS.listItem,
+              pattern: SAFE_TEXT_PATTERN.source,
+            },
           },
           tasks: {
             type: 'array',
@@ -79,25 +100,42 @@ const PLAN_INPUT_SCHEMA = Object.freeze({
                 'id', 'title', 'description', 'scope', 'targetPaths', 'dependsOn', 'acceptanceCriteria',
               ],
               properties: {
-                id: { type: 'string', pattern: ID_PATTERN.source, maxLength: 64 },
-                title: { type: 'string', minLength: 1, maxLength: LIMITS.title },
-                description: { type: 'string', minLength: 1, maxLength: LIMITS.description },
+                id: { type: 'string', pattern: ID_PATTERN.source, maxLength: LIMITS.id },
+                title: {
+                  type: 'string', minLength: 1, maxLength: LIMITS.title, pattern: SAFE_TEXT_PATTERN.source,
+                },
+                description: {
+                  type: 'string',
+                  minLength: 1,
+                  maxLength: LIMITS.description,
+                  pattern: SAFE_TEXT_PATTERN.source,
+                },
                 scope: { type: 'string', enum: TASK_SCOPES },
                 targetPaths: {
                   type: 'array',
-                  maxItems: MAX_CONTEXT_FILES,
-                  items: { type: 'string', minLength: 1, maxLength: LIMITS.listItem },
+                  maxItems: MAX_TASK_TARGETS,
+                  items: {
+                    type: 'string',
+                    minLength: 1,
+                    maxLength: LIMITS.path,
+                    pattern: SAFE_TEXT_PATTERN.source,
+                  },
                 },
                 dependsOn: {
                   type: 'array',
-                  maxItems: MAX_TASKS,
-                  items: { type: 'string', minLength: 1, maxLength: LIMITS.listItem },
+                  maxItems: MAX_DEPENDENCIES,
+                  items: { type: 'string', minLength: 1, maxLength: LIMITS.id },
                 },
                 acceptanceCriteria: {
                   type: 'array',
                   minItems: 1,
                   maxItems: MAX_LIST_ITEMS,
-                  items: { type: 'string', minLength: 1, maxLength: LIMITS.listItem },
+                  items: {
+                    type: 'string',
+                    minLength: 1,
+                    maxLength: LIMITS.listItem,
+                    pattern: SAFE_TEXT_PATTERN.source,
+                  },
                 },
               },
             },
@@ -175,21 +213,29 @@ function assertExactKeys(value, required, label) {
 function boundedString(value, label, max, optional = false) {
   if (optional && value === undefined) return '';
   if (typeof value !== 'string') fail('INVALID_MODEL_OUTPUT', `${label}必须是文本`);
+  if (!SAFE_TEXT_PATTERN.test(value)) {
+    fail('INVALID_MODEL_OUTPUT', `${label}包含不允许的控制字符或不完整 Unicode`);
+  }
   const normalized = value.trim();
-  if (!normalized || normalized.length > max) {
+  if (!normalized || Array.from(normalized).length > max) {
     fail('INVALID_MODEL_OUTPUT', `${label}应为 1–${max} 个字符`);
   }
   return normalized;
 }
 
-function boundedStringList(value, label, { optional = false, minItems = 0, maxItems = MAX_LIST_ITEMS } = {}) {
+function boundedStringList(value, label, {
+  optional = false,
+  minItems = 0,
+  maxItems = MAX_LIST_ITEMS,
+  maxChars = LIMITS.listItem,
+} = {}) {
   if (optional && value === undefined) return [];
   if (!Array.isArray(value) || value.length < minItems || value.length > maxItems) {
     fail('INVALID_MODEL_OUTPUT', `${label}必须是 ${minItems}–${maxItems} 项的数组`, 'STRUCTURE_SHAPE');
   }
   const seen = new Set();
   return value.map((item, index) => {
-    const normalized = boundedString(item, `${label}第 ${index + 1} 项`, LIMITS.listItem);
+    const normalized = boundedString(item, `${label}第 ${index + 1} 项`, maxChars);
     if (seen.has(normalized)) fail('INVALID_MODEL_OUTPUT', `${label}不能包含重复项`);
     seen.add(normalized);
     return normalized;
@@ -325,7 +371,7 @@ function validateModelPlan(parsed, availablePaths) {
   const milestones = parsed.milestones.map((rawMilestone, milestoneIndex) => {
     const label = `里程碑 ${milestoneIndex + 1}`;
     assertExactKeys(rawMilestone, ['id', 'title', 'objective', 'acceptanceCriteria', 'tasks'], label);
-    const id = boundedString(rawMilestone.id, `${label} ID`, 64);
+    const id = boundedString(rawMilestone.id, `${label} ID`, LIMITS.id);
     if (!ID_PATTERN.test(id) || allIds.has(id)) fail('INVALID_MODEL_OUTPUT', `${label} ID 无效或重复`);
     allIds.add(id);
     if (!Array.isArray(rawMilestone.tasks) || !rawMilestone.tasks.length || rawMilestone.tasks.length > MAX_TASKS_PER_MILESTONE) {
@@ -339,17 +385,23 @@ function validateModelPlan(parsed, availablePaths) {
       assertExactKeys(rawTask, [
         'id', 'title', 'description', 'scope', 'targetPaths', 'dependsOn', 'acceptanceCriteria',
       ], taskLabel);
-      const taskId = boundedString(rawTask.id, `${taskLabel} ID`, 64);
+      const taskId = boundedString(rawTask.id, `${taskLabel} ID`, LIMITS.id);
       if (!ID_PATTERN.test(taskId) || allIds.has(taskId)) fail('INVALID_MODEL_OUTPUT', `${taskLabel} ID 无效或重复`);
       const scope = boundedString(rawTask.scope, `${taskLabel}范围`, 20);
       if (!TASK_SCOPES.includes(scope)) fail('INVALID_MODEL_OUTPUT', `${taskLabel}范围无效`);
-      const targetPaths = boundedStringList(rawTask.targetPaths, `${taskLabel}目标文件`, { maxItems: MAX_CONTEXT_FILES });
+      const targetPaths = boundedStringList(rawTask.targetPaths, `${taskLabel}目标文件`, {
+        maxItems: MAX_TASK_TARGETS,
+        maxChars: LIMITS.path,
+      });
       for (const targetPath of targetPaths) {
         if (!availablePaths.has(targetPath)) {
           fail('INVALID_MODEL_OUTPUT', `${taskLabel}引用了不存在的 Markdown 文件`);
         }
       }
-      const dependsOn = boundedStringList(rawTask.dependsOn, `${taskLabel}依赖`, { maxItems: MAX_TASKS });
+      const dependsOn = boundedStringList(rawTask.dependsOn, `${taskLabel}依赖`, {
+        maxItems: MAX_DEPENDENCIES,
+        maxChars: LIMITS.id,
+      });
       for (const dependency of dependsOn) {
         if (!ID_PATTERN.test(dependency) || !priorTaskIds.has(dependency)) {
           fail('INVALID_MODEL_OUTPUT', `${taskLabel}只能依赖计划中已经出现的任务`);
@@ -400,6 +452,7 @@ function planPrompt(request, available, files, formatRetry = false) {
     `任务 scope 只能是：${TASK_SCOPES.join(', ')}。`,
     `必须且只能调用 ${PLAN_TOOL_NAME} 一次，把完整计划放入工具 input；不要在文本中输出 JSON 或计划正文。`,
     '工具 input 不得新增 schema 之外的字段。',
+    `保持计划紧凑：使用 1–${MAX_MILESTONES} 个里程碑，每个里程碑 1–${MAX_TASKS_PER_MILESTONE} 个任务；每个任务最多绑定 ${MAX_TASK_TARGETS} 个文件。说明和验收标准只写执行所需信息，不写背景复述。`,
     ...(formatRetry ? [
       '上一轮工具 input 未通过数组结构校验。本轮是唯一一次结构重试：不要复述或修补上一轮输出，重新调用工具并提交一个完整计划。',
       '特别检查每一个任务，而不只是第一个任务：targetPaths、dependsOn、acceptanceCriteria 都必须使用 JSON 数组；没有目标文件时使用 []。',
@@ -418,7 +471,7 @@ function providerMessages(prompt) {
 function providerRequestBody(messages) {
   return JSON.stringify({
     model: 'MiniMax-M3',
-    max_tokens: 8192,
+    max_tokens: PLAN_MAX_TOKENS,
     messages,
     tools: PLAN_TOOLS,
     tool_choice: PLAN_TOOL_CHOICE,
@@ -526,7 +579,7 @@ async function proposeProjectPlan({
   const messages = providerMessages(planPrompt(request, available, files));
   assertProviderRequest(messages);
   const structuredOptions = { tools: PLAN_TOOLS, toolChoice: PLAN_TOOL_CHOICE };
-  let model = await callLLM(messages, 'MiniMax-M3', 8192, structuredOptions);
+  let model = await callLLM(messages, 'MiniMax-M3', PLAN_MAX_TOKENS, structuredOptions);
   let parsedModel;
   try {
     parsedModel = parseModelResponse(model, available);
@@ -536,7 +589,7 @@ async function proposeProjectPlan({
     assertRetryDependencies(projectService, rootPath, available, files);
     const retryMessages = providerMessages(planPrompt(request, available, files, true));
     assertProviderRequest(retryMessages);
-    model = await callLLM(retryMessages, 'MiniMax-M3', 8192, structuredOptions);
+    model = await callLLM(retryMessages, 'MiniMax-M3', PLAN_MAX_TOKENS, structuredOptions);
     parsedModel = parseModelResponse(model, available);
   }
   if (parsedModel?.ok === false) return parsedModel;
@@ -624,13 +677,17 @@ module.exports = {
   MAX_MILESTONES,
   MAX_TASKS,
   MAX_TASKS_PER_MILESTONE,
+  MAX_TASK_TARGETS,
+  MAX_DEPENDENCIES,
   MAX_UNIQUE_TARGETS,
   MAX_TARGET_SNAPSHOT_BYTES,
   MAX_PROVIDER_REQUEST_BYTES,
+  PLAN_MAX_TOKENS,
   MAX_JSON_DEPTH,
   MAX_JSON_NODES,
   TASK_SCOPES,
   PLAN_TOOL_NAME,
+  SAFE_TEXT_PATTERN,
   PLAN_INPUT_SCHEMA,
   PLAN_TOOLS,
   PLAN_TOOL_CHOICE,

@@ -75,7 +75,7 @@
 5. 修复旅程中发现的 P0/P1 阻断项；P2 必须明确记录、分级并决定是否允许发版。
 6. 记录内容无关的私有指标：Inline 接受率、Plan 采用、Research 匹配判断、图片评分/采纳、耗时和稳定错误码。
 
-当前执行注记（2026-07-31）：项目卡、Inline 与 Chapter 已关闭。第七副本的第六次真实 Plan operation `ef44ed234ceb417d9d8723fa918e3173` 在 107,623 ms 后仍报“里程碑 7任务 1 targetPaths 非数组”，推翻 `94e6099` 已关闭结构问题的结论；六次 Plan 失败均零计划、零任务卡、零正文/History 写入。exact production candidate `054ce2b` 不再依赖自由文本 JSON 服从，而以单一 `submit_project_plan` 工具的完整 input schema + named tool choice 约束重复结构，Main 只接受一个同名 `tool_use.input` 并继续做全部语义/revision 校验，绝不本地转数组或回退文本 JSON。MiniMax adapter 17/17、Plan 22/22、UI 16/16、handoff 15/15 + 5/5、Assistant 11/11、完整 test、批准 GUI verify 通过；真实 Electron 保留一次 Plan 后段 CDP timeout 和一次 Plan 前项目卡进度 timeout 红灯，两者同源码单次确认均未复现，最终 37/37；独立复审 P0/P1/P2=0。该候选已在第七作者副本重启并只读确认“编辑器就绪 / 已保存”，但仍只是本地提交，尚未推送或发布。下一步只做一次真实 MiniMax named-tool canary；此前不得让作者连续重试或重复前三段。
+当前执行注记（2026-07-31）：项目卡、Inline 与 Chapter 已关闭。`054ce2b` 已让真实 MiniMax 接受 named tool 请求，但第七副本 operation `706fa3e5529d4cda9cf0e2c3ecfe211c` 在 54,660 ms 后返回 `stop_reason=max_tokens`；这是第七次 Plan 零写入失败，`changes.json` 仍停在 Chapter 接受时间。根因是原合法生成空间可达约 419 KiB，与 8192-token 预算不闭合；0.0BV 的 13,758-byte 初稿仍不足以证明 token 闭合。0.0BW 将单次迭代的生成/Main/Renderer 上限同步收敛为 2 个里程碑、每个 2 个任务、每任务最多 2 个目标；Schema/Main 拒绝 C0 控制字符和孤立 surrogate，Main/Renderer 按 code point 与 Schema 对齐后，填满全部唯一 Emoji 列表/叙述字段、唯一 80 字符 Emoji 路径与 ID 的最大合法 fixture 为精确 6,120 bytes（低于 6 KiB），且路径上限覆盖当前作者项目。唯一目标上限与结构真实可达值统一为 8。不提高 token 上限、不自动重试截断，也不回退文本 JSON或本地修补。默认调用已经是 MiniMax-M3；在中国区公开文档未确认 M3/1M 上下文合同前，不放宽当前显式 8 文件/240 KiB 的 Plan 上下文安全门禁。MiniMax adapter 17/17、Plan 25/25、UI 16/16、handoff 15/15 + 5/5、Assistant 11/11、完整 test/verify 与强制真实 Electron 37/37 均通过；独立终审 P0/P1/P2=0。当前只待提交/重启和一次相同目标 provider canary。此前不得点击旧错误页重试或重复前三段。
 
 ### 4.3 明确不做
 

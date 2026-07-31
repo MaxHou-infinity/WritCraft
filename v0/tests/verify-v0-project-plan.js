@@ -13,12 +13,16 @@ const {
   MAX_MODEL_OUTPUT_BYTES,
   MAX_MILESTONES,
   MAX_TASKS_PER_MILESTONE,
+  MAX_TASK_TARGETS,
+  MAX_DEPENDENCIES,
   MAX_UNIQUE_TARGETS,
   MAX_TARGET_SNAPSHOT_BYTES,
   MAX_PROVIDER_REQUEST_BYTES,
+  PLAN_MAX_TOKENS,
   MAX_JSON_DEPTH,
   MAX_JSON_NODES,
   PLAN_TOOL_NAME,
+  SAFE_TEXT_PATTERN,
   PLAN_INPUT_SCHEMA,
   PLAN_TOOLS,
   PLAN_TOOL_CHOICE,
@@ -98,28 +102,93 @@ function validPlan(overrides = {}) {
   };
 }
 
+function maxEnvelopePlan(character = '中') {
+  const top = PLAN_INPUT_SCHEMA.properties;
+  const milestoneSchema = top.milestones.items.properties;
+  const taskSchema = milestoneSchema.tasks.items.properties;
+  const repeated = length => character.repeat(length);
+  const padded = (prefix, length, fill = character) =>
+    `${prefix}${fill.repeat(Math.max(0, length - Array.from(prefix).length))}`;
+  const uniqueRepeated = (length, seed) =>
+    String.fromCodePoint(0x1F600 + seed).repeat(length);
+  const priorTaskIds = [];
+  const milestones = Array.from({ length: top.milestones.maxItems }, (_, milestoneIndex) => {
+    const tasks = Array.from({ length: milestoneSchema.tasks.maxItems }, (_, taskIndex) => {
+      const id = padded(`t${milestoneIndex}_${taskIndex}_`, taskSchema.id.maxLength, 'a');
+      const dependsOn = priorTaskIds.slice(-taskSchema.dependsOn.maxItems);
+      priorTaskIds.push(id);
+      return {
+        id,
+        title: repeated(taskSchema.title.maxLength),
+        description: repeated(taskSchema.description.maxLength),
+        scope: 'paragraph',
+        targetPaths: Array.from(
+          { length: taskSchema.targetPaths.maxItems },
+          (_, index) => uniqueRepeated(
+            taskSchema.targetPaths.items.maxLength,
+            milestoneIndex * 4 + taskIndex * 2 + index
+          )
+        ),
+        dependsOn,
+        acceptanceCriteria: Array.from(
+          { length: taskSchema.acceptanceCriteria.maxItems },
+          (_, index) => uniqueRepeated(taskSchema.acceptanceCriteria.items.maxLength, index)
+        ),
+      };
+    });
+    return {
+      id: padded(`m${milestoneIndex}_`, milestoneSchema.id.maxLength, 'a'),
+      title: repeated(milestoneSchema.title.maxLength),
+      objective: repeated(milestoneSchema.objective.maxLength),
+      acceptanceCriteria: Array.from(
+        { length: milestoneSchema.acceptanceCriteria.maxItems },
+        (_, index) => uniqueRepeated(milestoneSchema.acceptanceCriteria.items.maxLength, index)
+      ),
+      tasks,
+    };
+  });
+  return {
+    title: repeated(top.title.maxLength),
+    summary: repeated(top.summary.maxLength),
+    assumptions: Array.from(
+      { length: top.assumptions.maxItems },
+      (_, index) => uniqueRepeated(top.assumptions.items.maxLength, index)
+    ),
+    openQuestions: Array.from(
+      { length: top.openQuestions.maxItems },
+      (_, index) => uniqueRepeated(top.openQuestions.items.maxLength, index)
+    ),
+    milestones,
+  };
+}
+
 function planWithTargets(targetPaths) {
   const tasks = [];
-  for (let offset = 0; offset < targetPaths.length; offset += MAX_CONTEXT_FILES) {
+  for (let offset = 0; offset < targetPaths.length; offset += MAX_TASK_TARGETS) {
     const index = tasks.length + 1;
     tasks.push({
       id: `bulk_t${index}`,
       title: `目标批次 ${index}`,
       description: '验证项目级目标资源上限。',
       scope: 'file',
-      targetPaths: targetPaths.slice(offset, offset + MAX_CONTEXT_FILES),
+      targetPaths: targetPaths.slice(offset, offset + MAX_TASK_TARGETS),
       dependsOn: [],
-      acceptanceCriteria: ['只绑定 revision，不写入文件'],
+      acceptanceCriteria: ['只绑定版本，不写文件'],
+    });
+  }
+  const milestones = [];
+  for (let offset = 0; offset < tasks.length; offset += MAX_TASKS_PER_MILESTONE) {
+    const index = milestones.length + 1;
+    milestones.push({
+      id: `bulk_m${index}`,
+      title: `资源上限 ${index}`,
+      objective: '验证目标读取保持有界。',
+      acceptanceCriteria: ['超限时安全停止'],
+      tasks: tasks.slice(offset, offset + MAX_TASKS_PER_MILESTONE),
     });
   }
   return validPlan({
-    milestones: [{
-      id: 'bulk_m1',
-      title: '资源上限',
-      objective: '验证目标读取保持有界。',
-      acceptanceCriteria: ['超限时安全停止'],
-      tasks,
-    }],
+    milestones,
   });
 }
 
@@ -234,7 +303,7 @@ async function run() {
       assert.strictEqual(result.contextManifest.omitted.length, 0);
       assert.strictEqual(result.contextManifest.editPrompt.frontMatterStatus, 'valid');
       assert.strictEqual(captured.model, 'MiniMax-M3');
-      assert.strictEqual(captured.maxTokens, 8192);
+      assert.strictEqual(captured.maxTokens, PLAN_MAX_TOKENS);
       const prompt = captured.messages[0].content;
       assert(prompt.includes('edit.md 是权威项目 Prompt'));
       assert(prompt.includes('research/facts.md'));
@@ -243,6 +312,7 @@ async function run() {
       assert(prompt.includes('每一项都必须遵守同一结构'));
       assert(prompt.includes('targetPaths/dependsOn/acceptanceCriteria 必须始终是 JSON 数组'));
       assert(prompt.includes('不确定时必须返回 []'));
+      assert(prompt.includes('保持计划紧凑'));
       assert.deepStrictEqual(captured.requestOptions, {
         tools: PLAN_TOOLS,
         toolChoice: PLAN_TOOL_CHOICE,
@@ -252,9 +322,64 @@ async function run() {
         PLAN_INPUT_SCHEMA.properties.milestones.items.properties.tasks.items.properties.targetPaths.type,
         'array'
       );
+      assert.strictEqual(
+        PLAN_INPUT_SCHEMA.properties.milestones.items.properties.tasks.items.properties.targetPaths.maxItems,
+        MAX_TASK_TARGETS
+      );
+      assert.strictEqual(
+        PLAN_INPUT_SCHEMA.properties.milestones.items.properties.tasks.items.properties.dependsOn.maxItems,
+        MAX_DEPENDENCIES
+      );
     } finally {
       fs.rmSync(root, { recursive: true, force: true });
     }
+  });
+
+  await test('keeps the maximum legal generation envelope below 6 KiB', async () => {
+    const plan = maxEnvelopePlan('😀');
+    const targetPaths = new Set(plan.milestones.flatMap(milestone =>
+      milestone.tasks.flatMap(task => task.targetPaths)));
+    const bytes = Buffer.byteLength(JSON.stringify(plan), 'utf8');
+    assert.strictEqual(bytes, 6_120);
+    assert(bytes < 6 * 1024, `maximum legal Plan tool input is ${bytes} bytes`);
+    assert.strictEqual(parseModelResponse(modelResponse(plan), targetPaths).milestones.length, MAX_MILESTONES);
+    assert.strictEqual(
+      plan.milestones.reduce((total, milestone) => total + milestone.tasks.length, 0),
+      MAX_MILESTONES * MAX_TASKS_PER_MILESTONE
+    );
+  });
+
+  await test('rejects JSON escape amplification from controls and unpaired surrogates', async () => {
+    const available = new Set(['edit.md', 'chapters/one.md']);
+    const controls = validPlan();
+    controls.summary = `有效摘要\u0001`;
+    const surrogate = validPlan();
+    surrogate.milestones[0].tasks[0].description = `有效说明\uD800`;
+    const pathSurrogate = validPlan();
+    pathSurrogate.milestones[0].tasks[0].targetPaths = [`chapters/one.md\uDC00`];
+    for (const plan of [controls, surrogate, pathSurrogate]) {
+      assert.throws(
+        () => parseModelResponse(modelResponse(plan), available),
+        error => error.code === 'INVALID_MODEL_OUTPUT'
+      );
+    }
+    assert(SAFE_TEXT_PATTERN.test('中文与 emoji 😀'));
+    assert(!SAFE_TEXT_PATTERN.test('\u0001'));
+    assert(!SAFE_TEXT_PATTERN.test('\uD800'));
+
+    const emojiBoundary = validPlan();
+    const titleLimit = PLAN_INPUT_SCHEMA.properties.title.maxLength;
+    emojiBoundary.title = '😀'.repeat(titleLimit);
+    assert.strictEqual(
+      parseModelResponse(modelResponse(emojiBoundary), available).title,
+      emojiBoundary.title
+    );
+    const emojiOverflow = validPlan();
+    emojiOverflow.title = '😀'.repeat(titleLimit + 1);
+    assert.throws(
+      () => parseModelResponse(modelResponse(emojiOverflow), available),
+      error => error.code === 'INVALID_MODEL_OUTPUT'
+    );
   });
 
   await test('rejects legacy text JSON without retrying or downgrading from the tool protocol', async () => {
@@ -433,7 +558,7 @@ async function run() {
   await test('preflights the exact serialized provider request before dispatch', async () => {
     const emptyMessages = [{ role: 'user', content: '' }];
     const withoutToolsEmpty = Buffer.byteLength(JSON.stringify({
-      model: 'MiniMax-M3', max_tokens: 8192, messages: emptyMessages,
+      model: 'MiniMax-M3', max_tokens: PLAN_MAX_TOKENS, messages: emptyMessages,
     }), 'utf8');
     const withToolsEmpty = Buffer.byteLength(providerRequestBody(emptyMessages), 'utf8');
     assert(withToolsEmpty > withoutToolsEmpty);
@@ -442,7 +567,7 @@ async function run() {
       content: 'x'.repeat(MAX_PROVIDER_REQUEST_BYTES - withToolsEmpty + 1),
     }];
     const withoutToolsBoundary = Buffer.byteLength(JSON.stringify({
-      model: 'MiniMax-M3', max_tokens: 8192, messages: boundaryMessages,
+      model: 'MiniMax-M3', max_tokens: PLAN_MAX_TOKENS, messages: boundaryMessages,
     }), 'utf8');
     assert(withoutToolsBoundary <= MAX_PROVIDER_REQUEST_BYTES,
       'messages-only body must remain under the limit so the tool schema is decisive');
@@ -493,6 +618,27 @@ async function run() {
       () => parseModelResponse({ ok: true, text: JSON.stringify(validPlan()) }, available),
       error => error.code === 'MODEL_OUTPUT_INCOMPLETE'
     );
+  });
+
+  await test('never retries or accepts a max_tokens response even when it contains a complete tool input', async () => {
+    const root = makeProject();
+    try {
+      const before = snapshotTree(root);
+      let calls = 0;
+      await expectCode('MODEL_OUTPUT_TRUNCATED', () => proposeProjectPlan({
+        projectService,
+        rootPath: root,
+        goal: '规划第一章',
+        callLLM: async () => {
+          calls += 1;
+          return modelResponse(validPlan(), { stopReason: 'max_tokens' });
+        },
+      }));
+      assert.strictEqual(calls, 1);
+      assert.deepStrictEqual(snapshotTree(root), before);
+    } finally {
+      fs.rmSync(root, { recursive: true, force: true });
+    }
   });
 
   await test('requires exactly one named tool result while allowing bounded thinking and text blocks', async () => {
@@ -602,18 +748,24 @@ async function run() {
     }
   });
 
-  await test('bounds unique targets and aggregate target snapshot reads without retaining content', async () => {
+  await test('supports every structurally reachable unique target and bounds aggregate snapshot reads', async () => {
     const root = makeProject();
     try {
-      const paths = Array.from({ length: MAX_UNIQUE_TARGETS + 1 }, (_, index) => `chapters/bulk-${index}.md`);
+      assert.strictEqual(
+        MAX_UNIQUE_TARGETS,
+        MAX_MILESTONES * MAX_TASKS_PER_MILESTONE * MAX_TASK_TARGETS
+      );
+      const paths = Array.from({ length: MAX_UNIQUE_TARGETS }, (_, index) => `chapters/bulk-${index}.md`);
       for (const relPath of paths) fs.writeFileSync(path.join(root, relPath), '# target\n');
       const before = snapshotTree(root);
-      await expectCode('INVALID_MODEL_OUTPUT', () => proposeProjectPlan({
+      const result = await proposeProjectPlan({
         projectService,
         rootPath: root,
         goal: '验证目标数量上限',
         callLLM: llmPlan(planWithTargets(paths)),
-      }));
+      });
+      assert.strictEqual(result.ok, true);
+      assert.strictEqual(result.handoffRecord.targets.length, MAX_UNIQUE_TARGETS);
       assert.deepStrictEqual(snapshotTree(root), before);
     } finally {
       fs.rmSync(root, { recursive: true, force: true });

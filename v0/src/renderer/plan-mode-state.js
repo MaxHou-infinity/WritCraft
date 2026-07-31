@@ -7,12 +7,15 @@
 
   const PLAN_SCHEMA = 'writcraft.plan/v2';
   const HANDOFF_SCHEMA = 'writcraft.plan-task-handoff/v1';
-  const MAX_MILESTONES = 12;
-  const MAX_TASKS = 60;
+  const MAX_MILESTONES = 2;
+  const MAX_TASKS = 4;
+  const MAX_TASKS_PER_MILESTONE = 2;
   const TASK_SCOPES = new Set(['project', 'file', 'paragraph', 'research']);
 
   function text(value, limit = 2000) {
-    return typeof value === 'string' ? value.trim().slice(0, limit) : '';
+    return typeof value === 'string'
+      ? Array.from(value.trim()).slice(0, limit).join('')
+      : '';
   }
 
   function integer(value) {
@@ -44,9 +47,9 @@
     if (!Array.isArray(value)) return [];
     const seen = new Set();
     const targets = [];
-    for (const raw of value.slice(0, 8)) {
+    for (const raw of value.slice(0, 2)) {
       if (!raw || typeof raw !== 'object') continue;
-      const path = text(raw.path, 512);
+      const path = text(raw.path, 80);
       const revision = text(raw.revision, 256);
       if (!path || !/^[a-f0-9]{64}$/.test(revision) || seen.has(path)) continue;
       seen.add(path);
@@ -57,17 +60,17 @@
 
   function normalizeTask(raw, index, knownIds) {
     if (!raw || typeof raw !== 'object') return null;
-    const id = text(raw.id, 64) || `task-${index + 1}`;
+    const id = text(raw.id, 32) || `task-${index + 1}`;
     if (knownIds.has(id)) return null;
     knownIds.add(id);
     return {
       id,
-      title: text(raw.title, 120) || `任务 ${index + 1}`,
-      description: text(raw.description) || '尚未提供任务说明。',
+      title: text(raw.title, 24) || `任务 ${index + 1}`,
+      description: text(raw.description, 24) || '尚未提供任务说明。',
       scope: TASK_SCOPES.has(raw.scope) ? raw.scope : 'project',
       targets: normalizeTargets(raw.targets),
-      dependsOn: stringList(raw.dependsOn, MAX_TASKS, 64),
-      acceptanceCriteria: stringList(raw.acceptanceCriteria),
+      dependsOn: stringList(raw.dependsOn, 2, 32),
+      acceptanceCriteria: stringList(raw.acceptanceCriteria, 2, 16),
     };
   }
 
@@ -78,11 +81,11 @@
     const milestones = [];
     for (const [index, item] of (Array.isArray(raw.milestones) ? raw.milestones : []).slice(0, MAX_MILESTONES).entries()) {
       if (!item || typeof item !== 'object') continue;
-      const id = text(item.id, 64) || `milestone-${index + 1}`;
+      const id = text(item.id, 32) || `milestone-${index + 1}`;
       if (knownIds.has(id)) continue;
       knownIds.add(id);
       const tasks = [];
-      for (const task of Array.isArray(item.tasks) ? item.tasks : []) {
+      for (const task of (Array.isArray(item.tasks) ? item.tasks : []).slice(0, MAX_TASKS_PER_MILESTONE)) {
         if (taskCount >= MAX_TASKS) break;
         const normalized = normalizeTask(task, taskCount, knownIds);
         if (normalized) {
@@ -93,9 +96,9 @@
       if (!tasks.length) continue;
       milestones.push({
         id,
-        title: text(item.title, 120) || `里程碑 ${index + 1}`,
-        objective: text(item.objective) || '尚未提供里程碑目标。',
-        acceptanceCriteria: stringList(item.acceptanceCriteria),
+        title: text(item.title, 24) || `里程碑 ${index + 1}`,
+        objective: text(item.objective, 24) || '尚未提供里程碑目标。',
+        acceptanceCriteria: stringList(item.acceptanceCriteria, 2, 16),
         tasks,
       });
     }
@@ -103,10 +106,10 @@
     return {
       schema: PLAN_SCHEMA,
       planId: text(raw.planId, 128) || 'unversioned-plan',
-      title: text(raw.title, 120) || '未命名计划',
-      summary: text(raw.summary) || '尚未提供计划摘要。',
-      assumptions: stringList(raw.assumptions),
-      openQuestions: stringList(raw.openQuestions),
+      title: text(raw.title, 24) || '未命名计划',
+      summary: text(raw.summary, 48) || '尚未提供计划摘要。',
+      assumptions: stringList(raw.assumptions, 2, 16),
+      openQuestions: stringList(raw.openQuestions, 2, 16),
       milestones,
     };
   }
@@ -253,6 +256,7 @@
     HANDOFF_SCHEMA,
     MAX_MILESTONES,
     MAX_TASKS,
+    MAX_TASKS_PER_MILESTONE,
     TASK_SCOPES,
     createState,
     reduce,
