@@ -215,6 +215,67 @@ async function run() {
       assert(prompt.includes('edit.md 是权威项目 Prompt'));
       assert(prompt.includes('research/facts.md'));
       assert(prompt.includes('不能创建、修改、删除或移动文件'));
+      assert(prompt.includes('首个非空白字符必须是 {'));
+      assert(prompt.includes('不得包含 Markdown 代码围栏、JSON 前后的解释'));
+    } finally {
+      fs.rmSync(root, { recursive: true, force: true });
+    }
+  });
+
+  await test('retries peripheral text once without echoing model output or relaxing strict JSON', async () => {
+    const root = makeProject();
+    try {
+      const before = snapshotTree(root);
+      const calls = [];
+      const invalid = `LEAK_MARKER\n${JSON.stringify(validPlan())}`;
+      const result = await proposeProjectPlan({
+        projectService,
+        rootPath: root,
+        goal: '规划第一章',
+        callLLM: async messages => {
+          calls.push(messages[0].content);
+          return calls.length === 1 ? modelResponse(invalid) : modelResponse();
+        },
+      });
+      assert.strictEqual(result.ok, true);
+      assert.strictEqual(calls.length, 2);
+      assert(calls[1].includes('唯一一次格式重试'));
+      assert(!calls[1].includes('LEAK_MARKER'));
+      assert.deepStrictEqual(snapshotTree(root), before);
+
+      let rejectedCalls = 0;
+      await expectCode('INVALID_MODEL_OUTPUT', () => proposeProjectPlan({
+        projectService,
+        rootPath: root,
+        goal: '验证有界格式重试',
+        callLLM: async () => {
+          rejectedCalls += 1;
+          return modelResponse(invalid);
+        },
+      }));
+      assert.strictEqual(rejectedCalls, 2);
+      assert.deepStrictEqual(snapshotTree(root), before);
+    } finally {
+      fs.rmSync(root, { recursive: true, force: true });
+    }
+  });
+
+  await test('fails closed before format retry when project authority changed', async () => {
+    const root = makeProject();
+    try {
+      const beforeEdit = fs.readFileSync(path.join(root, 'edit.md'), 'utf8');
+      let calls = 0;
+      await expectCode('PLAN_DEPENDENCY_STALE', () => proposeProjectPlan({
+        projectService,
+        rootPath: root,
+        goal: '规划第一章',
+        callLLM: async () => {
+          calls += 1;
+          fs.writeFileSync(path.join(root, 'edit.md'), `${beforeEdit}\n外部变化\n`);
+          return modelResponse(`说明：${JSON.stringify(validPlan())}`);
+        },
+      }));
+      assert.strictEqual(calls, 1);
     } finally {
       fs.rmSync(root, { recursive: true, force: true });
     }

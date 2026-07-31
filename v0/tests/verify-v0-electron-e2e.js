@@ -1923,7 +1923,7 @@ async function run() {
       assert.strictEqual(fs.existsSync(markerPath), false);
     });
 
-    await stage('rejects non-strict Plan JSON without writes and retries the same goal successfully', async () => {
+    await stage('retries non-strict Plan JSON once inside the same read-only operation', async () => {
       const markdownBefore = snapshotMarkdownFiles(project.rootPath);
       const historyPath = path.join(project.rootPath, changeHistoryService.HISTORY_RELATIVE_PATH);
       const historyBefore = fs.existsSync(historyPath) ? fs.readFileSync(historyPath, 'utf8') : null;
@@ -1935,29 +1935,6 @@ async function run() {
         goal.dispatchEvent(new Event('input', { bubbles: true }));
         document.getElementById('plan-generate').click();
       })()`);
-      const recoverable = await waitForValue(first.client, `(() => {
-        const alert = document.querySelector('.plan-mode__status--error[role="alert"]');
-        const retry = alert?.querySelector('.plan-mode__primary');
-        if (!alert || !retry || retry.textContent.trim() !== '重新生成') return null;
-        return {
-          state: window.__planModeView.getState().status,
-          message: alert.querySelector('p')?.textContent || '',
-          goal: document.getElementById('plan-goal').value,
-          taskCount: document.querySelectorAll('.plan-mode__task').length,
-          retryLabel: retry.textContent.trim(),
-        };
-      })()`, 'the recoverable strict Plan JSON error');
-      assert.strictEqual(recoverable.state, 'error');
-      assert(recoverable.message.length > 0);
-      assert.strictEqual(recoverable.goal, electronAiFixture.PLAN_STRICT_RETRY_GOAL);
-      assert.strictEqual(recoverable.taskCount, 0);
-      assert.strictEqual(recoverable.retryLabel, '重新生成');
-      assert.deepStrictEqual(snapshotMarkdownFiles(project.rootPath), markdownBefore,
-        'non-strict Plan output must not modify any project Markdown');
-      assert.strictEqual(fs.existsSync(historyPath) ? fs.readFileSync(historyPath, 'utf8') : null, historyBefore,
-        'non-strict Plan output must write zero History bytes');
-
-      await first.client.evaluate(`document.querySelector('.plan-mode__status--error .plan-mode__primary').click()`);
       const recovered = await waitForValue(first.client, `(() => {
         const task = document.querySelector('.plan-mode__task[data-task-id="strict_retry_t1"]');
         if (!task) return null;
@@ -1968,16 +1945,16 @@ async function run() {
           title: task.textContent,
           hasError: Boolean(document.querySelector('.plan-mode__status--error')),
         };
-      })()`, 'the strict Plan retry task card');
+      })()`, 'the automatically recovered strict Plan task card');
       assert.strictEqual(recovered.state, 'ready');
       assert.strictEqual(recovered.goal, electronAiFixture.PLAN_STRICT_RETRY_GOAL);
       assert.strictEqual(recovered.taskCount, 1);
       assert(recovered.title.includes('验证 strict 恢复'));
       assert.strictEqual(recovered.hasError, false);
       assert.deepStrictEqual(snapshotMarkdownFiles(project.rootPath), markdownBefore,
-        'successful Plan generation remains read-only');
+        'automatic Plan format recovery remains read-only');
       assert.strictEqual(fs.existsSync(historyPath) ? fs.readFileSync(historyPath, 'utf8') : null, historyBefore,
-        'successful Plan generation must not create History');
+        'automatic Plan format recovery must not create History');
       await first.client.evaluate(`window.__assistantDock.close()`);
     });
 

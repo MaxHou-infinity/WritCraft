@@ -163,7 +163,8 @@ check('view renders the book-page, bookmark, milestone and task-card vocabulary'
 
 check('view provides actionable loading, error and empty states', () => {
   for (const copy of [
-    '正在整理项目计划', '计划没有生成', '重新生成', '先把写作意图装订成计划', '生成项目计划',
+    '正在整理项目计划', '格式不合格时最多自动重试一次', '计划没有生成', '重新生成',
+    '先把写作意图装订成计划', '生成项目计划',
   ]) assert(viewSource.includes(copy), `缺少状态文案 ${copy}`);
   assert(viewSource.includes("setAttribute('aria-busy', 'true')"));
   assert(viewSource.includes("setAttribute('role', 'alert')"));

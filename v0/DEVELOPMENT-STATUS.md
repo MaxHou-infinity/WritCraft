@@ -1,11 +1,11 @@
 # 笔触 · WritCraft · V0 开发状态与续作入口
 
-> 最后更新：2026-07-31（Asia/Shanghai，0.0BR · 第七副本 Chapter 接受落盘通过，陈旧审阅终态已修复）
+> 最后更新：2026-07-31（Asia/Shanghai，0.0BS · 真实 Plan 外围文本 P1 已修复，待同目标复验）
 > 当前状态：**`writ-craft@0.1.1` 已从 exact candidate `c65981e` 发布到 npm `preview`；registry 时间 `2026-07-29T14:30:16.176Z`，shasum `d370c500666e25cfb373852deafa21b232d2bc18` 与本地候选一致。公网隔离安装/启动/退出为 2/2。annotated tag `v0.1.1` 指向同一提交，GitHub prerelease 已公开：`https://github.com/MaxHou-infinity/WritCraft/releases/tag/v0.1.1`。**
 > 发布判断：**0.1.1 Developer Preview 已完成版本、自动化、双架构安装、独立复审、npm 发布、公网安装和 GitHub prerelease。registry 标签保持 `preview: 0.1.1`、`latest: 0.1.0`，因此本次没有把 Preview 冒充稳定版，也没有执行 unpublish、占位发布或上传未签名 App/ZIP。**
 > 当前目标版本：**`docs/ROADMAP.md` 的 `RM-1.0 / writ-craft@0.1.2` 真实作者可用性闭环。必须使用 `edit.md`、5+ 个 `chapters/` 章节、2000+ 可见中文字符和至少 1 个来源文件的作者隔离副本，完成五段旅程，并关闭现场 `Graph INVALID_CACHE` 的诊断/恢复终态。0.1.2 签字前不得插入驾驶舱、新 AI 模式或其他后续版本功能。**
-> 当前源码证据：**exact candidate `4bef659` 已关闭 Chapter 接受后残留旧 Diff 文案“尚未写入”的 Renderer P1：可信无 residual 提交后清空 pending Diff，只显示唯一终态“审阅已完成 · …”。Changes UX **9/9**、Onboarding Renderer dynamic **30/30**、完整 `npm test`、批准 GUI `npm run verify`、强制真实 Electron **37/37** 均通过并已推送 `origin/main`；独立复审尚未完成，npm/GitHub Release 仍未发布 0.1.2。**
-> 当前作者验收进度：**第七副本 Chapter operation `2acf8b66959744f0bedd1d94bbe31eab` 完成 `generated → accepted`；唯一 post-manifest History `change_b00d7f9d…` 为 `application/applied`，第一章 revision `1bdb3a5c… → b0462641…`。在 `4bef659` 重启同一副本后，源码 App 仍载入第七副本与该已接受正文，文件 SHA-256 保持 after `b0462641…`，状态“编辑器就绪 / 已保存”，不存在待审阅面板；原始源仍为 before `1bdb3a5c…`。Chapter 已关闭，不再生成或接受；下一段进入 Plan。**
+> 当前源码证据：**真实 Plan 连续三次返回 JSON 外围文本后，修复保持 strict parser 不变：提示明确首尾字符并禁止围栏/说明；只对 `PERIPHERAL_TEXT` 在同一操作内最多格式重试一次，重试不携带失败输出且先重验文件树、`edit.md` 与显式上下文。Plan service **21/21**、Plan UI **16/16**、Plan handoff **15/15 + 5/5**、完整 `npm test`、批准 GUI `npm run verify`、强制真实 Electron **37/37** 均通过；新 exact candidate 待本批提交，独立复审尚未完成，npm/GitHub Release 仍未发布 0.1.2。**
+> 当前作者验收进度：**项目卡、Inline 与 Chapter 已关闭。第七副本 Plan 目标“根据 edit.md 和现有章节，制定完成 COPE 手册的后续写作计划，并优先完善第二章。”连续三次失败：operations `ba09ce4c…` / `5fe259aa…` / `cf06a7b0…`，分别 47,122 / 37,843 / 39,474 ms，均为 `plan/failed`；UI 稳定显示“AI JSON 包含外围文本”。没有计划、任务卡、正文或 History 写入。修复提交并重启后，只允许作者用保留的同一目标再生成一次；成功后选择一张绑定目标文件的任务卡“交给 AI”。**
 > 0.0AA 历史保留红灯：**首轮真实 Electron 暴露 Inspector 在上下文失效时被清空、旧 5-chip 断言和项目 Chat 等待诊断；完整 test 又暴露 Plan 测试把 generation 函数正文写死。独立复审发现新请求预检窗口可提交不可见旧轮、同项目重开 UI/Main 串话、失败重开提前清会话及两项测试/错误文案缺口，均转为生产边界和回归后关闭。真实 Electron 曾连续两次在旧 Graph 恢复阶段超时；加入只读失败快照后该阶段连续四次通过，未改 Graph 产品逻辑，按重复同源证据关闭 timing P2。另一次 Chat preflight 红灯证明测试在恢复 `edit.md` 后未等待权威 watcher barrier；改为生产 `flushExternalChanges()` 收敛，而未放宽 Chat guard。该里程碑所有红运行保留，最终源码连续两次 34/34；后续 0.0AB 当时推进到 35/35，当前总链只看本文顶部当前里程碑。**
 > Graph 历史签字基线：**性能修复前的既有源码曾完整 `npm test`、Electron-enabled `npm run verify`、强制真实 Electron 26/26 exit 0；Graph Filter 15/15、Workbench 14/14、dynamic 5/5、Large 5/5、Watcher 15/15、Network 11/11、Intelligence 17/17，第二轮复审 P0=0/P1=0/P2=2。该数字只保留为历史过程；0.0AB 后来推进到 35/35，当前总链只看顶部当前里程碑。**
 > Graph 动态边界：**300 文件/1279 节点 cold-to-interactive、cache/incremental、筛选/内存/布局、AX/键鼠、三类纠错、stale/Issue→Changes、failure live、重启与项目隔离均进入真实 Electron；正文/History/ledger 的零写入门禁通过。**  
@@ -24,7 +24,7 @@
 
 ## 0. 续作口令
 
-Chat 的三级 scope/context、Main-owned 多轮连续性、Onboarding v2、Research→Changes、Inline Rewrite v2 与 Plan Strict 已经完成技术签字。项目卡、Inline 与第七副本 Chapter 已真实完成；`4bef659` 已关闭 Chapter 提交后陈旧 Diff，并以同一副本重启确认正文持久化。下一段只进入 Plan，不重复项目卡、Inline 或 Chapter，不重写已经关闭的协议，也不分发现有 `release/` 产物。
+Chat 的三级 scope/context、Main-owned 多轮连续性、Onboarding v2、Research→Changes、Inline Rewrite v2 与 Plan Strict 已经完成技术签字。项目卡、Inline 与 Chapter 已真实完成；真实 Plan 连续三次外围文本失败已转为 0.0BS 的有界格式重试修复。下一动作只在新候选上复验同一 Plan 目标，不重复前三段，不放宽 strict JSON，也不分发现有 `release/` 产物。
 
 1. 先读 `../docs/ROADMAP.md` 的当前目标，再读本文、`package.json`、对应合同、当前源码文件与 `git log -1 --stat`；本地 Git 历史从 2026-07-26 V0 基线开始，不得据此臆测更早的开发过程。
 2. **Diagnostic Export v1、Research Accuracy v1、committed-warning、Graph 三项韧性缺口、Changes/History durable recovery、Image Review v1 与 Image Trash 本地链均已完整签收，不再重开这些协议。**
@@ -32,6 +32,17 @@ Chat 的三级 scope/context、Main-owned 多轮连续性、Onboarding v2、Rese
 4. 不重写已经签字的 Onboarding v2 service、capability store、batch、Main/preload 与 Renderer 契约；Main 动态 admission、single-flight 和 Renderer 生命周期 authority 清理均已关闭。
 5. 每批合入后重跑定向测试；阶段完成时再运行完整 `npm test`、`npm run verify` 与 `WRITCRAFT_E2E_FORCE=1 npm run e2e:electron`，保存当次证据。
 6. 真实 API 只使用用户显式配置的 Key；记录延迟、限流、超时、故障和费用，不记录 Key、Prompt、模型原文或正文。Key 前缀只表示凭据/计费类型，不能代替官方能力与现场门禁。首发按 npm Developer Preview 合同执行；独立 App 发布才需要 Developer ID、公证与 Gatekeeper。
+
+### 0.0BS 2026-07-31 · 真实 Plan 外围文本 P1 与同操作有界格式重试
+
+- **真实红灯**：作者使用权威建议目标生成 Plan，UI 三次稳定报告“AI JSON 包含外围文本”。私有指标记录 operations **`ba09ce4c46f8424a99fbb300439d413c` / `5fe259aa74b64004ab9f917f35c118c1` / `cf06a7b0a2694acbb8d33bfe43fd9d79`**，耗时 **47,122 / 37,843 / 39,474 ms**，全部为 `plan/failed`、before/after 0。第三次后停止人工重试。
+- **根因**：Plan parser 有意只接受一个 strict JSON 对象并正确拒绝围栏和外围说明，但生产 prompt 只说“只返回 JSON”，没有像 parser 一样明确首尾字符、代码围栏、前后解释、第二对象与未知字段边界。模型连续服从了自然语言回答习惯；作者输入与 `edit.md` 均无错。
+- **零写入边界**：三次失败均未创建 Plan task、pending handoff、ChangeSet 或 History，也没有修改项目 Markdown。不得通过截取首尾大括号、本地剥离围栏或猜测内容冒充成功。
+- **生产修复**：初次提示明确首个非空白字符 `{`、最后一个 `}`，禁止围栏、外围文本、说明、注释、第二 JSON 与未知字段。只有错误被 strict scanner 精确分类为 `PERIPHERAL_TEXT` 时，Main 才在同一作者操作内最多重试一次；不携带或回显失败模型输出。重试前重新读取文件树并逐个核对冻结的 `edit.md`/显式上下文 revision 与正文；任何漂移以 `PLAN_DEPENDENCY_STALE` 在第二次付费调用前失败关闭。第二次仍不严格则终止，绝不递归重试。
+- **可见体验**：加载页明确说明“格式不合格时最多自动重试一次”，避免额外等待被误解为卡死；一次点击仍只形成一个内容无关 metrics operation。
+- **验证**：Plan service **21/21**，新增自动恢复、不回传 `LEAK_MARKER`、最多两次调用、依赖漂移仅一次调用；Plan UI **16/16**、Plan handoff **15/15 + 5/5**、Assistant **11/11**。完整 `npm test`、批准 GUI `npm run verify` 均 exit 0。真实 Electron fixture 首次返回“说明 + fenced JSON”，只在第二个 prompt 含唯一格式重试标记时返回 strict JSON；同一次点击出现任务卡，Markdown 与 History 字节不变，完整链 **37/37**。
+- **测试过程红灯**：曾误调用不存在的 `tests/verify-v0-project-plan-handler.js`，Node 以 `MODULE_NOT_FOUND` 退出；这是测试入口选择错误，不是产品失败。随后先用 `rg --files tests` 确认真正入口并运行 Plan handoff/Main factory 现有覆盖。后续不得凭记忆编造测试文件名。
+- **验收边界**：自动化通过不替代真实提供商复验。提交、推送并重启同一第七副本后，作者只用已保留目标再点一次“生成计划”；不得回退到旧代码连续手动重试。Plan task handoff 尚未通过。
 
 ### 0.0BR 2026-07-31 · 第七副本 Chapter 接受与提交后终态真相
 

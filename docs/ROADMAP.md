@@ -75,7 +75,7 @@
 5. 修复旅程中发现的 P0/P1 阻断项；P2 必须明确记录、分级并决定是否允许发版。
 6. 记录内容无关的私有指标：Inline 接受率、Plan 采用、Research 匹配判断、图片评分/采纳、耗时和稳定错误码。
 
-当前执行注记（2026-07-31）：项目卡、Inline 与第七副本 Chapter 作者旅程已经关闭。`2073406` 完成真实 Chapter 生成与接受；exact candidate `4bef659` 又关闭提交后仍保留“已选择接受 · 尚未写入”的陈旧 Diff，在可信无 residual 提交后以唯一完成卡替换旧审阅。UX 9/9、Renderer dynamic 30/30、完整 test、批准 GUI verify 和真实 Electron 37/37 通过并已推送。用 `4bef659` 重启同一副本后，已接受正文仍在、磁盘仍匹配 after revision、源稿未变且无待审阅面板。不得重复 Chapter；下一段只做 Plan，再进入 Research。
+当前执行注记（2026-07-31）：项目卡、Inline 与 Chapter 已关闭。第七副本随后用同一真实 Plan 目标连续三次因“AI JSON 包含外围文本”失败，均零计划、零任务卡、零正文/History 写入。根因是 prompt 没有把 strict parser 的围栏/外围文本边界写完整。0.0BS 保持 parser 不变，强化首尾/禁围栏契约，并只对精确外围文本在同一操作内最多做一次不携带旧输出、依赖重验后的格式重试；第二次仍错即终止。Plan service 21/21、Plan UI 16/16、完整 test、批准 GUI verify 与真实 Electron 37/37 通过。新候选重启后只复验保留的同一 Plan 目标；不得重复前三段或连续手动重试。
 
 ### 4.3 明确不做
 

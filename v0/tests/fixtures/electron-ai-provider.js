@@ -536,6 +536,12 @@ function createElectronAiProvider() {
       } else if (prompt.includes('WritCraft 的项目级 Plan Mode 助手')) {
         if (prompt.includes(`用户目标：${PLAN_STRICT_RETRY_GOAL}`)) {
           planStrictRetryCalls += 1;
+          if (planStrictRetryCalls === 1 && prompt.includes('唯一一次格式重试')) {
+            throw new Error('E2E_FIXTURE_EARLY_PLAN_FORMAT_RETRY');
+          }
+          if (planStrictRetryCalls === 2 && !prompt.includes('唯一一次格式重试')) {
+            throw new Error('E2E_FIXTURE_MISSING_PLAN_FORMAT_RETRY');
+          }
           const strictAnswer = JSON.stringify(planStrictRetryAnswer(prompt));
           output = planStrictRetryCalls === 1
             ? `以下是项目计划：\n\`\`\`json\n${strictAnswer}\n\`\`\`\n请查收。`
