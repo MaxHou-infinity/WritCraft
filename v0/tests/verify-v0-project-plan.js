@@ -217,6 +217,9 @@ async function run() {
       assert(prompt.includes('不能创建、修改、删除或移动文件'));
       assert(prompt.includes('首个非空白字符必须是 {'));
       assert(prompt.includes('不得包含 Markdown 代码围栏、JSON 前后的解释'));
+      assert(prompt.includes('每一项都必须遵守同一结构'));
+      assert(prompt.includes('targetPaths/dependsOn/acceptanceCriteria 必须始终是 JSON 数组'));
+      assert(prompt.includes('不确定时必须返回 []'));
     } finally {
       fs.rmSync(root, { recursive: true, force: true });
     }
@@ -239,7 +242,7 @@ async function run() {
       });
       assert.strictEqual(result.ok, true);
       assert.strictEqual(calls.length, 2);
-      assert(calls[1].includes('唯一一次格式重试'));
+      assert(calls[1].includes('唯一一次结构重试'));
       assert(!calls[1].includes('LEAK_MARKER'));
       assert.deepStrictEqual(snapshotTree(root), before);
 
@@ -260,7 +263,61 @@ async function run() {
     }
   });
 
-  await test('fails closed before format retry when project authority changed', async () => {
+  await test('retries an invalid task array shape once without coercing or echoing model output', async () => {
+    const root = makeProject();
+    try {
+      const before = snapshotTree(root);
+      const malformed = validPlan();
+      malformed.milestones[0].tasks[1].targetPaths = 'LEAK_TARGET_PATH';
+      const calls = [];
+      const result = await proposeProjectPlan({
+        projectService,
+        rootPath: root,
+        goal: '规划第一章',
+        callLLM: async messages => {
+          calls.push(messages[0].content);
+          return calls.length === 1 ? modelResponse(malformed) : modelResponse();
+        },
+      });
+      assert.strictEqual(result.ok, true);
+      assert.strictEqual(calls.length, 2);
+      assert(calls[1].includes('唯一一次结构重试'));
+      assert(calls[1].includes('每一个任务，而不只是第一个任务'));
+      assert(!calls[1].includes('LEAK_TARGET_PATH'));
+      assert.deepStrictEqual(snapshotTree(root), before);
+
+      let rejectedCalls = 0;
+      await expectCode('INVALID_MODEL_OUTPUT', () => proposeProjectPlan({
+        projectService,
+        rootPath: root,
+        goal: '验证有界结构重试',
+        callLLM: async () => {
+          rejectedCalls += 1;
+          return modelResponse(malformed);
+        },
+      }));
+      assert.strictEqual(rejectedCalls, 2, 'one operation must never make a third provider call');
+
+      let mixedCalls = 0;
+      await expectCode('INVALID_MODEL_OUTPUT', () => proposeProjectPlan({
+        projectService,
+        rootPath: root,
+        goal: '验证共享重试预算',
+        callLLM: async () => {
+          mixedCalls += 1;
+          return mixedCalls === 1
+            ? modelResponse(`说明：${JSON.stringify(validPlan())}`)
+            : modelResponse(malformed);
+        },
+      }));
+      assert.strictEqual(mixedCalls, 2, 'peripheral and structure failures share one retry budget');
+      assert.deepStrictEqual(snapshotTree(root), before);
+    } finally {
+      fs.rmSync(root, { recursive: true, force: true });
+    }
+  });
+
+  await test('fails closed before bounded model-output retry when project authority changed', async () => {
     const root = makeProject();
     try {
       const beforeEdit = fs.readFileSync(path.join(root, 'edit.md'), 'utf8');

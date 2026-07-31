@@ -267,7 +267,7 @@
       const view = State.toViewModel(state);
       host.replaceChildren();
       if (view.status === 'loading') {
-        host.append(statusView('loading', '正在整理项目计划', 'AI 正在依据 edit.md 和显式上下文拆分里程碑；格式不合格时最多自动重试一次。'));
+        host.append(statusView('loading', '正在整理项目计划', 'AI 正在依据 edit.md 和显式上下文拆分里程碑；JSON 外壳或数组结构不合格时最多自动重试一次。'));
       } else if (view.status === 'error') {
         host.append(statusView('error', '计划没有生成', view.error, '重新生成'));
       } else if (view.status === 'empty') {

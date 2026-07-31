@@ -1923,7 +1923,7 @@ async function run() {
       assert.strictEqual(fs.existsSync(markerPath), false);
     });
 
-    await stage('retries non-strict Plan JSON once inside the same read-only operation', async () => {
+    await stage('retries a non-array second Plan targetPaths once inside the same read-only operation', async () => {
       const markdownBefore = snapshotMarkdownFiles(project.rootPath);
       const historyPath = path.join(project.rootPath, changeHistoryService.HISTORY_RELATIVE_PATH);
       const historyBefore = fs.existsSync(historyPath) ? fs.readFileSync(historyPath, 'utf8') : null;
@@ -1945,7 +1945,7 @@ async function run() {
           title: task.textContent,
           hasError: Boolean(document.querySelector('.plan-mode__status--error')),
         };
-      })()`, 'the automatically recovered strict Plan task card');
+      })()`, 'the automatically recovered structured Plan task card');
       assert.strictEqual(recovered.state, 'ready');
       assert.strictEqual(recovered.goal, electronAiFixture.PLAN_STRICT_RETRY_GOAL);
       assert.strictEqual(recovered.taskCount, 1);
