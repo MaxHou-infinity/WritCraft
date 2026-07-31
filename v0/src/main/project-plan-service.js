@@ -21,6 +21,7 @@ const MAX_PROVIDER_REQUEST_BYTES = 1024 * 1024;
 const MAX_JSON_DEPTH = 32;
 const MAX_JSON_NODES = 4096;
 const TASK_SCOPES = Object.freeze(['project', 'file', 'paragraph', 'research']);
+const PLAN_TOOL_NAME = 'submit_project_plan';
 const DANGEROUS_KEYS = new Set(['__proto__', 'prototype', 'constructor']);
 const PROVIDER_ERROR_PATTERN = /^[A-Z][A-Z0-9_]{0,63}$/;
 
@@ -33,6 +34,86 @@ const LIMITS = Object.freeze({
 });
 
 const ID_PATTERN = /^[a-z][a-z0-9_-]{0,63}$/;
+
+const STRING_LIST_SCHEMA = Object.freeze({
+  type: 'array',
+  maxItems: MAX_LIST_ITEMS,
+  items: { type: 'string', minLength: 1, maxLength: LIMITS.listItem },
+});
+
+const PLAN_INPUT_SCHEMA = Object.freeze({
+  type: 'object',
+  additionalProperties: false,
+  required: ['title', 'summary', 'assumptions', 'openQuestions', 'milestones'],
+  properties: {
+    title: { type: 'string', minLength: 1, maxLength: LIMITS.title },
+    summary: { type: 'string', minLength: 1, maxLength: LIMITS.summary },
+    assumptions: STRING_LIST_SCHEMA,
+    openQuestions: STRING_LIST_SCHEMA,
+    milestones: {
+      type: 'array',
+      minItems: 1,
+      maxItems: MAX_MILESTONES,
+      items: {
+        type: 'object',
+        additionalProperties: false,
+        required: ['id', 'title', 'objective', 'acceptanceCriteria', 'tasks'],
+        properties: {
+          id: { type: 'string', pattern: ID_PATTERN.source, maxLength: 64 },
+          title: { type: 'string', minLength: 1, maxLength: LIMITS.title },
+          objective: { type: 'string', minLength: 1, maxLength: LIMITS.objective },
+          acceptanceCriteria: {
+            type: 'array',
+            minItems: 1,
+            maxItems: MAX_LIST_ITEMS,
+            items: { type: 'string', minLength: 1, maxLength: LIMITS.listItem },
+          },
+          tasks: {
+            type: 'array',
+            minItems: 1,
+            maxItems: MAX_TASKS_PER_MILESTONE,
+            items: {
+              type: 'object',
+              additionalProperties: false,
+              required: [
+                'id', 'title', 'description', 'scope', 'targetPaths', 'dependsOn', 'acceptanceCriteria',
+              ],
+              properties: {
+                id: { type: 'string', pattern: ID_PATTERN.source, maxLength: 64 },
+                title: { type: 'string', minLength: 1, maxLength: LIMITS.title },
+                description: { type: 'string', minLength: 1, maxLength: LIMITS.description },
+                scope: { type: 'string', enum: TASK_SCOPES },
+                targetPaths: {
+                  type: 'array',
+                  maxItems: MAX_CONTEXT_FILES,
+                  items: { type: 'string', minLength: 1, maxLength: LIMITS.listItem },
+                },
+                dependsOn: {
+                  type: 'array',
+                  maxItems: MAX_TASKS,
+                  items: { type: 'string', minLength: 1, maxLength: LIMITS.listItem },
+                },
+                acceptanceCriteria: {
+                  type: 'array',
+                  minItems: 1,
+                  maxItems: MAX_LIST_ITEMS,
+                  items: { type: 'string', minLength: 1, maxLength: LIMITS.listItem },
+                },
+              },
+            },
+          },
+        },
+      },
+    },
+  },
+});
+
+const PLAN_TOOLS = Object.freeze([Object.freeze({
+  name: PLAN_TOOL_NAME,
+  description: '提交一个只读、可审阅的 WritCraft 项目计划。此工具不会修改任何文件。',
+  input_schema: PLAN_INPUT_SCHEMA,
+})]);
+const PLAN_TOOL_CHOICE = Object.freeze({ type: 'tool', name: PLAN_TOOL_NAME });
 
 class ProjectPlanError extends Error {
   constructor(code, message, reason = null) {
@@ -227,8 +308,8 @@ function parseJsonSource(text) {
   return parsed;
 }
 
-function parseModelJson(text, availablePaths) {
-  const parsed = parseJsonSource(text);
+function validateModelPlan(parsed, availablePaths) {
+  assertSafeJsonTree(parsed);
   assertExactKeys(parsed, ['title', 'summary', 'assumptions', 'openQuestions', 'milestones'], '项目计划');
   const title = boundedString(parsed.title, '计划标题', LIMITS.title);
   const summary = boundedString(parsed.summary, '计划摘要', LIMITS.summary);
@@ -298,6 +379,10 @@ function parseModelJson(text, availablePaths) {
   return { title, summary, assumptions, openQuestions, milestones };
 }
 
+function parseModelJson(text, availablePaths) {
+  return validateModelPlan(parseJsonSource(text), availablePaths);
+}
+
 function promptFile(file) {
   return `<project-file role=${JSON.stringify(file.role)} path=${JSON.stringify(file.path)} revision=${JSON.stringify(file.revision)}>\n${file.content}\n</project-file>`;
 }
@@ -313,14 +398,12 @@ function planPrompt(request, available, files, formatRetry = false) {
     'targetPaths 只能引用下方已提供或项目中已存在的 Markdown 路径；不确定时必须返回 []，不得返回路径字符串。',
     'dependsOn 只能引用输出顺序中已经出现的任务 ID。',
     `任务 scope 只能是：${TASK_SCOPES.join(', ')}。`,
-    '只返回一个严格 JSON 对象：首个非空白字符必须是 {，最后一个非空白字符必须是 }。',
-    '不得包含 Markdown 代码围栏、JSON 前后的解释、标题、致歉、注释或第二个 JSON；不得新增结构之外的字段。',
+    `必须且只能调用 ${PLAN_TOOL_NAME} 一次，把完整计划放入工具 input；不要在文本中输出 JSON 或计划正文。`,
+    '工具 input 不得新增 schema 之外的字段。',
     ...(formatRetry ? [
-      '上一轮输出未通过严格 JSON 外壳或数组结构校验。本轮是唯一一次结构重试：不要复述或修补上一轮输出，重新生成一个完整的严格 JSON 对象。',
+      '上一轮工具 input 未通过数组结构校验。本轮是唯一一次结构重试：不要复述或修补上一轮输出，重新调用工具并提交一个完整计划。',
       '特别检查每一个任务，而不只是第一个任务：targetPaths、dependsOn、acceptanceCriteria 都必须使用 JSON 数组；没有目标文件时使用 []。',
     ] : []),
-    'JSON 只能包含以下结构：',
-    '{"title":"计划标题","summary":"摘要","assumptions":[],"openQuestions":[],"milestones":[{"id":"m1","title":"里程碑","objective":"目标","acceptanceCriteria":["标准"],"tasks":[{"id":"t1","title":"任务","description":"说明","scope":"project","targetPaths":["edit.md"],"dependsOn":[],"acceptanceCriteria":["标准"]}]}]}',
     `用户目标：${request.goal}`,
     `项目中可引用的 Markdown 路径：${JSON.stringify([...available].sort())}`,
     '',
@@ -332,8 +415,18 @@ function providerMessages(prompt) {
   return [{ role: 'user', content: prompt }];
 }
 
+function providerRequestBody(messages) {
+  return JSON.stringify({
+    model: 'MiniMax-M3',
+    max_tokens: 8192,
+    messages,
+    tools: PLAN_TOOLS,
+    tool_choice: PLAN_TOOL_CHOICE,
+  });
+}
+
 function assertProviderRequest(messages) {
-  const providerBody = JSON.stringify({ model: 'MiniMax-M3', max_tokens: 8192, messages });
+  const providerBody = providerRequestBody(messages);
   if (Buffer.byteLength(providerBody, 'utf8') > MAX_PROVIDER_REQUEST_BYTES) {
     fail('PLAN_PROMPT_TOO_LARGE', '项目计划请求超过安全上限，请缩小项目路径或上下文范围');
   }
@@ -381,15 +474,16 @@ function parseModelResponse(model, availablePaths) {
     if (model.stopReason === 'max_tokens') {
       fail('MODEL_OUTPUT_TRUNCATED', '项目计划达到模型输出上限');
     }
-    if (model.stopReason !== 'end_turn') {
-      fail('MODEL_OUTPUT_INCOMPLETE', '项目计划未以 end_turn 完整结束');
+    if (!model || model.ok !== true) return safeProviderFailure(model);
+    if (model.stopReason !== 'tool_use') {
+      fail('MODEL_OUTPUT_INCOMPLETE', '项目计划没有通过结构化工具完整提交');
     }
-    if (!hasOwn('contentBlockCount') || !hasOwn('textBlockCount') || !hasOwn('nonTextBlockCount') ||
-        model.contentBlockCount !== 1 || model.textBlockCount !== 1 || model.nonTextBlockCount !== 0) {
-      fail('INVALID_MODEL_OUTPUT', '项目计划必须只包含一个文本块');
+    if (!hasOwn('toolUseBlockCount') || model.toolUseBlockCount !== 1 ||
+        !isPlainObject(model.toolUse) || model.toolUse.name !== PLAN_TOOL_NAME ||
+        !Object.prototype.hasOwnProperty.call(model.toolUse, 'input')) {
+      fail('INVALID_MODEL_OUTPUT', '项目计划必须且只能提交一次结构化工具结果');
     }
-    if (!hasOwn('text')) fail('INVALID_MODEL_OUTPUT', '项目计划缺少独立文本结果');
-    return parseModelJson(model.text, availablePaths);
+    return validateModelPlan(model.toolUse.input, availablePaths);
   }
   if (!model || model.ok !== true) return safeProviderFailure(model);
   fail('MODEL_OUTPUT_INCOMPLETE', '项目计划缺少完整结束状态');
@@ -431,17 +525,18 @@ async function proposeProjectPlan({
 
   const messages = providerMessages(planPrompt(request, available, files));
   assertProviderRequest(messages);
-  let model = await callLLM(messages, 'MiniMax-M3', 8192);
+  const structuredOptions = { tools: PLAN_TOOLS, toolChoice: PLAN_TOOL_CHOICE };
+  let model = await callLLM(messages, 'MiniMax-M3', 8192, structuredOptions);
   let parsedModel;
   try {
     parsedModel = parseModelResponse(model, available);
   } catch (error) {
     if (!(error instanceof ProjectPlanError) ||
-        !['PERIPHERAL_TEXT', 'STRUCTURE_SHAPE'].includes(error.reason)) throw error;
+        error.reason !== 'STRUCTURE_SHAPE') throw error;
     assertRetryDependencies(projectService, rootPath, available, files);
     const retryMessages = providerMessages(planPrompt(request, available, files, true));
     assertProviderRequest(retryMessages);
-    model = await callLLM(retryMessages, 'MiniMax-M3', 8192);
+    model = await callLLM(retryMessages, 'MiniMax-M3', 8192, structuredOptions);
     parsedModel = parseModelResponse(model, available);
   }
   if (parsedModel?.ok === false) return parsedModel;
@@ -535,11 +630,17 @@ module.exports = {
   MAX_JSON_DEPTH,
   MAX_JSON_NODES,
   TASK_SCOPES,
+  PLAN_TOOL_NAME,
+  PLAN_INPUT_SCHEMA,
+  PLAN_TOOLS,
+  PLAN_TOOL_CHOICE,
   ProjectPlanError,
   markdownPaths,
   normalizeRequest,
   parseModelJson,
   parseModelResponse,
+  providerRequestBody,
+  assertProviderRequest,
   planIdFor,
   proposeProjectPlan,
 };

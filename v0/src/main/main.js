@@ -733,9 +733,9 @@ function inlineRewriteBinding(event, project = requireCurrentProject()) {
 }
 
 function projectCallLLM(projectInstanceId) {
-  return (messages, model, maxTokens) => runAiRequest(
+  return (messages, model, maxTokens, requestOptions = {}) => runAiRequest(
     projectInstanceId,
-    signal => callLLM(messages, model, maxTokens, signal)
+    signal => callLLM(messages, model, maxTokens, signal, requestOptions)
   );
 }
 
@@ -1426,10 +1426,12 @@ ipcMain.handle('writcraft:check-api', async event => {
 });
 
 // IPC: ⌘K 改写（Day 3 默认用 M3 + max_tokens 1024 稳）
-async function callLLM(messages, model = 'MiniMax-M3', maxTokens = 1024, signal) {
+async function callLLM(messages, model = 'MiniMax-M3', maxTokens = 1024, signal, requestOptions = {}) {
   const apiKey = resolveActiveApiKey();
   return minimaxTextService.callMessages({
     apiKey, messages, model, maxTokens, signal,
+    ...(requestOptions.tools === undefined ? {} : { tools: requestOptions.tools }),
+    ...(requestOptions.toolChoice === undefined ? {} : { toolChoice: requestOptions.toolChoice }),
     fetchImpl: electronAiFixture?.textFetch,
   });
 }

@@ -453,6 +453,18 @@ function planStrictRetryAnswer(prompt) {
   };
 }
 
+function assertPlanToolRequest(request) {
+  const tool = request.tools?.[0];
+  const targetPathsSchema = tool?.input_schema?.properties?.milestones?.items
+    ?.properties?.tasks?.items?.properties?.targetPaths;
+  if (request.tools?.length !== 1 || tool?.name !== 'submit_project_plan' ||
+      request.tool_choice?.type !== 'tool' || request.tool_choice?.name !== 'submit_project_plan' ||
+      tool?.input_schema?.type !== 'object' || tool?.input_schema?.additionalProperties !== false ||
+      targetPathsSchema?.type !== 'array' || targetPathsSchema?.maxItems !== 8) {
+    throw new Error('E2E_FIXTURE_INVALID_PLAN_TOOL_PROTOCOL');
+  }
+}
+
 function planChangesAnswer(prompt) {
   if (!prompt.includes(`"planGoal":"${PLAN_GOAL}"`)) throw new Error('E2E_FIXTURE_INVALID_PLAN_HANDOFF');
   const file = planTargetFile(prompt, PLAN_BEFORE);
@@ -519,6 +531,7 @@ function createElectronAiProvider() {
         throw new Error('E2E_FIXTURE_INVALID_CHAPTER_BLOCK_MAX_TOKENS');
       }
       let output;
+      let planToolInput = null;
       if (prompt.includes('WritCraft Onboarding v2 项目建立助手')) {
         if (request.max_tokens !== 4096) throw new Error('E2E_FIXTURE_INVALID_ONBOARDING_V2_MAX_TOKENS');
         onboardingCalls += 1;
@@ -534,6 +547,7 @@ function createElectronAiProvider() {
         await new Promise(resolve => setTimeout(resolve, 60));
         output = rewriteAnswer(prompt);
       } else if (prompt.includes('WritCraft 的项目级 Plan Mode 助手')) {
+        assertPlanToolRequest(request);
         if (prompt.includes(`用户目标：${PLAN_STRICT_RETRY_GOAL}`)) {
           planStrictRetryCalls += 1;
           if (planStrictRetryCalls === 1 && prompt.includes('唯一一次结构重试')) {
@@ -544,19 +558,27 @@ function createElectronAiProvider() {
           }
           const strictAnswer = planStrictRetryAnswer(prompt);
           if (planStrictRetryCalls === 1) {
-            strictAnswer.milestones[0].tasks.push({
-              id: 'strict_retry_t2',
-              title: '复核第二个任务',
-              description: '故意模拟真实供应商把第二个任务目标路径返回成字符串。',
-              scope: 'file',
-              targetPaths: CHAT_CURRENT_PATH,
-              dependsOn: ['strict_retry_t1'],
+            strictAnswer.milestones = Array.from({ length: 7 }, (_, index) => ({
+              id: `strict_retry_m${index + 1}`,
+              title: `复核里程碑 ${index + 1}`,
+              objective: '验证长计划中每一个重复任务字段都受结构约束。',
               acceptanceCriteria: ['结构错误必须被严格拒绝'],
-            });
+              tasks: [{
+                id: `strict_retry_t${index + 1}`,
+                title: `复核任务 ${index + 1}`,
+                description: index === 6
+                  ? '故意模拟真实供应商把第七个里程碑的目标路径返回成字符串。'
+                  : '验证前置任务保持标准数组结构。',
+                scope: 'file',
+                targetPaths: index === 6 ? CHAT_CURRENT_PATH : [CHAT_CURRENT_PATH],
+                dependsOn: [],
+                acceptanceCriteria: ['结构正确且磁盘保持不变'],
+              }],
+            }));
           }
-          output = JSON.stringify(strictAnswer);
+          planToolInput = strictAnswer;
         } else {
-          output = JSON.stringify(planAnswer(prompt));
+          planToolInput = planAnswer(prompt);
         }
       } else if (prompt.includes('WritCraft 的 Plan→Changes 修订执行器')) {
         output = JSON.stringify(planChangesAnswer(prompt));
@@ -618,6 +640,23 @@ function createElectronAiProvider() {
         output = selectionChatAnswer(prompt);
       } else {
         output = JSON.stringify(researchCard(prompt));
+      }
+      if (planToolInput) {
+        return jsonResponse({
+          model: 'MiniMax-M3',
+          content: [
+            { type: 'thinking', thinking: 'E2E tool protocol reasoning' },
+            { type: 'text', text: 'E2E 计划已提交。' },
+            {
+              type: 'tool_use',
+              id: `call_plan_${planStrictRetryCalls || 1}`,
+              name: 'submit_project_plan',
+              input: planToolInput,
+            },
+          ],
+          stop_reason: 'tool_use',
+          usage: { input_tokens: 128, output_tokens: 64 },
+        });
       }
       return jsonResponse({
         model: 'MiniMax-M3',

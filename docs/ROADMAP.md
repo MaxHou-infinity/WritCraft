@@ -75,7 +75,7 @@
 5. 修复旅程中发现的 P0/P1 阻断项；P2 必须明确记录、分级并决定是否允许发版。
 6. 记录内容无关的私有指标：Inline 接受率、Plan 采用、Research 匹配判断、图片评分/采纳、耗时和稳定错误码。
 
-当前执行注记（2026-07-31）：项目卡、Inline 与 Chapter 已关闭。第七副本同一真实 Plan 目标先有三次外围文本失败，`0e7ad38` 后又有两次“第二任务 targetPaths 非数组”失败；五次均零计划、零任务卡、零正文/History 写入。exact production candidate `94e6099` 保持 strict parser 与零本地修复不变，明确每个任务的全部列表字段必须为数组，并让精确外围文本与数组形状错误共享同一操作内唯一一次不携带旧输出、依赖重验后的结构重试；第二次仍错即终止，绝不发起第三次调用。Plan service 22/22、Plan UI 16/16、Plan handoff 15/15 + 5/5、Assistant 11/11、完整 test、批准 GUI verify 与真实 Electron 37/37 通过。重启后只复验保留的同一 Plan 目标；不得重复前三段或连续手动重试。
+当前执行注记（2026-07-31）：项目卡、Inline 与 Chapter 已关闭。第七副本的第六次真实 Plan operation `ef44ed234ceb417d9d8723fa918e3173` 在 107,623 ms 后仍报“里程碑 7任务 1 targetPaths 非数组”，推翻 `94e6099` 已关闭结构问题的结论；六次 Plan 失败均零计划、零任务卡、零正文/History 写入。当前 0.0BU 不再依赖自由文本 JSON 服从，而以单一 `submit_project_plan` 工具的完整 input schema + named tool choice 约束重复结构，Main 只接受一个同名 `tool_use.input` 并继续做全部语义/revision 校验，绝不本地转数组或回退文本 JSON。MiniMax adapter 17/17、Plan 22/22、UI 16/16、handoff 15/15 + 5/5、Assistant 11/11、完整 test、批准 GUI verify 通过；真实 Electron 保留一次 Plan 后段 CDP timeout 和一次 Plan 前项目卡进度 timeout 红灯，两者同源码单次确认均未复现，最终 37/37；独立复审 P0/P1/P2=0。下一步只剩一次真实 MiniMax named-tool canary；此前不得让作者继续重试或重复前三段。
 
 ### 4.3 明确不做
 

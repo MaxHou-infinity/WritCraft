@@ -6,7 +6,7 @@ const os = require('os');
 const path = require('path');
 const projectService = require('../src/main/project-service');
 const changeSetService = require('../src/main/changeset-service');
-const { proposeProjectPlan } = require('../src/main/project-plan-service');
+const { PLAN_TOOL_NAME, proposeProjectPlan } = require('../src/main/project-plan-service');
 const { createProposePlanHandler } = require('../src/main/project-plan-handler');
 const {
   HANDOFF_SCHEMA,
@@ -53,11 +53,13 @@ function modelPlan(targetPaths = ['chapters/one.md']) {
 function planEnvelope(plan) {
   return {
     ok: true,
-    stopReason: 'end_turn',
-    contentBlockCount: 1,
+    stopReason: 'tool_use',
+    contentBlockCount: 3,
     textBlockCount: 1,
-    nonTextBlockCount: 0,
-    text: JSON.stringify(plan),
+    toolUseBlockCount: 1,
+    nonTextBlockCount: 2,
+    text: '计划已提交。',
+    toolUse: { id: 'call_plan_handoff', name: PLAN_TOOL_NAME, input: plan },
   };
 }
 

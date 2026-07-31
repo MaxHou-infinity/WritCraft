@@ -18,8 +18,14 @@ const {
   MAX_PROVIDER_REQUEST_BYTES,
   MAX_JSON_DEPTH,
   MAX_JSON_NODES,
+  PLAN_TOOL_NAME,
+  PLAN_INPUT_SCHEMA,
+  PLAN_TOOLS,
+  PLAN_TOOL_CHOICE,
   parseModelJson,
   parseModelResponse,
+  providerRequestBody,
+  assertProviderRequest,
   proposeProjectPlan,
 } = require('../src/main/project-plan-service');
 
@@ -120,6 +126,24 @@ function planWithTargets(targetPaths) {
 function modelResponse(plan = validPlan(), overrides = {}) {
   return {
     ok: true,
+    stopReason: 'tool_use',
+    contentBlockCount: 3,
+    textBlockCount: 1,
+    toolUseBlockCount: 1,
+    nonTextBlockCount: 2,
+    text: '计划已整理。',
+    toolUse: {
+      id: 'call_plan_1',
+      name: PLAN_TOOL_NAME,
+      input: plan,
+    },
+    ...overrides,
+  };
+}
+
+function textModelResponse(plan = validPlan(), overrides = {}) {
+  return {
+    ok: true,
     stopReason: 'end_turn',
     contentBlockCount: 1,
     textBlockCount: 1,
@@ -191,8 +215,8 @@ async function run() {
     const root = makeProject();
     try {
       let captured;
-      const callLLM = async (messages, model, maxTokens) => {
-        captured = { messages, model, maxTokens };
+      const callLLM = async (messages, model, maxTokens, requestOptions) => {
+        captured = { messages, model, maxTokens, requestOptions };
         return modelResponse();
       };
       const result = await proposeProjectPlan({
@@ -215,48 +239,39 @@ async function run() {
       assert(prompt.includes('edit.md 是权威项目 Prompt'));
       assert(prompt.includes('research/facts.md'));
       assert(prompt.includes('不能创建、修改、删除或移动文件'));
-      assert(prompt.includes('首个非空白字符必须是 {'));
-      assert(prompt.includes('不得包含 Markdown 代码围栏、JSON 前后的解释'));
+      assert(prompt.includes(`必须且只能调用 ${PLAN_TOOL_NAME} 一次`));
       assert(prompt.includes('每一项都必须遵守同一结构'));
       assert(prompt.includes('targetPaths/dependsOn/acceptanceCriteria 必须始终是 JSON 数组'));
       assert(prompt.includes('不确定时必须返回 []'));
+      assert.deepStrictEqual(captured.requestOptions, {
+        tools: PLAN_TOOLS,
+        toolChoice: PLAN_TOOL_CHOICE,
+      });
+      assert.strictEqual(PLAN_INPUT_SCHEMA.properties.milestones.type, 'array');
+      assert.strictEqual(
+        PLAN_INPUT_SCHEMA.properties.milestones.items.properties.tasks.items.properties.targetPaths.type,
+        'array'
+      );
     } finally {
       fs.rmSync(root, { recursive: true, force: true });
     }
   });
 
-  await test('retries peripheral text once without echoing model output or relaxing strict JSON', async () => {
+  await test('rejects legacy text JSON without retrying or downgrading from the tool protocol', async () => {
     const root = makeProject();
     try {
       const before = snapshotTree(root);
-      const calls = [];
-      const invalid = `LEAK_MARKER\n${JSON.stringify(validPlan())}`;
-      const result = await proposeProjectPlan({
+      let calls = 0;
+      await expectCode('MODEL_OUTPUT_INCOMPLETE', () => proposeProjectPlan({
         projectService,
         rootPath: root,
         goal: '规划第一章',
-        callLLM: async messages => {
-          calls.push(messages[0].content);
-          return calls.length === 1 ? modelResponse(invalid) : modelResponse();
-        },
-      });
-      assert.strictEqual(result.ok, true);
-      assert.strictEqual(calls.length, 2);
-      assert(calls[1].includes('唯一一次结构重试'));
-      assert(!calls[1].includes('LEAK_MARKER'));
-      assert.deepStrictEqual(snapshotTree(root), before);
-
-      let rejectedCalls = 0;
-      await expectCode('INVALID_MODEL_OUTPUT', () => proposeProjectPlan({
-        projectService,
-        rootPath: root,
-        goal: '验证有界格式重试',
         callLLM: async () => {
-          rejectedCalls += 1;
-          return modelResponse(invalid);
+          calls += 1;
+          return textModelResponse();
         },
       }));
-      assert.strictEqual(rejectedCalls, 2);
+      assert.strictEqual(calls, 1);
       assert.deepStrictEqual(snapshotTree(root), before);
     } finally {
       fs.rmSync(root, { recursive: true, force: true });
@@ -267,8 +282,23 @@ async function run() {
     const root = makeProject();
     try {
       const before = snapshotTree(root);
-      const malformed = validPlan();
-      malformed.milestones[0].tasks[1].targetPaths = 'LEAK_TARGET_PATH';
+      const malformed = validPlan({
+        milestones: Array.from({ length: 7 }, (_, index) => ({
+          id: `late_m${index + 1}`,
+          title: `里程碑 ${index + 1}`,
+          objective: '验证所有重复项都受结构约束。',
+          acceptanceCriteria: ['结构正确'],
+          tasks: [{
+            id: `late_t${index + 1}`,
+            title: `任务 ${index + 1}`,
+            description: '验证晚位任务字段。',
+            scope: 'file',
+            targetPaths: index === 6 ? 'LEAK_TARGET_PATH' : ['chapters/one.md'],
+            dependsOn: [],
+            acceptanceCriteria: ['数组字段正确'],
+          }],
+        })),
+      });
       const calls = [];
       const result = await proposeProjectPlan({
         projectService,
@@ -298,19 +328,6 @@ async function run() {
       }));
       assert.strictEqual(rejectedCalls, 2, 'one operation must never make a third provider call');
 
-      let mixedCalls = 0;
-      await expectCode('INVALID_MODEL_OUTPUT', () => proposeProjectPlan({
-        projectService,
-        rootPath: root,
-        goal: '验证共享重试预算',
-        callLLM: async () => {
-          mixedCalls += 1;
-          return mixedCalls === 1
-            ? modelResponse(`说明：${JSON.stringify(validPlan())}`)
-            : modelResponse(malformed);
-        },
-      }));
-      assert.strictEqual(mixedCalls, 2, 'peripheral and structure failures share one retry budget');
       assert.deepStrictEqual(snapshotTree(root), before);
     } finally {
       fs.rmSync(root, { recursive: true, force: true });
@@ -329,7 +346,9 @@ async function run() {
         callLLM: async () => {
           calls += 1;
           fs.writeFileSync(path.join(root, 'edit.md'), `${beforeEdit}\n外部变化\n`);
-          return modelResponse(`说明：${JSON.stringify(validPlan())}`);
+          const malformed = validPlan();
+          malformed.milestones[0].tasks[1].targetPaths = 'not-an-array';
+          return modelResponse(malformed);
         },
       }));
       assert.strictEqual(calls, 1);
@@ -412,6 +431,24 @@ async function run() {
   });
 
   await test('preflights the exact serialized provider request before dispatch', async () => {
+    const emptyMessages = [{ role: 'user', content: '' }];
+    const withoutToolsEmpty = Buffer.byteLength(JSON.stringify({
+      model: 'MiniMax-M3', max_tokens: 8192, messages: emptyMessages,
+    }), 'utf8');
+    const withToolsEmpty = Buffer.byteLength(providerRequestBody(emptyMessages), 'utf8');
+    assert(withToolsEmpty > withoutToolsEmpty);
+    const boundaryMessages = [{
+      role: 'user',
+      content: 'x'.repeat(MAX_PROVIDER_REQUEST_BYTES - withToolsEmpty + 1),
+    }];
+    const withoutToolsBoundary = Buffer.byteLength(JSON.stringify({
+      model: 'MiniMax-M3', max_tokens: 8192, messages: boundaryMessages,
+    }), 'utf8');
+    assert(withoutToolsBoundary <= MAX_PROVIDER_REQUEST_BYTES,
+      'messages-only body must remain under the limit so the tool schema is decisive');
+    assert(Buffer.byteLength(providerRequestBody(boundaryMessages), 'utf8') > MAX_PROVIDER_REQUEST_BYTES);
+    assert.throws(() => assertProviderRequest(boundaryMessages), error => error.code === 'PLAN_PROMPT_TOO_LARGE');
+
     const longPaths = Array.from({ length: 5000 }, (_, index) =>
       `chapters/${String(index).padStart(4, '0')}-${'x'.repeat(210)}.md`);
     let calls = 0;
@@ -431,11 +468,9 @@ async function run() {
       callLLM: async () => { calls += 1; return modelResponse(); },
     }));
     assert.strictEqual(calls, 0);
-    const serialized = JSON.stringify({
-      model: 'MiniMax-M3', max_tokens: 8192,
-      messages: [{ role: 'user', content: longPaths.join('\n') }],
-    });
-    assert(Buffer.byteLength(serialized, 'utf8') > MAX_PROVIDER_REQUEST_BYTES);
+    assert(Buffer.byteLength(providerRequestBody([
+      { role: 'user', content: longPaths.join('\n') },
+    ]), 'utf8') > MAX_PROVIDER_REQUEST_BYTES);
   });
 
   await test('validates completion metadata before provider status or model text', async () => {
@@ -443,31 +478,30 @@ async function run() {
     const truncatedSecret = modelResponse('secret, not JSON', { ok: false, stopReason: 'max_tokens' });
     assert.throws(() => parseModelResponse(truncatedSecret, available), error =>
       error.code === 'MODEL_OUTPUT_TRUNCATED' && !error.message.includes('secret'));
-    for (const stopReason of ['tool_use', 'unknown', '', null]) {
+    for (const stopReason of ['end_turn', 'unknown', '', null]) {
       assert.throws(
-        () => parseModelResponse(modelResponse(validPlan(), { ok: false, stopReason }), available),
+        () => parseModelResponse(modelResponse(validPlan(), { stopReason }), available),
         error => error.code === 'MODEL_OUTPUT_INCOMPLETE'
       );
     }
-    assert.throws(
-      () => parseModelResponse(modelResponse(validPlan(), { ok: false, contentBlockCount: 2 }), available),
-      error => error.code === 'INVALID_MODEL_OUTPUT'
+    assert.deepStrictEqual(
+      parseModelResponse(modelResponse(validPlan(), { ok: false, error: 'INVALID_TOOL_USE' }), available),
+      { ok: false, error: 'INVALID_TOOL_USE', message: '项目计划生成失败' }
     );
-    assert.strictEqual(parseModelResponse(modelResponse(validPlan(), { ok: false }), available).title, '完成第一部分');
+    assert.strictEqual(parseModelResponse(modelResponse(), available).title, '完成第一部分');
     assert.throws(
       () => parseModelResponse({ ok: true, text: JSON.stringify(validPlan()) }, available),
       error => error.code === 'MODEL_OUTPUT_INCOMPLETE'
     );
   });
 
-  await test('requires exactly one text block and no additional content blocks', async () => {
+  await test('requires exactly one named tool result while allowing bounded thinking and text blocks', async () => {
     const available = new Set(['edit.md', 'chapters/one.md']);
     for (const overrides of [
-      { contentBlockCount: 0 },
-      { contentBlockCount: 2, textBlockCount: 2 },
-      { textBlockCount: 0 },
-      { nonTextBlockCount: 1, contentBlockCount: 2 },
-      { contentBlockCount: '1' },
+      { toolUseBlockCount: 0, toolUse: null },
+      { toolUseBlockCount: 2 },
+      { toolUse: { id: 'call_wrong', name: 'other_tool', input: validPlan() } },
+      { toolUse: { id: 'call_missing', name: PLAN_TOOL_NAME } },
     ]) {
       assert.throws(
         () => parseModelResponse(modelResponse(validPlan(), overrides), available),
@@ -475,11 +509,16 @@ async function run() {
       );
     }
     const inherited = Object.create(modelResponse());
-    inherited.stopReason = 'end_turn';
+    inherited.stopReason = 'tool_use';
     assert.throws(
       () => parseModelResponse(inherited, available),
       error => error.code === 'INVALID_MODEL_OUTPUT'
     );
+    assert.strictEqual(parseModelResponse(modelResponse(validPlan(), {
+      contentBlockCount: 4,
+      textBlockCount: 1,
+      nonTextBlockCount: 3,
+    }), available).title, '完成第一部分');
   });
 
   await test('rejects malformed, oversized and schema-smuggling model output', async () => {

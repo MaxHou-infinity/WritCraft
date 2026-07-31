@@ -11,10 +11,18 @@ const MAX_REQUEST_BYTES = 1024 * 1024;
 const MAX_RESPONSE_BYTES = 512 * 1024;
 const REQUEST_TIMEOUT_MS = 90_000;
 const MAX_MODELS = 256;
+const MAX_TOOLS = 8;
+const MAX_TOOL_SCHEMA_BYTES = 64 * 1024;
+const MAX_TOOL_INPUT_BYTES = 512 * 1024;
+const MAX_JSON_DEPTH = 32;
+const MAX_JSON_NODES = 4096;
 const KEY_RE = /^sk-(cp|api)-[A-Za-z0-9_-]{8,240}$/i;
 const MODEL_RE = /^[A-Za-z0-9][A-Za-z0-9._-]{0,127}$/;
+const TOOL_NAME_RE = /^[A-Za-z][A-Za-z0-9_-]{0,63}$/;
+const TOOL_ID_RE = /^[A-Za-z0-9._:-]{1,160}$/;
 const ALLOWED_ROLES = new Set(['user', 'assistant']);
 const ALLOWED_STOP_REASONS = new Set(['end_turn', 'max_tokens', 'tool_use']);
+const DANGEROUS_KEYS = new Set(['__proto__', 'prototype', 'constructor']);
 const UNKNOWN_STOP_REASON = 'unknown';
 const USAGE_FIELDS = Object.freeze([
   'input_tokens',
@@ -60,6 +68,63 @@ function validateMessages(value) {
     output.push({ role: message.role, content: message.content });
   }
   return output;
+}
+
+function isPlainObject(value) {
+  return Boolean(value && typeof value === 'object' && !Array.isArray(value) &&
+    Object.getPrototypeOf(value) === Object.prototype);
+}
+
+function safeJsonClone(value, maxBytes) {
+  const stack = [{ value, depth: 0 }];
+  let nodes = 0;
+  while (stack.length) {
+    const current = stack.pop();
+    nodes += 1;
+    if (nodes > MAX_JSON_NODES || current.depth > MAX_JSON_DEPTH) return null;
+    const item = current.value;
+    if (item === null || ['string', 'boolean'].includes(typeof item) ||
+        (typeof item === 'number' && Number.isFinite(item))) continue;
+    if (typeof item !== 'object' || (!Array.isArray(item) && !isPlainObject(item))) return null;
+    for (const key of Object.keys(item)) {
+      if (DANGEROUS_KEYS.has(key)) return null;
+      stack.push({ value: item[key], depth: current.depth + 1 });
+    }
+  }
+  let serialized;
+  try {
+    serialized = JSON.stringify(value);
+  } catch (_) {
+    return null;
+  }
+  if (typeof serialized !== 'string' || Buffer.byteLength(serialized, 'utf8') > maxBytes) return null;
+  return JSON.parse(serialized);
+}
+
+function validateTools(value) {
+  if (value === undefined) return { tools: undefined, names: new Set() };
+  if (!Array.isArray(value) || !value.length || value.length > MAX_TOOLS) return null;
+  const names = new Set();
+  const tools = [];
+  for (const tool of value) {
+    if (!isPlainObject(tool) ||
+        Object.keys(tool).some(key => !['name', 'description', 'input_schema'].includes(key)) ||
+        typeof tool.name !== 'string' || !TOOL_NAME_RE.test(tool.name) || names.has(tool.name) ||
+        typeof tool.description !== 'string' || !tool.description.trim() || tool.description.length > 1000 ||
+        !isPlainObject(tool.input_schema)) return null;
+    const inputSchema = safeJsonClone(tool.input_schema, MAX_TOOL_SCHEMA_BYTES);
+    if (!inputSchema) return null;
+    names.add(tool.name);
+    tools.push({ name: tool.name, description: tool.description.trim(), input_schema: inputSchema });
+  }
+  return { tools, names };
+}
+
+function validateToolChoice(value, names) {
+  if (value === undefined && names.size === 0) return undefined;
+  if (!isPlainObject(value) || Object.keys(value).length !== 2 ||
+      value.type !== 'tool' || typeof value.name !== 'string' || !names.has(value.name)) return null;
+  return { type: 'tool', name: value.name };
 }
 
 function timeoutValue(value) {
@@ -222,7 +287,17 @@ async function callMessages(options = {}) {
   if (!Number.isSafeInteger(maxTokens) || maxTokens < 1 || maxTokens > MAX_MAX_TOKENS) {
     return failure('INVALID_MAX_TOKENS');
   }
-  const body = JSON.stringify({ model, max_tokens: maxTokens, messages });
+  const validatedTools = validateTools(options.tools);
+  if (!validatedTools) return failure('INVALID_TOOLS');
+  const toolChoice = validateToolChoice(options.toolChoice, validatedTools.names);
+  if (toolChoice === null) return failure('INVALID_TOOL_CHOICE');
+  const toolRequest = validatedTools.tools !== undefined;
+  const body = JSON.stringify({
+    model,
+    max_tokens: maxTokens,
+    messages,
+    ...(toolRequest ? { tools: validatedTools.tools, tool_choice: toolChoice } : {}),
+  });
   if (Buffer.byteLength(body, 'utf8') > MAX_REQUEST_BYTES) return failure('REQUEST_TOO_LARGE');
 
   const result = await requestJson({
@@ -239,14 +314,54 @@ async function callMessages(options = {}) {
   const contentBlocks = Array.isArray(payload?.content) ? payload.content : [];
   let textBlock = null;
   let textBlockCount = 0;
+  const toolUseBlocks = [];
+  let rawToolUseBlockCount = 0;
   for (const block of contentBlocks) {
+    if (toolRequest && isPlainObject(block) && block.type === 'tool_use') {
+      rawToolUseBlockCount += 1;
+    }
     if (block && typeof block === 'object' && block.type === 'text' && typeof block.text === 'string') {
       textBlockCount += 1;
       if (!textBlock) textBlock = block;
+    } else if (toolRequest && isPlainObject(block) && block.type === 'tool_use' &&
+        typeof block.id === 'string' && TOOL_ID_RE.test(block.id) &&
+        typeof block.name === 'string' && validatedTools.names.has(block.name) &&
+        isPlainObject(block.input)) {
+      const input = safeJsonClone(block.input, MAX_TOOL_INPUT_BYTES);
+      if (input !== null) toolUseBlocks.push({ id: block.id, name: block.name, input });
     }
   }
   const stopReason = safeStopReason(payload.stop_reason);
   const responseModel = typeof payload.model === 'string' && MODEL_RE.test(payload.model) ? payload.model : model;
+  if (toolRequest) {
+    if (rawToolUseBlockCount !== 1 || toolUseBlocks.length !== 1) {
+      return {
+        ok: false,
+        error: 'INVALID_TOOL_USE',
+        text: textBlock ? textBlock.text : null,
+        toolUse: null,
+        contentBlockCount: contentBlocks.length,
+        textBlockCount,
+        toolUseBlockCount: rawToolUseBlockCount,
+        nonTextBlockCount: contentBlocks.length - textBlockCount,
+        usage: safeUsage(payload.usage),
+        model: responseModel,
+        stopReason,
+      };
+    }
+    return {
+      ok: true,
+      text: textBlock ? textBlock.text : null,
+      toolUse: toolUseBlocks[0],
+      contentBlockCount: contentBlocks.length,
+      textBlockCount,
+      toolUseBlockCount: 1,
+      nonTextBlockCount: contentBlocks.length - textBlockCount,
+      usage: safeUsage(payload.usage),
+      model: responseModel,
+      stopReason,
+    };
+  }
   // Keep the long-standing failure shape for callers that cannot parse an
   // absent text value, while retaining safe completion metadata so strict
   // consumers can classify truncation/incompletion before text presence.

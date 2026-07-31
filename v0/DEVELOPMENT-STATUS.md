@@ -1,11 +1,11 @@
 # 笔触 · WritCraft · V0 开发状态与续作入口
 
-> 最后更新：2026-07-31（Asia/Shanghai，0.0BT · 真实 Plan 第二任务数组结构 P1 已修复，待同目标单次复验）
+> 最后更新：2026-07-31（Asia/Shanghai，0.0BU · Plan 改用协议级结构化工具，待真实 MiniMax canary）
 > 当前状态：**`writ-craft@0.1.1` 已从 exact candidate `c65981e` 发布到 npm `preview`；registry 时间 `2026-07-29T14:30:16.176Z`，shasum `d370c500666e25cfb373852deafa21b232d2bc18` 与本地候选一致。公网隔离安装/启动/退出为 2/2。annotated tag `v0.1.1` 指向同一提交，GitHub prerelease 已公开：`https://github.com/MaxHou-infinity/WritCraft/releases/tag/v0.1.1`。**
 > 发布判断：**0.1.1 Developer Preview 已完成版本、自动化、双架构安装、独立复审、npm 发布、公网安装和 GitHub prerelease。registry 标签保持 `preview: 0.1.1`、`latest: 0.1.0`，因此本次没有把 Preview 冒充稳定版，也没有执行 unpublish、占位发布或上传未签名 App/ZIP。**
 > 当前目标版本：**`docs/ROADMAP.md` 的 `RM-1.0 / writ-craft@0.1.2` 真实作者可用性闭环。必须使用 `edit.md`、5+ 个 `chapters/` 章节、2000+ 可见中文字符和至少 1 个来源文件的作者隔离副本，完成五段旅程，并关闭现场 `Graph INVALID_CACHE` 的诊断/恢复终态。0.1.2 签字前不得插入驾驶舱、新 AI 模式或其他后续版本功能。**
-> 当前源码证据：**exact production candidate `94e6099` 保持 strict parser 与零本地修复不变，把同一操作的一次共享重试预算扩展到精确的 `PERIPHERAL_TEXT` 或数组 `STRUCTURE_SHAPE`；首轮与重试 prompt 都要求每一个任务的 `targetPaths` / `dependsOn` / `acceptanceCriteria` 为 JSON 数组，失败输出不回显，第二次调用前重验文件树、`edit.md` 与显式上下文，且绝不发起第三次调用。Plan service **22/22**、Plan UI **16/16**、Plan handoff **15/15 + 5/5**、Assistant **11/11**、完整 `npm test`、批准 GUI `npm run verify`、强制真实 Electron **37/37** 均通过；独立复审尚未完成，npm/GitHub Release 仍未发布 0.1.2。**
-> 当前作者验收进度：**项目卡、Inline 与 Chapter 已关闭。第七副本同一 Plan 目标先有三次外围文本失败，`0e7ad38` 后又记录两次结构失败：operations `0b5e7919…` / `79bca23…`，分别 57,477 / 77,039 ms，UI 报“里程碑 1任务 2目标文件必须是 0–8 项的数组”。五次均为 `plan/failed`、before/after 0，没有计划、任务卡、正文或 History 写入；`changes.json` 最后修改时间仍为此前 Chapter 接受时的 `2026-07-31T00:17:15.835Z`。新候选重启后，只允许作者用保留目标再生成一次；成功后选择一张绑定目标文件的任务卡“交给 AI”，不得重跑项目卡、Inline 或 Chapter。**
+> 当前源码证据：**0.0BT 的 prompt + 一次重试已被真实 operation `ef44ed234ceb417d9d8723fa918e3173` 推翻。当前工作树把 Plan 改为 MiniMax Anthropic-compatible 单工具 `submit_project_plan`：请求携带完整 `input_schema` 与 named `tool_choice`，Main 只接受 `stop_reason=tool_use` 和恰好一个同名工具 input；thinking/text 永不成为计划 authority，旧文本 JSON 明确拒绝，字符串也绝不本地转数组。MiniMax 边界 **17/17**、Plan service **22/22**、Plan UI **16/16**、Plan handoff **15/15 + 5/5**、Assistant **11/11**、完整 `npm test`、批准 GUI `npm run verify` 均通过。真实 Electron 保留一次 Plan 已成功后的后段 CDP timeout 和一次 Plan 前项目卡进度 timeout 红灯；两者同源码单次确认均未复现，最终完整 **37/37**。独立复审已关闭 **P0=0/P1=0/P2=0**；真实 MiniMax named-tool canary 尚未完成，npm/GitHub Release 仍未发布 0.1.2。**
+> 当前作者验收进度：**项目卡、Inline 与 Chapter 已关闭。第七副本的 Plan 已累计六次真实失败：三次外围文本、两次里程碑 1 任务 2数组错误，以及最新一次里程碑 7 任务 1数组错误。最新 operation `ef44ed234ceb417d9d8723fa918e3173` 为 `plan/failed`、107,623 ms、before/after 0，说明初次与唯一重试都已调用但晚位重复字段仍错。六次均没有计划、任务卡、正文或 History 写入；`changes.json` 最后修改时间仍为 `2026-07-31T00:17:15.835Z`。独立复审已关闭；提交并重启新候选后，作者只做一次真实 MiniMax tool canary，成功再选择一张绑定目标文件的任务卡“交给 AI”。**
 > 0.0AA 历史保留红灯：**首轮真实 Electron 暴露 Inspector 在上下文失效时被清空、旧 5-chip 断言和项目 Chat 等待诊断；完整 test 又暴露 Plan 测试把 generation 函数正文写死。独立复审发现新请求预检窗口可提交不可见旧轮、同项目重开 UI/Main 串话、失败重开提前清会话及两项测试/错误文案缺口，均转为生产边界和回归后关闭。真实 Electron 曾连续两次在旧 Graph 恢复阶段超时；加入只读失败快照后该阶段连续四次通过，未改 Graph 产品逻辑，按重复同源证据关闭 timing P2。另一次 Chat preflight 红灯证明测试在恢复 `edit.md` 后未等待权威 watcher barrier；改为生产 `flushExternalChanges()` 收敛，而未放宽 Chat guard。该里程碑所有红运行保留，最终源码连续两次 34/34；后续 0.0AB 当时推进到 35/35，当前总链只看本文顶部当前里程碑。**
 > Graph 历史签字基线：**性能修复前的既有源码曾完整 `npm test`、Electron-enabled `npm run verify`、强制真实 Electron 26/26 exit 0；Graph Filter 15/15、Workbench 14/14、dynamic 5/5、Large 5/5、Watcher 15/15、Network 11/11、Intelligence 17/17，第二轮复审 P0=0/P1=0/P2=2。该数字只保留为历史过程；0.0AB 后来推进到 35/35，当前总链只看顶部当前里程碑。**
 > Graph 动态边界：**300 文件/1279 节点 cold-to-interactive、cache/incremental、筛选/内存/布局、AX/键鼠、三类纠错、stale/Issue→Changes、failure live、重启与项目隔离均进入真实 Electron；正文/History/ledger 的零写入门禁通过。**  
@@ -24,7 +24,7 @@
 
 ## 0. 续作口令
 
-Chat 的三级 scope/context、Main-owned 多轮连续性、Onboarding v2、Research→Changes、Inline Rewrite v2 与 Plan Strict 已经完成技术签字。项目卡、Inline 与 Chapter 已真实完成；真实 Plan 的外围文本和第二任务数组结构失败已转为 0.0BT 的一次共享有界重试修复。下一动作只在新候选上复验同一 Plan 目标，不重复前三段，不放宽 strict JSON，也不分发现有 `release/` 产物。
+Chat 的三级 scope/context、Main-owned 多轮连续性、Onboarding v2、Research→Changes 与 Inline Rewrite v2 已经完成技术签字。项目卡、Inline 与 Chapter 已真实完成。0.0BT 的自由文本 JSON 修复已被晚位数组真实失败推翻；当前只关闭 Plan 协议迁移、独立复审和一次真实 MiniMax named-tool canary，不重复前三段、不回退文本 JSON、不分发现有 `release/` 产物。
 
 1. 先读 `../docs/ROADMAP.md` 的当前目标，再读本文、`package.json`、对应合同、当前源码文件与 `git log -1 --stat`；本地 Git 历史从 2026-07-26 V0 基线开始，不得据此臆测更早的开发过程。
 2. **Diagnostic Export v1、Research Accuracy v1、committed-warning、Graph 三项韧性缺口、Changes/History durable recovery、Image Review v1 与 Image Trash 本地链均已完整签收，不再重开这些协议。**
@@ -32,6 +32,17 @@ Chat 的三级 scope/context、Main-owned 多轮连续性、Onboarding v2、Rese
 4. 不重写已经签字的 Onboarding v2 service、capability store、batch、Main/preload 与 Renderer 契约；Main 动态 admission、single-flight 和 Renderer 生命周期 authority 清理均已关闭。
 5. 每批合入后重跑定向测试；阶段完成时再运行完整 `npm test`、`npm run verify` 与 `WRITCRAFT_E2E_FORCE=1 npm run e2e:electron`，保存当次证据。
 6. 真实 API 只使用用户显式配置的 Key；记录延迟、限流、超时、故障和费用，不记录 Key、Prompt、模型原文或正文。Key 前缀只表示凭据/计费类型，不能代替官方能力与现场门禁。首发按 npm Developer Preview 合同执行；独立 App 发布才需要 Developer ID、公证与 Gatekeeper。
+
+### 0.0BU 2026-07-31 · 晚位重复字段再次失败与 Plan 工具协议迁移
+
+- **真实红灯推翻旧结论**：作者改用短目标“把内容改简短一点”后，operation **`ef44ed234ceb417d9d8723fa918e3173`** 仍以 **107,623 ms** 失败，UI 报“里程碑 7任务 1目标文件必须是 0–8 项的数组”。before/after 均为 0，`changes.json` 未变化。长耗时证明同一操作的初次与唯一结构重试都已发生；0.0BT 只能提高格式服从概率，不能称为关闭。
+- **根因升级**：让模型自由生成大型、深层、重复 JSON 时，提示词、示例和一次重试无法强制每个晚位任务字段保持同一类型。继续扩大提示或增加重试会重复付费和等待，属于同一问题的补丁循环。短目标更适合 Changes/Inline 是后续模式引导候选，但不是 schema 失败根因。
+- **生产边界**：Plan 专用单工具 **`submit_project_plan`**，请求使用完整 JSON Schema 和 named `tool_choice`。网络适配器只暴露一个有界、同名、plain-JSON `tool_use.input`；Main 再做 exact keys、数组、ID、依赖顺序、路径存在性、总量与 revision 校验。thinking/text 块可共存但无 authority；没有/错误/多个/畸形 tool call 稳定失败，绝不降级到文本 JSON或本地修补。
+- **重试与零写入**：仅结构数组仍不合格时共享一次重试预算；第二次调用前重验树、`edit.md` 与显式上下文，不携带失败 input，绝无第三次。HTTP/鉴权/工具 envelope 失败不做格式重试。Plan 全程只读，任务写作仍必须经 Plan→Changes 审阅。
+- **验证证据**：MiniMax adapter **17/17**；Plan **22/22 + 15/15 + 5/5 + 16/16 + 11/11**；完整 `npm test` exit 0。沙箱 `npm run verify` 在 DOM Electron `code=null` 红灯，同命令在批准 GUI 环境 exit 0。真实 Electron fixture 断言收到 forced tool/schema，以 thinking + text + tool_use 返回，并在第七里程碑第一个任务注入字符串。完整链保留两条不稳定红灯：一次 Plan 已通过后的 Chat 后段 CDP `Runtime.evaluate` timeout，一次 Plan 前等待项目卡进度 timeout；两者同源码单次确认均未复现，最终 **37/37**。它们保留为测试时序 P2 证据，不作为产品回归，也没有通过产品补丁掩盖。
+- **外部门禁**：MiniMax 官方文档确认 `tools`、`tool_choice` 和 `tool_use`/`stop_reason=tool_use` 支持，但公开示例只展示 `tool_choice.type=auto`。因此 named forced 形态仍必须由当前已授权作者 profile 做一次真实 provider canary；若 API 拒绝，必须零写入失败，不得静默回退自由文本。
+- **独立复审**：首轮发现“一个合法 + 一个错误/畸形 tool_use”可能绕过唯一性 P1，以及请求临界测试未证明 schema 字节计入上限的 P2；前者改为分别统计原始/合法调用，后者让生产与测试共用 `providerRequestBody` 并构造 tools 决定越界的临界 fixture。合同中残留的 `end_turn` 文本 JSON 说明同步纠正。复审最终 **P0=0/P1=0/P2=0**。
+- **下一动作**：提交并重启当前作者副本；作者只生成一次 Plan。成功后再把一张有目标文件的任务交给 Changes。不得再连续手动点击“重新生成”，也不得重跑项目卡、Inline 或 Chapter。
 
 ### 0.0BT 2026-07-31 · 真实 Plan 第二任务数组结构 P1 与共享单次重试
 
@@ -719,7 +730,7 @@ Chat 的三级 scope/context、Main-owned 多轮连续性、Onboarding v2、Rese
 | Onboarding v2 Renderer | exact v2 request、独立 confirmation mode、committed-warning 真相、双授权 all-settled、dynamic 主链接入和 destroy/deferred/rAF 守卫均已落盘；state **8/8**、UI **11/11**、dynamic **12/12** | 第二轮独立复审 **P0=0、P1=0、P2=0** | 自动化与当前源码 App 人工体验均已签字 |
 | Onboarding v2 fixture/API/Electron | strict malformed→人工重试→第一次只改 edit→第二次原子建文件；冲突零部分写入、终态 token、迁移/no-op 均有动态覆盖 | 三文件独立复审 **P0=0、P1=0、P2=0**；强制真实 Electron **20/20** | 自动化签字；真实 API 本轮未重跑 |
 | Research→Changes v1 | Main-owned canonical card/run、identifier-only handoff、只读 provenance、ACK/TTL/apply lease/residual 与 committed-warning 生产事务均已落盘；Research 12/12、handoff 15/15、transaction 11/11、integration 12/12、Renderer 13/13 | 最终独立二审 **P0=0/P1=0/P2=0**；0.0AB 当时总链为 Electron 35/35，当前见顶部当前里程碑 | 产品链与 committed-warning 动态故障边界均已签字 |
-| Inline Rewrite / Plan strict | Inline 当前源码 App 已完成预览零写入、拒绝、重载、接受、History 与 undo；Plan 已补 exact envelope、strict JSON、stopReason、资源/错误脱敏门禁，service **19/19**、handoff **11/11** | Inline 与 Plan 独立复审均 **P0=0/P1=0**；强制 Electron **21/21** 含 Plan strict 拒绝→同目标重试 | 两条产品链签字；仅保留 Plan 内部缓存动态白盒 P2 |
+| Inline Rewrite / Plan strict（历史基线） | Inline 当前源码 App 已完成预览零写入、拒绝、重载、接受、History 与 undo；Plan 的旧文本 JSON 边界当时为 service **19/19**、handoff **11/11** | 该行只记录 2026-07-23 历史签字；真实作者晚位数组失败已使 Plan 生产协议迁移到 0.0BU 工具 input | Inline 保持签字；Plan 当前状态只看顶部与 0.0BU |
 
 Onboarding v2 独立底座的权威文件为：
 
@@ -744,7 +755,7 @@ Onboarding v2 独立底座的权威文件为：
 - **独立复审已经关闭 Renderer、fixture 与 Main 动态测试链**：Renderer 第二轮及 fixture/API/Electron 三文件复审均为 P0=0、P1=0、P2=0；Main Handler single-flight 与 navigation lifecycle 最终复审 P0=0、P1=0、P2=0。
 - **Research→Changes v1 产品链与异常边界均已签字**：`../docs/RESEARCH-CHANGES-V1-CONTRACT.md` 已落地；committed-warning 生产事务动态覆盖真实磁盘/History、residual、TTL、stale、回滚与 undo，最终独立二审 P0=0/P1=0/P2=0。强制 Electron 已覆盖 reject-only、late-open A→B 及 Research→Changes→History/undo。
 - **Inline Rewrite 产品链已经签字**：当前源码隔离 App 已完成预览零写入、拒绝、重载、接受后磁盘/History 同步与 Safe Undo；本次本地确定性 provider 不等于真实 API/作者验收。
-- **Plan Strict v1 已签字**：`../docs/PLAN-STRICT-V1-CONTRACT.md` 已实现；模型必须 `end_turn`、单一文本块与无外围 strict JSON，重复/危险键、资源超限和路径错误均 fail closed；独立复审 P0=0/P1=0。
+- **Plan Strict v1 历史文本基线**：2026-07-23 的 `end_turn`/单文本 strict JSON 曾完成独立复审，但已被真实作者晚位数组失败推翻为生产生成协议；当前只接受 0.0BU 的单一 `submit_project_plan` tool input，详见顶部与合同现行章节。
 - **该历史批当时的下一阶段入口（已完成并被取代）**：先完成 Image Review v1 独立复审，再补真实 `sk-api-`/作者证据、干净打包与发布复审；当前入口只看本文顶部。
 - **证据纪律**：本地 Git 历史从 2026-07-26 V0 基线开始；恢复时必须同时核对本文、`git log` / `git diff`、磁盘当前文件和当次可复现测试结果。任何新的通过数字都要写明命令、覆盖范围和是否使用真实 Electron/真实 API。
 - **顺序理由**：三级 AI 协作与 Graph 主链均已签字；真实 API/作者价值和发布门禁现在是最早仍开放的产品验收。
@@ -916,7 +927,7 @@ Onboarding v2 已取代上述“容错解析完整 `editContent` + 部分创建�
 - [x] Research→Changes 产品链：建立 `writcraft.research-handoff/v1`，Main 按 card ID 重建 source revision/quote/locator，把来源绑定为只读依赖并进入 provenance；独立实现复审 P0/P1=0、全量 verify exit 0；**20/20** 是含 reject/A→B 的历史专项 Electron 证据，0.0AB 当时总链为 **35/35**，当前见顶部当前里程碑。
 - [x] Inline Rewrite 自动化链：既有写入/恢复链保持签字；0.0BJ 新增必填作者指令 composer 与 exact request v2，定向 Context 15/15、Main 11/11、transaction 14/14、integration 7/7、Renderer 11/11，完整 test/批准 GUI verify 与最终 Electron 37/37 通过，第三轮独立复审 P0=0/P1=0/P2=0。
 - [x] Inline Rewrite 当前候选真实作者旅程：第五副本已完成接受、独立拒绝与精确 Safe Undo，正文、History 和全项目 Markdown 摘要均回到操作前基线；项目卡与 Inline 均不再重跑。
-- [x] Plan 生成只读路径补 strict JSON、stopReason、单文本块、错误脱敏、目标/Prompt 资源上限；独立复审 P0=0/P1=0，强制 Electron 覆盖失败→重试。
+- [ ] Plan 生成当前迁移到单一 named tool input，保留错误脱敏、目标/Prompt 资源与零写入门禁；自动化已覆盖第七里程碑结构失败→同操作重试，独立复审 P0/P1/P2=0，仍待一次真实 MiniMax named-tool canary。
 
 ### P2：Chat/Chapter 独立复审保留的非阻塞测试增强
 

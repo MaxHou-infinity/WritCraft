@@ -24,6 +24,22 @@ function response(payload, options = {}) {
 
 const CP_KEY = `sk-cp-${'A1_-'.repeat(20)}`;
 const API_KEY = `sk-api-${'B2_-'.repeat(20)}`;
+const TEST_TOOL = {
+  name: 'submit_project_plan',
+  description: 'Submit one structured project plan.',
+  input_schema: {
+    type: 'object',
+    additionalProperties: false,
+    required: ['milestones'],
+    properties: {
+      milestones: {
+        type: 'array',
+        items: { type: 'object' },
+      },
+    },
+  },
+};
+const TEST_TOOL_CHOICE = { type: 'tool', name: TEST_TOOL.name };
 
 async function run() {
   console.log('\nWritCraft MiniMax text network boundary verification');
@@ -95,6 +111,110 @@ async function run() {
       model: 'MiniMax-M3',
       stopReason: 'end_turn',
     });
+  });
+
+  await test('sends one forced tool schema and exposes only one bounded matching tool input', async () => {
+    let captured;
+    const input = { milestones: [{ id: 'm1' }] };
+    const result = await service.callMessages({
+      apiKey: API_KEY,
+      messages: [{ role: 'user', content: '生成项目计划' }],
+      tools: [TEST_TOOL],
+      toolChoice: TEST_TOOL_CHOICE,
+      fetchImpl: async (_url, options) => {
+        captured = JSON.parse(options.body);
+        return response({
+          model: 'MiniMax-M3',
+          content: [
+            { type: 'thinking', thinking: '不作为计划 authority' },
+            { type: 'text', text: '已提交。' },
+            { type: 'tool_use', id: 'call_plan_1', name: TEST_TOOL.name, input },
+          ],
+          stop_reason: 'tool_use',
+        });
+      },
+    });
+    assert.deepStrictEqual(captured, {
+      model: 'MiniMax-M3',
+      max_tokens: 1024,
+      messages: [{ role: 'user', content: '生成项目计划' }],
+      tools: [TEST_TOOL],
+      tool_choice: TEST_TOOL_CHOICE,
+    });
+    assert.deepStrictEqual(result, {
+      ok: true,
+      text: '已提交。',
+      toolUse: { id: 'call_plan_1', name: TEST_TOOL.name, input },
+      contentBlockCount: 3,
+      textBlockCount: 1,
+      toolUseBlockCount: 1,
+      nonTextBlockCount: 2,
+      usage: undefined,
+      model: 'MiniMax-M3',
+      stopReason: 'tool_use',
+    });
+
+    const noText = await service.callMessages({
+      apiKey: API_KEY,
+      messages: [{ role: 'user', content: '只调用工具' }],
+      tools: [TEST_TOOL],
+      toolChoice: TEST_TOOL_CHOICE,
+      fetchImpl: async () => response({
+        model: 'MiniMax-M3',
+        content: [{ type: 'tool_use', id: 'call_plan_2', name: TEST_TOOL.name, input }],
+        stop_reason: 'tool_use',
+      }),
+    });
+    assert.strictEqual(noText.ok, true);
+    assert.strictEqual(noText.text, null);
+    assert.deepStrictEqual(noText.toolUse.input, input);
+  });
+
+  await test('fails closed on missing, wrong, multiple or malformed tool results', async () => {
+    const payloads = [
+      { content: [], stop_reason: 'end_turn' },
+      {
+        content: [{ type: 'tool_use', id: 'call_1', name: 'wrong_tool', input: {} }],
+        stop_reason: 'tool_use',
+      },
+      {
+        content: [
+          { type: 'tool_use', id: 'call_1', name: TEST_TOOL.name, input: {} },
+          { type: 'tool_use', id: 'call_2', name: TEST_TOOL.name, input: {} },
+        ],
+        stop_reason: 'tool_use',
+      },
+      {
+        content: [
+          { type: 'tool_use', id: 'call_1', name: TEST_TOOL.name, input: {} },
+          { type: 'tool_use', id: 'call_2', name: 'wrong_tool', input: {} },
+        ],
+        stop_reason: 'tool_use',
+      },
+      {
+        content: [
+          { type: 'tool_use', id: 'call_1', name: TEST_TOOL.name, input: {} },
+          { type: 'tool_use', id: 'call_2', name: TEST_TOOL.name, input: 'not-an-object' },
+        ],
+        stop_reason: 'tool_use',
+      },
+      {
+        content: [{ type: 'tool_use', id: 'call_1', name: TEST_TOOL.name, input: 'not-an-object' }],
+        stop_reason: 'tool_use',
+      },
+    ];
+    for (const payload of payloads) {
+      const result = await service.callMessages({
+        apiKey: API_KEY,
+        messages: [{ role: 'user', content: 'x' }],
+        tools: [TEST_TOOL],
+        toolChoice: TEST_TOOL_CHOICE,
+        fetchImpl: async () => response(payload),
+      });
+      assert.strictEqual(result.ok, false);
+      assert.strictEqual(result.error, 'INVALID_TOOL_USE');
+      assert.strictEqual(result.toolUse, null);
+    }
   });
 
   await test('preserves the allowlisted max_tokens stop reason for truncation handling', async () => {
@@ -219,6 +339,14 @@ async function run() {
       [service.callMessages, { apiKey: API_KEY, messages: [{ role: 'user', content: 'x', apiKey: API_KEY }], fetchImpl }, 'INVALID_MESSAGES'],
       [service.callMessages, { apiKey: API_KEY, messages: [{ role: 'user', content: 'x' }], model: '../escape', fetchImpl }, 'INVALID_MODEL'],
       [service.callMessages, { apiKey: API_KEY, messages: [{ role: 'user', content: 'x' }], maxTokens: 0, fetchImpl }, 'INVALID_MAX_TOKENS'],
+      [service.callMessages, {
+        apiKey: API_KEY, messages: [{ role: 'user', content: 'x' }],
+        tools: [{ ...TEST_TOOL, name: '../escape' }], toolChoice: TEST_TOOL_CHOICE, fetchImpl,
+      }, 'INVALID_TOOLS'],
+      [service.callMessages, {
+        apiKey: API_KEY, messages: [{ role: 'user', content: 'x' }],
+        tools: [TEST_TOOL], toolChoice: { type: 'tool', name: 'other' }, fetchImpl,
+      }, 'INVALID_TOOL_CHOICE'],
     ];
     for (const [fn, options, error] of cases) assert.deepStrictEqual(await fn(options), { ok: false, error });
     assert.strictEqual(calls, 0);
