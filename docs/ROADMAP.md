@@ -75,7 +75,7 @@
 5. 修复旅程中发现的 P0/P1 阻断项；P2 必须明确记录、分级并决定是否允许发版。
 6. 记录内容无关的私有指标：Inline 接受率、Plan 采用、Research 匹配判断、图片评分/采纳、耗时和稳定错误码。
 
-当前执行注记（2026-07-31）：项目卡与 Inline 作者旅程已经关闭。`2073406` 关闭动态 blockId 冲突后，第七副本 Chapter 已真实生成并接受：唯一新 History 与磁盘 after revision 精确一致，原始源未变。现场同时暴露提交后仍保留“已选择接受 · 尚未写入”的陈旧 Diff，虽然底部和磁盘已确认成功。Renderer 修复候选在可信无 residual 提交后以唯一完成卡替换旧审阅；UX 9/9、Renderer dynamic 30/30、完整 test、批准 GUI verify 和真实 Electron 37/37 通过。修复提交后只重启核验已接受正文/History，不重复 Chapter 生成；随后继续 Plan，再进入 Research。
+当前执行注记（2026-07-31）：项目卡、Inline 与第七副本 Chapter 作者旅程已经关闭。`2073406` 完成真实 Chapter 生成与接受；exact candidate `4bef659` 又关闭提交后仍保留“已选择接受 · 尚未写入”的陈旧 Diff，在可信无 residual 提交后以唯一完成卡替换旧审阅。UX 9/9、Renderer dynamic 30/30、完整 test、批准 GUI verify 和真实 Electron 37/37 通过并已推送。用 `4bef659` 重启同一副本后，已接受正文仍在、磁盘仍匹配 after revision、源稿未变且无待审阅面板。不得重复 Chapter；下一段只做 Plan，再进入 Research。
 
 ### 4.3 明确不做
 
