@@ -179,6 +179,8 @@ contextBridge.exposeInMainWorld('writCraft', {
     proposeChapter: (projectInstanceId, request) => ipcRenderer.invoke('writcraft:project:propose-chapter', projectInstanceId, request),
     proposeOnboarding: (projectInstanceId, request) => ipcRenderer.invoke('writcraft:project:propose-onboarding', projectInstanceId, request),
     proposeEditPromptRepair: (projectInstanceId) => ipcRenderer.invoke('writcraft:project:propose-edit-prompt-repair', projectInstanceId),
+    proposeWritingNavigation: (projectInstanceId, request) =>
+      ipcRenderer.invoke('writcraft:project:propose-writing-navigation', projectInstanceId, request),
     proposePlan: (projectInstanceId, goal, contextPaths) => ipcRenderer.invoke('writcraft:project:propose-plan', projectInstanceId, goal, contextPaths),
     handoffPlanTask: (projectInstanceId, request) => ipcRenderer.invoke('writcraft:project:handoff-plan-task', projectInstanceId, request),
     handoffGraphIssue: (projectInstanceId, request) => ipcRenderer.invoke('writcraft:project:handoff-graph-issue', projectInstanceId, request),

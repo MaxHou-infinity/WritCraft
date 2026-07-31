@@ -32,6 +32,10 @@ const projectOnboardingHandler = require('./project-onboarding-handler');
 const projectPlanService = require('./project-plan-service');
 const projectPlanHandler = require('./project-plan-handler');
 const projectPlanHandoffService = require('./project-plan-handoff-service');
+const writingNavigationService = require('./writing-navigation-service');
+const writingNavigationStoreService = require('./writing-navigation-store');
+const writingNavigationHandlerService = require('./writing-navigation-handler');
+const writingNavigationProviderAdapter = require('./writing-navigation-provider-adapter');
 const projectChangesProposalService = require('./project-changes-proposal-service');
 const localizedEditService = require('./localized-edit-service');
 const graphIndexService = require('./graph-index-service');
@@ -154,6 +158,12 @@ pendingChangeSets = pendingChangeSetStoreService.createPendingChangeSetStore({
   },
 });
 const pendingPlanRecords = projectPlanHandoffService.createPlanHandoffStore();
+const writingNavigationStore = writingNavigationStoreService.createWritingNavigationStore();
+const writingNavigationProjectCallLLM =
+  writingNavigationProviderAdapter.createWritingNavigationProviderAdapter({
+    runAiRequest,
+    callLLM,
+  });
 const pendingOnboardingReviews = new Map();
 const onboardingCapabilityStore = onboardingCapabilityStoreService.createOnboardingCapabilityStore();
 const onboardingAdmission = projectOnboardingHandler.createOnboardingAdmission({
@@ -301,6 +311,8 @@ function projectFailure(error) {
   console.error('[project]', diagnosticCode);
   const graphFailure = graphIndexService.publicGraphIndexFailure(error);
   if (graphFailure) return graphFailure;
+  const navigationFailure = writingNavigationService.publicWritingNavigationFailure(error);
+  if (navigationFailure) return navigationFailure;
   const isSafeProjectError = error instanceof projectService.ProjectServiceError ||
     error instanceof issueStateService.IssueStateError ||
     error instanceof changeHistoryService.ChangeHistoryError ||
@@ -310,6 +322,8 @@ function projectFailure(error) {
     error instanceof onboardingBatchService.OnboardingBatchError ||
     error instanceof projectPlanService.ProjectPlanError ||
     error instanceof projectPlanHandoffService.ProjectPlanHandoffError ||
+    error instanceof writingNavigationService.WritingNavigationError ||
+    error instanceof writingNavigationStoreService.WritingNavigationStoreError ||
     error instanceof projectChangesProposalService.ProjectChangesProposalError ||
     error instanceof localizedEditService.LocalizedEditError ||
     error instanceof changeSetService.ChangeSetError ||
@@ -388,7 +402,7 @@ function assertProjectWatcherAvailable(project) {
   ));
 }
 
-async function settleMarkdownTrashListAuthority(project) {
+async function settleProjectReadAuthority(project, copy) {
   assertProjectWatcherAvailable(project);
   const watcher = currentProjectWatcher;
   const navigationEpoch = rendererNavigationEpoch;
@@ -396,13 +410,13 @@ async function settleMarkdownTrashListAuthority(project) {
   if (!watcher || typeof watcher.flush !== 'function') {
     throw new projectService.ProjectServiceError(
       'PROJECT_WATCHER_UNAVAILABLE',
-      '项目文件监控不可用；请重新打开项目'
+      copy.watcherUnavailable
     );
   }
   if ((internalMutationDepthByRoot.get(project.rootPath) || 0) > 0) {
     throw new projectService.ProjectServiceError(
       'PROJECT_MUTATION_IN_PROGRESS',
-      '项目文件正在提交，请稍后刷新回收区'
+      copy.mutationInProgress
     );
   }
   let flushed;
@@ -412,23 +426,39 @@ async function settleMarkdownTrashListAuthority(project) {
     projectWatcherHealth.markDegraded(project);
     throw new projectService.ProjectServiceError(
       'PROJECT_WATCHER_UNAVAILABLE',
-      '项目文件监控无法完成一致性扫描；请重新打开项目'
+      copy.watcherUnavailable
     );
   }
   if (!currentProject || currentProject.instanceId !== project.instanceId ||
       currentProject.rootPath !== project.rootPath ||
       currentProjectWatcher !== watcher ||
       rendererNavigationEpoch !== navigationEpoch) {
-    throw new projectService.ProjectServiceError('PROJECT_CHANGED', '项目状态已变化，请重新刷新回收区');
+    throw new projectService.ProjectServiceError('PROJECT_CHANGED', copy.projectChanged);
   }
   if (!flushed?.ok || internalMutationEpoch !== mutationEpoch ||
       (internalMutationDepthByRoot.get(project.rootPath) || 0) > 0) {
     throw new projectService.ProjectServiceError(
       'PROJECT_MUTATION_IN_PROGRESS',
-      '项目文件状态尚未收敛，请稍后刷新回收区'
+      copy.mutationInProgress
     );
   }
   assertProjectWatcherAvailable(project);
+}
+
+async function settleMarkdownTrashListAuthority(project) {
+  return settleProjectReadAuthority(project, {
+    watcherUnavailable: '项目文件监控无法完成一致性扫描；请重新打开项目',
+    mutationInProgress: '项目文件正在提交或状态尚未收敛，请稍后刷新回收区',
+    projectChanged: '项目状态已变化，请重新刷新回收区',
+  });
+}
+
+async function settleWritingNavigationAuthority(project) {
+  return settleProjectReadAuthority(project, {
+    watcherUnavailable: '项目文件监控无法完成一致性扫描；请重新打开项目后再生成导航',
+    mutationInProgress: '项目文件正在提交或状态尚未收敛，请稍后重新生成导航',
+    projectChanged: '项目状态已变化，请重新生成写作导航',
+  });
 }
 
 function requireMutableProject() {
@@ -478,6 +508,13 @@ function abortActiveAiRequests() {
 
 function advanceRendererNavigationEpoch() {
   abortActiveAiRequests();
+  const ownerId = currentChatConversationOwnerId();
+  if (ownerId && currentProject) {
+    writingNavigationStore.invalidateProject({
+      ownerId,
+      projectInstanceId: currentProject.instanceId,
+    });
+  }
   rendererNavigationEpoch += 1;
   if (currentProject) onboardingAdmission.invalidateProject(currentProject);
 }
@@ -541,6 +578,12 @@ function advanceAiContextGeneration(options = {}) {
   abortActiveAiRequests();
   const ownerId = currentChatConversationOwnerId();
   if (ownerId) chatConversationStore.invalidateOwner(ownerId, 'context_changed');
+  if (ownerId && currentProject) {
+    writingNavigationStore.invalidateProject({
+      ownerId,
+      projectInstanceId: currentProject.instanceId,
+    });
+  }
   projectMutationGeneration += 1;
   lastContextResponse = null;
   pendingPlanRecords.clear();
@@ -733,10 +776,14 @@ function inlineRewriteBinding(event, project = requireCurrentProject()) {
 }
 
 function projectCallLLM(projectInstanceId) {
-  return (messages, model, maxTokens, requestOptions = {}) => runAiRequest(
-    projectInstanceId,
-    signal => callLLM(messages, model, maxTokens, signal, requestOptions)
-  );
+  return (messages, model, maxTokens, requestOptions = {}) => {
+    const { signal: externalSignal, deadlineMs: _deadlineMs, ...providerOptions } = requestOptions;
+    return runAiRequest(
+      projectInstanceId,
+      signal => callLLM(messages, model, maxTokens, signal, providerOptions),
+      externalSignal
+    );
+  };
 }
 
 function startProjectWatcher(project) {
@@ -796,6 +843,13 @@ function setCurrentProject(project) {
     if (currentProject) {
       onboardingCapabilityStore.invalidateByProject(currentProject.instanceId, currentProject.rootPath);
       researchHandoffStore.clearProject(currentProject.instanceId, currentProject.rootPath);
+      const navigationOwnerId = currentChatConversationOwnerId();
+      if (navigationOwnerId) {
+        writingNavigationStore.invalidateProject({
+          ownerId: navigationOwnerId,
+          projectInstanceId: currentProject.instanceId,
+        });
+      }
     }
     pendingChangeSets.clear();
     pendingPlanRecords.clear();
@@ -1924,6 +1978,23 @@ ipcMain.handle('writcraft:chat:cancel-pending', async (event, projectInstanceId)
     return chatConversationFailure(error);
   }
 });
+
+ipcMain.handle('writcraft:project:propose-writing-navigation',
+  writingNavigationHandlerService.createProposeWritingNavigationHandler({
+    assertTrustedSender,
+    requireCurrentProject,
+    getCurrentProject: () => currentProject,
+    getMutationGeneration: () => projectMutationGeneration,
+    getRendererNavigationEpoch: () => rendererNavigationEpoch,
+    settleProjectAuthority: settleWritingNavigationAuthority,
+    writingNavigationService,
+    writingNavigationStore,
+    projectService,
+    projectCallLLM: writingNavigationProjectCallLLM,
+    staleAiProjectResult,
+    projectFailure,
+  })
+);
 
 ipcMain.handle('writcraft:project:propose-plan', projectPlanHandler.createProposePlanHandler({
   assertTrustedSender,

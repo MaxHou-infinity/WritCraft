@@ -1,11 +1,11 @@
 # 笔触 · WritCraft · V0 开发状态与续作入口
 
-> 最后更新：2026-07-31（Asia/Shanghai，0.0BY · 旧 Plan 产品假设退役，写作导航合同冻结）
+> 最后更新：2026-07-31（Asia/Shanghai，0.0BZ · 写作导航只读 Main/IPC 基础独立签收）
 > 当前状态：**`writ-craft@0.1.1` 已从 exact candidate `c65981e` 发布到 npm `preview`；registry 时间 `2026-07-29T14:30:16.176Z`，shasum `d370c500666e25cfb373852deafa21b232d2bc18` 与本地候选一致。公网隔离安装/启动/退出为 2/2。annotated tag `v0.1.1` 指向同一提交，GitHub prerelease 已公开：`https://github.com/MaxHou-infinity/WritCraft/releases/tag/v0.1.1`。**
 > 发布判断：**0.1.1 Developer Preview 已完成版本、自动化、双架构安装、独立复审、npm 发布、公网安装和 GitHub prerelease。registry 标签保持 `preview: 0.1.1`、`latest: 0.1.0`，因此本次没有把 Preview 冒充稳定版，也没有执行 unpublish、占位发布或上传未签名 App/ZIP。**
 > 当前目标版本：**`docs/ROADMAP.md` 的 `RM-1.1 / writ-craft@0.1.2` 真实作者可用性闭环。必须以 `WRITING-NAVIGATION-V1-CONTRACT.md` 的结构规划/写作导航替代旧 Plan，再完成 Research、image-01、Graph/recovery 和完整签字。不得插入驾驶舱或其他后续版本功能。**
-> 当前源码证据：**旧 Plan 的 fail-closed 边界仍在源码且自动化曾通过，但公开产品假设已经失效。六轮 Schema、容量、ID 和重试修补后，真实作者累计九次仍未得到可用计划；最新 operation `db1c6915ed38430aa827e441666b8218` 为 `plan/failed`、22,312 ms、before/after 0，UI 报“假设第 1 项应为 1–16 个字符”。`changes.json` 未变化，没有 Plan、任务卡、正文或 History 写入。安全性成立，作者价值未成立；停止旧 canary，不再修字段长度。替代功能当前只有冻结合同，尚无 Main/IPC/Renderer 实现或新验收证据。**
-> 当前作者验收进度：**项目卡、Inline 与 Chapter 已关闭。旧 Plan 九次失败只作为历史证据，不再要求作者复测。下一内部动作是实现并自动验证结构规划/写作导航；完成后才创建新的空项目与合格作者隔离副本做两段验收。Research、已授权 image-01 和 Graph/recovery 仍开放。**
+> 当前源码证据：**旧 Plan 的公开产品假设已经失效且不再付费复测。替代功能已完成第一个内部检查点：结构规划/写作导航的只读 Main 服务、严格 named-tool 协议、revision-bound 证据锚点、全局 8 条/30 分钟 owner 隔离缓存、一次性动作租约、watcher barrier、navigation/mutation generation 隔离、90 秒真实取消以及 Main/preload 生成入口。专项 53/53、Network 15/15，独立终审 P0=0/P1=0。当前 Renderer 尚未接入，也没有 open/Research/Changes 动作实现或骨架写入事务，因此不能称为用户可用、不能移除旧 runtime、不能进入作者验收。**
+> 当前作者验收进度：**项目卡、Inline 与 Chapter 已关闭。旧 Plan 九次失败只作为历史证据，不再要求作者复测。下一内部动作是完成动作交接与结构骨架三态事务，再接 Navigation Renderer 并移除公开旧 Plan；之后才创建新的空项目与合格作者隔离副本做两段验收。Research、已授权 image-01 和 Graph/recovery 仍开放。**
 > 0.0AA 历史保留红灯：**首轮真实 Electron 暴露 Inspector 在上下文失效时被清空、旧 5-chip 断言和项目 Chat 等待诊断；完整 test 又暴露 Plan 测试把 generation 函数正文写死。独立复审发现新请求预检窗口可提交不可见旧轮、同项目重开 UI/Main 串话、失败重开提前清会话及两项测试/错误文案缺口，均转为生产边界和回归后关闭。真实 Electron 曾连续两次在旧 Graph 恢复阶段超时；加入只读失败快照后该阶段连续四次通过，未改 Graph 产品逻辑，按重复同源证据关闭 timing P2。另一次 Chat preflight 红灯证明测试在恢复 `edit.md` 后未等待权威 watcher barrier；改为生产 `flushExternalChanges()` 收敛，而未放宽 Chat guard。该里程碑所有红运行保留，最终源码连续两次 34/34；后续 0.0AB 当时推进到 35/35，当前总链只看本文顶部当前里程碑。**
 > Graph 历史签字基线：**性能修复前的既有源码曾完整 `npm test`、Electron-enabled `npm run verify`、强制真实 Electron 26/26 exit 0；Graph Filter 15/15、Workbench 14/14、dynamic 5/5、Large 5/5、Watcher 15/15、Network 11/11、Intelligence 17/17，第二轮复审 P0=0/P1=0/P2=2。该数字只保留为历史过程；0.0AB 后来推进到 35/35，当前总链只看顶部当前里程碑。**
 > Graph 动态边界：**300 文件/1279 节点 cold-to-interactive、cache/incremental、筛选/内存/布局、AX/键鼠、三类纠错、stale/Issue→Changes、failure live、重启与项目隔离均进入真实 Electron；正文/History/ledger 的零写入门禁通过。**  
@@ -33,6 +33,16 @@ Chat 的三级 scope/context、Main-owned 多轮连续性、Onboarding v2、Rese
 4. 不重写已经签字的 Onboarding v2 service、capability store、batch、Main/preload 与 Renderer 契约；Main 动态 admission、single-flight 和 Renderer 生命周期 authority 清理均已关闭。
 5. 每批合入后重跑定向测试；阶段完成时再运行完整 `npm test`、`npm run verify` 与 `WRITCRAFT_E2E_FORCE=1 npm run e2e:electron`，保存当次证据。
 6. 真实 API 只使用用户显式配置的 Key；记录延迟、限流、超时、故障和费用，不记录 Key、Prompt、模型原文或正文。Key 前缀只表示凭据/计费类型，不能代替官方能力与现场门禁。首发按 npm Developer Preview 合同执行；独立 App 发布才需要 Developer ID、公证与 Gatekeeper。
+
+### 0.0BZ 2026-07-31 · 写作导航只读 Main/IPC 基础
+
+- **实现边界**：新增 `writing-navigation-service/store/provider-adapter/handler`。空项目只返回 2–3 个结构元数据方案；已有稿件只返回 1–3 个带 canonical evidence locator 的导航建议。Renderer 只可提交模式、目标与路径标识，正文、revision、Context manifest 和能力均由 Main 重建。
+- **严格传输与容量**：两模式使用动态专用 named-tool schema；模型值与 runtime 共用 raw 边界，路径被收窄为本次实际读取集合。一次点击最多一次 provider call，无格式修复或自动重试；请求 ≤1 MiB、tool input ≤64 KiB、正文总计 ≤8 文件/240 KiB、`max_tokens=8192`、deadline 90 秒。最大 Unicode、精确 `+1`、missing/extra keys 和路径/证据歧义均有动态反例。
+- **authority 与隔离**：每次明确点击获得随机 opaque navigation ID。缓存全局最多 8 条、TTL 30 分钟，以 owner/project/root/mutation generation/navigation epoch 隔离；淘汰、过期、reload、项目切换或 mutation 会撤销 action/lease 并 abort 在途 owner。`open` 可重复，Research/Changes 使用独立单次 action；后续 handoff 必须在副作用前再次调用 `assertLeaseCurrent`。
+- **项目状态门禁**：生成前后均经过 Main watcher full-flush barrier；项目、generation 或 Renderer epoch 漂移不会安装结果。专用 provider adapter 把 service deadline/cancel signal 穿透 `runAiRequest` 到最内层 MiniMax fetch。模型字段、证据和 JSON 协议错误统一映射为内容无关提示，不再向作者显示内部字段名。
+- **零写入与验证**：成功只安装短期 navigation authority，失败不触及 Markdown、History、Changes 或 mutation generation。`npm run verify:navigation` 为 **53/53**，Network boundary **15/15**；MiniMax **17/17**、Watcher flush **11/11**、Onboarding handler **11/11**、历史 Plan **26/26** 回归通过，`git diff --check` 与 changed JS `node --check` 通过。三轮独立复审最终 **P0=0/P1=0**。
+- **明确未完成**：Main/preload wiring 仍只有源码级专项证明，尚未经过真实 Electron IPC；动作路由、pending Changes admission、结构确认 capability、骨架三态事务、Navigation Renderer、旧公开 Plan 移除、真实 Electron 和作者验收都未完成。当前不是发布候选。
+- **下一执行顺序**：先完成 open/Research/Changes Main-owned handoff 与结构骨架全有或全无事务，再实现 Renderer 双模式和移除公开旧 Plan；随后运行完整回归、真实 Electron 与两段作者验收。
 
 ### 0.0BY 2026-07-31 · 旧 Plan 产品假设失效与写作导航合同冻结
 

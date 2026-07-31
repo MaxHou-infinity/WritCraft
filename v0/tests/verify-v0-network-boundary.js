@@ -10,6 +10,7 @@ const read = relative => fs.readFileSync(path.join(root, relative), 'utf8');
 const main = read('src/main/main.js');
 const changesHistoryHandler = read('src/main/changes-history-handler.js');
 const projectPlanHandler = read('src/main/project-plan-handler.js');
+const writingNavigationHandler = read('src/main/writing-navigation-handler.js');
 const projectOnboardingHandler = read('src/main/project-onboarding-handler.js');
 const diagnosticExportHandler = read('src/main/diagnostic-export-handler.js');
 const preload = read('src/main/preload.js');
@@ -31,6 +32,12 @@ function handler(channel) {
   if (channel === 'writcraft:project:propose-plan') {
     assert(main.slice(start, start + 320).includes('projectPlanHandler.createProposePlanHandler({'));
     return projectPlanHandler;
+  }
+  if (channel === 'writcraft:project:propose-writing-navigation') {
+    assert(main.slice(start, start + 900).includes(
+      'writingNavigationHandlerService.createProposeWritingNavigationHandler({'
+    ));
+    return writingNavigationHandler;
   }
   if (channel === 'writcraft:project:propose-onboarding') {
     assert(main.slice(start, start + 900).includes('projectOnboardingHandler.createProposeOnboardingHandler({'));
@@ -171,6 +178,7 @@ test('renderer context IPC is schema-checked and byte-bounded before project rea
 
 test('every project AI generation handler rejects a foreign instance before model work', () => {
   for (const channel of [
+    'writcraft:project:propose-writing-navigation',
     'writcraft:project:propose-plan',
     'writcraft:project:handoff-plan-task',
     'writcraft:project:propose-chapter',

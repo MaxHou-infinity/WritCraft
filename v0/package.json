@@ -46,6 +46,7 @@
     "manual:inline": "node scripts/launch-inline-manual.js",
     "verify:onboarding-v2-renderer": "node tests/verify-v0-onboarding-state.js && node tests/verify-v0-project-onboarding-ui.js && node tests/verify-v0-onboarding-renderer-dynamic.js",
     "verify:plan": "node tests/verify-v0-project-plan.js && node tests/verify-v0-plan-handoff.js && node tests/verify-v0-plan-handoff-transaction.js && node tests/verify-v0-plan-mode-ui.js && node tests/verify-v0-assistant-integration.js",
+    "verify:navigation": "node tests/verify-v0-writing-navigation-service.js && node tests/verify-v0-writing-navigation-store.js && node tests/verify-v0-writing-navigation-provider-adapter.js && node tests/verify-v0-writing-navigation-handler.js && node tests/verify-v0-writing-navigation-main-wiring.js && node tests/verify-v0-writing-navigation-zero-write.js",
     "verify:research-renderer": "node tests/verify-v0-sources-ui.js && node tests/verify-v0-research-handoff-renderer.js",
     "verify:research-main": "node tests/verify-v0-research-service.js && node tests/verify-v0-research-handoff.js && node tests/verify-v0-research-apply-transaction.js && node tests/verify-v0-research-judgment-transaction.js && node tests/verify-v0-project-watcher-health.js",
     "verify:graph-renderer": "node tests/verify-v0-graph-filter-state.js && node tests/verify-v0-graph-workbench.js && node tests/verify-v0-graph-renderer-dynamic.js && node tests/verify-v0-large-project.js",
