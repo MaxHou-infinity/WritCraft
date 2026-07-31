@@ -75,7 +75,7 @@
 5. 修复旅程中发现的 P0/P1 阻断项；P2 必须明确记录、分级并决定是否允许发版。
 6. 记录内容无关的私有指标：Inline 接受率、Plan 采用、Research 匹配判断、图片评分/采纳、耗时和稳定错误码。
 
-当前执行注记（2026-07-31）：项目卡、Inline 与 Chapter 已关闭。`054ce2b` 已让真实 MiniMax 接受 named tool 请求，但第七副本 operation `706fa3e5529d4cda9cf0e2c3ecfe211c` 在 54,660 ms 后返回 `stop_reason=max_tokens`；这是第七次 Plan 零写入失败，`changes.json` 仍停在 Chapter 接受时间。根因是原合法生成空间可达约 419 KiB，与 8192-token 预算不闭合；0.0BV 的 13,758-byte 初稿仍不足以证明 token 闭合。0.0BW 将单次迭代的生成/Main/Renderer 上限同步收敛为 2 个里程碑、每个 2 个任务、每任务最多 2 个目标；Schema/Main 拒绝 C0 控制字符和孤立 surrogate，Main/Renderer 按 code point 与 Schema 对齐后，填满全部唯一 Emoji 列表/叙述字段、唯一 80 字符 Emoji 路径与 ID 的最大合法 fixture 为精确 6,120 bytes（低于 6 KiB），且路径上限覆盖当前作者项目。唯一目标上限与结构真实可达值统一为 8。不提高 token 上限、不自动重试截断，也不回退文本 JSON或本地修补。默认调用已经是 MiniMax-M3；在中国区公开文档未确认 M3/1M 上下文合同前，不放宽当前显式 8 文件/240 KiB 的 Plan 上下文安全门禁。MiniMax adapter 17/17、Plan 25/25、UI 16/16、handoff 15/15 + 5/5、Assistant 11/11、完整 test/verify 与强制真实 Electron 37/37 均通过；独立终审 P0/P1/P2=0。生产修复已提交为 exact candidate `c6d8c44` 并从该提交重启开发 App；当前只待一次相同目标 provider canary。此前不得点击旧错误页重试或重复前三段。
+当前执行注记（2026-07-31）：项目卡、Inline 与 Chapter 已关闭。0.0BW candidate `c6d8c44` 已把 Plan 最大合法工具 input 收敛为 6,120 bytes，但最新真实 operation `b915291982d14f8bb5520674280b3d0d` 在 13,590 ms 后因首任务 `dependsOn` 含自然语言失败；before/after 0，`changes.json` 未变化，这是第八次 Plan 零写入失败。0.0BX 为 milestone/task ID 与依赖补齐精确短 ASCII Schema、说明、唯一性和 Main 不 trim 校验；首个任务必须无依赖，后续只能引用此前任务 ID。依赖结构与数组 shape 共享一次有界重试，重试不回显失败 input、第二次失败终止、绝不第三次调用。Plan 26/26、handoff 15/15、UI 16/16、完整 test/verify 和强制真实 Electron 37/37 通过，独立终审 P0/P1/P2=0；候选提交/重启和一次新 provider canary 尚待完成。默认模型仍为 MiniMax-M3，8 文件/240 KiB 上下文门禁不变。此前不得点击旧错误页重试或重复前三段。
 
 ### 4.3 明确不做
 

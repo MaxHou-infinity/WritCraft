@@ -39,11 +39,12 @@ const LIMITS = Object.freeze({
   path: 80,
 });
 
-const ID_PATTERN = /^[a-z][a-z0-9_-]{0,63}$/;
+const ID_PATTERN = /^[a-z][a-z0-9_-]{0,31}$/;
 
 const STRING_LIST_SCHEMA = Object.freeze({
   type: 'array',
   maxItems: MAX_LIST_ITEMS,
+  uniqueItems: true,
   items: {
     type: 'string', minLength: 1, maxLength: LIMITS.listItem, pattern: SAFE_TEXT_PATTERN.source,
   },
@@ -71,7 +72,12 @@ const PLAN_INPUT_SCHEMA = Object.freeze({
         additionalProperties: false,
         required: ['id', 'title', 'objective', 'acceptanceCriteria', 'tasks'],
         properties: {
-          id: { type: 'string', pattern: ID_PATTERN.source, maxLength: LIMITS.id },
+          id: {
+            type: 'string',
+            pattern: ID_PATTERN.source,
+            maxLength: LIMITS.id,
+            description: '短 ASCII 标识，例如 m1；不是标题或说明。',
+          },
           title: {
             type: 'string', minLength: 1, maxLength: LIMITS.title, pattern: SAFE_TEXT_PATTERN.source,
           },
@@ -82,6 +88,7 @@ const PLAN_INPUT_SCHEMA = Object.freeze({
             type: 'array',
             minItems: 1,
             maxItems: MAX_LIST_ITEMS,
+            uniqueItems: true,
             items: {
               type: 'string',
               minLength: 1,
@@ -100,7 +107,12 @@ const PLAN_INPUT_SCHEMA = Object.freeze({
                 'id', 'title', 'description', 'scope', 'targetPaths', 'dependsOn', 'acceptanceCriteria',
               ],
               properties: {
-                id: { type: 'string', pattern: ID_PATTERN.source, maxLength: LIMITS.id },
+                id: {
+                  type: 'string',
+                  pattern: ID_PATTERN.source,
+                  maxLength: LIMITS.id,
+                  description: '短 ASCII 任务标识，例如 t1；不是标题或说明。',
+                },
                 title: {
                   type: 'string', minLength: 1, maxLength: LIMITS.title, pattern: SAFE_TEXT_PATTERN.source,
                 },
@@ -114,6 +126,7 @@ const PLAN_INPUT_SCHEMA = Object.freeze({
                 targetPaths: {
                   type: 'array',
                   maxItems: MAX_TASK_TARGETS,
+                  uniqueItems: true,
                   items: {
                     type: 'string',
                     minLength: 1,
@@ -124,12 +137,21 @@ const PLAN_INPUT_SCHEMA = Object.freeze({
                 dependsOn: {
                   type: 'array',
                   maxItems: MAX_DEPENDENCIES,
-                  items: { type: 'string', minLength: 1, maxLength: LIMITS.id },
+                  uniqueItems: true,
+                  description: '只填写输出顺序中此前任务的精确 id。首个任务必须为 []；不要填写标题、说明或句子。',
+                  items: {
+                    type: 'string',
+                    minLength: 1,
+                    maxLength: LIMITS.id,
+                    pattern: ID_PATTERN.source,
+                    description: '此前任务的精确短 id，例如 t1。',
+                  },
                 },
                 acceptanceCriteria: {
                   type: 'array',
                   minItems: 1,
                   maxItems: MAX_LIST_ITEMS,
+                  uniqueItems: true,
                   items: {
                     type: 'string',
                     minLength: 1,
@@ -239,6 +261,33 @@ function boundedStringList(value, label, {
     if (seen.has(normalized)) fail('INVALID_MODEL_OUTPUT', `${label}不能包含重复项`);
     seen.add(normalized);
     return normalized;
+  });
+}
+
+function exactIdentifier(value, label, reason = undefined) {
+  if (typeof value !== 'string' ||
+      !SAFE_TEXT_PATTERN.test(value) ||
+      Array.from(value).length < 1 ||
+      Array.from(value).length > LIMITS.id ||
+      !ID_PATTERN.test(value)) {
+    fail('INVALID_MODEL_OUTPUT', `${label}必须是短 ASCII ID`, reason);
+  }
+  return value;
+}
+
+function exactIdentifierList(value, label, {
+  maxItems = MAX_DEPENDENCIES,
+  reason = undefined,
+} = {}) {
+  if (!Array.isArray(value) || value.length > maxItems) {
+    fail('INVALID_MODEL_OUTPUT', `${label}必须是 0–${maxItems} 项的数组`, reason);
+  }
+  const seen = new Set();
+  return value.map((item, index) => {
+    const identifier = exactIdentifier(item, `${label}第 ${index + 1} 项`, reason);
+    if (seen.has(identifier)) fail('INVALID_MODEL_OUTPUT', `${label}不能包含重复项`, reason);
+    seen.add(identifier);
+    return identifier;
   });
 }
 
@@ -371,8 +420,8 @@ function validateModelPlan(parsed, availablePaths) {
   const milestones = parsed.milestones.map((rawMilestone, milestoneIndex) => {
     const label = `里程碑 ${milestoneIndex + 1}`;
     assertExactKeys(rawMilestone, ['id', 'title', 'objective', 'acceptanceCriteria', 'tasks'], label);
-    const id = boundedString(rawMilestone.id, `${label} ID`, LIMITS.id);
-    if (!ID_PATTERN.test(id) || allIds.has(id)) fail('INVALID_MODEL_OUTPUT', `${label} ID 无效或重复`);
+    const id = exactIdentifier(rawMilestone.id, `${label} ID`, 'STRUCTURE_SHAPE');
+    if (allIds.has(id)) fail('INVALID_MODEL_OUTPUT', `${label} ID 无效或重复`, 'STRUCTURE_SHAPE');
     allIds.add(id);
     if (!Array.isArray(rawMilestone.tasks) || !rawMilestone.tasks.length || rawMilestone.tasks.length > MAX_TASKS_PER_MILESTONE) {
       fail('INVALID_MODEL_OUTPUT', `${label}任务应为 1–${MAX_TASKS_PER_MILESTONE} 项`, 'STRUCTURE_SHAPE');
@@ -385,8 +434,10 @@ function validateModelPlan(parsed, availablePaths) {
       assertExactKeys(rawTask, [
         'id', 'title', 'description', 'scope', 'targetPaths', 'dependsOn', 'acceptanceCriteria',
       ], taskLabel);
-      const taskId = boundedString(rawTask.id, `${taskLabel} ID`, LIMITS.id);
-      if (!ID_PATTERN.test(taskId) || allIds.has(taskId)) fail('INVALID_MODEL_OUTPUT', `${taskLabel} ID 无效或重复`);
+      const taskId = exactIdentifier(rawTask.id, `${taskLabel} ID`, 'STRUCTURE_SHAPE');
+      if (allIds.has(taskId)) {
+        fail('INVALID_MODEL_OUTPUT', `${taskLabel} ID 无效或重复`, 'STRUCTURE_SHAPE');
+      }
       const scope = boundedString(rawTask.scope, `${taskLabel}范围`, 20);
       if (!TASK_SCOPES.includes(scope)) fail('INVALID_MODEL_OUTPUT', `${taskLabel}范围无效`);
       const targetPaths = boundedStringList(rawTask.targetPaths, `${taskLabel}目标文件`, {
@@ -398,13 +449,17 @@ function validateModelPlan(parsed, availablePaths) {
           fail('INVALID_MODEL_OUTPUT', `${taskLabel}引用了不存在的 Markdown 文件`);
         }
       }
-      const dependsOn = boundedStringList(rawTask.dependsOn, `${taskLabel}依赖`, {
+      const dependsOn = exactIdentifierList(rawTask.dependsOn, `${taskLabel}依赖`, {
         maxItems: MAX_DEPENDENCIES,
-        maxChars: LIMITS.id,
+        reason: 'STRUCTURE_SHAPE',
       });
       for (const dependency of dependsOn) {
         if (!ID_PATTERN.test(dependency) || !priorTaskIds.has(dependency)) {
-          fail('INVALID_MODEL_OUTPUT', `${taskLabel}只能依赖计划中已经出现的任务`);
+          fail(
+            'INVALID_MODEL_OUTPUT',
+            `${taskLabel}依赖必须只包含此前任务的短 ID`,
+            'STRUCTURE_SHAPE'
+          );
         }
       }
       const task = {
@@ -448,14 +503,14 @@ function planPrompt(request, available, files, formatRetry = false) {
     '每个里程碑和每个任务都必须包含示例中的全部字段；有多个里程碑或任务时，每一项都必须遵守同一结构。',
     'assumptions、openQuestions、milestones、每个里程碑的 acceptanceCriteria/tasks，以及每个任务的 targetPaths/dependsOn/acceptanceCriteria 必须始终是 JSON 数组；不得用字符串、null 或对象代替。',
     'targetPaths 只能引用下方已提供或项目中已存在的 Markdown 路径；不确定时必须返回 []，不得返回路径字符串。',
-    'dependsOn 只能引用输出顺序中已经出现的任务 ID。',
+    'dependsOn 只能填写输出顺序中已经出现的任务短 ID（例如 t1），不得填写任务标题、说明或自然语言句子；整个计划的第一个任务必须是 []，没有直接前置任务时也使用 []。',
     `任务 scope 只能是：${TASK_SCOPES.join(', ')}。`,
     `必须且只能调用 ${PLAN_TOOL_NAME} 一次，把完整计划放入工具 input；不要在文本中输出 JSON 或计划正文。`,
     '工具 input 不得新增 schema 之外的字段。',
     `保持计划紧凑：使用 1–${MAX_MILESTONES} 个里程碑，每个里程碑 1–${MAX_TASKS_PER_MILESTONE} 个任务；每个任务最多绑定 ${MAX_TASK_TARGETS} 个文件。说明和验收标准只写执行所需信息，不写背景复述。`,
     ...(formatRetry ? [
-      '上一轮工具 input 未通过数组结构校验。本轮是唯一一次结构重试：不要复述或修补上一轮输出，重新调用工具并提交一个完整计划。',
-      '特别检查每一个任务，而不只是第一个任务：targetPaths、dependsOn、acceptanceCriteria 都必须使用 JSON 数组；没有目标文件时使用 []。',
+      '上一轮工具 input 未通过结构合同。本轮是唯一一次结构重试：不要复述或修补上一轮输出，重新调用工具并提交一个完整计划。',
+      '特别检查每一个任务，而不只是第一个任务：targetPaths、dependsOn、acceptanceCriteria 都必须使用 JSON 数组；首个任务的 dependsOn 必须是 []，其余依赖只能是此前任务的短 ID；没有目标文件时使用 []。',
     ] : []),
     `用户目标：${request.goal}`,
     `项目中可引用的 Markdown 路径：${JSON.stringify([...available].sort())}`,

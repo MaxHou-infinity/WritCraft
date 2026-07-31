@@ -330,6 +330,33 @@ async function run() {
         PLAN_INPUT_SCHEMA.properties.milestones.items.properties.tasks.items.properties.dependsOn.maxItems,
         MAX_DEPENDENCIES
       );
+      assert.strictEqual(
+        PLAN_INPUT_SCHEMA.properties.milestones.items.properties.tasks.items.properties.dependsOn.items.pattern,
+        '^[a-z][a-z0-9_-]{0,31}$'
+      );
+      assert.strictEqual(
+        PLAN_INPUT_SCHEMA.properties.milestones.items.properties.tasks.items.properties.dependsOn.uniqueItems,
+        true
+      );
+      assert.strictEqual(PLAN_INPUT_SCHEMA.properties.assumptions.uniqueItems, true);
+      assert.strictEqual(
+        PLAN_INPUT_SCHEMA.properties.milestones.items.properties.acceptanceCriteria.uniqueItems,
+        true
+      );
+      assert.strictEqual(
+        PLAN_INPUT_SCHEMA.properties.milestones.items.properties.tasks.items.properties.targetPaths.uniqueItems,
+        true
+      );
+      assert.strictEqual(
+        PLAN_INPUT_SCHEMA.properties.milestones.items.properties.tasks.items.properties.acceptanceCriteria.uniqueItems,
+        true
+      );
+      assert(
+        PLAN_INPUT_SCHEMA.properties.milestones.items.properties.tasks.items.properties.dependsOn.description
+          .includes('首个任务必须为 []')
+      );
+      assert(prompt.includes('不得填写任务标题、说明或自然语言句子'));
+      assert(prompt.includes('整个计划的第一个任务必须是 []'));
     } finally {
       fs.rmSync(root, { recursive: true, force: true });
     }
@@ -453,6 +480,46 @@ async function run() {
       }));
       assert.strictEqual(rejectedCalls, 2, 'one operation must never make a third provider call');
 
+      assert.deepStrictEqual(snapshotTree(root), before);
+    } finally {
+      fs.rmSync(root, { recursive: true, force: true });
+    }
+  });
+
+  await test('retries an invalid natural-language dependency once without echoing or writing it', async () => {
+    const root = makeProject();
+    try {
+      const before = snapshotTree(root);
+      const malformed = validPlan();
+      malformed.milestones[0].tasks[0].dependsOn = ['先完成项目结构梳理和资料核对后再开始本任务'];
+      const calls = [];
+      const result = await proposeProjectPlan({
+        projectService,
+        rootPath: root,
+        goal: '规划第一章',
+        callLLM: async messages => {
+          calls.push(messages[0].content);
+          return calls.length === 1 ? modelResponse(malformed) : modelResponse();
+        },
+      });
+      assert.strictEqual(result.ok, true);
+      assert.strictEqual(calls.length, 2);
+      assert(calls[1].includes('首个任务的 dependsOn 必须是 []'));
+      assert(calls[1].includes('其余依赖只能是此前任务的短 ID'));
+      assert(!calls[1].includes('先完成项目结构梳理'));
+      assert.deepStrictEqual(snapshotTree(root), before);
+
+      let rejectedCalls = 0;
+      await expectCode('INVALID_MODEL_OUTPUT', () => proposeProjectPlan({
+        projectService,
+        rootPath: root,
+        goal: '验证依赖结构重试上限',
+        callLLM: async () => {
+          rejectedCalls += 1;
+          return modelResponse(malformed);
+        },
+      }));
+      assert.strictEqual(rejectedCalls, 2, 'dependency failure must never make a third provider call');
       assert.deepStrictEqual(snapshotTree(root), before);
     } finally {
       fs.rmSync(root, { recursive: true, force: true });
@@ -825,7 +892,13 @@ async function run() {
     missing.milestones[0].tasks[1].dependsOn = ['missing'];
     const forward = validPlan();
     forward.milestones[0].tasks[0].dependsOn = ['t2'];
-    for (const plan of [self, missing, forward]) {
+    const spacedMilestone = validPlan();
+    spacedMilestone.milestones[0].id = ' m1 ';
+    const spacedTask = validPlan();
+    spacedTask.milestones[0].tasks[0].id = ' t1 ';
+    const spacedDependency = validPlan();
+    spacedDependency.milestones[0].tasks[1].dependsOn = [' t1 '];
+    for (const plan of [self, missing, forward, spacedMilestone, spacedTask, spacedDependency]) {
       assert.throws(() => parseModelJson(JSON.stringify(plan), available), error => error.code === 'INVALID_MODEL_OUTPUT');
     }
     assert.deepStrictEqual(parseModelJson(JSON.stringify(validPlan()), available).milestones[0].tasks[1].dependsOn, ['t1']);
