@@ -36,6 +36,8 @@ const writingNavigationService = require('./writing-navigation-service');
 const writingNavigationStoreService = require('./writing-navigation-store');
 const writingNavigationHandlerService = require('./writing-navigation-handler');
 const writingNavigationProviderAdapter = require('./writing-navigation-provider-adapter');
+const writingNavigationHandoffService = require('./writing-navigation-handoff-service');
+const writingNavigationActionHandlerService = require('./writing-navigation-action-handler');
 const projectChangesProposalService = require('./project-changes-proposal-service');
 const localizedEditService = require('./localized-edit-service');
 const graphIndexService = require('./graph-index-service');
@@ -324,6 +326,7 @@ function projectFailure(error) {
     error instanceof projectPlanHandoffService.ProjectPlanHandoffError ||
     error instanceof writingNavigationService.WritingNavigationError ||
     error instanceof writingNavigationStoreService.WritingNavigationStoreError ||
+    error instanceof writingNavigationHandoffService.WritingNavigationHandoffError ||
     error instanceof projectChangesProposalService.ProjectChangesProposalError ||
     error instanceof localizedEditService.LocalizedEditError ||
     error instanceof changeSetService.ChangeSetError ||
@@ -1991,6 +1994,40 @@ ipcMain.handle('writcraft:project:propose-writing-navigation',
     writingNavigationStore,
     projectService,
     projectCallLLM: writingNavigationProjectCallLLM,
+    staleAiProjectResult,
+    projectFailure,
+  })
+);
+
+ipcMain.handle('writcraft:project:run-writing-navigation-action',
+  writingNavigationActionHandlerService.createWritingNavigationActionHandler({
+    assertTrustedSender,
+    requireCurrentProject,
+    getCurrentProject: () => currentProject,
+    getMutationGeneration: () => projectMutationGeneration,
+    getRendererNavigationEpoch: () => rendererNavigationEpoch,
+    settleProjectAuthority: settleWritingNavigationAuthority,
+    writingNavigationStore,
+    handoffService: writingNavigationHandoffService,
+    projectService,
+    projectCallLLM: writingNavigationProjectCallLLM,
+    changeSetService,
+    pendingChangeSets,
+    cacheReview: cacheReviewedChangeSet,
+    discardReview: (capability, reason) => pendingChangeSets.delete(capability, reason),
+    staleAiProjectResult,
+    projectFailure,
+  })
+);
+
+ipcMain.handle('writcraft:project:cancel-writing-navigation-action',
+  writingNavigationActionHandlerService.createCancelWritingNavigationActionHandler({
+    assertTrustedSender,
+    requireCurrentProject,
+    getMutationGeneration: () => projectMutationGeneration,
+    getRendererNavigationEpoch: () => rendererNavigationEpoch,
+    writingNavigationStore,
+    handoffService: writingNavigationHandoffService,
     staleAiProjectResult,
     projectFailure,
   })

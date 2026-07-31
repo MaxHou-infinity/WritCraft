@@ -1,0 +1,416 @@
+'use strict';
+
+const assert = require('assert');
+const crypto = require('crypto');
+const navigationService = require('../src/main/writing-navigation-service');
+const navigationStoreService = require('../src/main/writing-navigation-store');
+const handoffService = require('../src/main/writing-navigation-handoff-service');
+const handlerModule = require('../src/main/writing-navigation-action-handler');
+const changeSetService = require('../src/main/changeset-service');
+
+let passed = 0;
+async function test(name, fn) {
+  try {
+    await fn();
+    passed += 1;
+    console.log(`✓ ${name}`);
+  } catch (error) {
+    console.error(`✗ ${name}`);
+    throw error;
+  }
+}
+
+const PROJECT = Object.freeze({
+  instanceId: 'instance_0123456789abcdef01234567',
+  rootPath: '/tmp/writcraft-navigation-action',
+});
+const EVENT = Object.freeze({ sender: Object.freeze({ id: 7 }) });
+const OWNER = 'webcontents:7';
+const CHAPTER = '# 第一章\n\n这是作者已经写下的正文证据。\n';
+
+function revision(content) {
+  return crypto.createHash('sha256').update(content).digest('hex');
+}
+
+function fakeProject() {
+  const files = new Map([
+    ['edit.md', '# 项目说明\n\n项目 Prompt。\n'],
+    ['chapters/01.md', CHAPTER],
+  ]);
+  return {
+    files,
+    listTree: () => [
+      { type: 'file', path: 'edit.md' },
+      {
+        type: 'directory',
+        path: 'chapters',
+        children: [{ type: 'file', path: 'chapters/01.md' }],
+      },
+    ],
+    readFileWithRevision(_root, filePath) {
+      if (!files.has(filePath)) throw new Error('NOT_FOUND');
+      const content = files.get(filePath);
+      return { content, revision: revision(content) };
+    },
+  };
+}
+
+async function setup(action, overrides = {}) {
+  const projectService = fakeProject();
+  const store = navigationStoreService.createWritingNavigationStore();
+  const proposal = await navigationService.proposeWritingNavigation({
+    projectService,
+    rootPath: PROJECT.rootPath,
+    request: {
+      schema: navigationService.REQUEST_SCHEMA,
+      mode: 'navigation',
+      goal: '告诉我下一步',
+      currentFilePath: 'chapters/01.md',
+      contextPaths: [],
+    },
+    callLLM: async () => ({
+      ok: true,
+      stopReason: 'tool_use',
+      toolUseBlockCount: 1,
+      toolUse: {
+        name: navigationService.TOOL_NAME,
+        input: {
+          mode: 'navigation',
+          suggestions: [{
+            finding: '当前段落还缺少具体例子。',
+            evidence: [{
+              relativePath: 'chapters/01.md',
+              sectionHeading: '第一章',
+              quote: '作者已经写下的正文证据',
+            }],
+            whyNow: '现在补充便于后文展开。',
+            recommendedAction: '补充一个具体例子。',
+            expectedResult: '读者更容易理解。',
+            action,
+          }],
+        },
+      },
+    }),
+  });
+  let currentProject = PROJECT;
+  let generation = 5;
+  let navigationEpoch = 2;
+  let pending = false;
+  let modelCalls = 0;
+  let cacheCalls = 0;
+  const discarded = [];
+  const installed = store.install({
+    ownerId: OWNER,
+    projectInstanceId: PROJECT.instanceId,
+    rootPath: PROJECT.rootPath,
+    mutationGeneration: generation,
+    navigationEpoch,
+    record: proposal.record,
+  });
+  const options = {
+    assertTrustedSender() {},
+    requireCurrentProject: () => currentProject,
+    getCurrentProject: () => currentProject,
+    getMutationGeneration: () => generation,
+    getRendererNavigationEpoch: () => navigationEpoch,
+    settleProjectAuthority: async () => {},
+    writingNavigationStore: store,
+    handoffService,
+    projectService,
+    projectCallLLM: () => async () => {
+        modelCalls += 1;
+        return {
+          ok: true,
+          stopReason: 'end_turn',
+          text: JSON.stringify({
+            edits: [{
+              path: 'chapters/01.md',
+              oldText: '这是作者已经写下的正文证据。',
+              newText: '这是作者已经写下的正文证据，例如一次真实访谈。',
+              summary: '补充例子',
+            }],
+          }),
+        };
+      },
+    changeSetService,
+    pendingChangeSets: {
+      hasForRoot: () => pending,
+    },
+    cacheReview(changeSet, _project, metadata) {
+      cacheCalls += 1;
+      return {
+        capability: `pc_${'a'.repeat(32)}`,
+        review: {
+          changeSetId: `pc_${'a'.repeat(32)}`,
+          files: changeSet.changes.map(change => ({ path: change.path })),
+        },
+        metadata,
+      };
+    },
+    discardReview(capability, reason) {
+      discarded.push({ capability, reason });
+    },
+    staleAiProjectResult: () => ({ ok: false, error: 'PROJECT_CHANGED' }),
+    projectFailure: error => ({
+      ok: false,
+      error: typeof error?.code === 'string' ? error.code : 'NAVIGATION_ACTION_FAILED',
+      message: '动作没有完成',
+    }),
+    ...overrides,
+  };
+  const rawHandler = handlerModule.createWritingNavigationActionHandler(options);
+  const rawCancelHandler = handlerModule.createCancelWritingNavigationActionHandler(options);
+  let attemptSequence = 0;
+  const nextAttempt = () => {
+    attemptSequence += 1;
+    return `wno_${attemptSequence.toString(16).padStart(32, '0')}`;
+  };
+  return {
+    handler: (event, projectInstanceId, actionId, attemptId = nextAttempt()) =>
+      rawHandler(event, projectInstanceId, actionId, attemptId),
+    cancelHandler: (event, projectInstanceId, actionId, attemptId) =>
+      rawCancelHandler(event, projectInstanceId, actionId, attemptId),
+    nextAttempt,
+    store,
+    actionId: installed.suggestions[0].actionId,
+    projectService,
+    get modelCalls() { return modelCalls; },
+    get cacheCalls() { return cacheCalls; },
+    discarded,
+    setPending(value) { pending = value; },
+    setGeneration(value) { generation = value; },
+    setProject(value) { currentProject = value; },
+    binding(extra = {}) {
+      return {
+        ownerId: OWNER,
+        projectInstanceId: PROJECT.instanceId,
+        rootPath: PROJECT.rootPath,
+        mutationGeneration: generation,
+        navigationEpoch,
+        ...extra,
+      };
+    },
+  };
+}
+
+(async () => {
+  console.log('\nWriting navigation action handler verification');
+
+  await test('open is local, zero-model and repeatable', async () => {
+    const state = await setup('open');
+    const first = await state.handler(EVENT, PROJECT.instanceId, state.actionId);
+    const second = await state.handler(EVENT, PROJECT.instanceId, state.actionId);
+    assert.strictEqual(first.kind, 'open');
+    assert.strictEqual(second.kind, 'open');
+    assert.strictEqual(state.modelCalls, 0);
+  });
+
+  await test('research returns one evidence-bound handoff and consumes its action', async () => {
+    const state = await setup('research');
+    const first = await state.handler(EVENT, PROJECT.instanceId, state.actionId);
+    assert.strictEqual(first.kind, 'research');
+    assert.strictEqual(first.handoff.evidence[0].path, 'chapters/01.md');
+    const replay = await state.handler(EVENT, PROJECT.instanceId, state.actionId);
+    assert.strictEqual(replay.error, 'ACTION_NOT_FOUND');
+  });
+
+  await test('an existing Changes review is preserved and the same action can retry', async () => {
+    const state = await setup('changes');
+    state.setPending(true);
+    const blocked = await state.handler(EVENT, PROJECT.instanceId, state.actionId);
+    assert.strictEqual(blocked.error, 'REVIEW_IN_PROGRESS');
+    assert.strictEqual(state.modelCalls, 0);
+    state.setPending(false);
+    const retry = await state.handler(EVENT, PROJECT.instanceId, state.actionId);
+    assert.strictEqual(retry.ok, true);
+    assert.strictEqual(retry.noChanges, false);
+  });
+
+  await test('changes makes one model call and installs one review', async () => {
+    const state = await setup('changes');
+    const result = await state.handler(EVENT, PROJECT.instanceId, state.actionId);
+    assert.strictEqual(result.ok, true);
+    assert.strictEqual(result.changeSetId, `pc_${'a'.repeat(32)}`);
+    assert.strictEqual(state.modelCalls, 1);
+    assert.strictEqual(state.cacheCalls, 1);
+  });
+
+  await test('a pending review arriving during generation wins without replacement', async () => {
+    let state;
+    state = await setup('changes', {
+      projectCallLLM: () => async () => {
+        state.setPending(true);
+        return {
+          ok: true,
+          stopReason: 'end_turn',
+          text: JSON.stringify({ edits: [{
+            path: 'chapters/01.md',
+            oldText: '这是作者已经写下的正文证据。',
+            newText: '新的内容。',
+            summary: '修改',
+          }] }),
+        };
+      },
+    });
+    const result = await state.handler(EVENT, PROJECT.instanceId, state.actionId);
+    assert.strictEqual(result.error, 'REVIEW_IN_PROGRESS');
+    assert.strictEqual(state.cacheCalls, 0);
+  });
+
+  await test('generation drift cannot install a late Changes review', async () => {
+    let state;
+    state = await setup('changes', {
+      projectCallLLM: () => async () => {
+        state.setGeneration(6);
+        return { ok: true, stopReason: 'end_turn', text: '{"edits":[]}' };
+      },
+    });
+    const result = await state.handler(EVENT, PROJECT.instanceId, state.actionId);
+    assert.strictEqual(result.error, 'PROJECT_CHANGED');
+    assert.strictEqual(state.cacheCalls, 0);
+  });
+
+  await test('changes deadline aborts the innermost provider and leaves no review', async () => {
+    let providerSignal = null;
+    let providerCalls = 0;
+    const state = await setup('changes', {
+      projectCallLLM: () => async (_messages, _model, _maxTokens, options) => {
+        providerCalls += 1;
+        providerSignal = options.signal;
+        return new Promise(() => {});
+      },
+      deadlineMs: 1,
+      setTimer(callback) {
+        queueMicrotask(callback);
+        return 1;
+      },
+      clearTimer() {},
+    });
+    const result = await state.handler(EVENT, PROJECT.instanceId, state.actionId);
+    assert.strictEqual(result.error, 'TIMEOUT');
+    assert.strictEqual(providerSignal.aborted, true);
+    assert.strictEqual(state.cacheCalls, 0);
+    const retry = await state.handler(EVENT, PROJECT.instanceId, state.actionId);
+    assert.strictEqual(retry.error, 'TIMEOUT');
+    assert.strictEqual(providerCalls, 2);
+  });
+
+  await test('explicit owner-bound cancel aborts one request and preserves a retry', async () => {
+    let providerCalls = 0;
+    let firstSignal = null;
+    const state = await setup('changes', {
+      projectCallLLM: () => async (_messages, _model, _maxTokens, options) => {
+        providerCalls += 1;
+        if (providerCalls === 1) {
+          firstSignal = options.signal;
+          return new Promise(() => {});
+        }
+        return { ok: true, stopReason: 'end_turn', text: '{"edits":[]}' };
+      },
+    });
+    const attemptId = state.nextAttempt();
+    const running = state.handler(EVENT, PROJECT.instanceId, state.actionId, attemptId);
+    while (!firstSignal) await new Promise(resolve => setImmediate(resolve));
+    const foreign = await state.cancelHandler(
+      { sender: { id: 8 } },
+      PROJECT.instanceId,
+      state.actionId,
+      attemptId
+    );
+    assert.strictEqual(foreign.error, 'ACTION_NOT_FOUND');
+    assert.strictEqual(firstSignal.aborted, false);
+    const cancelled = await state.cancelHandler(
+      EVENT,
+      PROJECT.instanceId,
+      state.actionId,
+      attemptId
+    );
+    assert.deepStrictEqual(cancelled, { ok: true, cancelled: true });
+    const first = await running;
+    assert.strictEqual(first.error, 'REQUEST_ABORTED');
+    assert.strictEqual(firstSignal.aborted, true);
+    const retry = await state.handler(EVENT, PROJECT.instanceId, state.actionId);
+    assert.strictEqual(retry.ok, true);
+    assert.strictEqual(retry.noChanges, true);
+  });
+
+  await test('provider failure preserves the current action for an explicit retry', async () => {
+    let providerCalls = 0;
+    const state = await setup('changes', {
+      projectCallLLM: () => async () => {
+        providerCalls += 1;
+        return providerCalls === 1
+          ? { ok: false, error: 'LLM_FAILED' }
+          : { ok: true, stopReason: 'end_turn', text: '{"edits":[]}' };
+      },
+    });
+    const failed = await state.handler(EVENT, PROJECT.instanceId, state.actionId);
+    assert.strictEqual(failed.error, 'LLM_FAILED');
+    const retry = await state.handler(EVENT, PROJECT.instanceId, state.actionId);
+    assert.strictEqual(retry.ok, true);
+    assert.strictEqual(retry.noChanges, true);
+  });
+
+  await test('attempt A late cancel cannot abort active retry B', async () => {
+    let providerCalls = 0;
+    let retrySignal = null;
+    const state = await setup('changes', {
+      projectCallLLM: () => async (_messages, _model, _maxTokens, options) => {
+        providerCalls += 1;
+        if (providerCalls === 1) return { ok: false, error: 'LLM_FAILED' };
+        retrySignal = options.signal;
+        return new Promise(() => {});
+      },
+    });
+    const attemptA = `wno_${'d'.repeat(32)}`;
+    const attemptB = `wno_${'e'.repeat(32)}`;
+    const first = await state.handler(EVENT, PROJECT.instanceId, state.actionId, attemptA);
+    assert.strictEqual(first.error, 'LLM_FAILED');
+    const retry = state.handler(EVENT, PROJECT.instanceId, state.actionId, attemptB);
+    while (!retrySignal) await new Promise(resolve => setImmediate(resolve));
+    const staleCancel = await state.cancelHandler(
+      EVENT,
+      PROJECT.instanceId,
+      state.actionId,
+      attemptA
+    );
+    assert.strictEqual(staleCancel.error, 'ATTEMPT_NOT_ACTIVE');
+    assert.strictEqual(retrySignal.aborted, false);
+    const currentCancel = await state.cancelHandler(
+      EVENT,
+      PROJECT.instanceId,
+      state.actionId,
+      attemptB
+    );
+    assert.strictEqual(currentCancel.ok, true);
+    assert.strictEqual((await retry).error, 'REQUEST_ABORTED');
+  });
+
+  await test('a lost lease after cache rolls back the pending review', async () => {
+    let state;
+    state = await setup('changes', {
+      cacheReview(changeSet) {
+        state.store.invalidateProject({
+          ownerId: OWNER,
+          projectInstanceId: PROJECT.instanceId,
+        });
+        return {
+          capability: `pc_${'b'.repeat(32)}`,
+          review: {
+            changeSetId: `pc_${'b'.repeat(32)}`,
+            files: changeSet.changes.map(change => ({ path: change.path })),
+          },
+        };
+      },
+    });
+    const result = await state.handler(EVENT, PROJECT.instanceId, state.actionId);
+    assert.strictEqual(result.ok, false);
+    assert.strictEqual(state.discarded.length, 1);
+    assert.strictEqual(state.discarded[0].capability, `pc_${'b'.repeat(32)}`);
+  });
+
+  console.log(`\n${passed}/11 writing-navigation action handler checks passed.`);
+})().catch(error => {
+  console.error(error);
+  process.exitCode = 1;
+});

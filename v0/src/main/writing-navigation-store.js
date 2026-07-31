@@ -11,6 +11,7 @@ const DEFAULT_MAX_RESULTS = 8;
 const MAX_RECORD_BYTES = 256 * 1024;
 const NAVIGATION_ID_RE = /^nav_[a-f0-9]{32}$/;
 const ACTION_ID_RE = /^wna_[a-f0-9]{32}$/;
+const ATTEMPT_ID_RE = /^wno_[a-f0-9]{32}$/;
 const LEASE_ID_RE = /^wnl_[a-f0-9]{32}$/;
 const PROJECT_INSTANCE_ID_RE = /^instance_[a-f0-9]{24}$/;
 const ACTIONS = new Set(['open', 'research', 'changes']);
@@ -171,6 +172,7 @@ function createWritingNavigationStore(options = {}) {
       leases.delete(action.leaseId);
       occupiedIds.delete(action.leaseId);
       action.leaseId = null;
+      action.attemptId = null;
     }
   }
 
@@ -248,6 +250,7 @@ function createWritingNavigationStore(options = {}) {
           action: suggestion.action,
           terminated: false,
           leaseId: null,
+          attemptId: null,
         });
       }
     }
@@ -284,10 +287,14 @@ function createWritingNavigationStore(options = {}) {
 
   function acquireAction(raw) {
     const binding = normalizeBinding(raw, [
-      'ownerId', 'projectInstanceId', 'rootPath', 'mutationGeneration', 'navigationEpoch', 'actionId',
+      'ownerId', 'projectInstanceId', 'rootPath', 'mutationGeneration',
+      'navigationEpoch', 'actionId', 'attemptId',
     ]);
     if (typeof raw.actionId !== 'string' || !ACTION_ID_RE.test(raw.actionId)) {
       fail('INVALID_ACTION', '写作导航动作无效');
+    }
+    if (typeof raw.attemptId !== 'string' || !ATTEMPT_ID_RE.test(raw.attemptId)) {
+      fail('INVALID_ATTEMPT', '写作导航执行轮次无效');
     }
     purgeExpired();
     const action = actions.get(raw.actionId);
@@ -321,6 +328,7 @@ function createWritingNavigationStore(options = {}) {
     const controller = new AbortController();
     occupiedIds.add(leaseId);
     action.leaseId = leaseId;
+    action.attemptId = raw.attemptId;
     leases.set(leaseId, {
       actionId: raw.actionId,
       resultKey: action.resultKey,
@@ -382,7 +390,9 @@ function createWritingNavigationStore(options = {}) {
       'ownerId', 'projectInstanceId', 'rootPath', 'mutationGeneration',
       'navigationEpoch', 'leaseId', 'outcome',
     ], 'INVALID_ACTION_SETTLEMENT');
-    if (!['success', 'review_in_progress', 'failed', 'stale'].includes(raw.outcome)) {
+    if (![
+      'success', 'review_in_progress', 'retryable_failure', 'cancelled', 'failed', 'stale',
+    ].includes(raw.outcome)) {
       fail('INVALID_ACTION_SETTLEMENT', '写作导航动作结算无效');
     }
     const { lease, action } = requireLease(raw, [
@@ -393,12 +403,14 @@ function createWritingNavigationStore(options = {}) {
     occupiedIds.delete(raw.leaseId);
     lease.controller.abort();
     action.leaseId = null;
+    action.attemptId = null;
     const reviewBlocked = raw.outcome === 'review_in_progress' && action.action === 'changes';
     if (raw.outcome === 'review_in_progress' && action.action !== 'changes') {
       action.terminated = true;
       fail('INVALID_ACTION_SETTLEMENT', '只有 Changes 动作可以保留待审重试能力');
     }
-    if (!reviewBlocked && action.action !== 'open') {
+    const retryable = ['retryable_failure', 'cancelled'].includes(raw.outcome);
+    if (!reviewBlocked && !retryable && action.action !== 'open') {
       action.terminated = true;
     }
     if (raw.outcome === 'stale') action.terminated = true;
@@ -407,6 +419,44 @@ function createWritingNavigationStore(options = {}) {
       action: action.action,
       consumed: action.terminated,
     });
+  }
+
+  function cancelAction(raw) {
+    const binding = normalizeBinding(raw, [
+      'ownerId', 'projectInstanceId', 'rootPath', 'mutationGeneration',
+      'navigationEpoch', 'actionId', 'attemptId',
+    ]);
+    if (typeof raw.actionId !== 'string' || !ACTION_ID_RE.test(raw.actionId)) {
+      fail('INVALID_ACTION', '写作导航动作无效');
+    }
+    if (typeof raw.attemptId !== 'string' || !ATTEMPT_ID_RE.test(raw.attemptId)) {
+      fail('INVALID_ATTEMPT', '写作导航执行轮次无效');
+    }
+    purgeExpired();
+    const action = actions.get(raw.actionId);
+    if (!action || action.terminated ||
+        action.ownerId !== binding.ownerId ||
+        action.projectInstanceId !== binding.projectInstanceId) {
+      fail('ACTION_NOT_FOUND', '写作导航动作已过期或不存在');
+    }
+    const entry = results.get(action.resultKey);
+    if (!entry || entry.rootPath !== binding.rootPath ||
+        entry.mutationGeneration !== binding.mutationGeneration ||
+        entry.navigationEpoch !== binding.navigationEpoch) {
+      terminateAction(raw.actionId);
+      fail('STALE_NAVIGATION', '写作导航已因项目状态变化失效');
+    }
+    if (!action.leaseId || action.attemptId !== raw.attemptId) {
+      fail('ATTEMPT_NOT_ACTIVE', '这一轮写作导航动作当前没有正在运行');
+    }
+    const leaseId = action.leaseId;
+    const lease = leases.get(leaseId);
+    lease?.controller.abort();
+    leases.delete(leaseId);
+    occupiedIds.delete(leaseId);
+    action.leaseId = null;
+    action.attemptId = null;
+    return Object.freeze({ actionId: raw.actionId, cancelled: true });
   }
 
   function invalidateProject(raw) {
@@ -434,6 +484,7 @@ function createWritingNavigationStore(options = {}) {
     acquireAction,
     assertLeaseCurrent,
     settleAction,
+    cancelAction,
     invalidateProject,
     stats,
   });

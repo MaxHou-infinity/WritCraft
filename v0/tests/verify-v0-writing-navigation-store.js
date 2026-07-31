@@ -89,6 +89,15 @@ function binding(extra = {}) {
   };
 }
 
+let attemptCounter = 0;
+function actionBinding(extra = {}) {
+  attemptCounter += 1;
+  return binding({
+    attemptId: `wno_${attemptCounter.toString(16).padStart(32, '0')}`,
+    ...extra,
+  });
+}
+
 function deterministicBytes() {
   let index = 0;
   return size => {
@@ -113,12 +122,12 @@ function deterministicBytes() {
     for (const action of ['research', 'changes']) {
       const store = storeModule.createWritingNavigationStore({ randomBytes: deterministicBytes() });
       const result = store.install(binding({ record: await record(action === 'research' ? 2 : 3, action) }));
-      const lease = store.acquireAction(binding({ actionId: result.suggestions[0].actionId }));
+      const lease = store.acquireAction(actionBinding({ actionId: result.suggestions[0].actionId }));
       assert.strictEqual(lease.suggestion.action, action);
       const settled = store.settleAction(binding({ leaseId: lease.leaseId, outcome: 'success' }));
       assert.strictEqual(settled.consumed, true);
       assert.throws(
-        () => store.acquireAction(binding({ actionId: result.suggestions[0].actionId })),
+        () => store.acquireAction(actionBinding({ actionId: result.suggestions[0].actionId })),
         error => error.code === 'ACTION_NOT_FOUND'
       );
     }
@@ -128,14 +137,14 @@ function deterministicBytes() {
     const store = storeModule.createWritingNavigationStore({ randomBytes: deterministicBytes() });
     const result = store.install(binding({ record: await record(4, 'open') }));
     const actionId = result.suggestions[0].actionId;
-    const first = store.acquireAction(binding({ actionId }));
+    const first = store.acquireAction(actionBinding({ actionId }));
     assert.throws(
-      () => store.acquireAction(binding({ actionId })),
+      () => store.acquireAction(actionBinding({ actionId })),
       error => error.code === 'ACTION_BUSY'
     );
     assert.strictEqual(store.assertLeaseCurrent(binding({ leaseId: first.leaseId })).action, 'open');
     assert.strictEqual(store.settleAction(binding({ leaseId: first.leaseId, outcome: 'success' })).consumed, false);
-    const second = store.acquireAction(binding({ actionId }));
+    const second = store.acquireAction(actionBinding({ actionId }));
     assert.notStrictEqual(first.leaseId, second.leaseId);
     assert.strictEqual(second.repeatable, true);
   });
@@ -144,22 +153,76 @@ function deterministicBytes() {
     const store = storeModule.createWritingNavigationStore({ randomBytes: deterministicBytes() });
     const result = store.install(binding({ record: await record(5, 'changes') }));
     const actionId = result.suggestions[0].actionId;
-    const first = store.acquireAction(binding({ actionId }));
+    const first = store.acquireAction(actionBinding({ actionId }));
     assert.strictEqual(store.settleAction(binding({
       leaseId: first.leaseId,
       outcome: 'review_in_progress',
     })).consumed, false);
-    assert.doesNotThrow(() => store.acquireAction(binding({ actionId })));
+    assert.doesNotThrow(() => store.acquireAction(actionBinding({ actionId })));
+  });
+
+  await test('retryable failures and explicit cancellation preserve a current action', async () => {
+    for (const outcome of ['retryable_failure', 'cancelled']) {
+      const store = storeModule.createWritingNavigationStore({ randomBytes: deterministicBytes() });
+      const result = store.install(binding({ record: await record(51, 'changes', outcome) }));
+      const actionId = result.suggestions[0].actionId;
+      const lease = store.acquireAction(actionBinding({ actionId }));
+      assert.strictEqual(store.settleAction(binding({
+        leaseId: lease.leaseId,
+        outcome,
+      })).consumed, false);
+      assert.doesNotThrow(() => store.acquireAction(actionBinding({ actionId })));
+    }
+  });
+
+  await test('owner-bound cancel aborts only the active lease and allows retry', async () => {
+    const store = storeModule.createWritingNavigationStore({ randomBytes: deterministicBytes() });
+    const result = store.install(binding({ record: await record(52, 'changes', 'cancel') }));
+    const actionId = result.suggestions[0].actionId;
+    const attemptId = `wno_${'a'.repeat(32)}`;
+    const lease = store.acquireAction(binding({ actionId, attemptId }));
+    assert.strictEqual(lease.signal.aborted, false);
+    assert.deepStrictEqual(store.cancelAction(binding({ actionId, attemptId })), {
+      actionId,
+      cancelled: true,
+    });
+    assert.strictEqual(lease.signal.aborted, true);
+    assert.throws(
+      () => store.cancelAction(binding({ actionId, attemptId })),
+      error => error.code === 'ATTEMPT_NOT_ACTIVE'
+    );
+    assert.doesNotThrow(() => store.acquireAction(actionBinding({ actionId })));
+  });
+
+  await test('a late cancel from attempt A cannot abort retry attempt B', async () => {
+    const store = storeModule.createWritingNavigationStore({ randomBytes: deterministicBytes() });
+    const result = store.install(binding({ record: await record(53, 'changes', 'attempt') }));
+    const actionId = result.suggestions[0].actionId;
+    const attemptA = `wno_${'b'.repeat(32)}`;
+    const attemptB = `wno_${'c'.repeat(32)}`;
+    const first = store.acquireAction(binding({ actionId, attemptId: attemptA }));
+    store.settleAction(binding({ leaseId: first.leaseId, outcome: 'retryable_failure' }));
+    const second = store.acquireAction(binding({ actionId, attemptId: attemptB }));
+    assert.throws(
+      () => store.cancelAction(binding({ actionId, attemptId: attemptA })),
+      error => error.code === 'ATTEMPT_NOT_ACTIVE'
+    );
+    assert.strictEqual(second.signal.aborted, false);
+    assert.deepStrictEqual(store.cancelAction(binding({ actionId, attemptId: attemptB })), {
+      actionId,
+      cancelled: true,
+    });
+    assert.strictEqual(second.signal.aborted, true);
   });
 
   await test('concurrent replay terminates the single-use action', async () => {
     const store = storeModule.createWritingNavigationStore({ randomBytes: deterministicBytes() });
     const result = store.install(binding({ record: await record(6, 'research') }));
     const actionId = result.suggestions[0].actionId;
-    const first = store.acquireAction(binding({ actionId }));
+    const first = store.acquireAction(actionBinding({ actionId }));
     assert.strictEqual(store.assertLeaseCurrent(binding({ leaseId: first.leaseId })).action, 'research');
     assert.throws(
-      () => store.acquireAction(binding({ actionId })),
+      () => store.acquireAction(actionBinding({ actionId })),
       error => error.code === 'ACTION_REPLAYED'
     );
     assert.strictEqual(first.signal.aborted, true);
@@ -168,7 +231,7 @@ function deterministicBytes() {
       error => error.code === 'LEASE_NOT_FOUND'
     );
     assert.throws(
-      () => store.acquireAction(binding({ actionId })),
+      () => store.acquireAction(actionBinding({ actionId })),
       error => error.code === 'ACTION_NOT_FOUND'
     );
   });
@@ -182,10 +245,10 @@ function deterministicBytes() {
       const result = store.install(binding({ record: await record(7) }));
       const actionId = result.suggestions[0].actionId;
       assert.throws(
-        () => store.acquireAction(binding({ actionId, ...changed })),
+        () => store.acquireAction(actionBinding({ actionId, ...changed })),
         error => error.code === 'ACTION_NOT_FOUND'
       );
-      assert.doesNotThrow(() => store.acquireAction(binding({ actionId })));
+      assert.doesNotThrow(() => store.acquireAction(actionBinding({ actionId })));
     }
   });
 
@@ -199,11 +262,11 @@ function deterministicBytes() {
       const result = store.install(binding({ record: await record(7) }));
       const actionId = result.suggestions[0].actionId;
       assert.throws(
-        () => store.acquireAction(binding({ actionId, ...changed })),
+        () => store.acquireAction(actionBinding({ actionId, ...changed })),
         error => error.code === 'STALE_NAVIGATION'
       );
       assert.throws(
-        () => store.acquireAction(binding({ actionId })),
+        () => store.acquireAction(actionBinding({ actionId })),
         error => error.code === 'ACTION_NOT_FOUND'
       );
     }
@@ -217,7 +280,7 @@ function deterministicBytes() {
       randomBytes: deterministicBytes(),
     });
     const expiring = ttlStore.install(binding({ record: await record(8) }));
-    const expiringLease = ttlStore.acquireAction(binding({
+    const expiringLease = ttlStore.acquireAction(actionBinding({
       actionId: expiring.suggestions[0].actionId,
     }));
     now = 150;
@@ -237,7 +300,7 @@ function deterministicBytes() {
     }
     assert.deepStrictEqual(evictionStore.stats(), { results: 8, actions: 8, leases: 0 });
     assert.throws(
-      () => evictionStore.acquireAction(binding({ actionId: first.suggestions[0].actionId })),
+      () => evictionStore.acquireAction(actionBinding({ actionId: first.suggestions[0].actionId })),
       error => error.code === 'ACTION_NOT_FOUND'
     );
   });
@@ -246,7 +309,7 @@ function deterministicBytes() {
     const store = storeModule.createWritingNavigationStore({ randomBytes: deterministicBytes() });
     const ownerBRecord = await record(30);
     const ownerB = store.install(binding({ ownerId: 'webContents:8', record: ownerBRecord }));
-    const ownerBLease = store.acquireAction(binding({
+    const ownerBLease = store.acquireAction(actionBinding({
       ownerId: 'webContents:8',
       actionId: ownerB.suggestions[0].actionId,
     }));

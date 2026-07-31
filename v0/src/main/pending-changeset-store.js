@@ -350,6 +350,14 @@ function createPendingChangeSetStore(options = {}) {
         if (candidate !== capability) remove(candidate, reason);
       }
     },
+    hasForRoot(rootPath) {
+      pruneExpired();
+      if (typeof rootPath !== 'string' || !rootPath) return false;
+      for (const record of records.values()) {
+        if (record.rootPath === rootPath) return true;
+      }
+      return false;
+    },
     has(capability) { pruneExpired(); return CAPABILITY_RE.test(String(capability || '')) && records.has(capability); },
     get size() { pruneExpired(); return records.size; },
   });

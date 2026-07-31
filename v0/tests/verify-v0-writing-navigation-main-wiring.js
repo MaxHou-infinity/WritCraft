@@ -37,6 +37,17 @@ test('trusted IPC uses the dedicated handler and abort-aware provider adapter', 
   assert.match(preload, /proposeWritingNavigation: \(projectInstanceId, request\) =>\s*ipcRenderer\.invoke\('writcraft:project:propose-writing-navigation'/);
 });
 
+test('opaque actions use one Main-owned handler and the preload exposes no trusted content', () => {
+  assert.match(main, /ipcMain\.handle\('writcraft:project:run-writing-navigation-action'/);
+  assert.match(main, /writingNavigationActionHandlerService\.createWritingNavigationActionHandler\(\{/);
+  assert.match(main, /ipcMain\.handle\('writcraft:project:cancel-writing-navigation-action'/);
+  assert.match(main, /createCancelWritingNavigationActionHandler\(\{/);
+  assert.match(main, /pendingChangeSets,\s*cacheReview: cacheReviewedChangeSet,/);
+  assert.match(preload, /runWritingNavigationAction: \(projectInstanceId, actionId, attemptId\) =>[\s\S]{0,220}'writcraft:project:run-writing-navigation-action',[\s\S]{0,120}attemptId/);
+  assert(!/runWritingNavigationAction: \([^)]*(?:content|revision|rootPath|suggestion)/.test(preload));
+  assert.match(preload, /cancelWritingNavigationAction: \(projectInstanceId, actionId, attemptId\) =>[\s\S]{0,220}'writcraft:project:cancel-writing-navigation-action',[\s\S]{0,120}attemptId/);
+});
+
 test('renderer reload and project mutation invalidate cached navigation authority', () => {
   const rendererAdvance = functionBlock('advanceRendererNavigationEpoch()', 'invalidatePendingOnboardingReviews(');
   assert(rendererAdvance.includes('writingNavigationStore.invalidateProject({'));
@@ -58,6 +69,7 @@ test('model protocol errors are mapped before generic safe-error passthrough', (
   const genericMessage = failure.indexOf('isSafeProjectError && error.message');
   assert(navigationMap >= 0);
   assert(genericMessage > navigationMap);
+  assert(failure.includes('writingNavigationHandoffService.WritingNavigationHandoffError'));
 });
 
 console.log(`\n${passed}/${passed} writing-navigation Main/preload wiring checks passed.`);

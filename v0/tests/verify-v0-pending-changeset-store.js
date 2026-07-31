@@ -59,6 +59,18 @@ test('invalid capability strings never address a record', () => {
   assert.strictEqual(store.size, 1);
 });
 
+test('root-scoped admission detects only current pending reviews', () => {
+  const store = createPendingChangeSetStore({
+    idFactory: () => '56565656-5656-4565-8565-565656565656',
+  });
+  const capability = store.put({ id: 'cs_root' }, '/project-a');
+  assert.strictEqual(store.hasForRoot('/project-a'), true);
+  assert.strictEqual(store.hasForRoot('/project-b'), false);
+  assert.strictEqual(store.hasForRoot(''), false);
+  store.delete(capability);
+  assert.strictEqual(store.hasForRoot('/project-a'), false);
+});
+
 test('bounded FIFO eviction never aliases a newly issued capability', () => {
   const ids = [
     '66666666-6666-4666-8666-666666666666',

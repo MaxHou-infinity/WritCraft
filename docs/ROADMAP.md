@@ -80,6 +80,8 @@
 
 实现进度（0.0BZ）：只读 Main/IPC 基础已独立签收，包括严格结构/导航工具协议、证据锚点、8 条/30 分钟隔离缓存、watcher barrier、真实 deadline abort 和零写入门禁；专项 53/53、Network 15/15，独立复审 P0/P1=0。该证据不包含 Renderer、动作交接、骨架事务或真实 Electron，不能把“基础接线”写成“替代功能完成”。下一阶段先闭合三种动作与骨架事务，再接双模式 UI 并移除公开旧 Plan。
 
+实现进度（0.0CA）：三种 Main-owned 动作交接已独立签收。open 为零模型本地定位；Research 携带 canonical evidence 进入研究页；Changes 重新读取依赖并生成待审 Diff，已有审阅时 fail-closed 且保留同一建议。失败/超时/取消可在有效建议上重试，每次执行使用独立 attempt ID，旧 A cancel 不得影响新 B。专项 73/73、Pending 13/13、Network 15/15，独立复审 P0/P1=0。结构骨架事务、Renderer、真实 Electron 与作者验收仍未完成；下一阶段只推进这些既定缺口。
+
 ### 4.3 明确不做
 
 - 不新增项目驾驶舱或命令面板；结构规划/写作导航只替代当前失效 Plan，不扩成第二套 AI 系统。

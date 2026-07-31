@@ -181,6 +181,20 @@ contextBridge.exposeInMainWorld('writCraft', {
     proposeEditPromptRepair: (projectInstanceId) => ipcRenderer.invoke('writcraft:project:propose-edit-prompt-repair', projectInstanceId),
     proposeWritingNavigation: (projectInstanceId, request) =>
       ipcRenderer.invoke('writcraft:project:propose-writing-navigation', projectInstanceId, request),
+    runWritingNavigationAction: (projectInstanceId, actionId, attemptId) =>
+      ipcRenderer.invoke(
+        'writcraft:project:run-writing-navigation-action',
+        projectInstanceId,
+        actionId,
+        attemptId
+      ),
+    cancelWritingNavigationAction: (projectInstanceId, actionId, attemptId) =>
+      ipcRenderer.invoke(
+        'writcraft:project:cancel-writing-navigation-action',
+        projectInstanceId,
+        actionId,
+        attemptId
+      ),
     proposePlan: (projectInstanceId, goal, contextPaths) => ipcRenderer.invoke('writcraft:project:propose-plan', projectInstanceId, goal, contextPaths),
     handoffPlanTask: (projectInstanceId, request) => ipcRenderer.invoke('writcraft:project:handoff-plan-task', projectInstanceId, request),
     handoffGraphIssue: (projectInstanceId, request) => ipcRenderer.invoke('writcraft:project:handoff-graph-issue', projectInstanceId, request),

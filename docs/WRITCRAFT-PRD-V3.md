@@ -6,7 +6,7 @@
 > 适用范围：V0 起的桌面写作 IDE  
 > 优先级：本文定义产品契约；`docs/ROADMAP.md` 定义唯一版本顺序与当前目标范围；工程事实以源码和 `v0/DEVELOPMENT-STATUS.md` 为准，具体实现以对应技术规格/合同为准。
 
-> **实现状态注记（2026-07-31，RM-1.1 / 0.0BZ）**：本文仍是产品权威规格，**完整 PRD 尚未完成合格真实作者验收**。0.1.1 已发布到 npm `preview` 与 GitHub prerelease，`latest` 仍为 0.1.0。旧 Plan 在九次真实零写入失败后被判定为产品假设失效。0.1.2 按 `WRITING-NAVIGATION-V1-CONTRACT.md` 以“结构规划 / 写作导航”替代；只读 Main/IPC 基础已经独立签收，但动作交接、骨架事务、Renderer、真实 Electron 和作者验收尚未完成。
+> **实现状态注记（2026-07-31，RM-1.1 / 0.0CA）**：本文仍是产品权威规格，**完整 PRD 尚未完成合格真实作者验收**。0.1.1 已发布到 npm `preview` 与 GitHub prerelease，`latest` 仍为 0.1.0。旧 Plan 在九次真实零写入失败后被判定为产品假设失效。0.1.2 按 `WRITING-NAVIGATION-V1-CONTRACT.md` 以“结构规划 / 写作导航”替代；只读 Main/IPC 基础与 open/Research/Changes 动作交接已经独立签收，但骨架事务、Renderer、真实 Electron 和作者验收尚未完成。
 
 > **完成定义**：任何“V0 完成”声明必须同时满足 §10.1–§10.4、全量自动回归、真实 Electron E2E 和独立复审。局部 suite 通过、本地 ad-hoc App 或历史 ZIP 均不能单独构成完成证据。
 
