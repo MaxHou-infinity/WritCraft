@@ -1,11 +1,11 @@
 # 笔触 · WritCraft · V0 开发状态与续作入口
 
-> 最后更新：2026-07-31（Asia/Shanghai，0.0BQ · `2073406` 第七 fresh Chapter 验收副本已就绪）
+> 最后更新：2026-07-31（Asia/Shanghai，0.0BR · 第七副本 Chapter 接受落盘通过，陈旧审阅终态已修复）
 > 当前状态：**`writ-craft@0.1.1` 已从 exact candidate `c65981e` 发布到 npm `preview`；registry 时间 `2026-07-29T14:30:16.176Z`，shasum `d370c500666e25cfb373852deafa21b232d2bc18` 与本地候选一致。公网隔离安装/启动/退出为 2/2。annotated tag `v0.1.1` 指向同一提交，GitHub prerelease 已公开：`https://github.com/MaxHou-infinity/WritCraft/releases/tag/v0.1.1`。**
 > 发布判断：**0.1.1 Developer Preview 已完成版本、自动化、双架构安装、独立复审、npm 发布、公网安装和 GitHub prerelease。registry 标签保持 `preview: 0.1.1`、`latest: 0.1.0`，因此本次没有把 Preview 冒充稳定版，也没有执行 unpublish、占位发布或上传未签名 App/ZIP。**
 > 当前目标版本：**`docs/ROADMAP.md` 的 `RM-1.0 / writ-craft@0.1.2` 真实作者可用性闭环。必须使用 `edit.md`、5+ 个 `chapters/` 章节、2000+ 可见中文字符和至少 1 个来源文件的作者隔离副本，完成五段旅程，并关闭现场 `Graph INVALID_CACHE` 的诊断/恢复终态。0.1.2 签字前不得插入驾驶舱、新 AI 模式或其他后续版本功能。**
-> 当前源码证据：**exact production candidate 为 `2073406 fix(chapter): bind prompt to current block`，已推送到 `origin/main`。区块示例现在从同一 `block.id` 权威动态序列化，单元测试与真实 Electron fixture 对非默认 ID 做 canary；Main 的 strict blockId 校验没有放宽。Chapter **21/21**、完整 `npm test`、批准 GUI `npm run verify`、强制真实 Electron **37/37** 均通过。独立复审尚未完成，npm/GitHub Release 仍未发布 0.1.2。**
-> 当前作者验收进度：**第四副本项目卡和第五副本 Inline 已关闭，不得重复。第六副本 operation `814b0f1e…` 的 blockId 红灯为安全零写入诊断证据。第七 fresh 副本已绑定 `2073406` 创建并在当前源码 App 打开，预检 eligible；作者下一步只重跑第一章 Chapter 生成并自行审阅，成功后继续 Plan。原始验收源 digest 仍为 `9d089886…`。**
+> 当前源码证据：**`2073406` 已通过真实 Chapter 生成、审阅与落盘，但接受后的 Renderer 保留了旧 Diff 文案“尚未写入”，与底部“已安全应用”及磁盘真相冲突。修复候选在无 residual 的可信提交后清空 pending Diff，改为唯一终态“审阅已完成 · …”；Changes UX **9/9**、Onboarding Renderer dynamic **30/30**、完整 `npm test`、批准 GUI `npm run verify`、强制真实 Electron **37/37** 均通过。新 exact candidate 待本批提交；独立复审尚未完成，npm/GitHub Release 仍未发布 0.1.2。**
+> 当前作者验收进度：**第七副本 Chapter operation `2acf8b66959744f0bedd1d94bbe31eab` 完成 `generated → accepted`；唯一 post-manifest History `change_b00d7f9d…` 为 `application/applied`，第一章 revision `1bdb3a5c… → b0462641…`，磁盘与 after 精确一致，原始源未变。Chapter 的真实生成与写盘通过；旧 UI 终态只算现场 UX 缺口。修复提交后重启同一副本验证 accepted 正文/History 恢复，不要求作者再次生成或接受；随后进入 Plan。**
 > 0.0AA 历史保留红灯：**首轮真实 Electron 暴露 Inspector 在上下文失效时被清空、旧 5-chip 断言和项目 Chat 等待诊断；完整 test 又暴露 Plan 测试把 generation 函数正文写死。独立复审发现新请求预检窗口可提交不可见旧轮、同项目重开 UI/Main 串话、失败重开提前清会话及两项测试/错误文案缺口，均转为生产边界和回归后关闭。真实 Electron 曾连续两次在旧 Graph 恢复阶段超时；加入只读失败快照后该阶段连续四次通过，未改 Graph 产品逻辑，按重复同源证据关闭 timing P2。另一次 Chat preflight 红灯证明测试在恢复 `edit.md` 后未等待权威 watcher barrier；改为生产 `flushExternalChanges()` 收敛，而未放宽 Chat guard。该里程碑所有红运行保留，最终源码连续两次 34/34；后续 0.0AB 当时推进到 35/35，当前总链只看本文顶部当前里程碑。**
 > Graph 历史签字基线：**性能修复前的既有源码曾完整 `npm test`、Electron-enabled `npm run verify`、强制真实 Electron 26/26 exit 0；Graph Filter 15/15、Workbench 14/14、dynamic 5/5、Large 5/5、Watcher 15/15、Network 11/11、Intelligence 17/17，第二轮复审 P0=0/P1=0/P2=2。该数字只保留为历史过程；0.0AB 后来推进到 35/35，当前总链只看顶部当前里程碑。**
 > Graph 动态边界：**300 文件/1279 节点 cold-to-interactive、cache/incremental、筛选/内存/布局、AX/键鼠、三类纠错、stale/Issue→Changes、failure live、重启与项目隔离均进入真实 Electron；正文/History/ledger 的零写入门禁通过。**  
@@ -24,7 +24,7 @@
 
 ## 0. 续作口令
 
-Chat 的三级 scope/context、Main-owned 多轮连续性、Onboarding v2、Research→Changes、Inline Rewrite v2 与 Plan Strict 已经完成技术签字。项目卡/Inline 作者证据继续有效；Chapter 动态 blockId 修复已形成 exact candidate `2073406`。第七 fresh 副本已打开，下一步只重跑 Chapter proposal 与 Plan handoff；不重复项目卡或 Inline，不重写已经关闭的协议，也不分发现有 `release/` 产物。
+Chat 的三级 scope/context、Main-owned 多轮连续性、Onboarding v2、Research→Changes、Inline Rewrite v2 与 Plan Strict 已经完成技术签字。项目卡/Inline 证据继续有效；第七副本 Chapter 已真实接受并写盘，当前只收口提交后陈旧 Diff UX，再重启验证已接受正文/History 后进入 Plan。不重复项目卡、Inline 或 Chapter 生成，不重写已经关闭的协议，也不分发现有 `release/` 产物。
 
 1. 先读 `../docs/ROADMAP.md` 的当前目标，再读本文、`package.json`、对应合同、当前源码文件与 `git log -1 --stat`；本地 Git 历史从 2026-07-26 V0 基线开始，不得据此臆测更早的开发过程。
 2. **Diagnostic Export v1、Research Accuracy v1、committed-warning、Graph 三项韧性缺口、Changes/History durable recovery、Image Review v1 与 Image Trash 本地链均已完整签收，不再重开这些协议。**
@@ -32,6 +32,16 @@ Chat 的三级 scope/context、Main-owned 多轮连续性、Onboarding v2、Rese
 4. 不重写已经签字的 Onboarding v2 service、capability store、batch、Main/preload 与 Renderer 契约；Main 动态 admission、single-flight 和 Renderer 生命周期 authority 清理均已关闭。
 5. 每批合入后重跑定向测试；阶段完成时再运行完整 `npm test`、`npm run verify` 与 `WRITCRAFT_E2E_FORCE=1 npm run e2e:electron`，保存当次证据。
 6. 真实 API 只使用用户显式配置的 Key；记录延迟、限流、超时、故障和费用，不记录 Key、Prompt、模型原文或正文。Key 前缀只表示凭据/计费类型，不能代替官方能力与现场门禁。首发按 npm Developer Preview 合同执行；独立 App 发布才需要 Developer ID、公证与 Gatekeeper。
+
+### 0.0BR 2026-07-31 · 第七副本 Chapter 接受与提交后终态真相
+
+- **真实操作**：作者在第七 fresh 副本对第一章输入“写的简短一些”，成功获得完整 Diff 并明确接受。operation **`2acf8b66959744f0bedd1d94bbe31eab`** 为 **50,103 ms `generated` → 31,915 ms `accepted`**。
+- **History 与磁盘**：唯一 post-manifest History 为 **`change_b00d7f9d-c8ae-4b84-a003-589d515e1eda`**，状态 `application/applied`，路径只包含 `chapters/01-cope-origin/chapter-01-why-cope.md`。before revision **`1bdb3a5c646b61dc01dcc1328f6e0039a34d6986cbb17230164591f4d947ef8b`**，after revision **`b04626419b89f415a9dc85d97dedf09dd44447ebddf21f389f704f9c0aad14ce`**；当前磁盘 SHA-256 与 after 精确一致，文件为 15,092 bytes。
+- **原稿隔离**：确认源对应第一章仍为 16,931 bytes / before revision；原稿项目 preflight digest 保持 **`9d0898863636da74615481a669c3e40362a60176249870e6d1793380c85b4380`**。没有误写原稿或其他 Markdown。
+- **现场 UX 红灯**：AX 同时读到编辑器“已按磁盘、文件树和修改历史确认本次操作”、底部“已安全应用 1 个文件”，以及旧 hunk 卡“已选择接受 · 尚未写入”。写盘与 History 成功，但 Renderer 在可信无 residual 终态把 `pending=null` 后没有替换旧 preview DOM，造成陈旧且相互矛盾的提示。
+- **生产修复**：可信提交且无 residual 时，隐藏提交按钮、清空全部旧 Diff/决定，并只显示“审阅已完成 · [权威终态]”。预提交阶段的“尚未写入”文案继续保留；只有提交后才消失，不会混淆审阅与落盘边界。
+- **验证**：Changes UX **9/9**、Onboarding Renderer dynamic **30/30**；动态测试证明权威 reload 无重复 IPC、终态无 `尚未写入` 且 hunk 卡为 0。真实 Electron 的 Chapter 阶段新增相同断言；完整 `npm test`、批准 GUI `npm run verify`、强制真实 Electron **37/37** 均通过。
+- **验收边界**：真实 Chapter 生成、审阅、写盘和 History 已通过；旧候选的提交后视觉终态不算通过。修复后只重启同一副本验证 accepted 正文/History 恢复，不要求作者重复付费生成与内容决定。最终发布候选仍需独立复审和路线图规定的最终绑定。
 
 ### 0.0BQ 2026-07-31 · `2073406` 第七 fresh Chapter 验收副本
 
@@ -849,7 +859,7 @@ Onboarding v2 已取代上述“容错解析完整 `editContent` + 部分创建�
 ### RM-1.0 / 0.1.2：当前唯一目标
 
 - [x] 由作者显式指定满足合同的真实项目，完成只读预检与隔离副本；0.0AQ 的正式事务证明源不变，fresh 副本已合格创建并在当前 App 打开。
-- [ ] 在隔离副本完成项目卡、Inline/Chapter/Plan、Research、image-01、Graph/恢复五段真实旅程；第四副本项目卡与第五副本 Inline 已关闭。动态 blockId exact candidate 为 `2073406`，第七 fresh 副本已打开，当前只重跑 Chapter/Plan。
+- [ ] 在隔离副本完成项目卡、Inline/Chapter/Plan、Research、image-01、Graph/恢复五段真实旅程；项目卡、Inline 与第七副本 Chapter 真实写盘已完成。提交后陈旧 Diff UX 修复已通过自动化，待新候选重启核验后只继续 Plan。
 - [x] 复现并诊断作者项目 `Graph INVALID_CACHE`；0.0AN / `a72a179` 已提供不删除作者数据、不手工清缓存的可理解诊断、自动重建与失败恢复终态，最终独立复审 P0/P1/P2=0。
 - [ ] 收集内容无关的 Inline 接受率、Plan 采用、Research 匹配判断、图片评分/采纳和耗时样本。
 - [ ] 只修复验收中发现的 P0/P1 与决定阻断发版的 P2；`⌘K` 必填作者指令 P1 已实现、完成自动化与独立复审，并作为 exact candidate `9b21a9d` 提交推送；不得插入 `0.2.0+` 功能。
@@ -984,7 +994,7 @@ Graph Extended Acceptance v1 已签字。首轮复审曾以 P1=3 回退 watcher�
 - [x] 真实作者 Inline 拒绝：第五副本 operation `8f093bb9…` 记录 `generated → rejected`，没有新增 History，目标 mtime 和磁盘内容保持在前一笔已接受真相；界面明确显示“原文已恢复”。
 - [x] 真实作者 Inline 接受：第五副本 operation `cd20e785…` 产生唯一 post-manifest application/applied History `change_6516ccbc…`，目标 before/after revision 与磁盘 SHA-256 精确一致。
 - [x] 真实作者 Inline Safe Undo：第五副本最新正文 History 已变为 `undone`，正文 SHA-256 恢复到 beforeHash `1bdb3a5c…`，14 个 Markdown 的组合摘要精确回到基线 `7ead5eaa…`，原始验收源保持不变。
-- [ ] 由作者显式选择的合格源创建 fresh 隔离副本并完成五段真实旅程；第四副本项目卡与第五副本 Inline 已关闭且不重跑；第六副本为 blockId 模板冲突诊断证据，`2073406` 第七副本已就绪，只重跑 Chapter/Plan，Research、image-01、Graph/恢复仍开放。
+- [ ] 由作者显式选择的合格源创建 fresh 隔离副本并完成五段真实旅程；项目卡与 Inline 已关闭，第七副本 Chapter 生成/接受/落盘通过；修复提交后陈旧 Diff 终态并重启核验，再继续 Plan。Research、image-01、Graph/恢复仍开放。
 
 ### P2：Main 网络与安全审计
 

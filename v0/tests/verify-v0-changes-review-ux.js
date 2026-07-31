@@ -49,6 +49,13 @@ test('decided hunks collapse into a truthful pre-commit summary', () => {
   assert(html.includes('.change-hunk-result'));
 });
 
+test('completed review replaces every stale pre-commit decision with one terminal truth', () => {
+  assert(view.includes("className: 'tree-empty changes-review-complete'"));
+  assert(view.includes('textContent: `审阅已完成 · ${completionMessage}`'));
+  assert(view.indexOf('pending = null;', view.indexOf('async function applySelected()')) <
+    view.indexOf("className: 'tree-empty changes-review-complete'"));
+});
+
 test('chapter generation owns only its own busy label', () => {
   assert(view.includes("function setBusy(busy, label = 'general', owner = null)"));
   assert(view.includes("busy && label !== 'chapter'"));
@@ -83,4 +90,4 @@ test('history undo names its exact target and warns on older records', () => {
   assert(html.includes('.history-card.is-latest'));
 });
 
-console.log(`\nChanges review UX verification: ${passed}/8 passed.`);
+console.log(`\nChanges review UX verification: ${passed}/9 passed.`);

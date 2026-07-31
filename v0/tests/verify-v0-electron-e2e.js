@@ -1341,6 +1341,13 @@ async function run() {
       }
       const generated = projectService.readFile(project.rootPath, createdPath);
       assert(generated.includes(electronAiFixture.CHAPTER_GENERATED_MARKER));
+      const terminalReview = await first.client.evaluate(`(() => ({
+        text: document.getElementById('changes-preview')?.textContent || '',
+        hunkCards: document.querySelectorAll('#changes-preview .change-hunk-card').length,
+      }))()`);
+      assert(terminalReview.text.includes('审阅已完成 · 已安全应用 1 个文件'));
+      assert(!terminalReview.text.includes('尚未写入'));
+      assert.strictEqual(terminalReview.hunkCards, 0);
 
       const historyUndoPresentation = await first.client.evaluate(`(() => {
         const cards = [...document.querySelectorAll('.history-card')];

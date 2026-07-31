@@ -655,6 +655,10 @@ function extractFunction(source, name) {
     assert.strictEqual(harness.calls.reload, 0);
     assert.strictEqual(harness.calls.reconcile, 1);
     assert(harness.document.getElementById('changes-status').textContent.includes('已安全应用 1 个文件'));
+    const previewText = allText(harness.document.getElementById('changes-preview'));
+    assert(previewText.includes('审阅已完成 · 已安全应用 1 个文件'));
+    assert(!previewText.includes('尚未写入'));
+    assert.strictEqual(harness.document.getElementById('changes-preview').querySelectorAll('.change-hunk-card').length, 0);
   });
 
   await test('authoritative Research residual recovery reaches its terminal state without duplicate refresh IPCs', async () => {

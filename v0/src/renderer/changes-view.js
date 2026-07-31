@@ -2114,7 +2114,7 @@
       }
       discardButton.textContent = '丢弃';
       resetCommitControls();
-      setStatus(completedResearch
+      const completionMessage = completedResearch
         ? appliedCount
           ? `Research 修改已安全应用 ${appliedCount} 个文件；来源保持只读。`
           : `已拒绝 ${result.rejectedHunkCount || 0} 个 Research 修改块，项目文件没有变化`
@@ -2128,7 +2128,12 @@
         ? `已记录拒绝 ${result.rejectedHunkCount || 0} 个修改块，项目文件没有变化`
         : isEditPromptProposal
         ? '已更新磁盘中的 edit.md；没有创建初始文件'
-        : `已安全应用 ${appliedCount} 个文件`);
+        : `已安全应用 ${appliedCount} 个文件`;
+      preview.replaceChildren(Object.assign(document.createElement('div'), {
+        className: 'tree-empty changes-review-complete',
+        textContent: `审阅已完成 · ${completionMessage}`,
+      }));
+      setStatus(completionMessage);
     } catch (error) {
       if (isOnboardingProposal && (committedResult?.applied?.length || 0) > 0) {
         const abandonedConfirmation = committedResult?.onboardingConfirmation;
