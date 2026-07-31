@@ -75,7 +75,7 @@
 5. 修复旅程中发现的 P0/P1 阻断项；P2 必须明确记录、分级并决定是否允许发版。
 6. 记录内容无关的私有指标：Inline 接受率、Plan 采用、Research 匹配判断、图片评分/采纳、耗时和稳定错误码。
 
-当前执行注记（2026-07-31）：项目卡、Inline 与 Chapter 已关闭。0.0BW candidate `c6d8c44` 已把 Plan 最大合法工具 input 收敛为 6,120 bytes，但最新真实 operation `b915291982d14f8bb5520674280b3d0d` 在 13,590 ms 后因首任务 `dependsOn` 含自然语言失败；before/after 0，`changes.json` 未变化，这是第八次 Plan 零写入失败。0.0BX 为 milestone/task ID 与依赖补齐精确短 ASCII Schema、说明、唯一性和 Main 不 trim 校验；首个任务必须无依赖，后续只能引用此前任务 ID。依赖结构与数组 shape 共享一次有界重试，重试不回显失败 input、第二次失败终止、绝不第三次调用。Plan 26/26、handoff 15/15、UI 16/16、完整 test/verify 和强制真实 Electron 37/37 通过，独立终审 P0/P1/P2=0；候选提交/重启和一次新 provider canary 尚待完成。默认模型仍为 MiniMax-M3，8 文件/240 KiB 上下文门禁不变。此前不得点击旧错误页重试或重复前三段。
+当前执行注记（2026-07-31）：项目卡、Inline 与 Chapter 已关闭。0.0BW candidate `c6d8c44` 已把 Plan 最大合法工具 input 收敛为 6,120 bytes，但最新真实 operation `b915291982d14f8bb5520674280b3d0d` 在 13,590 ms 后因首任务 `dependsOn` 含自然语言失败；before/after 0，`changes.json` 未变化，这是第八次 Plan 零写入失败。0.0BX 为 milestone/task ID 与依赖补齐精确短 ASCII Schema、说明、唯一性和 Main 不 trim 校验；首个任务必须无依赖，后续只能引用此前任务 ID。依赖结构与数组 shape 共享一次有界重试，重试不回显失败 input、第二次失败终止、绝不第三次调用。Plan 26/26、handoff 15/15、UI 16/16、完整 test/verify 和强制真实 Electron 37/37 通过，独立终审 P0/P1/P2=0。Exact candidate `1c7f178` 已重启，当前只待一次新 provider canary。默认模型仍为 MiniMax-M3，8 文件/240 KiB 上下文门禁不变。此前不得点击旧错误页重试或重复前三段。
 
 ### 4.3 明确不做
 

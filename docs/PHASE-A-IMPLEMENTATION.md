@@ -8,7 +8,7 @@
 
 > **历史工程交接（2026-07-29，0.0AC npm Developer Preview 本地签字收口）**：0.0AC 新增 macOS CLI、窄 npm 包、Node `>=22.12.0`、npm 10/11 fail-closed、Electron `43.2.0`、Main 观测 `did-finish-load` 后的 CLI readiness IPC 和零网络 `--check`；同时让 `sk-cp-` 图片能力进入 provider 现场门禁。该 readiness 只证明页面加载完成，不单独证明全部 workspace/bootstrap 逻辑成功。该批历史证据为 Persistent **3/3**、npm Preview **10/10**、installed **2/2**、真实 Electron **35/35**；当前候选只看下条。
 > **下一阶段合同**：`docs/AUTHOR-ACCEPTANCE-V1-CONTRACT.md` 已冻结，明确付费网络门禁、允许记录的隐私安全证据、真实长文旅程与发布前签字顺序。
-> **当前实现停点**：`writ-craft@0.1.1` 已公开到 npm `preview`，`latest` 仍为 `0.1.0`；唯一目标仍是 `RM-1.0 / 0.1.2` 真实作者闭环。项目卡、Inline 与 Chapter 已完成。0.0BW candidate `c6d8c44` 关闭 Plan 输出容量后，真实 operation `b915291982d14f8bb5520674280b3d0d` 在 13,590 ms 暴露首任务 `dependsOn` 被填入自然语言；before/after 0，项目零写入。0.0BX 将 ID/依赖统一为不 trim 的精确短 ASCII ID，在 Schema 内补字段说明和唯一性，并让依赖结构错误共享既有一次重试预算；第二次失败终止、绝不第三次调用。Plan 26/26、handoff 15/15、UI 16/16、完整 test/verify 与强制真实 Electron 37/37 通过，独立终审 P0/P1/P2=0；候选提交/重启和一次新 provider canary尚待完成。默认模型仍为 MiniMax-M3，显式 8 文件/240 KiB 上下文门禁不变。0.1.2 尚未发布；精确红绿只看 `v0/DEVELOPMENT-STATUS.md`。
+> **当前实现停点**：`writ-craft@0.1.1` 已公开到 npm `preview`，`latest` 仍为 `0.1.0`；唯一目标仍是 `RM-1.0 / 0.1.2` 真实作者闭环。项目卡、Inline 与 Chapter 已完成。0.0BW candidate `c6d8c44` 关闭 Plan 输出容量后，真实 operation `b915291982d14f8bb5520674280b3d0d` 在 13,590 ms 暴露首任务 `dependsOn` 被填入自然语言；before/after 0，项目零写入。0.0BX 将 ID/依赖统一为不 trim 的精确短 ASCII ID，在 Schema 内补字段说明和唯一性，并让依赖结构错误共享既有一次重试预算；第二次失败终止、绝不第三次调用。Plan 26/26、handoff 15/15、UI 16/16、完整 test/verify 与强制真实 Electron 37/37 通过，独立终审 P0/P1/P2=0。Exact candidate `1c7f178` 已重启，只待一次新 provider canary。默认模型仍为 MiniMax-M3，显式 8 文件/240 KiB 上下文门禁不变。0.1.2 尚未发布；精确红绿只看 `v0/DEVELOPMENT-STATUS.md`。
 > **路线图入口**：Phase A 已是工程地基，不再负责后续版本排期。当前唯一目标是 `docs/ROADMAP.md` 的 `RM-1.0 / writ-craft@0.1.2` 真实作者可用性闭环。
 
 ## 1. 阶段目标

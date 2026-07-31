@@ -4,8 +4,8 @@
 > 当前状态：**`writ-craft@0.1.1` 已从 exact candidate `c65981e` 发布到 npm `preview`；registry 时间 `2026-07-29T14:30:16.176Z`，shasum `d370c500666e25cfb373852deafa21b232d2bc18` 与本地候选一致。公网隔离安装/启动/退出为 2/2。annotated tag `v0.1.1` 指向同一提交，GitHub prerelease 已公开：`https://github.com/MaxHou-infinity/WritCraft/releases/tag/v0.1.1`。**
 > 发布判断：**0.1.1 Developer Preview 已完成版本、自动化、双架构安装、独立复审、npm 发布、公网安装和 GitHub prerelease。registry 标签保持 `preview: 0.1.1`、`latest: 0.1.0`，因此本次没有把 Preview 冒充稳定版，也没有执行 unpublish、占位发布或上传未签名 App/ZIP。**
 > 当前目标版本：**`docs/ROADMAP.md` 的 `RM-1.0 / writ-craft@0.1.2` 真实作者可用性闭环。必须使用 `edit.md`、5+ 个 `chapters/` 章节、2000+ 可见中文字符和至少 1 个来源文件的作者隔离副本，完成五段旅程，并关闭现场 `Graph INVALID_CACHE` 的诊断/恢复终态。0.1.2 签字前不得插入驾驶舱、新 AI 模式或其他后续版本功能。**
-> 当前源码证据：**0.0BW exact candidate `c6d8c44` 已关闭输出容量，但真实 operation `b915291982d14f8bb5520674280b3d0d` 暴露 `dependsOn` 字段协议缺口：MiniMax 在首个任务的依赖数组内放入自然语言，13,590 ms 后被 Main 以 `INVALID_MODEL_OUTPUT` 拒绝。0.0BX 在同一 named-tool 边界内为 milestone/task ID 与 `dependsOn` 增加短 ASCII ID 的字段级 Schema、说明、唯一性和不做 trim 的 Main 精确校验；首个任务必须 `[]`，后续只能引用此前任务 ID。该类纯结构错误共享既有最多一次重试预算，重试前仍重验全部冻结依赖，不回显失败 input，第二次失败终止，绝不第三次调用。Plan service **26/26**、handoff **15/15**、UI **16/16**，完整 `npm test`、批准 GUI `npm run verify` 和强制真实 Electron **37/37** 全部通过；独立终审 **P0=0/P1=0/P2=0，可提交**。最终候选提交/重启尚待完成。默认模型仍为 MiniMax-M3，8 文件/240 KiB 上下文门禁不变；0.1.2 未发布。**
-> 当前作者验收进度：**项目卡、Inline 与 Chapter 已关闭。第七副本 Plan 现累计八次真实零写入失败；最新 operation `b915291982d14f8bb5520674280b3d0d` 为 `plan/failed`、13,590 ms、before/after 0。`changes.json` 仍停在 `2026-07-31T00:17:15.803Z`，没有计划、任务卡、正文或 History 写入。在 0.0BX 完成独立复审、提交并重启前，作者不得点击旧错误页“重新生成”。**
+> 当前源码证据：**0.0BW exact candidate `c6d8c44` 已关闭输出容量，但真实 operation `b915291982d14f8bb5520674280b3d0d` 暴露 `dependsOn` 字段协议缺口：MiniMax 在首个任务的依赖数组内放入自然语言，13,590 ms 后被 Main 以 `INVALID_MODEL_OUTPUT` 拒绝。0.0BX 在同一 named-tool 边界内为 milestone/task ID 与 `dependsOn` 增加短 ASCII ID 的字段级 Schema、说明、唯一性和不做 trim 的 Main 精确校验；首个任务必须 `[]`，后续只能引用此前任务 ID。该类纯结构错误共享既有最多一次重试预算，重试前仍重验全部冻结依赖，不回显失败 input，第二次失败终止，绝不第三次调用。Plan service **26/26**、handoff **15/15**、UI **16/16**，完整 `npm test`、批准 GUI `npm run verify` 和强制真实 Electron **37/37** 全部通过；独立终审 **P0=0/P1=0/P2=0**。生产修复已提交为 exact candidate **`1c7f178`** 并从该提交重启开发 App；只待一次新 canary。默认模型仍为 MiniMax-M3，8 文件/240 KiB 上下文门禁不变；0.1.2 未发布。**
+> 当前作者验收进度：**项目卡、Inline 与 Chapter 已关闭。第七副本 Plan 现累计八次真实零写入失败；最新 operation `b915291982d14f8bb5520674280b3d0d` 为 `plan/failed`、13,590 ms、before/after 0。`changes.json` 仍停在 `2026-07-31T00:17:15.803Z`，没有计划、任务卡、正文或 History 写入。`1c7f178` 已重启到同一验收副本；作者现在只执行一次新 canary，不点击旧错误页“重新生成”。**
 > 0.0AA 历史保留红灯：**首轮真实 Electron 暴露 Inspector 在上下文失效时被清空、旧 5-chip 断言和项目 Chat 等待诊断；完整 test 又暴露 Plan 测试把 generation 函数正文写死。独立复审发现新请求预检窗口可提交不可见旧轮、同项目重开 UI/Main 串话、失败重开提前清会话及两项测试/错误文案缺口，均转为生产边界和回归后关闭。真实 Electron 曾连续两次在旧 Graph 恢复阶段超时；加入只读失败快照后该阶段连续四次通过，未改 Graph 产品逻辑，按重复同源证据关闭 timing P2。另一次 Chat preflight 红灯证明测试在恢复 `edit.md` 后未等待权威 watcher barrier；改为生产 `flushExternalChanges()` 收敛，而未放宽 Chat guard。该里程碑所有红运行保留，最终源码连续两次 34/34；后续 0.0AB 当时推进到 35/35，当前总链只看本文顶部当前里程碑。**
 > Graph 历史签字基线：**性能修复前的既有源码曾完整 `npm test`、Electron-enabled `npm run verify`、强制真实 Electron 26/26 exit 0；Graph Filter 15/15、Workbench 14/14、dynamic 5/5、Large 5/5、Watcher 15/15、Network 11/11、Intelligence 17/17，第二轮复审 P0=0/P1=0/P2=2。该数字只保留为历史过程；0.0AB 后来推进到 35/35，当前总链只看顶部当前里程碑。**
 > Graph 动态边界：**300 文件/1279 节点 cold-to-interactive、cache/incremental、筛选/内存/布局、AX/键鼠、三类纠错、stale/Issue→Changes、failure live、重启与项目隔离均进入真实 Electron；正文/History/ledger 的零写入门禁通过。**  
@@ -39,7 +39,7 @@ Chat 的三级 scope/context、Main-owned 多轮连续性、Onboarding v2、Rese
 - **根因**：工具 Schema 虽给 `dependsOn` 单项 32 字符上限，但没有字段级声明“只能是此前任务的精确短 ID；首个任务必须 `[]`”，provider 把自然语言前置说明放入数组。Main 又曾复用会 `.trim()` 的通用文本 validator，存在把 `" t1 "` 静默修成 `"t1"` 的 Schema/Main 分歧。
 - **生产修复**：milestone/task `id` 和 `dependsOn` 统一使用 `^[a-z][a-z0-9_-]{0,31}$`；Schema 增加字段说明与 `uniqueItems:true`，所有 Main ID/依赖校验不 trim、不猜测、不改写。提示明确首个任务依赖为空、后续只写此前短 ID。依赖长度、格式、重复或非法引用归入同一内容无关结构分类，与数组 shape 共享**一次**重试预算；失败 input 不进入重试 prompt，第二次仍错即停止，绝无第三次调用。
 - **回归**：新增自然语言依赖→一次恢复、二次仍错→两调用终止、拒绝内容不回显、零写入，以及 spaced milestone/task/dependency 不得静默规范化的动态证明。Plan **26/26**、handoff **15/15**、UI **16/16**；完整 `npm test`、批准 GUI `npm run verify` 与强制真实 Electron **37/37** 全部通过。
-- **独立复审与当前门禁**：复审发现并推动关闭 trim、`uniqueItems` 与旧 TODO 漂移，最终 **P0=0/P1=0/P2=0，可提交**。候选提交、开发 App 重启和一次新 canary 尚未完成；此前作者不得手动重试。
+- **独立复审、候选与当前门禁**：复审发现并推动关闭 trim、`uniqueItems` 与旧 TODO 漂移，最终 **P0=0/P1=0/P2=0**。生产修复、回归与同批文档已提交为 exact candidate **`1c7f178`**，开发 App 已从该提交重启；本轮没有自动发起付费调用。作者现在只执行一次新 canary。
 
 ### 0.0BW 2026-07-31 · 真实 tool 请求命中输出上限与 Plan 生成 envelope 二次收敛
 
@@ -949,7 +949,7 @@ Onboarding v2 已取代上述“容错解析完整 `editContent` + 部分创建�
 - [x] Research→Changes 产品链：建立 `writcraft.research-handoff/v1`，Main 按 card ID 重建 source revision/quote/locator，把来源绑定为只读依赖并进入 provenance；独立实现复审 P0/P1=0、全量 verify exit 0；**20/20** 是含 reject/A→B 的历史专项 Electron 证据，0.0AB 当时总链为 **35/35**，当前见顶部当前里程碑。
 - [x] Inline Rewrite 自动化链：既有写入/恢复链保持签字；0.0BJ 新增必填作者指令 composer 与 exact request v2，定向 Context 15/15、Main 11/11、transaction 14/14、integration 7/7、Renderer 11/11，完整 test/批准 GUI verify 与最终 Electron 37/37 通过，第三轮独立复审 P0=0/P1=0/P2=0。
 - [x] Inline Rewrite 当前候选真实作者旅程：第五副本已完成接受、独立拒绝与精确 Safe Undo，正文、History 和全项目 Markdown 摘要均回到操作前基线；项目卡与 Inline 均不再重跑。
-- [ ] Plan 生成已迁移到单一 named tool input；0.0BW `c6d8c44` 仅作为 2×2/6,120-byte 容量基线。0.0BX 已补 exact ID/dependsOn 协议，Plan 26/26 且独立复审 P0/P1/P2=0；当前仍待候选提交/重启及一次真实 MiniMax canary。
+- [ ] Plan 生成已迁移到单一 named tool input；0.0BW `c6d8c44` 仅作为 2×2/6,120-byte 容量基线。0.0BX exact candidate `1c7f178` 已补 exact ID/dependsOn 协议并重启，Plan 26/26 且独立复审 P0/P1/P2=0；当前只待一次真实 MiniMax canary。
 
 ### P2：Chat/Chapter 独立复审保留的非阻塞测试增强
 
