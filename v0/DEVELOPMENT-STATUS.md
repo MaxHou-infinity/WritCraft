@@ -54,9 +54,11 @@
 - ✅ 最终工作树完整 `npm test` 与批准 GUI `npm run verify` 均 exit 0；强制真实 Electron **37/37** exit 0，新阶段覆盖一次点击→正文内 Diff→拒绝零写入，以及接受→History provenance→Safe Undo 精确恢复。
 - ✅ 独立复审保留的首轮红灯：Schema 允许 640 个四字节字符但 Main `oldText` 仅允许 2 KiB；ChangeSet 构造可接受伪造 parsed；成功结果漏传 `fileCount`。第二轮又证明 WeakSet 品牌未绑定请求且可重放。最终改为 512 scalar 闭合上限、模块私有 WeakMap 绑定 exact snapshots/ranges identity 并单次消费、ChangeSet 前复验 exact slice、正确传播 `fileCount`；跨请求同内容、二次重放、512/513 emoji 和 action 返回链均有回归。
 - ✅ 第三轮独立只读复审 **P0=0、P1=0、P2=0，可以技术签字**；未沿用任何早于最终修复的旧结论。
-- ⬜ 作者授权隔离副本最短旅程验收。此前已签字的项目卡、Inline、Chapter、空项目结构、Chat、Graph 等不重测。
+- ✅ exact candidate 已提交为 **`1b51595 fix(navigation): bind unified edit authority`**；该提交包含最终生产修复、回归和本批文档，未推送、未发布。
+- ✅ 作者确认源再次只读预检为 eligible：20 files / 608,433 bytes / 12 chapters / 4,748 可见中文字符 / 1 source，digest 仍为 **`9d0898863636da74615481a669c3e40362a60176249870e6d1793380c85b4380`**。已通过生产复制事务创建新副本 **`/Users/maxhou/Desktop/Max 项目-2026/WritCraft 作者验收/WritCraft-0.1.2-作者验收-10`**，返回 `copyCreated=true / sourceUnchanged=true`；manifest `createdAt=2026-08-01T14:54:22.350Z`。副本继承的 3 条 History 与 23 条 metrics 均早于本次 manifest，不计入新旅程证据。
+- ⬜ 作者授权隔离副本最短旅程验收。稳定 profile 仅核验为 `configured=true / keyType=CODING_PLAN`，未读取或迁移 Key；开发 App 曾以 exact candidate 打开后已在本次暂停时用 SIGINT 正常关闭，尚未代作者触发 AI、接受、拒绝或撤销。此前已签字的项目卡、Inline、Chapter、空项目结构、Chat、Graph 等不重测。
 
-**暂停点 / 唯一下一步（2026-08-01）**：把当前最终源码与本文提交为 exact candidate；随后按 `AUTHOR-ACCEPTANCE-V1-CONTRACT.md` 从作者已确认的验收源创建一个新的隔离副本，只验“一张建议→一次点击→正文内 Diff→决定→Safe Undo”最短旅程及零写入/History/recovery/源项目不变。不要重复已经通过的自动化或已签字旅程，除非源码再次变化。不得回到旧 Research→Changes 人工转交，也不得发布 0.1.2。
+**暂停点 / 唯一下一步（2026-08-01）**：从 exact candidate `1b51595` 重新启动 **作者验收-10**，因导航 action ID 只在 Main 进程内有效，先在该副本重新生成一次 Navigation 以建立本次进程 authority（这不是重做已经签字的“建议是否有帮助”判断）；随后只验“一张建议→一次点击处理→正文内 Diff→作者接受→Safe Undo”。Diff 出现后应先停下，核验源项目不变、副本预览零写入以及 History/recovery 基线，再由作者决定并继续。不要重跑自动化或已签字旅程，除非源码再次变化；不得回到旧 Research→Changes 人工转交，也不得发布 0.1.2。
 
 ## 0. 续作口令
 
