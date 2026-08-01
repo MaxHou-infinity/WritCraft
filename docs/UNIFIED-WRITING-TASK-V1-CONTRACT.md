@@ -4,7 +4,7 @@
 > Product version: `writ-craft@0.1.2`
 > Public journey: Writing Navigation suggestion → inline review → explicit decision
 
-> Implementation checkpoint (2026-08-01): Main/Renderer/inline Diff/Safe Undo state handoff and focused automated checks are implemented locally. The deterministic provider fixture and 37-stage real-Electron script now cover one-click Diff, reject-zero-write, accept/History, and exact Safe Undo, but that GUI script has not run on this checkpoint because the Codex usage gate rejected launch. Full regression must be rerun because the last `npm test` session lost its terminal result. Real Electron, independent review, and real-author acceptance remain open; this is not release sign-off.
+> Implementation checkpoint (2026-08-01): Main/Renderer/inline Diff/Safe Undo state handoff is implemented. A real-Electron red run proved that asking the model to return an entire authorized range was incompatible with the 640-character local-change ceiling. The protocol now returns a short exact `oldText` anchor and its short `newText` replacement inside a Main-owned range; Main restores canonical path, revision and offsets and rejects missing, repeated, stale or overlapping anchors. Focused checks, full `npm test`, and real Electron 37/37 pass. The final `npm run verify` terminal receipt was lost and must be rerun; independent review and real-author acceptance remain open. This is not release sign-off.
 
 ## 1. Product decision
 
@@ -34,14 +34,14 @@ The task card always names the goal, for example “正在精简第一章开篇�
 
 ## 3. Generation envelope
 
-Main reconstructs `edit.md`, canonical suggestion evidence, current target snapshots, revisions, locators, and explicitly selected sources. The model receives bounded request-local evidence/range IDs and returns exactly one named `submit_unified_writing_task` tool input.
+Main reconstructs `edit.md`, canonical suggestion evidence, current target snapshots, revisions, locators, and explicitly selected sources. The model receives bounded request-local evidence/range IDs and returns exactly one named `submit_unified_writing_task` tool input. A `changes` item contains only `rangeId`, a short exact `oldText` anchor within that range, its short `newText` replacement, and a bounded summary. The model must not reproduce the full range or supply a path, revision, locator, or offset.
 
 The result is exactly one branch:
 
 - `changes`: 1–3 localized, non-overlapping edits over at most 3 authorized manuscript files; or
 - `needs_sources`: no edits, a bounded author-facing reason, and a focused source question.
 
-Main performs exact-key, ID-membership, size, overlap, revision, project-instance, attempt-owner, deadline, and late-result validation. Free text is never parsed into authority. A timed-out, cancelled, stale, old-project, duplicated, or expired result is discarded.
+Main requires each `oldText` to occur exactly once inside its frozen authorized range, converts that local UTF-16 position into canonical file offsets, and then performs exact-key, ID-membership, Unicode/byte-size, overlap, revision, project-instance, attempt-owner, deadline, and late-result validation. Missing or repeated anchors fail closed; Main never guesses, trims, fuzzy-matches, or repairs them. Free text is never parsed into authority. A timed-out, cancelled, stale, old-project, duplicated, or expired result is discarded.
 
 ## 4. Inline Diff review
 

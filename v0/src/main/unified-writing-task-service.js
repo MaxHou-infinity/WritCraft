@@ -5,9 +5,11 @@ const localizedEditService = require('./localized-edit-service');
 const TOOL_NAME = 'submit_unified_writing_task';
 const MAX_EDITS = 3;
 const MAX_RECOVERY_CHARS = 160;
-const MAX_TOOL_INPUT_BYTES = 8 * 1024;
+const MAX_OLD_TEXT_CHARS = 640;
+const MAX_TOOL_INPUT_BYTES = 20 * 1024;
 const SAFE_TEXT_PATTERN = '^(?!\\s)(?![\\s\\S]*\\s$)(?:[^\\u0000-\\u001f\\uD800-\\uDFFF]|[\\uD800-\\uDBFF][\\uDC00-\\uDFFF])+$';
 const SAFE_TEXT = /^(?:[^\u0000-\u001f\uD800-\uDFFF]|[\uD800-\uDBFF][\uDC00-\uDFFF])+$/u;
+const SAFE_MULTILINE = /^(?:[\t\n\r]|[^\u0000-\u001f\uD800-\uDFFF]|[\uD800-\uDBFF][\uDC00-\uDFFF])*$/u;
 
 class UnifiedWritingTaskError extends Error {
   constructor(code, message) {
@@ -88,9 +90,10 @@ function providerOptions(ranges) {
             items: {
               type: 'object',
               additionalProperties: false,
-              required: ['rangeId', 'newText', 'summary'],
+              required: ['rangeId', 'oldText', 'newText', 'summary'],
               properties: {
                 rangeId: { type: 'string', enum: rangeIds },
+                oldText: { ...multiline, minLength: 1, maxLength: MAX_OLD_TEXT_CHARS },
                 newText: multiline,
                 summary,
               },
@@ -110,9 +113,68 @@ function protocolPromptLines() {
     `必须且只能调用 ${TOOL_NAME} 一次；不要在文本中输出 JSON、Diff 或完整文件。`,
     `能够依据现有材料修改时，status 必须为 changes，提交 1–${MAX_EDITS} 个 edits，并让 reason 与 question 都为空字符串。`,
     '只有完成建议确实依赖当前没有提供的事实、数据或引用时，status 才能为 needs_sources；此时 edits 必须为空，并用 reason 说明缺口、用 question 提出一个聚焦的补充问题。',
-    `只能使用列出的 rangeId；每项 newText 最多 ${localizedEditService.STRUCTURED_MAX_NEW_TEXT_CHARS} 字，全部 newText 合计最多 ${localizedEditService.STRUCTURED_MAX_TOTAL_NEW_TEXT_CHARS} 字，summary 最多 ${localizedEditService.STRUCTURED_MAX_SUMMARY_CHARS} 字。`,
-    'Main 会恢复权威路径、revision、原文和偏移。不得返回这些字段，也不得把“希望查看更多内容”冒充必需来源缺口。',
+    `只能使用列出的 rangeId；每项 oldText 必须是该范围内唯一出现、需要修改的短原文且最多 ${MAX_OLD_TEXT_CHARS} 字；newText 只返回它的替换文本，最多 ${localizedEditService.STRUCTURED_MAX_NEW_TEXT_CHARS} 字，全部 newText 合计最多 ${localizedEditService.STRUCTURED_MAX_TOTAL_NEW_TEXT_CHARS} 字。`,
+    `每项 summary 最多 ${localizedEditService.STRUCTURED_MAX_SUMMARY_CHARS} 字。Main 会从 oldText 恢复权威路径、revision 和精确偏移；不得返回这些字段、完整范围或完整文件，也不得把“希望查看更多内容”冒充必需来源缺口。`,
   ];
+}
+
+function canonicalLocalizedEdits(input, snapshots, ranges) {
+  const trustedRanges = localizedEditService.validateStructuredRangeCatalog(ranges, snapshots);
+  const rangeById = new Map(trustedRanges.map(range => [range.rangeId, range]));
+  const edits = [];
+  let totalNewTextChars = 0;
+  for (const [index, raw] of input.edits.entries()) {
+    exactKeys(raw, ['rangeId', 'oldText', 'newText', 'summary'], `edits[${index}]`);
+    if (typeof raw.rangeId !== 'string' || !rangeById.has(raw.rangeId)) {
+      fail('UNAUTHORIZED_PATCH_RANGE', `edits[${index}] 试图修改未授权正文范围`);
+    }
+    if (typeof raw.oldText !== 'string' || !raw.oldText ||
+        typeof raw.newText !== 'string' || typeof raw.summary !== 'string' ||
+        !SAFE_MULTILINE.test(raw.oldText) || !SAFE_MULTILINE.test(raw.newText) ||
+        !SAFE_TEXT.test(raw.summary) || raw.summary !== raw.summary.trim()) {
+      fail('INVALID_MODEL_OUTPUT', `edits[${index}] 包含无效局部文本`);
+    }
+    if (Array.from(raw.oldText).length > MAX_OLD_TEXT_CHARS ||
+        Buffer.byteLength(raw.oldText, 'utf8') > localizedEditService.MAX_OLD_TEXT_BYTES) {
+      fail('PATCH_OLD_TEXT_TOO_LARGE', `edits[${index}].oldText 超过局部锚点上限`);
+    }
+    const newTextChars = Array.from(raw.newText).length;
+    totalNewTextChars += newTextChars;
+    if (newTextChars > localizedEditService.STRUCTURED_MAX_NEW_TEXT_CHARS ||
+        totalNewTextChars > localizedEditService.STRUCTURED_MAX_TOTAL_NEW_TEXT_CHARS ||
+        Buffer.byteLength(raw.newText, 'utf8') > localizedEditService.MAX_NEW_TEXT_BYTES) {
+      fail('PATCH_NEW_TEXT_TOO_LARGE', `edits[${index}].newText 超过局部替换上限`);
+    }
+    if (Array.from(raw.summary).length > localizedEditService.STRUCTURED_MAX_SUMMARY_CHARS) {
+      fail('INVALID_MODEL_OUTPUT', `edits[${index}].summary 超过上限`);
+    }
+    const range = rangeById.get(raw.rangeId);
+    const localStart = range.content.indexOf(raw.oldText);
+    if (localStart < 0) {
+      fail('PATCH_ANCHOR_NOT_FOUND', `edits[${index}].oldText 不在授权范围内`);
+    }
+    if (range.content.indexOf(raw.oldText, localStart + 1) >= 0) {
+      fail('PATCH_ANCHOR_NOT_UNIQUE', `edits[${index}].oldText 在授权范围内不唯一`);
+    }
+    edits.push(Object.freeze({
+      path: range.path,
+      revision: range.revision,
+      start: range.start + localStart,
+      end: range.start + localStart + raw.oldText.length,
+      newText: raw.newText,
+      summary: raw.summary,
+    }));
+  }
+  const ordered = [...edits].sort((left, right) =>
+    left.path.localeCompare(right.path) || left.start - right.start || left.end - right.end);
+  for (let index = 1; index < ordered.length; index += 1) {
+    const previous = ordered[index - 1];
+    const current = ordered[index];
+    if (current.path === previous.path && current.start < previous.end) {
+      fail('PATCH_OVERLAP', '统一任务局部修改不得重叠');
+    }
+  }
+  return Object.freeze(edits);
 }
 
 function parseResult(model, snapshots, ranges) {
@@ -151,25 +213,30 @@ function parseResult(model, snapshots, ranges) {
   if (input.reason || input.question) {
     fail('INVALID_MODEL_OUTPUT', '修改结果不得同时请求补充来源');
   }
-  const localizedModel = Object.freeze({
-    ...model,
-    toolUse: Object.freeze({
-      ...model.toolUse,
-      name: localizedEditService.STRUCTURED_TOOL_NAME,
-      input: Object.freeze({ edits: input.edits }),
-    }),
-  });
-  localizedEditService.parseStructuredModelEdits(localizedModel, snapshots, ranges);
-  return Object.freeze({ kind: 'changes', model: localizedModel });
+  const edits = canonicalLocalizedEdits(input, snapshots, ranges);
+  return Object.freeze({ kind: 'changes', edits });
+}
+
+function buildChangeSet({ snapshots, edits, changeSetService }) {
+  if (!changeSetService || typeof changeSetService.createChangeSet !== 'function') {
+    fail('INVALID_PATCH_SERVICE', '统一任务修改结果处理器不可用');
+  }
+  const proposals = localizedEditService.structuredEditsToProposals(snapshots, edits);
+  if (!proposals.length) return Object.freeze({ noChanges: true, editCount: edits.length });
+  const changeSet = changeSetService.createChangeSet(snapshots, proposals);
+  if (!changeSet.changes.length) return Object.freeze({ noChanges: true, editCount: edits.length });
+  return Object.freeze({ noChanges: false, editCount: edits.length, changeSet });
 }
 
 module.exports = Object.freeze({
   TOOL_NAME,
   MAX_EDITS,
   MAX_RECOVERY_CHARS,
+  MAX_OLD_TEXT_CHARS,
   MAX_TOOL_INPUT_BYTES,
   UnifiedWritingTaskError,
   providerOptions,
   protocolPromptLines,
   parseResult,
+  buildChangeSet,
 });

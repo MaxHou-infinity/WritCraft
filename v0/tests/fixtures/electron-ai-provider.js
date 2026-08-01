@@ -548,7 +548,8 @@ function unifiedWritingTaskAnswer(prompt, request) {
     status: 'changes',
     edits: [{
       rangeId: target.rangeId,
-      newText: target.content.replace(UNIFIED_BEFORE, UNIFIED_AFTER),
+      oldText: UNIFIED_BEFORE,
+      newText: UNIFIED_AFTER,
       summary: '验证正文内统一任务 Diff',
     }],
     reason: '',

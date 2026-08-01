@@ -1419,6 +1419,7 @@ async function run() {
           paragraph(${JSON.stringify(electronAiFixture.REWRITE_TARGET)}), blank(),
           paragraph(${JSON.stringify(electronAiFixture.REWRITE_AFTER)}), blank(),
           paragraph(${JSON.stringify(electronAiFixture.REWRITE_FAR)}), blank(),
+          paragraph(${JSON.stringify(electronAiFixture.UNIFIED_BEFORE)}), blank(),
           paragraph(${JSON.stringify(marker)})
         );
         editor.dispatchEvent(new InputEvent('input', { bubbles: true, inputType: 'insertParagraph' }));
@@ -1925,11 +1926,29 @@ async function run() {
     });
 
     await stage('generates one Writing Navigation suggestion and rejects its inline Diff with zero manuscript writes', async () => {
+      const targetBefore = projectService.readFile(project.rootPath, createdPath);
+      assert(targetBefore.includes(electronAiFixture.UNIFIED_BEFORE),
+        'the unified-task fixture marker must still exist on disk after earlier independent stages');
+      await first.client.evaluate(`window.__workspace.openFile(${JSON.stringify(project.chapterPaths[0])})`);
+      await waitForValue(first.client,
+        `window.__workspace.state.currentPath === ${JSON.stringify(project.chapterPaths[0])}`,
+        'switching away before the isolated unified-task journey');
       await first.client.evaluate(`window.__workspace.openFile(${JSON.stringify(createdPath)})`);
-      await waitForValue(first.client, `(() =>
-        window.__workspace.state.currentPath === ${JSON.stringify(createdPath)} &&
-        window.__editor.getContent().includes(${JSON.stringify(electronAiFixture.UNIFIED_BEFORE)})
-      )()`, 'the unified writing task target file');
+      try {
+        await waitForValue(first.client, `(() =>
+          window.__workspace.state.currentPath === ${JSON.stringify(createdPath)} &&
+          window.__editor.getContent().includes(${JSON.stringify(electronAiFixture.UNIFIED_BEFORE)})
+        )()`, 'the unified writing task target file');
+      } catch (error) {
+        const snapshot = await first.client.evaluate(`(() => ({
+          currentPath: window.__workspace?.state?.currentPath || '',
+          dirty: Boolean(window.__workspace?.state?.dirty),
+          blocked: Boolean(window.__workspace?.state?.inlineMutationBlocked),
+          saveState: document.getElementById('save-state')?.textContent || '',
+          hasMarker: window.__editor?.getContent?.().includes(${JSON.stringify(electronAiFixture.UNIFIED_BEFORE)}) || false,
+        }))()`).catch(() => null);
+        throw new Error(`${error.message}; state=${JSON.stringify(snapshot)}`);
+      }
       const markdownBefore = snapshotMarkdownFiles(project.rootPath);
       const navigation = await first.client.evaluate(`(() => {
         document.querySelector('[data-assistant-mode="navigation"]').click();
@@ -1937,14 +1956,15 @@ async function run() {
         const goal = host.querySelector('textarea');
         goal.value = ${JSON.stringify(electronAiFixture.UNIFIED_NAVIGATION_GOAL)};
         goal.dispatchEvent(new Event('input', { bubbles: true }));
-        host.querySelector('[data-navigation-action="generate"]').click();
-        return {
+        const snapshot = {
           planTabExists: Boolean(document.querySelector('[data-assistant-mode="plan"]')),
           navigationSelected: document.querySelector('[data-assistant-mode="navigation"]')
             .getAttribute('aria-selected'),
           hasGoal: goal.value.length > 0,
           hasEvidencePromise: host.textContent.includes('原文依据'),
         };
+        host.querySelector('[data-navigation-action="generate"]').click();
+        return snapshot;
       })()`);
       assert.deepStrictEqual(navigation, {
         planTabExists: false,
@@ -1974,16 +1994,32 @@ async function run() {
       );
 
       await first.client.evaluate(`document.querySelector('.writing-navigation__suggestion .writing-navigation__primary').click()`);
-      const inlineReview = await waitForValue(first.client, `(() => {
-        const wrapper = document.querySelector('.changes-inline-review');
-        if (!wrapper || !wrapper.textContent.includes(${JSON.stringify(electronAiFixture.UNIFIED_AFTER)})) return null;
-        return {
-          mode: window.__assistantDock.getMode(),
-          hasRemove: Boolean(wrapper.querySelector('.changes-inline-review__text.is-remove[aria-label="AI 建议删除"]')),
-          hasAdd: Boolean(wrapper.querySelector('.changes-inline-review__text.is-add[aria-label="AI 建议新增"]')),
+      let inlineReview;
+      try {
+        inlineReview = await waitForValue(first.client, `(() => {
+          const wrapper = document.querySelector('.changes-inline-review');
+          if (!wrapper || !wrapper.textContent.includes(${JSON.stringify(electronAiFixture.UNIFIED_AFTER)})) return null;
+          return {
+            mode: window.__assistantDock.getMode(),
+            hasRemove: Boolean(wrapper.querySelector('.changes-inline-review__text.is-remove[aria-label="AI 建议删除"]')),
+            hasAdd: Boolean(wrapper.querySelector('.changes-inline-review__text.is-add[aria-label="AI 建议新增"]')),
+            writeState: document.querySelector('.writing-navigation__write-state')?.textContent || '',
+          };
+        })()`, 'the inline unified-task Diff');
+      } catch (error) {
+        const snapshot = await first.client.evaluate(`(() => ({
+          mode: window.__assistantDock?.getMode?.() || '',
+          taskStage: document.querySelector('.writing-navigation__task-stage')?.textContent || '',
           writeState: document.querySelector('.writing-navigation__write-state')?.textContent || '',
-        };
-      })()`, 'the inline unified-task Diff');
+          publicError: document.querySelector('.writing-navigation__status--error')?.textContent || '',
+          reviewText: document.querySelector('.changes-inline-review')?.textContent || '',
+          reviewHtml: document.querySelector('.changes-inline-review')?.outerHTML || '',
+          generationState: document.getElementById('writing-navigation-host')?.dataset?.generationState || '',
+          editorHasBefore: window.__editor?.getContent?.().includes(${JSON.stringify(electronAiFixture.UNIFIED_BEFORE)}) || false,
+          editorHasAfter: window.__editor?.getContent?.().includes(${JSON.stringify(electronAiFixture.UNIFIED_AFTER)}) || false,
+        }))()`).catch(() => null);
+        throw new Error(`${error.message}; state=${JSON.stringify(snapshot)}; process=${boundedLog(first.logRef.value)}`);
+      }
       assert.deepStrictEqual(inlineReview, {
         mode: 'navigation', hasRemove: true, hasAdd: true,
         writeState: '尚未写入；接受后才会修改文件',

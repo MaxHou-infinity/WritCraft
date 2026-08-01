@@ -28,14 +28,19 @@ test('provider forces one named tool with a 1–3 edit ceiling', () => {
   assert.deepStrictEqual(options.toolChoice, { type: 'tool', name: service.TOOL_NAME });
   assert.strictEqual(options.tools[0].input_schema.properties.edits.maxItems, 3);
   assert.deepStrictEqual(options.tools[0].input_schema.properties.edits.items.properties.rangeId.enum, ['range_1']);
+  assert.strictEqual(options.tools[0].input_schema.properties.edits.items.required.includes('oldText'), true);
 });
 
-test('changes converts validated IDs to Main-owned localized input', () => {
+test('changes converts a unique bounded anchor to Main-owned exact offsets', () => {
   const result = service.parseResult(model({ status: 'changes',
-    edits: [{ rangeId: 'range_1', newText: '## 开篇\n\n更清晰的作者原文。\n', summary: '精简开篇' }],
+    edits: [{ rangeId: 'range_1', oldText: '作者原文。', newText: '更清晰的作者原文。', summary: '精简开篇' }],
     reason: '', question: '' }), snapshots, ranges);
   assert.strictEqual(result.kind, 'changes');
-  assert.strictEqual(result.model.toolUse.name, localized.STRUCTURED_TOOL_NAME);
+  assert.deepStrictEqual(result.edits[0], {
+    path: 'chapters/01.md', revision: snapshots[0].revision,
+    start: content.indexOf('作者原文。'), end: content.indexOf('作者原文。') + '作者原文。'.length,
+    newText: '更清晰的作者原文。', summary: '精简开篇',
+  });
 });
 
 test('needs-sources returns one focused recovery question and no edit', () => {
@@ -47,16 +52,47 @@ test('needs-sources returns one focused recovery question and no edit', () => {
 
 test('mixed changes and source recovery is rejected', () => {
   expectCode('INVALID_MODEL_OUTPUT', () => service.parseResult(model({ status: 'changes',
-    edits: [{ rangeId: 'range_1', newText: content, summary: '保持原文' }],
+    edits: [{ rangeId: 'range_1', oldText: '作者原文。', newText: '作者原文。', summary: '保持原文' }],
     reason: '仍缺来源', question: '' }), snapshots, ranges));
 });
 
 test('zero-edit changes and more than three edits are rejected', () => {
   expectCode('INVALID_MODEL_OUTPUT', () => service.parseResult(model({
     status: 'changes', edits: [], reason: '', question: '' }), snapshots, ranges));
-  const edits = Array.from({ length: 4 }, () => ({ rangeId: 'range_1', newText: content, summary: '保持原文' }));
+  const edits = Array.from({ length: 4 }, () => ({ rangeId: 'range_1', oldText: '作者原文。', newText: '作者原文。', summary: '保持原文' }));
   expectCode('TOO_MANY_PATCH_EDITS', () => service.parseResult(model({
     status: 'changes', edits, reason: '', question: '' }), snapshots, ranges));
+});
+
+test('long ranges accept a short local replacement without reproducing the range', () => {
+  const longContent = `## 长章节\n\n${'很长的正文。'.repeat(300)}唯一锚点。\n`;
+  const longSnapshots = [{ path: 'chapters/long.md', content: longContent, revision: crypto.createHash('sha256').update(longContent).digest('hex') }];
+  const longRanges = localized.buildStructuredRangeCatalog(longSnapshots);
+  const parsed = service.parseResult(model({ status: 'changes', edits: [{
+    rangeId: 'range_1', oldText: '唯一锚点。', newText: '精简锚点。', summary: '精简局部',
+  }], reason: '', question: '' }), longSnapshots, longRanges);
+  const built = service.buildChangeSet({ snapshots: longSnapshots, edits: parsed.edits,
+    changeSetService: { createChangeSet: (_snapshots, proposals) => ({ changes: proposals }) } });
+  assert.strictEqual(built.noChanges, false);
+  assert(built.changeSet.changes[0].after.includes('精简锚点。'));
+  assert(!built.changeSet.changes[0].after.includes('唯一锚点。'));
+});
+
+test('missing, repeated and overlapping anchors fail closed', () => {
+  expectCode('PATCH_ANCHOR_NOT_FOUND', () => service.parseResult(model({ status: 'changes', edits: [{
+    rangeId: 'range_1', oldText: '不存在', newText: '替换', summary: '修改',
+  }], reason: '', question: '' }), snapshots, ranges));
+  const repeatedContent = '## 开篇\n\n重复原文。重复原文。\n';
+  const repeatedSnapshots = [{ path: 'chapters/repeated.md', content: repeatedContent,
+    revision: crypto.createHash('sha256').update(repeatedContent).digest('hex') }];
+  const repeatedRanges = localized.buildStructuredRangeCatalog(repeatedSnapshots);
+  expectCode('PATCH_ANCHOR_NOT_UNIQUE', () => service.parseResult(model({ status: 'changes', edits: [{
+    rangeId: 'range_1', oldText: '重复原文。', newText: '替换', summary: '修改',
+  }], reason: '', question: '' }), repeatedSnapshots, repeatedRanges));
+  expectCode('PATCH_OVERLAP', () => service.parseResult(model({ status: 'changes', edits: [
+    { rangeId: 'range_1', oldText: '作者原文。', newText: '替换', summary: '修改一' },
+    { rangeId: 'range_1', oldText: '原文。', newText: '替换', summary: '修改二' },
+  ], reason: '', question: '' }), snapshots, ranges));
 });
 
 test('free text, multiple tools and max-token partial output never become authority', () => {

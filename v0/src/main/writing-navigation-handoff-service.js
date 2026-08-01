@@ -309,15 +309,19 @@ function needsSourcesHandoff(preparedHandoff, parsed) {
   });
 }
 
-function finalizeChangesHandoff({ preparedHandoff, model, changeSetService }) {
-  const finalized = projectChangesProposalService.finalizeProjectChangesProposal({
-    prepared: preparedHandoff.prepared,
-    model,
+function finalizeChangesHandoff({ preparedHandoff, parsed, changeSetService }) {
+  if (parsed?.kind !== 'changes' || !Array.isArray(parsed.edits)) {
+    fail('INVALID_MODEL_OUTPUT', '统一任务修改结果无效');
+  }
+  const finalized = unifiedWritingTaskService.buildChangeSet({
+    snapshots: preparedHandoff.prepared.snapshots,
+    edits: parsed.edits,
     changeSetService,
   });
-  if (!finalized.ok || finalized.noChanges) {
+  if (finalized.noChanges) {
     return Object.freeze({
-      ...finalized,
+      ok: true,
+      noChanges: true,
       kind: 'changes',
       provenance: preparedHandoff.provenance,
     });

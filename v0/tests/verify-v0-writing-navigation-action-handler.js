@@ -48,7 +48,8 @@ function structuredModel(edits) {
 function noopModel() {
   return structuredModel([{
     rangeId: 'range_1',
-    newText: CHAPTER,
+    oldText: '这是作者已经写下的正文证据。',
+    newText: '这是作者已经写下的正文证据。',
     summary: '保持原文',
   }]);
 }
@@ -168,7 +169,8 @@ async function setup(action, overrides = {}) {
         providerOptionsSeen = providerOptions;
         return structuredModel([{
               rangeId: 'range_1',
-              newText: '# 第一章\n\n这是作者已经写下的正文证据，例如一次真实访谈。\n',
+              oldText: '这是作者已经写下的正文证据。',
+              newText: '这是作者已经写下的正文证据，例如一次真实访谈。',
               summary: '补充例子',
             }]);
       },
@@ -359,7 +361,8 @@ async function setup(action, overrides = {}) {
         state.setPending(true);
         return structuredModel([{
             rangeId: 'range_1',
-            newText: '# 第一章\n\n新的内容。\n',
+            oldText: '这是作者已经写下的正文证据。',
+            newText: '新的内容。',
             summary: '修改',
           }]);
       },
@@ -470,6 +473,7 @@ async function setup(action, overrides = {}) {
         providerCalls += 1;
         return structuredModel([{
           rangeId: 'range_1',
+          oldText: '这是作者已经写下的正文证据。',
           newText: 'x'.repeat(641),
           summary: '超大结果',
         }]);
@@ -523,6 +527,7 @@ async function setup(action, overrides = {}) {
         providerCalls += 1;
         return structuredModel([{
           rangeId: 'range_1',
+          oldText: '这是作者已经写下的正文证据。',
           newText: 'x'.repeat(641),
           summary: '仍然超限',
         }]);
@@ -543,6 +548,7 @@ async function setup(action, overrides = {}) {
         state.projectService.files.set('chapters/01.md', `${CHAPTER}\n外部变化`);
         return structuredModel([{
           rangeId: 'range_1',
+          oldText: '这是作者已经写下的正文证据。',
           newText: 'x'.repeat(641),
           summary: '超限',
         }]);

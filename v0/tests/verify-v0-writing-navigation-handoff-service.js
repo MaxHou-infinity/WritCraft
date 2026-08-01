@@ -212,18 +212,16 @@ async function authority(action, chapter = CHAPTER) {
     assert.match(prepared.prepared.messages[0].content, /1–3 个 edits/);
     const result = handoffService.finalizeChangesHandoff({
       preparedHandoff: prepared,
-      model: {
-        ok: true,
-        stopReason: 'tool_use',
-        toolUseBlockCount: 1,
-        toolUse: {
-          name: 'submit_localized_edits',
-          input: { edits: [{
-            rangeId: 'range_1',
-            newText: '# 第一章\n\n这是作者已经写下的正文证据，例如一次真实访谈。\n',
-            summary: '补充例子',
-          }] },
-        },
+      parsed: {
+        kind: 'changes',
+        edits: [{
+          path: 'chapters/01.md',
+          revision: revision(CHAPTER),
+          start: CHAPTER.indexOf('这是作者已经写下的正文证据。'),
+          end: CHAPTER.indexOf('这是作者已经写下的正文证据。') + '这是作者已经写下的正文证据。'.length,
+          newText: '这是作者已经写下的正文证据，例如一次真实访谈。',
+          summary: '补充例子',
+        }],
       },
       changeSetService,
     });

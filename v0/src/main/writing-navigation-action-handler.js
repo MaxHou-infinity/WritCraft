@@ -299,7 +299,7 @@ function createWritingNavigationActionHandler(options = {}) {
       }
       const result = handoffService.finalizeChangesHandoff({
         preparedHandoff,
-        model: parsed.model,
+        parsed,
         changeSetService,
       });
       if (!result.ok) {

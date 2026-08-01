@@ -1,11 +1,11 @@
 # 笔触 · WritCraft · V0 开发状态与续作入口
 
-> 最后更新：2026-08-01（Asia/Shanghai，0.0CM · 统一写作任务流自动化夹具检查点，待真实 Electron/复审/作者验收）
+> 最后更新：2026-08-01（Asia/Shanghai，0.0CM · 统一写作任务流长正文局部锚点检查点，待完整 verify 终态/复审/作者验收）
 > 当前状态：**`writ-craft@0.1.1` 已从 exact candidate `c65981e` 发布到 npm `preview`；registry 时间 `2026-07-29T14:30:16.176Z`，shasum `d370c500666e25cfb373852deafa21b232d2bc18` 与本地候选一致。公网隔离安装/启动/退出为 2/2。annotated tag `v0.1.1` 指向同一提交，GitHub prerelease 已公开：`https://github.com/MaxHou-infinity/WritCraft/releases/tag/v0.1.1`。**
 > 发布判断：**0.1.1 Developer Preview 已完成版本、自动化、双架构安装、独立复审、npm 发布、公网安装和 GitHub prerelease。registry 标签保持 `preview: 0.1.1`、`latest: 0.1.0`，因此本次没有把 Preview 冒充稳定版，也没有执行 unpublish、占位发布或上传未签名 App/ZIP。**
 > 当前目标版本：**`docs/ROADMAP.md` 的 `RM-1.2 / writ-craft@0.1.2` 真实作者可用性闭环。当前唯一开发纵切是 `UNIFIED-WRITING-TASK-V1-CONTRACT.md`：把 Navigation 建议、必要依据核对、正文内 Diff、决定和 Safe Undo 合并为同一任务。不得继续派发旧公开 Research→Changes 多步旅程，也不得插入驾驶舱或其他后续版本功能。**
 > 当前源码证据：**旧 Plan 公共入口已移除，右栏固定为 Chat / 导航 / Context / Changes。Navigation→Changes 使用 Main-owned revision-bound range 协议；刷新恢复、固定 Research/Changes 双动作及 Research handoff 安全重入均已实现。0.0CL 又把初始 Research 从模型自由文本 JSON 迁移为唯一具名 `submit_research_cards` tool-use：接口 Schema 限制来源 ID、字段、数量和长度，Main 再做 exact-key、字节、逐字 quote、locator、revision 与末端 stale 校验；围栏、解释文本、零/多 tool block、截断和越权来源均零写入失败。Research Main **12+15+12+10+4**、Main integration **12/12**、Renderer **17+13** 全绿；完整 `npm test` 与批准 GUI `npm run verify` 均 exit 0。真实 Electron 首次因夹具把未知请求误路由为 Research 而红，修正夹具后一次在完成 28 阶段时出现 CDP `Runtime.evaluate` 超时，随后同源复跑 **36/36**；该时序红灯保留为 P2，不用产品代码掩盖。**
-> 当前作者验收进度：**项目卡、Inline、Chapter、空项目结构规划、Navigation 生成/原文定位/帮助度，以及旧 Navigation→Changes→接受→Safe Undo 的技术链已关闭。新的真实红灯必须保留：作者在旧默认流程中经历 Navigation→Research→Changes 的重复跳转和选择，已忘记任务目标；另一次 AI 操作在底层网络时限后仍停留“处理中”超过三分钟。0.0CM 已完成一轮生产实现与定向自动化：单一“处理这个建议”、同任务 `needs_sources` 恢复、Main 具名结构输出、正文内瞬态 Diff、15 秒取消、60 秒 Renderer 终态/50 秒 Main deadline、接受/拒绝和 Safe Undo 状态回传均已接入。确定性 provider fixture 与真实 Electron 最短阶段也已写入测试代码，但强制 GUI 命令因 Codex 当前使用额度门禁未实际启动；完整 `npm test` 的后台会话在上下文收缩后无法取得终态，必须重跑。当前仍未完成真实 Electron、独立复审和真实作者最短链路，不能称为用户可用或 0.1.2 候选完成。**
+> 当前作者验收进度：**项目卡、Inline、Chapter、空项目结构规划、Navigation 生成/原文定位/帮助度，以及旧 Navigation→Changes→接受→Safe Undo 的技术链已关闭。新的真实红灯必须保留：作者在旧默认流程中经历 Navigation→Research→Changes 的重复跳转和选择，已忘记任务目标；另一次 AI 操作在底层网络时限后仍停留“处理中”超过三分钟。0.0CM 已完成单一“处理这个建议”、同任务 `needs_sources` 恢复、正文内瞬态 Diff、15 秒取消、60 秒 Renderer 终态/50 秒 Main deadline、接受/拒绝和 Safe Undo 状态回传。2026-08-01 真实 Electron 又暴露长章节仍会触发 `PATCH_NEW_TEXT_TOO_LARGE`：统一工具错误要求模型返回整个授权范围，而单项 `newText` 上限仅 640 字。当前工作区已改为 `rangeId + oldText + newText + summary` 的短局部锚点协议，Main 只接受授权范围内唯一逐字锚点并恢复 canonical path/revision/offset；专项、完整 `npm test` 和真实 Electron **37/37** 已通过。最后一轮 `npm run verify` 已执行但终态回执在上下文收缩时丢失，不能登记为通过；独立复审和真实作者最短链路仍开放，不能称为 0.1.2 候选完成。**
 > 0.0AA 历史保留红灯：**首轮真实 Electron 暴露 Inspector 在上下文失效时被清空、旧 5-chip 断言和项目 Chat 等待诊断；完整 test 又暴露 Plan 测试把 generation 函数正文写死。独立复审发现新请求预检窗口可提交不可见旧轮、同项目重开 UI/Main 串话、失败重开提前清会话及两项测试/错误文案缺口，均转为生产边界和回归后关闭。真实 Electron 曾连续两次在旧 Graph 恢复阶段超时；加入只读失败快照后该阶段连续四次通过，未改 Graph 产品逻辑，按重复同源证据关闭 timing P2。另一次 Chat preflight 红灯证明测试在恢复 `edit.md` 后未等待权威 watcher barrier；改为生产 `flushExternalChanges()` 收敛，而未放宽 Chat guard。该里程碑所有红运行保留，最终源码连续两次 34/34；后续 0.0AB 当时推进到 35/35，当前总链只看本文顶部当前里程碑。**
 > Graph 历史签字基线：**性能修复前的既有源码曾完整 `npm test`、Electron-enabled `npm run verify`、强制真实 Electron 26/26 exit 0；Graph Filter 15/15、Workbench 14/14、dynamic 5/5、Large 5/5、Watcher 15/15、Network 11/11、Intelligence 17/17，第二轮复审 P0=0/P1=0/P2=2。该数字只保留为历史过程；0.0AB 后来推进到 35/35，当前总链只看顶部当前里程碑。**
 > Graph 动态边界：**300 文件/1279 节点 cold-to-interactive、cache/incremental、筛选/内存/布局、AX/键鼠、三类纠错、stale/Issue→Changes、failure live、重启与项目隔离均进入真实 Electron；正文/History/ledger 的零写入门禁通过。**  
@@ -47,15 +47,16 @@
 - ✅ Main 统一 attempt 编排、50 秒 provider deadline、显式取消和唯一具名 `needs_sources | changes` 结构协议；单次严格限制 1–3 个局部修改，不自动付费重试。
 - ✅ Renderer 同任务状态机、单一主动作、同任务来源恢复、15 秒可取消与 60 秒硬终态；保存阶段超时也会阻止迟到 provider 调用。
 - ✅ 主编辑器瞬态 inline ChangeSet review：删除为红色删除线、新增为绿色插入，单块审阅移除冗余批量按钮；确认前稳定正文与磁盘保持不变。接受结果绑定 History，Safe Undo 会回传同一导航任务显示“已安全撤销”。
-- ✅ 2026-08-01 收口定向证据：Unified service **8/8**、action handler **20/20**、Renderer state **14/14**、dynamic **12/12**、production integration **8/8**、Changes review UX **12/12**，相关 JS 语法检查通过。此前本实现批完整 `npm test` 曾 exit 0，但最新 Safe Undo 状态回传之后只重跑了上述定向集合，不能冒充当前完整签字。
+- ✅ 2026-08-01 收口定向证据：Unified service **10/10**、handoff **8/8**、action handler **20/20**、Renderer state **14/14**、dynamic **12/12**、production integration **8/8**、Changes review UX **12/12**；`npm run verify:navigation` 全链、相关 JS 语法和 `git diff --check` 通过。
 - ✅ 2026-08-01 E2E 夹具检查点：`electron-ai-provider` 已严格识别 `submit_writing_navigation` 与 `submit_unified_writing_task` 两个具名工具，并用请求内 evidence/range ID 生成确定性局部修改；真实 Electron 脚本由 **36 个历史阶段调整为 37 个现行阶段**，新增“建议一次点击 → 正文内 Diff → 拒绝零写入”与“接受 → History provenance → Safe Undo 精确恢复”。两个变更文件 `node --check` 通过，`npm run verify:navigation` 全链通过，`git diff --check` 通过。
 - ⚠️ 红灯保留：首次完整 `npm test` 暴露已退休“自动重试”断言；新增全程 timeout 后，dynamic 测试曾误取已清除的旧 generation timer；integration 曾因跨 VM prototype 使用 `deepStrictEqual` 失败。三者均判定为测试漂移并修正，原始失败不能由复跑绿灯抹除。
-- ⚠️ 当前环境门禁：`WRITCRAFT_E2E_FORCE=1 npm run e2e:electron` 的批准 GUI 请求被 Codex 使用额度门禁拒绝，**没有启动 Electron，也没有形成产品红/绿结论**。不得绕过门禁或把旧 36/36 当作本轮证据。
-- ⚠️ 完整回归终态未知：本轮启动了 `npm test`，但执行会话在上下文收缩后丢失，无法证明 exit code；恢复后必须原样重跑，不得登记为通过。
-- ⬜ 当前夹具源码的完整 `npm test`、`npm run verify`、强制真实 Electron 37/37、独立复审 P0/P1=0。
+- ⚠️ 真实 Electron 红灯及根因：首轮目标标记被更早 Inline 夹具重建正文时遗漏；修正夹具生命周期后，生产边界稳定返回 `PATCH_NEW_TEXT_TOO_LARGE`。后者不是测试漂移：统一工具要求模型复述整个长范围，与 640 字局部输出上限自相矛盾。现改为范围内短 `oldText` 唯一锚点和短 `newText`，路径、revision、offset、唯一性及重叠仍由 Main fail-closed 校验。红运行均保留，未靠扩大 AI 权限或放宽校验掩盖。
+- ✅ 当前工作区在上述修复后完整 `npm test` exit 0；强制真实 Electron **37/37** exit 0，新阶段覆盖一次点击→正文内 Diff→拒绝零写入，以及接受→History provenance→Safe Undo 精确恢复。
+- ⚠️ 最后一轮批准 GUI `npm run verify` 已执行，但后台会话终态回执在上下文收缩后丢失；它既不能登记为绿灯，也没有可归类的产品红灯。恢复后只需在当前 exact commit 原样重跑并保存 exit code。
+- ⬜ 本检查点本地提交后仍需重跑 `npm run verify`、完成独立复审 P0/P1=0，并执行作者授权隔离副本的统一任务最短旅程。
 - ⬜ 作者授权隔离副本最短旅程验收。此前已签字的项目卡、Inline、Chapter、空项目结构、Chat、Graph 等不重测。
 
-**暂停点 / 唯一下一步（2026-08-01）**：恢复时先核对 Git HEAD 与工作区，然后从 `v0/` 原样重跑 `npm test`；通过后运行 `npm run verify`。额度门禁解除后再运行 `WRITCRAFT_E2E_FORCE=1 npm run e2e:electron`，目标为现行 **37/37**；任何红灯必须保留并先分类。随后才做独立复审和作者隔离副本最短旅程。不得重写已完成夹具、回到旧 Research→Changes 人工转交、重测已签字旅程或发布 0.1.2。
+**暂停点 / 唯一下一步（2026-08-01）**：恢复时先核对本次收口提交与干净工作区；从 `v0/` 原样重跑 `npm run verify` 并保存终态。不要重复已经通过的 `npm test`、`npm run verify:navigation` 或 37/37，除非源码再次变化。随后对短 `oldText` 锚点协议及统一任务状态/权限边界做独立复审；P0/P1 清零后，才准备新的作者授权隔离副本并只验“一张建议→一次点击→正文内 Diff→决定→Safe Undo”最短旅程。不得回到旧 Research→Changes 人工转交、重测已签字旅程或发布 0.1.2。
 
 ## 0. 续作口令
 
