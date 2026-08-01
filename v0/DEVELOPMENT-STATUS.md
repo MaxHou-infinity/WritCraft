@@ -36,7 +36,7 @@ Chat 的三级 scope/context、Main-owned 多轮连续性、Onboarding v2、Rese
 
 ### 0.0CI 2026-08-01 · Navigation→Changes 真实单项越界与范围协议收口
 
-- **最新作者复验**：提交 `da5e8d6` 启动后，作者用原目标重建 Navigation authority 并点击“生成修改建议”。App 自动切换到右侧“修改 / Project Changes”，成功显示当前章节 **3 项修改、待决定**及逐块接受/拒绝控件；这就是当前统一 Changes Diff，不会把未接受内容叠加到左侧正文。目标章节 SHA-256 仍为 `1bdb3a5c…`，recovery=0，History 更新时间仍为 2026-07-29 的继承记录，证明真实 MiniMax Diff 生成前后零正文/History 写入。Changes 的真实生成门已关闭；作者决定、提交终态与 Safe Undo 仍待本轮完成。
+- **最新作者复验｜完整关闭**：提交 `da5e8d6` 启动后，作者用原目标重建 Navigation authority；真实 MiniMax 成功生成右侧当前章节 **3 项修改、待决定**。预览阶段目标 SHA 保持 `1bdb3a5c…`、recovery=0、无新增 History。作者随后接受全部 3 项并提交，只有目标章节变为 `d83ec04a…`，History 新增一条 `writcraft.writing-navigation-changes/v1`、`applied`、单文件记录；`edit.md` 和其余公开文件不变。作者执行 Safe Undo 后，同一记录变为 `undone`，目标精确恢复 `1bdb3a5c…`，recovery=0，副本全部公开文件再次与授权源逐字节一致。Navigation→Changes 的真实生成、零写入预览、人工决定、落盘、History 与撤销闭环正式关闭，不再重复。
 - **第二次真实红灯**：作者在第九副本再次点击“生成修改建议”，Main 稳定码为 `PATCH_NEW_TEXT_TOO_LARGE`，不是旧的总输出超量。模型已返回唯一可解析工具调用，但至少一个 `newText` 超过 256 Unicode code points；系统未创建 Diff、待审 capability、History 或项目写入。
 - **根因与修复**：`targetId + oldText` 仍让模型决定原文锚点和改写粒度。现由 Main 从冻结目标快照建立 revision-bound、request-local 的 `range_1…range_96` 章节范围；模型只能提交 `rangeId/newText/summary`，路径、revision、原文和偏移均由 Main 恢复并重验。每次最多 8 项、单项 640 字、合计 1024 字、summary 40 字，完整工具参数最多 7 KiB，专用输出预算 8192 tokens。
 - **一次内部收敛**：首轮仅对严格列举的结构/容量错误（含 `INVALID_TOOL_USE`）自动纠正一次，且不回显被拒内容；第二次仍失败即终止，绝不第三次付费调用。第二次调用前后重新验证 action lease、项目、Navigation evidence 和所有文件 revision，失败不缓存审阅。
@@ -995,7 +995,7 @@ Onboarding v2 已取代上述“容错解析完整 `editContent` + 部分创建�
 | 普通 Markdown 回收区恢复 UI | ✅ | Explorer 列表/刷新/单项恢复、窄 IPC、opaque token、watcher barrier、native journal recovery、冲突与替换 fail-closed 均已签字；真实 Electron 35/35 |
 | Chapter 生成/整体重写 | ✅ | strict plan/block、整文件审阅、撤销、完整异步所有权、no-op/provenance/result/capability 运行态门禁均已接入；最终复审 P0/P1/P2=0 |
 | Changes 分块审阅与历史 Plan→Changes 安全链 | ✅ | Changes 默认 pending、逐块/整文件决策、residual、审计/撤销和目标 revision 锁定仍有效；Plan→Changes 只算历史安全证据，不是现行入口 |
-| 结构规划 / 写作导航 | 🟡 | 结构规划与 Navigation 生成/定位/帮助度已签字；Changes 的两次真实失败均零写入。0.0CI 已改为 Main-owned range 协议并完成自动化/独立复审，仍待最新源码真实 Diff；Research 动作仍待验收 |
+| 结构规划 / 写作导航 | 🟡 | 结构规划、Navigation 生成/定位/帮助度及 Changes 的真实 3 项 Diff→全接受→单文件落盘→History→Safe Undo 已签字，最终公开文件恢复源字节；Research 动作仍待验收 |
 | Graph v2 核心与扩展验收 | ✅ | 300 文件/1279 节点、纠错/stale/failure live、AX/键鼠、布局/性能、重启/A→B 均有行为证据；韧性批关闭语义权威、不可变快照与异步所有权，复审 P0/P1/P2=0；0.0AB 当时总链为 35/35，当前见顶部当前里程碑 |
 | Diagnostic Preview / Export | ✅ | 设置页精确预览、递归脱敏 allowlist、token-only IPC、原生保存和不可覆盖 0600 写入均已接入；Service 13/13、Handler 10/10、Renderer 7/7、真实 Electron 可见旅程通过 |
 | 来源、PDF、脚注 | ✅ | 本地证据地基和可审查建议已接入 |
@@ -1012,7 +1012,7 @@ Onboarding v2 已取代上述“容错解析完整 `editContent` + 部分创建�
 ### RM-1.1 / 0.1.2：当前唯一目标
 
 - [x] 由作者显式指定满足合同的真实项目，完成只读预检与隔离副本；0.0AQ 的正式事务证明源不变，fresh 副本已合格创建并在当前 App 打开。
-- [ ] 项目卡、Inline、Chapter、结构规划与 Navigation 原文定位/帮助度已完成，不再重复价值验收。0.0CI 范围协议已技术签字；重启最新源码后仅重建一次进程内 Navigation authority并复验 Changes Diff，再完成 Research、image-01 与 Graph/恢复。
+- [ ] 项目卡、Inline、Chapter、结构规划、Navigation 原文定位/帮助度及 Changes 完整闭环均已完成，不再重复。下一步只完成 Research，随后验收 image-01 与 Graph/恢复。
 - [x] 复现并诊断作者项目 `Graph INVALID_CACHE`；0.0AN / `a72a179` 已提供不删除作者数据、不手工清缓存的可理解诊断、自动重建与失败恢复终态，最终独立复审 P0/P1/P2=0。
 - [ ] Inline 接受率与导航帮助度已有真实作者证据；继续收集导航动作、Research 匹配判断、图片评分/采纳和耗时样本。
 - [ ] 只修复验收中发现的 P0/P1 与决定阻断发版的 P2；`⌘K` 必填作者指令 P1 已实现、完成自动化与独立复审，并作为 exact candidate `9b21a9d` 提交推送；不得插入 `0.2.0+` 功能。
