@@ -73,6 +73,7 @@
 
   const state = {
     project: null,
+    projectReady: false,
     tree: [],
     tabs: [],
     previewPath: null,
@@ -95,6 +96,9 @@
     externalDeleted: false,
     loading: false,
     openGeneration: 0,
+    projectEntryGeneration: 0,
+    projectEntryRequestGeneration: 0,
+    projectEntryRequestOwner: null,
     onboardingController: null,
     onboardingDraft: null,
     inlineMutationBlocked: false,
@@ -104,6 +108,50 @@
     changesHistoryRecoveryGeneration: 0,
     changesHistoryRecovery: null,
   };
+
+  function beginProjectEntry() {
+    state.projectEntryGeneration += 1;
+    return state.projectEntryGeneration;
+  }
+
+  function isProjectEntryCurrent(entryGeneration, projectInstanceId = null) {
+    return entryGeneration === state.projectEntryGeneration &&
+      (!projectInstanceId || state.project?.instanceId === projectInstanceId);
+  }
+
+  function failProjectEntry(entryGeneration, projectInstanceId) {
+    if (!isProjectEntryCurrent(entryGeneration, projectInstanceId)) return false;
+    state.projectReady = false;
+    document.dispatchEvent(new CustomEvent('writcraft:project-entry-failed', {
+      detail: { projectInstanceId },
+    }));
+    return true;
+  }
+
+  function beginProjectEntryRequest() {
+    if (state.projectEntryRequestOwner !== null) return null;
+    state.projectEntryRequestGeneration += 1;
+    state.projectEntryRequestOwner = state.projectEntryRequestGeneration;
+    return state.projectEntryRequestOwner;
+  }
+
+  function isProjectEntryRequestCurrent(requestOwner) {
+    return requestOwner !== null && state.projectEntryRequestOwner === requestOwner;
+  }
+
+  function finishProjectEntryRequest(requestOwner) {
+    if (!isProjectEntryRequestCurrent(requestOwner)) return false;
+    state.projectEntryRequestOwner = null;
+    return true;
+  }
+
+  function projectEntryOwner(entryGeneration, projectInstanceId) {
+    return { entryGeneration, projectInstanceId };
+  }
+
+  function isOwnedProjectEntryCurrent(owner) {
+    return !owner || isProjectEntryCurrent(owner.entryGeneration, owner.projectInstanceId);
+  }
 
   const INLINE_RECONCILIATION_REQUEST = Object.freeze({
     schema: 'writcraft.inline-rewrite-reconciliation/v1',
@@ -1262,20 +1310,21 @@
     }
   }
 
-  async function loadEditContext() {
-    state.editContext = '';
-    state.editContextRevision = '';
+  async function loadEditContext(owner = null) {
+    if (!isOwnedProjectEntryCurrent(owner)) return false;
     if (bridge && bridge.getContext) {
       const result = normalizeResult(await bridge.getContext());
+      if (!isOwnedProjectEntryCurrent(owner)) return false;
       if (result.ok) {
         state.editContext = result.editPrompt || result.content || '';
         state.editContextRevision = result.editRevision || '';
         state.projectPromptMissing = Boolean(result.projectPromptMissing);
         state.promptFrontMatter = result.editFrontMatter || null;
-        return;
+        return true;
       }
     }
     const result = normalizeResult(await bridge.readFile('edit.md'));
+    if (!isOwnedProjectEntryCurrent(owner)) return false;
     if (result.ok) {
       state.editContext = result.content || '';
       state.editContextRevision = result.revision || '';
@@ -1285,6 +1334,7 @@
       state.projectPromptMissing = true;
       state.promptFrontMatter = null;
     }
+    return true;
   }
 
   async function queryInlineRewriteReconciliation(expectedRewriteId, recoveryGeneration) {
@@ -1395,6 +1445,10 @@
   }
 
   async function finishInlineRewriteTerminal(marker, recoveryGeneration, options = {}) {
+    const entryOwner = options.entryOwner || null;
+    if (!isOwnedProjectEntryCurrent(entryOwner)) {
+      return Object.freeze({ ok: false, status: 'stale', safeToRestore: false, authoritativeReloaded: false });
+    }
     if (marker.outcome === 'manual_recovery') {
       return inlineRecoveryFailure('Inline Rewrite 需要人工恢复；请重开项目，不要重试');
     }
@@ -1411,10 +1465,17 @@
       return inlineRecoveryFailure('零写入结果与恢复记录不一致；请重开项目，不要重试');
     }
     const snapshot = await loadInlineRewriteAuthority(marker, recoveryGeneration);
+    if (!isOwnedProjectEntryCurrent(entryOwner)) {
+      return Object.freeze({ ok: false, status: 'stale', safeToRestore: false, authoritativeReloaded: false });
+    }
     if (!snapshot) return inlineRecoveryFailure('无法完整重载文件、文件树和历史；请重开项目，不要重试');
     const zeroWriteBindingCurrent = Boolean(options.requireZeroWrite &&
       marker.path === state.currentPath && marker.revision === state.revision);
-    if (!await clearInlineRewriteMarker(marker, recoveryGeneration)) {
+    const cleared = await clearInlineRewriteMarker(marker, recoveryGeneration);
+    if (!isOwnedProjectEntryCurrent(entryOwner)) {
+      return Object.freeze({ ok: false, status: 'stale', safeToRestore: false, authoritativeReloaded: false });
+    }
+    if (!cleared) {
       return inlineRecoveryFailure('恢复记录无法安全清除；请重开项目，不要重试');
     }
     try {
@@ -1439,10 +1500,16 @@
     });
   }
 
-  async function reconcileInlineRewriteOnProjectEnter() {
+  async function reconcileInlineRewriteOnProjectEnter(entryOwner = null) {
+    if (!isOwnedProjectEntryCurrent(entryOwner)) {
+      return Object.freeze({ ok: false, status: 'stale', safeToRestore: false, authoritativeReloaded: false });
+    }
     const recoveryGeneration = ++state.inlineRecoveryGeneration;
     setInlineMutationBlocked(true, '正在核对上次 Inline Rewrite 提交状态…');
     const action = await queryInlineRewriteReconciliation(null, recoveryGeneration);
+    if (!isOwnedProjectEntryCurrent(entryOwner)) {
+      return Object.freeze({ ok: false, status: 'stale', safeToRestore: false, authoritativeReloaded: false });
+    }
     if (!action) return inlineRecoveryFailure('无法查询上次提交状态；请重开项目，不要继续编辑');
     if (action.action === 'ready') {
       setInlineMutationBlocked(false);
@@ -1454,7 +1521,10 @@
     if (action.action !== 'reload-and-clear' || !action.marker) {
       return inlineRecoveryFailure('提交状态无法完成核对；请重开项目，不要继续编辑');
     }
-    return finishInlineRewriteTerminal(action.marker, recoveryGeneration, { installTarget: true });
+    return finishInlineRewriteTerminal(action.marker, recoveryGeneration, {
+      installTarget: true,
+      entryOwner,
+    });
   }
 
   async function beginInlineRewriteRecovery(value = {}) {
@@ -1661,8 +1731,11 @@
 
   async function finishChangesHistoryTerminal(recovery, recoveryGeneration, options = {}) {
     const helper = window.WritCraftChangesHistoryRecovery;
+    const entryOwner = options.entryOwner || null;
+    if (!isOwnedProjectEntryCurrent(entryOwner)) return changesHistoryRecoveryStale();
     const projectInstanceId = state.project?.instanceId;
     const snapshot = await loadChangesHistoryAuthority(recovery, recoveryGeneration);
+    if (!isOwnedProjectEntryCurrent(entryOwner)) return changesHistoryRecoveryStale();
     if (recoveryGeneration !== state.changesHistoryRecoveryGeneration ||
         state.project?.instanceId !== projectInstanceId) return changesHistoryRecoveryStale();
     if (!snapshot) {
@@ -1683,11 +1756,13 @@
     try {
       cleared = await bridge.clearChangesHistoryRecovery(projectInstanceId, recovery.operationId);
     } catch (_) {
+      if (!isOwnedProjectEntryCurrent(entryOwner)) return changesHistoryRecoveryStale();
       return changesHistoryRecoveryFailure(
         '权威结果已重载，但恢复记录无法清除；项目仍保持锁定，请重新打开项目。',
         recovery
       );
     }
+    if (!isOwnedProjectEntryCurrent(entryOwner)) return changesHistoryRecoveryStale();
     if (recoveryGeneration !== state.changesHistoryRecoveryGeneration ||
         state.project?.instanceId !== projectInstanceId) return changesHistoryRecoveryStale();
     if (!helper?.clearMatchesRecovery?.(cleared, recovery)) {
@@ -1737,7 +1812,8 @@
     });
   }
 
-  async function reconcileChangesHistoryOnProjectEnter() {
+  async function reconcileChangesHistoryOnProjectEnter(entryOwner = null) {
+    if (!isOwnedProjectEntryCurrent(entryOwner)) return changesHistoryRecoveryStale();
     const recoveryGeneration = ++state.changesHistoryRecoveryGeneration;
     state.changesHistoryRecovery = null;
     setChangesHistoryMutationBlocked(true, '正在核对上次 Changes / History 写入状态…');
@@ -1748,6 +1824,7 @@
       message: '核对完成前，编辑、保存和 AI 写入均已暂停。',
     });
     const action = await queryChangesHistoryRecovery(recoveryGeneration);
+    if (!isOwnedProjectEntryCurrent(entryOwner)) return changesHistoryRecoveryStale();
     if (!action) {
       return changesHistoryRecoveryFailure('无法查询上次项目写入状态；请重新打开项目，不要继续编辑。');
     }
@@ -1768,6 +1845,7 @@
     if (action.action === 'reload-and-clear' && action.recovery) {
       return finishChangesHistoryTerminal(action.recovery, recoveryGeneration, {
         mutationTrusted: false,
+        entryOwner,
       });
     }
     return changesHistoryRecoveryFailure(
@@ -1885,18 +1963,27 @@
     });
   }
 
-  async function enterProject(result) {
-    if (result.canceled) return;
+  async function enterProject(result, entryGeneration) {
+    if (!isProjectEntryCurrent(entryGeneration)) return false;
+    if (result.canceled) return false;
     if (!result.ok || !result.project) {
       showError(resultMessage(result, '无法打开项目'));
-      return;
+      return false;
     }
+    if (migrationResolver) finishMigrationDialog('later');
     closeProjectOnboarding();
     state.onboardingDraft = null;
     resetMarkdownTrash();
     externalSyncState?.reset();
     window.__assistantDock?.close?.();
     state.project = result.project;
+    state.projectReady = false;
+    state.openGeneration += 1;
+    const projectInstanceId = result.project.instanceId;
+    const owner = projectEntryOwner(entryGeneration, projectInstanceId);
+    document.dispatchEvent(new CustomEvent('writcraft:project-entering', {
+      detail: { projectInstanceId },
+    }));
     ++state.inlineRecoveryGeneration;
     ++state.changesHistoryRecoveryGeneration;
     state.mutationBlockers = {};
@@ -1927,25 +2014,41 @@
       window.__editor.setProjectManaged(true);
     }
     renderTree();
-    const changesHistoryRecovery = await reconcileChangesHistoryOnProjectEnter();
-    if (!changesHistoryRecovery.ok) return;
-    const inlineRecovery = await reconcileInlineRewriteOnProjectEnter();
-    if (!inlineRecovery.ok) return;
-    await loadEditContext();
+    const changesHistoryRecovery = await reconcileChangesHistoryOnProjectEnter(owner);
+    if (!isProjectEntryCurrent(entryGeneration, projectInstanceId)) return false;
+    if (!changesHistoryRecovery.ok) {
+      failProjectEntry(entryGeneration, projectInstanceId);
+      return false;
+    }
+    const inlineRecovery = await reconcileInlineRewriteOnProjectEnter(owner);
+    if (!isProjectEntryCurrent(entryGeneration, projectInstanceId)) return false;
+    if (!inlineRecovery.ok) {
+      failProjectEntry(entryGeneration, projectInstanceId);
+      return false;
+    }
+    await loadEditContext(owner);
+    if (!isProjectEntryCurrent(entryGeneration, projectInstanceId)) return false;
     let initialPath = state.projectPromptMissing ? markdownPaths()[0] || '' : 'edit.md';
     if (bridge?.loadWorkspace) {
+      let saved = null;
       try {
-        const saved = normalizeResult(await bridge.loadWorkspace());
-        if (saved.ok && saved.workspace) {
-          state.tabs = Array.isArray(saved.workspace.tabs) ? [...saved.workspace.tabs] : [];
-          state.views = saved.workspace.files && typeof saved.workspace.files === 'object'
-            ? { ...saved.workspace.files }
-            : {};
-          initialPath = saved.workspace.activePath || initialPath;
-        }
+        saved = normalizeResult(await bridge.loadWorkspace());
       } catch (_) {}
+      if (!isProjectEntryCurrent(entryGeneration, projectInstanceId)) return false;
+      if (saved?.ok && saved.workspace) {
+        state.tabs = Array.isArray(saved.workspace.tabs) ? [...saved.workspace.tabs] : [];
+        state.views = saved.workspace.files && typeof saved.workspace.files === 'object'
+          ? { ...saved.workspace.files }
+          : {};
+        initialPath = saved.workspace.activePath || initialPath;
+      }
     }
-    await openFile(initialPath);
+    const initialOpened = await openFile(initialPath);
+    if (!isProjectEntryCurrent(entryGeneration, projectInstanceId)) return false;
+    if (!initialOpened) {
+      failProjectEntry(entryGeneration, projectInstanceId);
+      return false;
+    }
     if (result.migrationNotice?.kind === 'legacy-edit-conflict') {
       const notice = result.migrationNotice;
       await presentMigration({
@@ -1956,9 +2059,12 @@
         confirmLabel: '继续使用 edit.md',
         laterLabel: '稍后处理',
       });
+      if (!isProjectEntryCurrent(entryGeneration, projectInstanceId)) return false;
     }
-    await maybeOfferOrphanRecovery();
-    await maybeOfferLegacyDraft();
+    await maybeOfferOrphanRecovery(owner);
+    if (!isProjectEntryCurrent(entryGeneration, projectInstanceId)) return false;
+    await maybeOfferLegacyDraft(owner);
+    if (!isProjectEntryCurrent(entryGeneration, projectInstanceId)) return false;
     if (state.projectPromptMissing) {
       updateDocumentChrome(state.currentPath);
       const action = await presentMigration({
@@ -1969,16 +2075,24 @@
         confirmLabel: '创建项目说明',
         laterLabel: '暂不创建，继续写作',
       });
+      if (!isProjectEntryCurrent(entryGeneration, projectInstanceId)) return false;
       if (action === 'confirm' && bridge?.createProjectPrompt) {
         let created;
         try { created = normalizeResult(await bridge.createProjectPrompt()); }
         catch (error) { created = { ok: false, message: error.message }; }
+        if (!isProjectEntryCurrent(entryGeneration, projectInstanceId)) return false;
         if (created.ok) {
           state.tree = created.tree || state.tree;
           state.projectPromptMissing = false;
           state.promptFrontMatter = created.file?.frontMatter || null;
-          await loadEditContext();
-          await openFile('edit.md');
+          await loadEditContext(owner);
+          if (!isProjectEntryCurrent(entryGeneration, projectInstanceId)) return false;
+          const promptOpened = await openFile('edit.md');
+          if (!isProjectEntryCurrent(entryGeneration, projectInstanceId)) return false;
+          if (!promptOpened) {
+            failProjectEntry(entryGeneration, projectInstanceId);
+            return false;
+          }
           setSaveState('已创建项目说明 edit.md', 'saved');
           if (startOnboardingButton) startOnboardingButton.disabled = false;
           openProjectOnboarding();
@@ -1989,10 +2103,14 @@
         setSaveState('⚠ 当前没有项目 Prompt；仍可浏览和编辑 Markdown', 'future');
       }
     }
+    if (!isProjectEntryCurrent(entryGeneration, projectInstanceId)) return false;
+    state.projectReady = true;
     document.dispatchEvent(new CustomEvent('writcraft:project-entered'));
     await refreshMarkdownTrash();
+    if (!isProjectEntryCurrent(entryGeneration, projectInstanceId)) return false;
     if (startOnboardingButton) startOnboardingButton.disabled = state.projectPromptMissing;
     if (result.onboardingRecommended && !state.projectPromptMissing) openProjectOnboarding();
+    return true;
   }
 
   function closeProjectOnboarding() {
@@ -2092,7 +2210,8 @@
     resolve(action);
   }
 
-  async function handleProjectResult(result) {
+  async function handleProjectResult(result, entryGeneration) {
+    if (!isProjectEntryCurrent(entryGeneration)) return false;
     result = normalizeResult(result);
     if (result.migration?.kind === 'legacy-edit') {
       const migration = result.migration;
@@ -2104,8 +2223,13 @@
         warnings: migration.source?.truncated ? ['预览已截断，迁移仍会保留完整文件。'] : [],
         confirmLabel: '确认改名并打开',
       });
+      if (!isProjectEntryCurrent(entryGeneration)) {
+        await releaseEntryMigration(migration.token);
+        return false;
+      }
       if (action !== 'confirm') {
         await bridge?.discardMigration?.(migration.token);
+        if (!isProjectEntryCurrent(entryGeneration)) return false;
         setSaveState('旧项目未迁移，原文件保持不变', 'future');
         return false;
       }
@@ -2113,14 +2237,14 @@
       let next;
       try { next = normalizeResult(await bridge.confirmLegacyEdit(migration.token)); }
       catch (error) { next = { ok: false, message: error.message }; }
+      if (!isProjectEntryCurrent(entryGeneration)) return false;
       if (!next.ok && !next.migration) {
         showError(resultMessage(next, '迁移失败，原文件保持不变'));
         return false;
       }
-      return handleProjectResult(next);
+      return handleProjectResult(next, entryGeneration);
     }
-    await enterProject(result);
-    return Boolean(result.ok);
+    return enterProject(result, entryGeneration);
   }
 
   function markdownTreePaths(nodes, output = new Set()) {
@@ -2155,21 +2279,30 @@
     return candidates[0] || null;
   }
 
-  async function maybeOfferOrphanRecovery() {
-    if (!state.project || !bridge?.previewLegacyDraft) return;
+  async function releaseEntryMigration(token) {
+    if (!token || !bridge?.discardMigration) return;
+    try { await bridge.discardMigration(token); } catch (_) {}
+  }
+
+  async function maybeOfferOrphanRecovery(owner = null) {
+    if (!isOwnedProjectEntryCurrent(owner)) return false;
+    if (!state.project || !bridge?.previewLegacyDraft) return true;
     const existing = markdownTreePaths(state.tree);
     const recoveryPaths = new Set(loadRecoveryManifest());
     if (bridge.listRecoveries) {
       try {
         const result = normalizeResult(await bridge.listRecoveries());
+        if (!isOwnedProjectEntryCurrent(owner)) return false;
         if (result.ok) for (const entry of result.recoveries || []) {
           if (isPublicMarkdownPath(entry.path)) recoveryPaths.add(entry.path);
         }
       } catch (_) {}
     }
     for (const path of [...recoveryPaths].slice(0, 100)) {
+      if (!isOwnedProjectEntryCurrent(owner)) return false;
       if (existing.has(path)) continue;
       const recovery = await readRecoveryEntry(path);
+      if (!isOwnedProjectEntryCurrent(owner)) return false;
       if (!recovery) {
         clearRecovery(path);
         continue;
@@ -2177,9 +2310,13 @@
       let planned;
       try { planned = normalizeResult(await bridge.previewLegacyDraft(recovery.content, path)); }
       catch (error) { planned = { ok: false, message: error.message }; }
+      if (!isOwnedProjectEntryCurrent(owner)) {
+        await releaseEntryMigration(planned?.token);
+        return false;
+      }
       if (!planned.ok) {
         showError(resultMessage(planned, '无法准备被删除文件的恢复预览'));
-        return;
+        return false;
       }
       const action = await presentMigration({
         title: path === 'edit.md' ? '恢复缺失的项目 Prompt' : '发现被外部删除的未保存稿',
@@ -2192,23 +2329,34 @@
         allowDiscard: true,
         discardLabel: '丢弃恢复稿',
       });
+      if (!isOwnedProjectEntryCurrent(owner)) {
+        await releaseEntryMigration(planned.token);
+        return false;
+      }
       if (action === 'discard') {
         await bridge.discardMigration?.(planned.token);
+        if (!isOwnedProjectEntryCurrent(owner)) return false;
         clearRecovery(path);
         setSaveState('已丢弃所选恢复稿，磁盘文件未改动', 'future');
         continue;
       }
       if (action !== 'confirm') {
         await bridge.discardMigration?.(planned.token);
+        if (!isOwnedProjectEntryCurrent(owner)) return false;
         setSaveState('恢复稿继续保留，可稍后处理', 'future');
-        return;
+        return true;
+      }
+      if (!isOwnedProjectEntryCurrent(owner)) {
+        await releaseEntryMigration(planned.token);
+        return false;
       }
       let restored;
       try { restored = normalizeResult(await bridge.confirmLegacyDraft(planned.token)); }
       catch (error) { restored = { ok: false, message: error.message }; }
+      if (!isOwnedProjectEntryCurrent(owner)) return false;
       if (!restored.ok) {
         showError(resultMessage(restored, '恢复失败；恢复稿仍保留'));
-        return;
+        return false;
       }
       clearRecovery(path);
       state.tree = restored.tree || state.tree;
@@ -2224,33 +2372,41 @@
       }
       if (restored.file.path === 'edit.md') {
         state.projectPromptMissing = false;
-        await loadEditContext();
+        if (!(await loadEditContext(owner))) return false;
       }
+      if (!isOwnedProjectEntryCurrent(owner)) return false;
       renderTree();
-      await openFile(restored.file.path);
+      const opened = await openFile(restored.file.path);
+      if (!isOwnedProjectEntryCurrent(owner) || !opened) return false;
       setSaveState('已从恢复清单重建文件', 'saved');
       continue;
     }
+    return true;
   }
 
-  async function maybeOfferLegacyDraft() {
-    if (legacyDraftSnoozed || !state.project || !window.__legacyDraft || !bridge?.previewLegacyDraft) return;
+  async function maybeOfferLegacyDraft(owner = null) {
+    if (!isOwnedProjectEntryCurrent(owner)) return false;
+    if (legacyDraftSnoozed || !state.project || !window.__legacyDraft || !bridge?.previewLegacyDraft) return true;
     let raw = null;
     try { raw = localStorage.getItem(window.__legacyDraft.STORAGE_KEY); } catch (_) {}
     const legacy = window.__legacyDraft.inspect(raw, document);
-    if (!legacy) return;
+    if (!legacy) return true;
     let planned;
     try { planned = normalizeResult(await bridge.previewLegacyDraft(legacy.markdown, 'chapters/imported-draft.md')); }
     catch (error) { planned = { ok: false, message: error.message }; }
+    if (!isOwnedProjectEntryCurrent(owner)) {
+      await releaseEntryMigration(planned?.token);
+      return false;
+    }
     if (!planned.ok) {
       showError(resultMessage(planned, '旧草稿预览失败，草稿仍保留在本机'));
-      return;
+      return false;
     }
     const marker = `writcraft:v0:draft-migrated:${planned.plan.revision}`;
     try {
       if (localStorage.getItem(marker)) {
         await bridge.discardMigration?.(planned.token);
-        return;
+        return isOwnedProjectEntryCurrent(owner);
       }
     } catch (_) {}
     const warnings = [...legacy.warnings];
@@ -2264,59 +2420,91 @@
       warnings: legacy.markdown.length > 60000 ? [...warnings, '预览已截断，导入仍使用完整草稿。'] : warnings,
       confirmLabel: '导入为项目文件',
     });
+    if (!isOwnedProjectEntryCurrent(owner)) {
+      await releaseEntryMigration(planned.token);
+      return false;
+    }
     if (action !== 'confirm') {
-      legacyDraftSnoozed = true;
       await bridge.discardMigration?.(planned.token);
+      if (!isOwnedProjectEntryCurrent(owner)) return false;
+      legacyDraftSnoozed = true;
       setSaveState('旧草稿已保留，可稍后再次迁移', 'future');
-      return;
+      return true;
+    }
+    if (!isOwnedProjectEntryCurrent(owner)) {
+      await releaseEntryMigration(planned.token);
+      return false;
     }
     let imported;
     try { imported = normalizeResult(await bridge.confirmLegacyDraft(planned.token)); }
     catch (error) { imported = { ok: false, message: error.message }; }
+    if (!isOwnedProjectEntryCurrent(owner)) return false;
     if (!imported.ok) {
       showError(resultMessage(imported, '草稿导入失败；旧草稿仍保留'));
-      return;
+      return false;
     }
     try { localStorage.setItem(marker, JSON.stringify({ importedAt: Date.now(), path: imported.file.path })); } catch (_) {}
     state.tree = imported.tree || state.tree;
     renderTree();
-    await openFile(imported.file.path);
+    const opened = await openFile(imported.file.path);
+    if (!isOwnedProjectEntryCurrent(owner) || !opened) return false;
     setSaveState('旧草稿已导入；原始备份仍保留', 'saved');
+    return true;
   }
 
   async function createProject(name) {
     if (!bridge || !bridge.create) return showError('项目服务未连接');
-    if (!(await persistCurrent(true))) return;
-    if (window.__changesView?.discardPending && !(await window.__changesView.discardPending())) {
-      return showError('当前 Onboarding 审阅未能安全结算，已停止切换项目');
-    }
-    if (window.__imageGenerationView?.discardPending &&
-        !(await window.__imageGenerationView.discardPending())) {
-      return showError('请先对当前生成图片选择插入、保留或移入废纸篓，再切换项目');
-    }
-    setSaveState('正在创建项目…', 'saving');
+    const requestOwner = beginProjectEntryRequest();
+    if (requestOwner === null) return showError('项目正在安全打开中，请稍候');
+    const entryGeneration = beginProjectEntry();
     try {
-      await handleProjectResult(await bridge.create(name));
+      if (!(await persistCurrent(true))) return;
+      if (!isProjectEntryCurrent(entryGeneration)) return;
+      if (window.__changesView?.discardPending && !(await window.__changesView.discardPending())) {
+        return showError('当前 Onboarding 审阅未能安全结算，已停止切换项目');
+      }
+      if (!isProjectEntryCurrent(entryGeneration)) return;
+      if (window.__imageGenerationView?.discardPending &&
+          !(await window.__imageGenerationView.discardPending())) {
+        return showError('请先对当前生成图片选择插入、保留或移入废纸篓，再切换项目');
+      }
+      if (!isProjectEntryCurrent(entryGeneration)) return;
+      setSaveState('正在创建项目…', 'saving');
+      const result = await bridge.create(name);
+      if (!isProjectEntryCurrent(entryGeneration)) return;
+      await handleProjectResult(result, entryGeneration);
     } catch (error) {
-      showError(error.message);
+      if (isProjectEntryCurrent(entryGeneration)) showError(error.message);
+    } finally {
+      finishProjectEntryRequest(requestOwner);
     }
   }
 
   async function openProject() {
     if (!bridge || !bridge.open) return showError('项目服务未连接');
-    if (!state.inlineMutationBlocked && !(await persistCurrent(true))) return;
-    if (window.__changesView?.discardPending && !(await window.__changesView.discardPending())) {
-      return showError('当前 Onboarding 审阅未能安全结算，已停止切换项目');
-    }
-    if (window.__imageGenerationView?.discardPending &&
-        !(await window.__imageGenerationView.discardPending())) {
-      return showError('请先对当前生成图片选择插入、保留或移入废纸篓，再切换项目');
-    }
-    setSaveState('正在打开项目…', 'saving');
+    const requestOwner = beginProjectEntryRequest();
+    if (requestOwner === null) return showError('项目正在安全打开中，请稍候');
+    const entryGeneration = beginProjectEntry();
     try {
-      await handleProjectResult(await bridge.open());
+      if (!state.inlineMutationBlocked && !(await persistCurrent(true))) return;
+      if (!isProjectEntryCurrent(entryGeneration)) return;
+      if (window.__changesView?.discardPending && !(await window.__changesView.discardPending())) {
+        return showError('当前 Onboarding 审阅未能安全结算，已停止切换项目');
+      }
+      if (!isProjectEntryCurrent(entryGeneration)) return;
+      if (window.__imageGenerationView?.discardPending &&
+          !(await window.__imageGenerationView.discardPending())) {
+        return showError('请先对当前生成图片选择插入、保留或移入废纸篓，再切换项目');
+      }
+      if (!isProjectEntryCurrent(entryGeneration)) return;
+      setSaveState('正在打开项目…', 'saving');
+      const result = await bridge.open();
+      if (!isProjectEntryCurrent(entryGeneration)) return;
+      await handleProjectResult(result, entryGeneration);
     } catch (error) {
-      showError(error.message);
+      if (isProjectEntryCurrent(entryGeneration)) showError(error.message);
+    } finally {
+      finishProjectEntryRequest(requestOwner);
     }
   }
 
@@ -2417,7 +2605,7 @@
   }
 
   function canUseAI() {
-    return Boolean(state.project && !state.inlineMutationBlocked && !state.projectPromptMissing &&
+    return Boolean(state.project && state.projectReady && !state.inlineMutationBlocked && !state.projectPromptMissing &&
       !state.conflictRecovery && !state.externalDeleted && externalSyncState?.available());
   }
 
@@ -2769,7 +2957,14 @@
   setAIVisible(false);
 
   if (bridge?.openRecent) {
-    bridge.openRecent().then(result => handleProjectResult(result)).catch(() => {});
+    const requestOwner = beginProjectEntryRequest();
+    if (requestOwner !== null) {
+      const entryGeneration = beginProjectEntry();
+      bridge.openRecent()
+        .then(result => handleProjectResult(result, entryGeneration))
+        .catch(() => {})
+        .finally(() => finishProjectEntryRequest(requestOwner));
+    }
   }
 
   const unsubscribeExternalChanges = bridge?.onExternalChange?.(payload => {

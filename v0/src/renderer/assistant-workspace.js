@@ -226,9 +226,11 @@
     workArea,
     dock: dockElement,
     beforeOpen() {
-      if (!window.__workspace?.state?.project) {
+      if (!window.__workspace?.state?.project || window.__workspace?.state?.projectReady !== true) {
         const status = document.getElementById('save-state');
-        if (status) status.textContent = '请先创建或打开写作项目';
+        if (status) status.textContent = window.__workspace?.state?.project
+          ? '项目仍在安全打开中，请稍候'
+          : '请先创建或打开写作项目';
         return false;
       }
       window.__graphView?.close?.();
@@ -251,7 +253,7 @@
     },
   });
 
-  document.addEventListener('writcraft:project-entered', () => {
+  function syncEnteredProject() {
     const workspace = window.__workspace;
     const navigationState = navigationController?.updateProject?.(
       workspace?.state?.project || null,
@@ -264,7 +266,18 @@
       { scope: 'file', budgetChars: 10000, usedChars: 0, usedBytes: 0, chips: [] },
       []
     );
-  });
+  }
+  function clearEnteringProject() {
+    navigationController?.updateProject?.(null, [], null);
+    contextController?.update?.(
+      { scope: 'file', budgetChars: 10000, usedChars: 0, usedBytes: 0, chips: [] },
+      []
+    );
+  }
+  document.addEventListener('writcraft:project-entering', clearEnteringProject);
+  document.addEventListener('writcraft:project-entry-failed', clearEnteringProject);
+  document.addEventListener('writcraft:project-entered', syncEnteredProject);
+  if (window.__workspace?.state?.projectReady === true) syncEnteredProject();
   document.addEventListener('writcraft:tree-changed', () => {
     navigationController?.updateTree?.(
       window.__workspace?.state?.tree || [],

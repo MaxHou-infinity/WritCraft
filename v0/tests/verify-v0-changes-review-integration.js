@@ -120,13 +120,14 @@ test('Renderer routes apply, undo, bootstrap and manual recovery through one aut
   assert(view.includes('resolveChangesHistoryRecovery?.(operationId, action)'));
   assert(view.includes('setRecoveryState: renderRecoveryState'));
   assert(view.includes('clearRecoveryState: () => renderRecoveryState(null)'));
-  const enterStart = workspace.indexOf('async function enterProject(result)');
+  const enterStart = workspace.indexOf('async function enterProject(result, entryGeneration)');
   const enterEnd = workspace.indexOf('\n  function closeProjectOnboarding()', enterStart);
+  assert(enterStart >= 0 && enterEnd > enterStart);
   const enterProject = workspace.slice(enterStart, enterEnd);
-  assert(enterProject.indexOf('reconcileChangesHistoryOnProjectEnter()') <
-    enterProject.indexOf('reconcileInlineRewriteOnProjectEnter()'));
-  assert(enterProject.indexOf('reconcileInlineRewriteOnProjectEnter()') <
-    enterProject.indexOf('await loadEditContext()'));
+  assert(enterProject.indexOf('reconcileChangesHistoryOnProjectEnter(owner)') <
+    enterProject.indexOf('reconcileInlineRewriteOnProjectEnter(owner)'));
+  assert(enterProject.indexOf('reconcileInlineRewriteOnProjectEnter(owner)') <
+    enterProject.indexOf('await loadEditContext(owner)'));
 });
 
 console.log(`\nChanges review integration ${passed}/${passed} passed.`);

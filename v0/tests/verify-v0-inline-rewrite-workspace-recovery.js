@@ -116,6 +116,7 @@ function harness(options = {}) {
       calls.query += 1;
       assert.strictEqual(payload?.schema, 'writcraft.inline-rewrite-reconciliation/v1');
       assert.deepStrictEqual(Object.keys(payload), ['schema']);
+      if (options.reconciliationPromise) return options.reconciliationPromise;
       return responses.length > 1 ? responses.shift() : responses[0];
     },
     async clearRewriteReconciliation(_projectInstanceId, payload) {
@@ -271,8 +272,31 @@ async function run() {
     assert.strictEqual(calls.query, 1);
     assert.strictEqual(api.state.inlineMutationBlocked, false);
     const enter = SOURCE.slice(SOURCE.indexOf('async function enterProject'), SOURCE.indexOf('function closeProjectOnboarding'));
-    assert(enter.indexOf('await reconcileInlineRewriteOnProjectEnter()') < enter.indexOf('await loadEditContext()'));
-    assert(enter.indexOf('if (!inlineRecovery.ok) return') < enter.indexOf('await openFile(initialPath)'));
+    assert(enter.indexOf('await reconcileInlineRewriteOnProjectEnter(owner)') < enter.indexOf('await loadEditContext(owner)'));
+    assert(enter.indexOf('if (!inlineRecovery.ok) {') < enter.indexOf('await openFile(initialPath)'));
+  });
+
+  await test('late project-A entry reconciliation cannot change project-B blocker state', async () => {
+    let resolveReconciliation;
+    const reconciliationPromise = new Promise(resolve => { resolveReconciliation = resolve; });
+    const { api, calls } = harness({ reconciliationPromise });
+    api.state.projectEntryGeneration = 1;
+    api.state.project = { instanceId: 'project-a', name: 'A' };
+    const pendingA = api.reconcileInlineRewriteOnProjectEnter({
+      entryGeneration: 1,
+      projectInstanceId: 'project-a',
+    });
+    await Promise.resolve();
+    assert.strictEqual(calls.query, 1);
+
+    api.state.projectEntryGeneration = 2;
+    api.state.project = { instanceId: 'project-b', name: 'B' };
+    api.setInlineMutationBlocked(false);
+    resolveReconciliation(reconciliation('none'));
+    const result = await pendingA;
+    assert.strictEqual(result.status, 'stale');
+    assert.strictEqual(api.state.project.instanceId, 'project-b');
+    assert.strictEqual(api.state.inlineMutationBlocked, false);
   });
 
   console.log(`\n✅ Inline Rewrite workspace recovery ${passed}/${passed} passed`);

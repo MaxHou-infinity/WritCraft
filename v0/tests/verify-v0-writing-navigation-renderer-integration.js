@@ -335,6 +335,38 @@ async function test(name, fn) {
     assert.strictEqual(harness.captured.resumed, 1);
   });
 
+  await test('an already-entered recent project is synchronized after the listener mounts', async () => {
+    const project = { instanceId: 'instance_1123456789abcdef01234567' };
+    const harness = createHarness({ workspace: {
+      state: {
+        project,
+        projectReady: true,
+        tree: [{ type: 'file', path: 'chapters/01.md' }],
+        currentPath: 'chapters/01.md',
+      },
+    } });
+    assert.strictEqual(harness.captured.updates.length, 1);
+    assert.strictEqual(harness.captured.updates[0][0], 'project');
+    assert.strictEqual(harness.captured.updates[0][1], project);
+    assert.strictEqual(harness.captured.recovered, 0);
+    assert.strictEqual(harness.captured.resumed, 1);
+  });
+
+  await test('project entering and failed events clear stale Navigation authority', async () => {
+    const harness = createHarness();
+    await harness.dispatch('writcraft:project-entered');
+    assert.strictEqual(harness.captured.updates.at(-1)[1], harness.workspace.state.project);
+    await harness.dispatch('writcraft:project-entering', {
+      projectInstanceId: 'instance_abcdefabcdefabcdefabcdef',
+    });
+    assert.strictEqual(harness.captured.updates.at(-1)[1], null);
+    harness.workspace.state.project = { instanceId: 'instance_abcdefabcdefabcdefabcdef' };
+    await harness.dispatch('writcraft:project-entry-failed', {
+      projectInstanceId: harness.workspace.state.project.instanceId,
+    });
+    assert.strictEqual(harness.captured.updates.at(-1)[1], null);
+  });
+
   console.log(`\n${passed}/${passed} Writing Navigation production Renderer integration checks passed.`);
 })().catch(error => {
   console.error(error);
