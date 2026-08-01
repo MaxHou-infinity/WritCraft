@@ -344,6 +344,22 @@
     .inline-diff-style { border: 0; border-right: 1px solid #e6ded2; background: transparent; color: var(--ink-soft); padding: 3px 6px 3px 3px; font: 10px/1.4 -apple-system, sans-serif; }
     .inline-diff-button:hover, .inline-diff-button:focus-visible { background: #f4efe8; color: var(--ink); outline: none; }
     .inline-diff-button.is-primary { background: var(--theme); color: white; }
+    .changes-inline-review { display: block; position: relative; white-space: pre-wrap; }
+    .changes-inline-review__toolbar { position: sticky; top: 0; z-index: 4; display: flex; align-items: center; gap: 5px; margin: -4px 0 18px; padding: 8px 10px; border: 1px solid #d8d0c4; border-left: 3px solid #587a73; border-radius: 6px; background: rgba(251,250,246,.97); box-shadow: 0 5px 16px rgba(67,51,31,.10); font: 11px/1.35 -apple-system, sans-serif; white-space: normal; }
+    .changes-inline-review__toolbar strong { margin-right: auto; color: #496962; }
+    .changes-inline-review__button { border: 1px solid #d6cec2; border-radius: 5px; padding: 4px 7px; background: #fff; color: #5f584f; cursor: pointer; font: 10px/1.3 -apple-system, sans-serif; }
+    .changes-inline-review__button:hover, .changes-inline-review__button:focus-visible { border-color: #587a73; color: #365950; outline: none; }
+    .changes-inline-review__button.is-primary { border-color: #587a73; background: #587a73; color: #fff; }
+    .changes-inline-review__button:disabled { opacity: .55; cursor: default; }
+    .changes-inline-review__text { display: inline; border-radius: 2px; box-decoration-break: clone; -webkit-box-decoration-break: clone; }
+    .changes-inline-review__text.is-remove { background: #f8deda; color: #843f3a; text-decoration: line-through; text-decoration-thickness: 1.5px; }
+    .changes-inline-review__text.is-add { background: #dff0df; color: #285c35; text-decoration: none; }
+    .changes-inline-review__text.is-add::before { content: "+"; display: inline-block; width: 0; transform: translateX(-12px); color: #3f8150; font: 700 10px/1 -apple-system, sans-serif; }
+    .changes-inline-review__hunk { display: block; margin: 8px -10px; padding: 10px; border-left: 3px solid #bca77f; background: rgba(255,255,255,.38); }
+    .changes-inline-review__hunk.is-accepted { border-left-color: #5d9669; }
+    .changes-inline-review__hunk.is-rejected { border-left-color: #a75b52; opacity: .72; }
+    .changes-inline-review__hunk-tools { display: flex; align-items: center; justify-content: flex-end; gap: 5px; margin: 0 0 7px; color: #746d63; font: 10px/1.35 -apple-system, sans-serif; white-space: normal; }
+    .changes-inline-review__hunk-tools span { margin-right: auto; }
     .inline-rewrite-command {
       position: fixed; z-index: 90; width: min(560px, calc(100vw - 32px)); padding: 10px 11px 9px;
       border: 1px solid #caa376; border-left: 3px solid var(--theme); border-radius: 7px;

@@ -385,8 +385,8 @@ test('public error mapping never exposes structured transport vocabulary', () =>
   assert.strictEqual(evidence.action, 'retry');
   const oversized = State.publicFailure({ error: 'MODEL_OUTPUT_TOO_LARGE' });
   assert(oversized.message.includes('安全审阅范围'));
-  assert(oversized.message.includes('自动重新整理一次'));
-  assert(oversized.message.includes('不要继续重复点击'));
+  assert(oversized.message.includes('没有自动重试'));
+  assert(oversized.message.includes('缩小目标'));
   const route = State.publicFailure({ error: 'RESEARCH_ROUTE_FAILED' });
   assert.strictEqual(route.action, 'retry');
   assert(route.message.includes('建议仍然保留'));

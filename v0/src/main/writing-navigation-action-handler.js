@@ -2,6 +2,7 @@
 
 const localizedEditService = require('./localized-edit-service');
 const projectChangesProposalService = require('./project-changes-proposal-service');
+const unifiedWritingTaskService = require('./unified-writing-task-service');
 
 function createWritingNavigationActionHandler(options = {}) {
   const {
@@ -16,15 +17,29 @@ function createWritingNavigationActionHandler(options = {}) {
     projectService,
     projectCallLLM,
     changeSetService,
+    sourceIndexService,
     pendingChangeSets,
     cacheReview,
     discardReview,
     staleAiProjectResult,
     projectFailure,
-    deadlineMs = 90_000,
+    // Leave a bounded hand-off window before the Renderer-wide 60 second
+    // terminal so a completed Main review cannot race the visible timeout.
+    deadlineMs = 50_000,
     setTimer = setTimeout,
     clearTimer = clearTimeout,
   } = options;
+
+  function reportProgress(event, attemptId, phase) {
+    try {
+      event?.sender?.send?.('writcraft:writing-task-progress', Object.freeze({
+        attemptId,
+        phase,
+      }));
+    } catch (_) {
+      // Progress is advisory only; Main authority never depends on delivery.
+    }
+  }
 
   function ownerId(event) {
     if (!event?.sender || !Number.isSafeInteger(event.sender.id)) {
@@ -34,6 +49,20 @@ function createWritingNavigationActionHandler(options = {}) {
       );
     }
     return `webcontents:${event.sender.id}`;
+  }
+
+  function hasInvalidUnicode(value) {
+    for (let index = 0; index < value.length; index += 1) {
+      const code = value.charCodeAt(index);
+      if (code >= 0xd800 && code <= 0xdbff) {
+        const next = value.charCodeAt(index + 1);
+        if (!(next >= 0xdc00 && next <= 0xdfff)) return true;
+        index += 1;
+      } else if (code >= 0xdc00 && code <= 0xdfff) {
+        return true;
+      }
+    }
+    return false;
   }
 
   function binding(owner, project, mutationGeneration, navigationEpoch, extra = {}) {
@@ -98,7 +127,9 @@ function createWritingNavigationActionHandler(options = {}) {
     event,
     projectInstanceId,
     actionId,
-    attemptId
+    attemptId,
+    adjustment = '',
+    sourceIds = []
   ) {
     let lease = null;
     let leaseBinding = null;
@@ -150,6 +181,39 @@ function createWritingNavigationActionHandler(options = {}) {
         attemptId,
       });
 
+      if (typeof adjustment !== 'string' || adjustment.length > 500 ||
+          adjustment !== adjustment.trim() || hasInvalidUnicode(adjustment) ||
+          /[\u0000-\u0008\u000b\u000c\u000e-\u001f\u007f]/.test(adjustment)) {
+        throw new handoffService.WritingNavigationHandoffError(
+          'INVALID_ADJUSTMENT',
+          '继续调整内容无效'
+        );
+      }
+      if (!Array.isArray(sourceIds) || sourceIds.length > 8 ||
+          sourceIds.some(id => typeof id !== 'string' || !/^src_[a-f0-9]{20}$/.test(id)) ||
+          new Set(sourceIds).size !== sourceIds.length) {
+        throw new handoffService.WritingNavigationHandoffError(
+          'INVALID_SOURCE_SELECTION',
+          '补充来源选择无效'
+        );
+      }
+      let extraContextPaths = [];
+      if (sourceIds.length) {
+        const index = sourceIndexService.buildSourceIndex(project.rootPath);
+        const byId = new Map(index.sources.map(source => [source.id, source]));
+        extraContextPaths = sourceIds.map(id => {
+          const source = byId.get(id);
+          if (!source) {
+            throw new handoffService.WritingNavigationHandoffError(
+              'SOURCE_NOT_FOUND',
+              '补充来源已变化，请重新选择'
+            );
+          }
+          return source.filePath;
+        });
+      }
+
+      reportProgress(event, attemptId, 'checking_evidence');
       handoffService.revalidateAuthority({
         projectService,
         rootPath: project.rootPath,
@@ -190,11 +254,14 @@ function createWritingNavigationActionHandler(options = {}) {
         projectService,
         rootPath: project.rootPath,
         authority: lease,
+        adjustment,
+        extraContextPaths,
       });
-      const providerOptions = localizedEditService.structuredProviderOptions(
+      const providerOptions = unifiedWritingTaskService.providerOptions(
         preparedHandoff.prepared.structuredRanges
       );
-      let model = await runBoundedChangesModel(
+      reportProgress(event, attemptId, 'generating_changes');
+      const model = await runBoundedChangesModel(
         project.instanceId,
         preparedHandoff.prepared.messages,
         lease.signal,
@@ -208,70 +275,39 @@ function createWritingNavigationActionHandler(options = {}) {
       }
       await settleProjectAuthority(project);
       assertLeaseCurrent();
+      reportProgress(event, attemptId, 'preparing_diff');
       handoffService.revalidateAuthority({
         projectService,
         rootPath: project.rootPath,
         authority: lease,
       });
-      let result;
-      try {
-        const providerStructureError = localizedEditService.structuredProviderResultError(model);
-        if (providerStructureError) throw providerStructureError;
-        result = handoffService.finalizeChangesHandoff({
-          preparedHandoff,
-          model,
-          changeSetService,
-        });
-      } catch (firstError) {
-        if (!localizedEditService.isRetryableStructuredOutputError(firstError)) throw firstError;
+      const parsed = unifiedWritingTaskService.parseResult(
+        model,
+        preparedHandoff.prepared.snapshots,
+        preparedHandoff.prepared.structuredRanges
+      );
+      if (parsed.kind === 'needs_sources') {
         projectChangesProposalService.validateProjectDependencies({
           projectService,
           rootPath: project.rootPath,
           dependencies: preparedHandoff.prepared.dependencies,
         });
         assertLeaseCurrent();
-        const retryMessages = localizedEditService.structuredRetryMessages(
-          preparedHandoff.prepared.messages,
-          firstError
-        );
-        model = await runBoundedChangesModel(
-          project.instanceId,
-          retryMessages,
-          lease.signal,
-          providerOptions
-        );
-        if (!isCurrent(project, mutationGeneration, navigationEpoch)) {
-          throw new handoffService.WritingNavigationHandoffError(
-            'PROJECT_CHANGED',
-            '重新整理修改建议期间项目状态已变化'
-          );
-        }
-        await settleProjectAuthority(project);
-        assertLeaseCurrent();
-        handoffService.revalidateAuthority({
-          projectService,
-          rootPath: project.rootPath,
-          authority: lease,
-        });
-        projectChangesProposalService.validateProjectDependencies({
-          projectService,
-          rootPath: project.rootPath,
-          dependencies: preparedHandoff.prepared.dependencies,
-        });
-        const retryProviderStructureError = localizedEditService.structuredProviderResultError(model);
-        if (retryProviderStructureError) throw retryProviderStructureError;
-        result = handoffService.finalizeChangesHandoff({
-          preparedHandoff,
-          model,
-          changeSetService,
-        });
+        const result = handoffService.needsSourcesHandoff(preparedHandoff, parsed);
+        settle('retryable_failure');
+        return result;
       }
+      const result = handoffService.finalizeChangesHandoff({
+        preparedHandoff,
+        model: parsed.model,
+        changeSetService,
+      });
       if (!result.ok) {
         settle('retryable_failure');
         return result;
       }
       if (result.noChanges) {
-        settle('success');
+        settle('retryable_failure');
         return result;
       }
       projectChangesProposalService.validateProjectDependencies({
@@ -295,7 +331,7 @@ function createWritingNavigationActionHandler(options = {}) {
       cachedCapability = cached.capability;
       try {
         assertLeaseCurrent();
-        settle('success');
+        settle('review_ready');
       } catch (error) {
         discardReview(cachedCapability, 'writing-navigation-settle-rollback');
         cachedCapability = null;

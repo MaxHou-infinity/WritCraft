@@ -282,11 +282,20 @@
 }
 
 .writing-navigation__evidence {
-  display: grid;
-  gap: 6px;
   margin-top: 11px;
   padding-top: 10px;
   border-top: 1px solid var(--navigation-line);
+}
+
+.writing-navigation__evidence summary {
+  cursor: pointer;
+  color: var(--navigation-muted);
+  font-size: 10px;
+}
+
+.writing-navigation__evidence[open] {
+  display: grid;
+  gap: 6px;
 }
 
 .writing-navigation__evidence-link {
@@ -294,6 +303,56 @@
   color: #586c53;
   font-size: 10px;
   line-height: 1.45;
+}
+
+.writing-navigation__task {
+  margin-top: 12px;
+  padding: 10px 11px;
+  border-left: 3px solid var(--navigation-accent);
+  border-radius: 0 6px 6px 0;
+  background: #f2f4ef;
+}
+
+.writing-navigation__task-kicker {
+  display: block;
+  margin-bottom: 3px;
+  color: var(--navigation-accent);
+  font-size: 9px;
+  font-weight: 700;
+  letter-spacing: .12em;
+}
+
+.writing-navigation__task-title {
+  display: block;
+  font: 600 13px/1.45 "Songti SC", "STSong", Georgia, serif;
+}
+
+.writing-navigation__task .writing-navigation__task-stage {
+  color: #496962;
+  font-weight: 600;
+}
+
+.writing-navigation__task .writing-navigation__write-state {
+  font-size: 10px;
+}
+
+.writing-navigation__adjustment {
+  box-sizing: border-box;
+  width: 100%;
+  margin: 8px 0 6px;
+  padding: 7px 8px;
+  resize: vertical;
+  border: 1px solid #cdd6ca;
+  border-radius: 5px;
+  background: #fffefa;
+  color: var(--ink);
+  font: inherit;
+  line-height: 1.45;
+}
+
+.writing-navigation__adjustment:focus-visible {
+  outline: 2px solid var(--navigation-accent);
+  outline-offset: 1px;
 }
 
 @media (max-width: 720px) {

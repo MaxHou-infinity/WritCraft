@@ -39,8 +39,33 @@ function structuredModel(edits) {
     stopReason: 'tool_use',
     toolUseBlockCount: 1,
     toolUse: {
-      name: 'submit_localized_edits',
-      input: { edits },
+      name: 'submit_unified_writing_task',
+      input: { status: 'changes', edits, reason: '', question: '' },
+    },
+  };
+}
+
+function noopModel() {
+  return structuredModel([{
+    rangeId: 'range_1',
+    newText: CHAPTER,
+    summary: '保持原文',
+  }]);
+}
+
+function needsSourcesModel() {
+  return {
+    ok: true,
+    stopReason: 'tool_use',
+    toolUseBlockCount: 1,
+    toolUse: {
+      name: 'submit_unified_writing_task',
+      input: {
+        status: 'needs_sources',
+        edits: [],
+        reason: '缺少支持该事实的来源',
+        question: '请选择一项能够支持该事实的来源',
+      },
     },
   };
 }
@@ -49,6 +74,7 @@ function fakeProject() {
   const files = new Map([
     ['edit.md', '# 项目说明\n\n项目 Prompt。\n'],
     ['chapters/01.md', CHAPTER],
+    ['references/source.md', '# 来源\n\n一项可核对的事实。\n'],
   ]);
   return {
     files,
@@ -58,6 +84,11 @@ function fakeProject() {
         type: 'directory',
         path: 'chapters',
         children: [{ type: 'file', path: 'chapters/01.md' }],
+      },
+      {
+        type: 'directory',
+        path: 'references',
+        children: [{ type: 'file', path: 'references/source.md' }],
       },
     ],
     readFileWithRevision(_root, filePath) {
@@ -142,6 +173,11 @@ async function setup(action, overrides = {}) {
             }]);
       },
     changeSetService,
+    sourceIndexService: {
+      buildSourceIndex: () => ({
+        sources: [{ id: `src_${'b'.repeat(20)}`, filePath: 'references/source.md' }],
+      }),
+    },
     pendingChangeSets: {
       hasForRoot: () => pending,
     },
@@ -175,8 +211,8 @@ async function setup(action, overrides = {}) {
     return `wno_${attemptSequence.toString(16).padStart(32, '0')}`;
   };
   return {
-    handler: (event, projectInstanceId, actionId, attemptId = nextAttempt()) =>
-      rawHandler(event, projectInstanceId, actionId, attemptId),
+    handler: (event, projectInstanceId, actionId, attemptId = nextAttempt(), adjustment = '', sourceIds = []) =>
+      rawHandler(event, projectInstanceId, actionId, attemptId, adjustment, sourceIds),
     cancelHandler: (event, projectInstanceId, actionId, attemptId) =>
       rawCancelHandler(event, projectInstanceId, actionId, attemptId),
     nextAttempt,
@@ -237,14 +273,83 @@ async function setup(action, overrides = {}) {
     assert.strictEqual(result.changeSetId, `pc_${'a'.repeat(32)}`);
     assert.strictEqual(state.modelCalls, 1);
     assert.strictEqual(state.cacheCalls, 1);
-    assert.strictEqual(state.providerOptionsSeen.tools[0].name, 'submit_localized_edits');
+    assert.strictEqual(state.providerOptionsSeen.tools[0].name, 'submit_unified_writing_task');
     assert.deepStrictEqual(
       state.providerOptionsSeen.tools[0].input_schema.properties.edits.items.properties.rangeId.enum,
       ['range_1']
     );
     assert.deepStrictEqual(state.providerOptionsSeen.toolChoice, {
-      type: 'tool', name: 'submit_localized_edits',
+      type: 'tool', name: 'submit_unified_writing_task',
     });
+  });
+
+  await test('needs-sources keeps the same action reusable and creates no review', async () => {
+    let calls = 0;
+    const state = await setup('changes', {
+      projectCallLLM: () => async () => {
+        calls += 1;
+        return calls === 1 ? needsSourcesModel() : noopModel();
+      },
+    });
+    const first = await state.handler(EVENT, PROJECT.instanceId, state.actionId);
+    assert.strictEqual(first.kind, 'needs_sources');
+    assert.strictEqual(first.handoff.suggestionId, 'suggestion_1');
+    assert.strictEqual(state.cacheCalls, 0);
+    const second = await state.handler(
+      EVENT,
+      PROJECT.instanceId,
+      state.actionId,
+      state.nextAttempt(),
+      '',
+      [`src_${'b'.repeat(20)}`]
+    );
+    assert.strictEqual(second.ok, true);
+    assert.strictEqual(second.noChanges, true);
+    assert.strictEqual(calls, 2);
+  });
+
+  await test('author adjustment and selected source stay read-only context in one explicit retry', async () => {
+    let prompt = null;
+    const state = await setup('changes', {
+      projectCallLLM: () => async messages => {
+        prompt = messages.map(message => message.content).join('\n');
+        return noopModel();
+      },
+    });
+    const result = await state.handler(
+      EVENT,
+      PROJECT.instanceId,
+      state.actionId,
+      state.nextAttempt(),
+      '保留作者语气',
+      [`src_${'b'.repeat(20)}`]
+    );
+    assert.strictEqual(result.ok, true);
+    assert.match(prompt, /作者继续调整：保留作者语气/);
+    assert.match(prompt, /references\/source\.md/);
+  });
+
+  await test('Main emits bounded real stages before the Diff capability is returned', async () => {
+    const phases = [];
+    const event = { sender: { id: 7, send: (_channel, payload) => phases.push(payload.phase) } };
+    const state = await setup('changes');
+    const result = await state.handler(event, PROJECT.instanceId, state.actionId);
+    assert.strictEqual(result.ok, true);
+    assert.deepStrictEqual(phases, ['checking_evidence', 'generating_changes', 'preparing_diff']);
+  });
+
+  await test('Main provider work ends before the Renderer-wide 60 second terminal', async () => {
+    const delays = [];
+    const state = await setup('changes', {
+      setTimer(_callback, delay) {
+        delays.push(delay);
+        return delays.length;
+      },
+      clearTimer() {},
+    });
+    const result = await state.handler(EVENT, PROJECT.instanceId, state.actionId);
+    assert.strictEqual(result.ok, true);
+    assert.deepStrictEqual(delays, [50_000]);
   });
 
   await test('a pending review arriving during generation wins without replacement', async () => {
@@ -269,7 +374,7 @@ async function setup(action, overrides = {}) {
     state = await setup('changes', {
       projectCallLLM: () => async () => {
         state.setGeneration(6);
-        return structuredModel([]);
+        return noopModel();
       },
     });
     const result = await state.handler(EVENT, PROJECT.instanceId, state.actionId);
@@ -312,7 +417,7 @@ async function setup(action, overrides = {}) {
           firstSignal = options.signal;
           return new Promise(() => {});
         }
-        return structuredModel([]);
+        return noopModel();
       },
     });
     const attemptId = state.nextAttempt();
@@ -348,7 +453,7 @@ async function setup(action, overrides = {}) {
         providerCalls += 1;
         return providerCalls === 1
           ? { ok: false, error: 'LLM_FAILED' }
-          : structuredModel([]);
+          : noopModel();
       },
     });
     const failed = await state.handler(EVENT, PROJECT.instanceId, state.actionId);
@@ -358,33 +463,22 @@ async function setup(action, overrides = {}) {
     assert.strictEqual(retry.noChanges, true);
   });
 
-  await test('one oversized range replacement is corrected internally before review install', async () => {
+  await test('oversized output is terminal without a hidden paid retry', async () => {
     let providerCalls = 0;
-    let retryMessages = null;
     const state = await setup('changes', {
-      projectCallLLM: () => async messages => {
+      projectCallLLM: () => async () => {
         providerCalls += 1;
-        return providerCalls === 1
-          ? structuredModel([{
-            rangeId: 'range_1',
-            newText: 'x'.repeat(641),
-            summary: '超大结果',
-          }])
-          : (retryMessages = messages, structuredModel([{
-            rangeId: 'range_1',
-            newText: '# 第一章\n\n纠正后的有界内容。\n',
-            summary: '有界修改',
-          }]));
+        return structuredModel([{
+          rangeId: 'range_1',
+          newText: 'x'.repeat(641),
+          summary: '超大结果',
+        }]);
       },
     });
     const result = await state.handler(EVENT, PROJECT.instanceId, state.actionId);
-    assert.strictEqual(result.ok, true);
-    assert.strictEqual(result.noChanges, false);
-    assert.strictEqual(state.cacheCalls, 1);
-    assert.strictEqual(providerCalls, 2);
-    assert.strictEqual(retryMessages.length, 2);
-    assert.match(retryMessages[1].content, /PATCH_NEW_TEXT_TOO_LARGE/);
-    assert(!retryMessages[1].content.includes('x'.repeat(100)));
+    assert.strictEqual(result.error, 'PATCH_NEW_TEXT_TOO_LARGE');
+    assert.strictEqual(state.cacheCalls, 0);
+    assert.strictEqual(providerCalls, 1);
   });
 
   await test('the Changes model uses the dedicated bounded structured token budget', async () => {
@@ -394,24 +488,7 @@ async function setup(action, overrides = {}) {
     assert.strictEqual(state.maxTokensSeen, localizedEditService.STRUCTURED_MAX_TOKENS);
   });
 
-  await test('one invalid provider tool result is corrected internally', async () => {
-    let providerCalls = 0;
-    const state = await setup('changes', {
-      projectCallLLM: () => async () => {
-        providerCalls += 1;
-        return providerCalls === 1
-          ? { ok: false, error: 'INVALID_TOOL_USE' }
-          : structuredModel([]);
-      },
-    });
-    const result = await state.handler(EVENT, PROJECT.instanceId, state.actionId);
-    assert.strictEqual(result.ok, true);
-    assert.strictEqual(result.noChanges, true);
-    assert.strictEqual(providerCalls, 2);
-    assert.strictEqual(state.cacheCalls, 0);
-  });
-
-  await test('a second invalid provider tool result is terminal without a third call', async () => {
+  await test('invalid provider tool result is terminal without a hidden paid retry', async () => {
     let providerCalls = 0;
     const state = await setup('changes', {
       projectCallLLM: () => async () => {
@@ -421,11 +498,25 @@ async function setup(action, overrides = {}) {
     });
     const result = await state.handler(EVENT, PROJECT.instanceId, state.actionId);
     assert.strictEqual(result.error, 'INVALID_TOOL_USE');
-    assert.strictEqual(providerCalls, 2);
+    assert.strictEqual(providerCalls, 1);
     assert.strictEqual(state.cacheCalls, 0);
   });
 
-  await test('a second malformed structure is terminal and never makes a third paid call', async () => {
+  await test('repeated invalid provider behavior still costs only the explicit attempt', async () => {
+    let providerCalls = 0;
+    const state = await setup('changes', {
+      projectCallLLM: () => async () => {
+        providerCalls += 1;
+        return { ok: false, error: 'INVALID_TOOL_USE' };
+      },
+    });
+    const result = await state.handler(EVENT, PROJECT.instanceId, state.actionId);
+    assert.strictEqual(result.error, 'INVALID_TOOL_USE');
+    assert.strictEqual(providerCalls, 1);
+    assert.strictEqual(state.cacheCalls, 0);
+  });
+
+  await test('malformed structure is terminal after one paid call', async () => {
     let providerCalls = 0;
     const state = await setup('changes', {
       projectCallLLM: () => async () => {
@@ -439,7 +530,7 @@ async function setup(action, overrides = {}) {
     });
     const result = await state.handler(EVENT, PROJECT.instanceId, state.actionId);
     assert.strictEqual(result.error, 'PATCH_NEW_TEXT_TOO_LARGE');
-    assert.strictEqual(providerCalls, 2);
+    assert.strictEqual(providerCalls, 1);
     assert.strictEqual(state.cacheCalls, 0);
   });
 

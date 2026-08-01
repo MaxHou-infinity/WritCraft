@@ -364,24 +364,68 @@ async function flush() {
     assert.strictEqual(controller.getState().phase, 'idle');
   });
 
-  await test('navigation discloses X/Y and always offers Research plus Changes', async () => {
+  await test('the complete navigation generation reaches a retryable terminal by 60 seconds', async () => {
+    const document = new Document();
+    const host = document.createElement('div');
+    document.body.append(host);
+    const pending = deferred();
+    const timers = [];
+    const cancelled = [];
+    const controller = View.mount(host, {
+      stateApi: State,
+      createAttemptId: nextId,
+      setTimer(callback, delay) { timers.push({ callback, delay, cleared: false }); return timers.length - 1; },
+      clearTimer(timerId) { if (timers[timerId]) timers[timerId].cleared = true; },
+      onGenerate: () => pending.promise,
+      onCancelGeneration: async (...args) => {
+        cancelled.push(args);
+        return { ok: true, cancelled: true };
+      },
+    });
+    controller.updateProject(PROJECT, [{ type: 'file', path: 'edit.md' }]);
+    const goal = host.querySelector('textarea');
+    goal.value = '规划新文章';
+    await goal.dispatch('input');
+    void byText(host, '生成结构方案').click();
+    await flush();
+    const timeout = timers.find(timer => timer.delay === 60_000);
+    assert(timeout);
+    timeout.callback();
+    await flush();
+    assert.strictEqual(cancelled.length, 1);
+    assert.strictEqual(controller.getState().phase, 'failure');
+    assert(text(host).includes('已在 60 秒时自动停止'));
+    pending.resolve(structure());
+    await flush();
+    assert.strictEqual(controller.getState().phase, 'failure');
+  });
+
+  await test('navigation discloses X/Y and exposes one unified primary action', async () => {
     const document = new Document();
     const host = document.createElement('div');
     document.body.append(host);
     let actionCalls = 0;
+    let adjustmentSeen = null;
     const controller = View.mount(host, {
       stateApi: State,
       createAttemptId: nextId,
       onGenerate: async () => navigation('open'),
-      onRunAction: async (_projectId, actionId, attemptId) => {
+      onRunAction: async (_projectId, actionId, attemptId, _onStage, taskInput) => {
         actionCalls += 1;
-        assert.strictEqual(actionId, ACTION_ID);
+        adjustmentSeen = taskInput?.adjustment || null;
+        assert.strictEqual(actionId, CHANGES_ACTION_ID);
         assert.match(attemptId, /^wno_[a-f0-9]{32}$/);
-        return { ok: true, kind: 'research', handoff: {} };
+        return {
+          ok: true,
+          kind: 'changes',
+          noChanges: false,
+          changeSetId: `pc_${'f'.repeat(32)}`,
+        };
       },
       onOpenEvidence: async value => {
         assert.strictEqual(value.filePath, 'chapters/01.md');
       },
+      onAdjustReview: async () => true,
     });
     controller.updateProject(PROJECT, [
       { type: 'file', path: 'edit.md' },
@@ -397,12 +441,75 @@ async function flush() {
     assert(text(host).includes('基于本次已读取的 1/3 个正文文件'));
     assert(text(host).includes('以下建议仅在本次已读范围内优先'));
     assert(text(host).includes('开篇缺少边界'));
-    assert(text(host).includes('补充来源'));
-    assert(text(host).includes('生成修改建议'));
-    await byText(host, '补充来源').click();
+    assert.strictEqual(host.querySelectorAll('.writing-navigation__primary').filter(
+      node => node.textContent === '处理这个建议'
+    ).length, 1);
+    assert(!text(host).includes('生成修改建议'));
+    await byText(host, '处理这个建议').click();
     await flush();
     assert.strictEqual(actionCalls, 1);
-    assert(text(host).includes('已进入 Research'));
+    assert(text(host).includes('Diff 已显示在正文编辑区'));
+    const adjustment = host.querySelector('.writing-navigation__adjustment');
+    adjustment.value = '保留作者的口语感';
+    await adjustment.dispatch('input');
+    await byText(host, '重新生成 Diff').click();
+    await flush();
+    assert.strictEqual(actionCalls, 2);
+    assert.strictEqual(adjustmentSeen, '保留作者的口语感');
+  });
+
+  await test('no-change and failed review adjustment stay inside the same visible task', async () => {
+    const document = new Document();
+    const host = document.createElement('div');
+    document.body.append(host);
+    const adjustments = [];
+    let actionCalls = 0;
+    let discardFails = false;
+    const controller = View.mount(host, {
+      stateApi: State,
+      createAttemptId: nextId,
+      onGenerate: async () => navigation('changes'),
+      onRunAction: async (_projectId, _actionId, _attemptId, _onStage, taskInput) => {
+        actionCalls += 1;
+        adjustments.push(taskInput?.adjustment || '');
+        return actionCalls < 2
+          ? { ok: true, kind: 'changes', noChanges: true }
+          : { ok: true, kind: 'changes', noChanges: false, changeSetId: `pc_${'e'.repeat(32)}` };
+      },
+      onAdjustReview: async () => {
+        if (discardFails) throw Object.assign(new Error('blocked'), { code: 'REVIEW_DISCARD_FAILED' });
+        return true;
+      },
+    });
+    controller.updateProject(PROJECT, [
+      { type: 'file', path: 'edit.md' },
+      { type: 'file', path: 'chapters/01.md' },
+    ], 'chapters/01.md');
+    const goal = host.querySelector('textarea');
+    goal.value = '找下一步';
+    await goal.dispatch('input');
+    await byText(host, '生成写作导航').click();
+    await flush();
+    await byText(host, '处理这个建议').click();
+    await flush();
+    assert(text(host).includes('没有形成有效的局部修改'));
+    const retryAdjustment = host.querySelector('.writing-navigation__adjustment');
+    retryAdjustment.value = '只精简前三段';
+    await retryAdjustment.dispatch('input');
+    await byText(host, '按调整重试').click();
+    await flush();
+    assert.strictEqual(adjustments[1], '只精简前三段');
+    assert(text(host).includes('Diff 已显示在正文编辑区'));
+
+    discardFails = true;
+    const reviewAdjustment = host.querySelector('.writing-navigation__adjustment');
+    reviewAdjustment.value = '保留原意';
+    await reviewAdjustment.dispatch('input');
+    await byText(host, '重新生成 Diff').click();
+    await flush();
+    assert.strictEqual(controller.getState().actions[CHANGES_ACTION_ID].status, 'review');
+    assert(text(host).includes('当前 Diff 还没有安全退出'));
+    assert.strictEqual(actionCalls, 2, '退出审阅失败后不得启动新的付费请求');
   });
 
   await test('resume owns the UI until Main returns and does not permit a competing generation', async () => {
@@ -429,8 +536,49 @@ async function flush() {
     pending.resolve(navigation('research'));
     assert.strictEqual(await restoring, true);
     assert.strictEqual(controller.getState().phase, 'navigation-ready');
-    assert(text(host).includes('补充来源'));
-    assert(text(host).includes('生成修改建议'));
+    assert(text(host).includes('处理这个建议'));
+    assert(!text(host).includes('生成修改建议'));
+  });
+
+  await test('a unified action exposes cancel after 15 seconds and hard-stops at 60 seconds', async () => {
+    const document = new Document();
+    const host = document.createElement('div');
+    document.body.append(host);
+    const pending = deferred();
+    const timers = [];
+    const cancelled = [];
+    const controller = View.mount(host, {
+      stateApi: State,
+      createAttemptId: nextId,
+      setTimer(callback, delay) { timers.push({ callback, delay, cleared: false }); return timers.length - 1; },
+      clearTimer(id) { if (timers[id]) timers[id].cleared = true; },
+      onGenerate: async () => navigation('changes'),
+      onRunAction: () => pending.promise,
+      onCancelAction: async (...args) => { cancelled.push(args); return { ok: true, cancelled: true }; },
+    });
+    controller.updateProject(PROJECT, [
+      { type: 'file', path: 'edit.md' },
+      { type: 'file', path: 'chapters/01.md' },
+    ], 'chapters/01.md');
+    const goal = host.querySelector('textarea');
+    goal.value = '找下一步';
+    await goal.dispatch('input');
+    await byText(host, '生成写作导航').click();
+    await flush();
+    void byText(host, '处理这个建议').click();
+    await flush();
+    const cancelTimer = timers.find(timer => timer.delay === 15_000);
+    const timeoutTimer = timers.find(timer => timer.delay === 60_000 && timer.cleared === false);
+    assert(cancelTimer && timeoutTimer);
+    cancelTimer.callback();
+    assert(text(host).includes('取消'));
+    timeoutTimer.callback();
+    await flush();
+    assert(text(host).includes('已在 60 秒时自动停止'));
+    assert.strictEqual(cancelled.length, 1);
+    pending.resolve({ ok: true, kind: 'changes', noChanges: false, changeSetId: `pc_${'1'.repeat(32)}` });
+    await flush();
+    assert.strictEqual(controller.getState().actions[CHANGES_ACTION_ID].status, 'retryable');
   });
 
   await test('NO_KEY and REVIEW_IN_PROGRESS expose executable recovery actions', async () => {
@@ -472,7 +620,7 @@ async function flush() {
     await goal.dispatch('input');
     await byText(host, '生成写作导航').click();
     await flush();
-    await byText(host, '生成修改建议').click();
+    await byText(host, '处理这个建议').click();
     await flush();
     assert(text(host).includes('现有审阅保持不变'));
     assert(!text(host).includes('internal copy'));

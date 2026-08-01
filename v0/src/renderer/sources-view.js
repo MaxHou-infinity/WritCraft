@@ -20,6 +20,7 @@
   let indexRequestSequence = 0;
   let importRequestSequence = 0;
   let navigationHandoff = null;
+  let navigationSourceReturn = null;
 
   function exactKeys(value, keys) {
     if (!value || typeof value !== 'object' || Array.isArray(value)) return false;
@@ -75,7 +76,10 @@
   function syncResearchControls() {
     const hasQuestion = Boolean(researchQuestion?.value.trim());
     if (researchCount) researchCount.textContent = `${selectedSourceIds.length} / 8`;
-    if (researchRun) researchRun.disabled = researching || !hasQuestion || selectedSourceIds.length === 0;
+    if (researchRun) {
+      researchRun.textContent = navigationHandoff ? '使用所选来源继续处理' : '研究所选来源';
+      researchRun.disabled = researching || !hasQuestion || selectedSourceIds.length === 0;
+    }
   }
 
   function clearResearchResults() {
@@ -402,10 +406,10 @@
       checkbox.type = 'checkbox';
       checkbox.checked = selectedSourceIds.includes(source.id);
       checkbox.disabled = selectedSourceIds.length >= 8 && !checkbox.checked;
-      checkbox.setAttribute('aria-label', `选择 ${source.title || source.filePath} 用于 Research`);
+      checkbox.setAttribute('aria-label', `选择 ${source.title || source.filePath}${navigationHandoff ? '补充当前任务' : '用于 Research'}`);
       checkbox.addEventListener('change', () => updateSelection(source.id, checkbox.checked));
       const selectText = document.createElement('span');
-      selectText.textContent = '用于 Research';
+      selectText.textContent = navigationHandoff ? '补充当前任务' : '用于 Research';
       select.append(checkbox, selectText);
       const cite = document.createElement('button');
       cite.type = 'button';
@@ -432,6 +436,15 @@
     const requestId = ++researchRequestSequence;
     const projectInstanceId = window.__workspace?.state?.project?.instanceId;
     const sourceIds = [...selectedSourceIds];
+    if (navigationHandoff && typeof navigationSourceReturn === 'function') {
+      const resume = navigationSourceReturn;
+      navigationHandoff = null;
+      navigationSourceReturn = null;
+      resume(sourceIds);
+      window.__assistantDock?.open?.('navigation');
+      syncResearchControls();
+      return;
+    }
     researching = true;
     syncResearchControls();
     researchState('正在只读分析所选来源…');
@@ -452,17 +465,19 @@
     renderResearchCards(result.cards, result.warnings);
   }
 
-  function openWritingNavigation(value) {
+  function openWritingNavigation(value, onSelected) {
     const handoff = normalizeNavigationHandoff(value);
     if (!handoff) return { ok: false, message: '这条研究线索已经失效，请重新生成写作导航。' };
     researchRequestSequence += 1;
     researching = false;
     navigationHandoff = handoff;
+    navigationSourceReturn = typeof onSelected === 'function' ? onSelected : null;
     if (researchQuestion) researchQuestion.value = handoff.question;
     window.__workspace?.setSidebarView?.('sources');
     active = true;
     syncResearchControls();
     renderNavigationHandoff();
+    void refresh();
     researchQuestion?.focus?.();
     return { ok: true };
   }
@@ -546,6 +561,7 @@
     selectedSourceIds = [];
     currentIndex = null;
     navigationHandoff = null;
+    navigationSourceReturn = null;
     researching = false;
     clearResearchResults();
     syncResearchControls();

@@ -35,6 +35,7 @@ const writingNavigationHandlerService = require('./writing-navigation-handler');
 const writingNavigationProviderAdapter = require('./writing-navigation-provider-adapter');
 const writingNavigationHandoffService = require('./writing-navigation-handoff-service');
 const writingNavigationActionHandlerService = require('./writing-navigation-action-handler');
+const unifiedWritingTaskService = require('./unified-writing-task-service');
 const writingStructureService = require('./writing-structure-service');
 const writingStructureCapabilityStoreService = require('./writing-structure-capability-store');
 const writingStructureHandlerService = require('./writing-structure-handler');
@@ -348,6 +349,7 @@ function projectFailure(error) {
     error instanceof writingNavigationService.WritingNavigationError ||
     error instanceof writingNavigationStoreService.WritingNavigationStoreError ||
     error instanceof writingNavigationHandoffService.WritingNavigationHandoffError ||
+    error instanceof unifiedWritingTaskService.UnifiedWritingTaskError ||
     error instanceof writingStructureService.WritingStructureError ||
     error instanceof writingStructureCapabilityStoreService.WritingStructureCapabilityStoreError ||
     error instanceof writingStructureHandlerService.WritingStructureHandlerError ||
@@ -2132,6 +2134,7 @@ ipcMain.handle('writcraft:project:run-writing-navigation-action',
     projectService,
     projectCallLLM: writingNavigationProjectCallLLM,
     changeSetService,
+    sourceIndexService,
     pendingChangeSets,
     cacheReview: cacheReviewedChangeSet,
     discardReview: (capability, reason) => pendingChangeSets.delete(capability, reason),

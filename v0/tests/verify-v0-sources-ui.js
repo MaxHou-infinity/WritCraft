@@ -136,16 +136,17 @@ test('a new Research run first cancels any dedicated handoff in Changes', () => 
   assert.match(sourceView, /await window\.__changesView\?\.cancelResearchForRerun\?\.\(\)/);
 });
 
-test('Writing Navigation hands Research a strict question-and-evidence preview without auto-running it', () => {
+test('统一任务只在缺来源时打开选择器，并把来源 ID 返回原任务而不启动 Research', () => {
   assert.match(sourceView, /writcraft\.writing-navigation-research\/v1/);
-  assert.match(sourceView, /function openWritingNavigation\(value\)/);
+  assert.match(sourceView, /function openWritingNavigation\(value, onSelected\)/);
   assert.match(sourceView, /window\.__workspace\?\.setSidebarView\?\.\('sources'\)/);
   assert.match(sourceView, /researchQuestion\.value = handoff\.question/);
   assert.match(sourceView, /renderNavigationHandoff\(\)/);
   assert.match(sourceView, /researchRequestSequence \+= 1/);
   assert.match(sourceView, /researching = false/);
   assert.match(sourceView, /只用于保留写作现场/);
-  assert.doesNotMatch(sourceView, /function openWritingNavigation[\s\S]{0,900}runResearch\(\)/);
+  assert.match(sourceView, /navigationSourceReturn\(sourceIds\)|resume\(sourceIds\)/);
+  assert.match(sourceView, /使用所选来源继续处理/);
   assert.match(sourceView, /window\.__sourcesView = \{ activate: open, openWritingNavigation \}/);
 });
 

@@ -4,6 +4,8 @@
 > Product version: `writ-craft@0.1.2`
 > Public journey: Writing Navigation suggestion → inline review → explicit decision
 
+> Implementation checkpoint (2026-08-01): Main/Renderer/inline Diff/Safe Undo state handoff and focused automated checks are implemented locally. Full verification, real Electron, independent review, and real-author acceptance remain open; this is not release sign-off.
+
 ## 1. Product decision
 
 The default author journey is one continuous writing task. Navigation, evidence checking, localized generation, Diff review, decision, and Safe Undo may retain separate internal services, but must not appear as a chain of public workspaces.

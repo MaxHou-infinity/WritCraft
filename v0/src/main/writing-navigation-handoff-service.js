@@ -2,6 +2,7 @@
 
 const blockAnchor = require('../renderer/block-anchor');
 const projectChangesProposalService = require('./project-changes-proposal-service');
+const unifiedWritingTaskService = require('./unified-writing-task-service');
 const { markdownPaths } = require('./writing-navigation-service');
 
 const OPEN_HANDOFF_SCHEMA = 'writcraft.writing-navigation-open/v1';
@@ -236,26 +237,38 @@ function researchHandoff(authority) {
   });
 }
 
-function prepareChangesHandoff({ projectService, rootPath, authority }) {
+function prepareChangesHandoff({
+  projectService,
+  rootPath,
+  authority,
+  adjustment = '',
+  extraContextPaths = [],
+}) {
   if (authority?.suggestion?.action !== 'changes') {
     fail('ACTION_MISMATCH', '这条建议不是生成修改建议动作');
   }
   const suggestion = authority.suggestion;
-  const targetPaths = [...new Set(suggestion.evidence.map(item => item.relativePath))];
+  // The public unified task defaults to the first canonical evidence file.
+  // Other files stay read-only context unless a later explicit advanced scope
+  // contract authorizes them.
+  const targetPaths = [suggestion.evidence[0].relativePath];
   const targetSet = new Set(targetPaths);
-  const contextPaths = authority.record.sources
-    .map(item => item.path)
-    .filter(filePath => !targetSet.has(filePath));
+  const contextPaths = [...new Set([
+    ...extraContextPaths,
+    ...authority.record.sources.map(item => item.path),
+  ])].filter(filePath => !targetSet.has(filePath)).slice(0, 8);
   const instruction = [
     `发现：${suggestion.finding}`,
     `为什么现在处理：${suggestion.whyNow}`,
     `建议动作：${suggestion.recommendedAction}`,
     `预期结果：${suggestion.expectedResult}`,
+    ...(adjustment ? [`作者继续调整：${adjustment}`] : []),
   ].join('\n');
   const prepared = projectChangesProposalService.prepareProjectChangesProposal({
     projectService,
     rootPath,
     structuredOutput: true,
+    structuredProtocolLines: unifiedWritingTaskService.protocolPromptLines(),
     request: {
       schema: projectChangesProposalService.REQUEST_SCHEMA,
       instruction,
@@ -270,6 +283,28 @@ function prepareChangesHandoff({ projectService, rootPath, authority }) {
       navigationId: authority.navigationId,
       suggestionId: suggestion.suggestionId,
       evidence: Object.freeze(suggestion.evidence.map(publicEvidence)),
+    }),
+  });
+}
+
+function needsSourcesHandoff(preparedHandoff, parsed) {
+  if (!preparedHandoff?.provenance || parsed?.kind !== 'needs_sources') {
+    fail('INVALID_MODEL_OUTPUT', '统一任务来源恢复结果无效');
+  }
+  return Object.freeze({
+    ok: true,
+    kind: 'needs_sources',
+    noChanges: true,
+    reason: parsed.reason,
+    question: parsed.question,
+    provenance: preparedHandoff.provenance,
+    handoff: Object.freeze({
+      schema: RESEARCH_HANDOFF_SCHEMA,
+      navigationId: preparedHandoff.provenance.navigationId,
+      suggestionId: preparedHandoff.provenance.suggestionId,
+      question: parsed.question,
+      finding: parsed.reason,
+      evidence: preparedHandoff.provenance.evidence,
     }),
   });
 }
@@ -308,5 +343,6 @@ module.exports = Object.freeze({
   openHandoff,
   researchHandoff,
   prepareChangesHandoff,
+  needsSourcesHandoff,
   finalizeChangesHandoff,
 });

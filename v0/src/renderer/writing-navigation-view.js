@@ -5,11 +5,9 @@
 })(typeof globalThis !== 'undefined' ? globalThis : window, function (DefaultState) {
   'use strict';
 
-  const ACTION_LABELS = Object.freeze({
-    open: '打开章节',
-    research: '补充来源',
-    changes: '生成修改建议',
-  });
+  const ACTION_LABEL = '处理这个建议';
+  const CANCEL_VISIBLE_MS = 15_000;
+  const HARD_TIMEOUT_MS = 60_000;
 
   function element(document, tag, className, label) {
     const node = document.createElement(tag);
@@ -49,8 +47,12 @@
     if (!State) throw new Error('缺少 WritCraftWritingNavigationState');
     const document = host.ownerDocument;
     const createAttemptId = options.createAttemptId || defaultAttemptId;
+    const setTimer = options.setTimer || setTimeout;
+    const clearTimer = options.clearTimer || clearTimeout;
     let state = State.createState();
     let destroyed = false;
+    let generationTimer = null;
+    const actionTimers = new Map();
 
     host.classList.add('writing-navigation');
     host.setAttribute('aria-label', '写作导航');
@@ -88,6 +90,33 @@
       return State.publicFailure(raw || {});
     }
 
+    function clearActionTimers(attemptId) {
+      const timers = actionTimers.get(attemptId);
+      if (!timers) return;
+      clearTimer(timers.cancel);
+      clearTimer(timers.timeout);
+      actionTimers.delete(attemptId);
+    }
+
+    function clearGenerationTimer() {
+      if (generationTimer === null) return;
+      clearTimer(generationTimer);
+      generationTimer = null;
+    }
+
+    function scheduleActionTimers(projectId, actionId, attemptId) {
+      const cancel = setTimer(() => {
+        dispatch({ type: 'action-cancel-visible', actionId, attemptId });
+      }, CANCEL_VISIBLE_MS);
+      const timeout = setTimer(() => {
+        const active = state.actions[actionId];
+        if (!active || active.status !== 'running' || active.attemptId !== attemptId) return;
+        dispatch({ type: 'action-timeout', actionId, attemptId });
+        void options.onCancelAction?.(projectId, actionId, attemptId);
+      }, HARD_TIMEOUT_MS);
+      actionTimers.set(attemptId, { cancel, timeout });
+    }
+
     async function request() {
       if (destroyed || state.generation || state.phase === 'restoring' || state.phase === 'recovery' ||
           state.phase === 'recovery-querying') return false;
@@ -111,6 +140,12 @@
       const epoch = state.projectEpoch;
       dispatch({ type: 'generation-start', attemptId });
       if (state.generation?.attemptId !== attemptId) return false;
+      clearGenerationTimer();
+      generationTimer = setTimer(() => {
+        if (state.generation?.attemptId !== attemptId) return;
+        dispatch({ type: 'generation-timeout', attemptId });
+        void options.onCancelGeneration?.(projectId, attemptId);
+      }, HARD_TIMEOUT_MS);
       try {
         const result = await options.onGenerate(requestValue, attemptId, projectId);
         if (result?.ok === true) {
@@ -128,6 +163,7 @@
         });
         return false;
       } finally {
+        clearGenerationTimer();
         dispatch({ type: 'generation-finally', attemptId });
       }
     }
@@ -151,6 +187,7 @@
           return false;
         }
         dispatch({ type: 'generation-cancelled', attemptId: active.attemptId });
+        clearGenerationTimer();
         return true;
       } catch (error) {
         dispatch({
@@ -306,8 +343,8 @@
       }
     }
 
-    async function runAction(suggestion, kind) {
-      const actionId = suggestion?.actionIds?.[kind];
+    async function runAction(suggestion, taskInput = {}) {
+      const actionId = suggestion?.actionIds?.changes;
       if (state.phase !== 'navigation-ready' || !actionId ||
           typeof options.onRunAction !== 'function') return false;
       const attemptId = createAttemptId();
@@ -315,8 +352,11 @@
       const epoch = state.projectEpoch;
       dispatch({ type: 'action-start', actionId, attemptId });
       if (state.actions[actionId]?.attemptId !== attemptId) return false;
+      scheduleActionTimers(projectId, actionId, attemptId);
       try {
-        const result = await options.onRunAction(projectId, actionId, attemptId);
+        const result = await options.onRunAction(projectId, actionId, attemptId, phase => {
+          dispatch({ type: 'action-progress', actionId, attemptId, phase });
+        }, taskInput);
         if (state.projectInstanceId !== projectId || state.projectEpoch !== epoch) return false;
         if (result?.ok === true && result.kind === 'open' && result.handoff?.locator) {
           await options.onOpenEvidence?.(result.handoff.locator, result.handoff.path);
@@ -340,12 +380,13 @@
         }
         return false;
       } finally {
+        clearActionTimers(attemptId);
         dispatch({ type: 'action-finally', actionId, attemptId });
       }
     }
 
-    async function cancelAction(suggestion, kind) {
-      const actionId = suggestion?.actionIds?.[kind];
+    async function cancelAction(suggestion) {
+      const actionId = suggestion?.actionIds?.changes;
       const active = state.actions[actionId];
       if (!active || active.status !== 'running' ||
           typeof options.onCancelAction !== 'function') return false;
@@ -374,6 +415,7 @@
           actionId,
           attemptId: active.attemptId,
         });
+        clearActionTimers(active.attemptId);
         return true;
       } catch (error) {
         dispatch({
@@ -384,6 +426,48 @@
         });
         return false;
       }
+    }
+
+    async function adjustReview(suggestion, action, value) {
+      const adjustment = String(value || '').trim();
+      if (!adjustment || adjustment.length > 500 || !action?.result?.changeSetId ||
+          typeof options.onAdjustReview !== 'function') return false;
+      try {
+        const discarded = await options.onAdjustReview(action.result.changeSetId);
+        if (discarded !== true) {
+          dispatch({
+            type: 'action-review-adjust-failed',
+            actionId: suggestion.actionIds.changes,
+            error: { error: 'REVIEW_DISCARD_FAILED' },
+          });
+          return false;
+        }
+        dispatch({ type: 'action-retry-ready', actionId: suggestion.actionIds.changes });
+        return runAction(suggestion, { adjustment });
+      } catch (error) {
+        dispatch({
+          type: 'action-review-adjust-failed',
+          actionId: suggestion.actionIds.changes,
+          error: { error: error?.code || 'REVIEW_DISCARD_FAILED' },
+        });
+        return false;
+      }
+    }
+
+    async function adjustNoChanges(suggestion, value) {
+      const adjustment = String(value || '').trim();
+      if (!adjustment || adjustment.length > 500) return false;
+      const actionId = suggestion.actionIds.changes;
+      dispatch({ type: 'action-retry-ready', actionId });
+      return runAction(suggestion, { adjustment });
+    }
+
+    async function resumeWithSources(suggestionId, sourceIds) {
+      const suggestion = state.result?.suggestions?.find(item => item.suggestionId === suggestionId);
+      if (!suggestion || !Array.isArray(sourceIds) || !sourceIds.length) return false;
+      const actionId = suggestion.actionIds.changes;
+      dispatch({ type: 'action-retry-ready', actionId });
+      return runAction(suggestion, { sourceIds });
     }
 
     function status(title, description, kind = 'status') {
@@ -633,16 +717,25 @@
       return section;
     }
 
-    function actionCopy(kind, action) {
-      if (action?.status === 'running') return '处理中…';
+    function actionCopy(action) {
+      if (action?.status === 'running') return '正在处理…';
       if (action?.status === 'cancelling') return '正在停止…';
-      if (action?.status === 'success') {
-        if (kind === 'research') return '已进入 Research';
-        if (action.result?.noChanges) return '正文无需修改';
-        return '已生成待审修改';
-      }
+      if (action?.status === 'review') return 'Diff 待审阅';
+      if (action?.status === 'needs_sources') return '需要补充来源';
+      if (action?.status === 'no_changes') return '重新处理';
+      if (action?.status === 'committed') return '已写入文件';
+      if (action?.status === 'undone') return '已安全撤销';
+      if (action?.status === 'rejected') return '已结束审阅';
+      if (action?.status === 'conflict') return '文件已变化';
       if (action?.status === 'stale') return '建议已过期';
-      return ACTION_LABELS[kind];
+      return ACTION_LABEL;
+    }
+
+    function phaseCopy(phase) {
+      if (phase === 'saving_current_content') return '正在保存当前内容';
+      if (phase === 'checking_evidence') return '正在核对依据';
+      if (phase === 'preparing_diff') return '正在准备 Diff';
+      return '正在生成局部修改';
     }
 
     function recoveryAction(error) {
@@ -670,8 +763,8 @@
           element(document, 'p', '', `建议动作：${suggestion.recommendedAction}`),
           element(document, 'p', '', `预期改善：${suggestion.expectedResult}`)
         );
-        const evidence = element(document, 'div', 'writing-navigation__evidence');
-        evidence.append(element(document, 'strong', '', '原文依据'));
+        const evidence = element(document, 'details', 'writing-navigation__evidence');
+        evidence.append(element(document, 'summary', '', '查看依据与来源'));
         for (const item of suggestion.evidence) {
           const open = button(document,
             `${item.relativePath} · ${item.sectionHeading} · “${item.quote}”`,
@@ -681,24 +774,97 @@
           evidence.append(open);
         }
         card.append(evidence);
+        const actionId = suggestion.actionIds.changes;
+        const action = view.actions[actionId];
+        const task = element(document, 'section', 'writing-navigation__task');
+        task.setAttribute('aria-live', 'polite');
+        task.append(
+          element(document, 'small', 'writing-navigation__task-kicker', '当前目标'),
+          element(document, 'strong', 'writing-navigation__task-title', suggestion.recommendedAction)
+        );
+        if (action?.status === 'running' || action?.status === 'cancelling') {
+          task.append(element(
+            document,
+            'p',
+            'writing-navigation__task-stage',
+            action.status === 'cancelling' ? '正在停止本次处理' : phaseCopy(action.phase)
+          ));
+          task.append(element(document, 'p', 'writing-navigation__write-state', '尚未写入任何项目文件'));
+        } else if (action?.status === 'review') {
+          task.append(
+            element(document, 'p', 'writing-navigation__task-stage', 'Diff 已显示在正文编辑区'),
+            element(document, 'p', 'writing-navigation__write-state', '尚未写入；接受后才会修改文件')
+          );
+          const adjustment = element(document, 'textarea', 'writing-navigation__adjustment');
+          adjustment.maxLength = 500;
+          adjustment.rows = 2;
+          adjustment.placeholder = '继续调整这份建议（可选）';
+          const adjust = button(document, '重新生成 Diff', 'writing-navigation__secondary', () => {
+            void adjustReview(suggestion, action, adjustment.value);
+          });
+          adjustment.addEventListener('input', () => {
+            adjust.disabled = !adjustment.value.trim();
+          });
+          adjust.disabled = true;
+          task.append(adjustment, adjust);
+        } else if (action?.status === 'needs_sources') {
+          task.append(
+            element(document, 'p', 'writing-navigation__task-stage', action.result?.reason || '完成这项修改还缺少来源'),
+            element(document, 'p', 'writing-navigation__write-state', '没有生成修改，也没有写入项目文件')
+          );
+        } else if (action?.status === 'no_changes') {
+          task.append(
+            element(document, 'p', 'writing-navigation__task-stage', '本次没有形成有效的局部修改'),
+            element(document, 'p', 'writing-navigation__write-state', '没有写入项目文件；可以直接调整后重试')
+          );
+          const adjustment = element(document, 'textarea', 'writing-navigation__adjustment');
+          adjustment.maxLength = 500;
+          adjustment.rows = 2;
+          adjustment.placeholder = '例如：只精简开篇前三段，保留具体数据';
+          const adjust = button(document, '按调整重试', 'writing-navigation__secondary', () => {
+            void adjustNoChanges(suggestion, adjustment.value);
+          });
+          adjustment.addEventListener('input', () => {
+            adjust.disabled = !adjustment.value.trim();
+          });
+          adjust.disabled = true;
+          task.append(adjustment, adjust);
+        } else if (action?.status === 'committed') {
+          task.append(
+            element(document, 'p', 'writing-navigation__task-stage', '修改已经写入项目文件'),
+            element(document, 'p', 'writing-navigation__write-state', '可在修改历史中安全撤销')
+          );
+        } else if (action?.status === 'undone') {
+          task.append(
+            element(document, 'p', 'writing-navigation__task-stage', '这次写入已经安全撤销'),
+            element(document, 'p', 'writing-navigation__write-state', '项目文件已恢复到写入前版本')
+          );
+        } else if (action?.status === 'rejected') {
+          task.append(
+            element(document, 'p', 'writing-navigation__task-stage', '本次审阅已经结束'),
+            element(document, 'p', 'writing-navigation__write-state', '没有采用的修改不会写入项目文件')
+          );
+        }
+        if (action?.error) {
+          task.append(element(document, 'p', 'writing-navigation__action-error', action.error.message));
+          const errorAction = recoveryAction(action.error);
+          if (errorAction) task.append(errorAction);
+        }
+        card.append(task);
         const actionRow = element(document, 'div', 'writing-navigation__action-row');
-        for (const kind of ['research', 'changes']) {
-          const actionId = suggestion.actionIds[kind];
-          const action = view.actions[actionId];
-          if (action?.error) {
-            card.append(element(document, 'p', 'writing-navigation__action-error', action.error.message));
-            const errorAction = recoveryAction(action.error);
-            if (errorAction) card.append(errorAction);
-          }
-          const run = button(document, actionCopy(kind, action),
-            kind === 'changes' ? 'writing-navigation__primary' : 'writing-navigation__secondary',
-            () => runAction(suggestion, kind));
-          run.disabled = ['running', 'cancelling', 'stale', 'success'].includes(action?.status);
-          actionRow.append(run);
-          if (kind === 'changes' && action?.status === 'running') {
-            actionRow.append(button(document, '停止生成修改建议',
-              'writing-navigation__secondary', () => cancelAction(suggestion, kind)));
-          }
+        const run = button(document, actionCopy(action), 'writing-navigation__primary',
+          () => runAction(suggestion));
+        run.disabled = ['running', 'cancelling', 'stale', 'review', 'needs_sources',
+          'committed', 'undone', 'rejected', 'conflict'].includes(action?.status);
+        actionRow.append(run);
+        if (action?.status === 'running' && action.cancelVisible) {
+          actionRow.append(button(document, '取消', 'writing-navigation__secondary',
+            () => cancelAction(suggestion)));
+        }
+        if (action?.status === 'needs_sources') {
+          actionRow.append(button(document, '添加来源', 'writing-navigation__secondary', () => {
+            options.onAddSources?.(action.result?.handoff);
+          }));
         }
         card.append(actionRow);
         section.append(card);
@@ -783,6 +949,8 @@
     render();
     return Object.freeze({
       updateProject(project, tree, currentFilePath = null) {
+        clearGenerationTimer();
+        for (const attemptId of [...actionTimers.keys()]) clearActionTimers(attemptId);
         dispatch({
           type: 'project-update',
           projectInstanceId: project?.instanceId,
@@ -798,8 +966,44 @@
       request,
       recover,
       resume,
+      progress(payload) {
+        if (!payload || typeof payload.attemptId !== 'string' || typeof payload.phase !== 'string') {
+          return state;
+        }
+        const match = Object.entries(state.actions).find(([, action]) =>
+          action?.attemptId === payload.attemptId && action.status === 'running'
+        );
+        if (match) dispatch({
+          type: 'action-progress',
+          actionId: match[0],
+          attemptId: payload.attemptId,
+          phase: payload.phase,
+        });
+        return state;
+      },
+      reviewSettled(changeSetId, outcome) {
+        const match = Object.entries(state.actions).find(([, action]) =>
+          action?.status === 'review' && action.result?.changeSetId === changeSetId
+        );
+        if (match) dispatch({
+          type: 'action-review-settled',
+          actionId: match[0],
+          changeSetId,
+          outcome,
+        });
+        return state;
+      },
+      historyUndone(detail) {
+        if (!detail || detail.projectInstanceId !== state.projectInstanceId ||
+            typeof detail.historyEntryId !== 'string') return state;
+        dispatch({ type: 'action-history-undone', historyEntryId: detail.historyEntryId });
+        return state;
+      },
+      resumeWithSources,
       getState: () => state,
       destroy() {
+        clearGenerationTimer();
+        for (const attemptId of [...actionTimers.keys()]) clearActionTimers(attemptId);
         destroyed = true;
         state = State.createState();
         host.replaceChildren();
@@ -809,7 +1013,7 @@
   }
 
   return Object.freeze({
-    ACTION_LABELS,
+    ACTION_LABEL,
     mount,
   });
 });

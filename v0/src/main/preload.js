@@ -197,12 +197,14 @@ contextBridge.exposeInMainWorld('writCraft', {
         'writcraft:project:resume-writing-navigation',
         projectInstanceId
       ),
-    runWritingNavigationAction: (projectInstanceId, actionId, attemptId) =>
+    runWritingNavigationAction: (projectInstanceId, actionId, attemptId, adjustment = '', sourceIds = []) =>
       ipcRenderer.invoke(
         'writcraft:project:run-writing-navigation-action',
         projectInstanceId,
         actionId,
-        attemptId
+        attemptId,
+        adjustment,
+        sourceIds
       ),
     cancelWritingNavigationAction: (projectInstanceId, actionId, attemptId) =>
       ipcRenderer.invoke(
@@ -211,6 +213,12 @@ contextBridge.exposeInMainWorld('writCraft', {
         actionId,
         attemptId
       ),
+    onWritingTaskProgress: handler => {
+      if (typeof handler !== 'function') return () => {};
+      const listener = (_event, payload) => handler(payload);
+      ipcRenderer.on('writcraft:writing-task-progress', listener);
+      return () => ipcRenderer.removeListener('writcraft:writing-task-progress', listener);
+    },
     prepareWritingStructure: (projectInstanceId, navigationId, alternativeId, chapters) =>
       ipcRenderer.invoke(
         'writcraft:project:prepare-writing-structure',

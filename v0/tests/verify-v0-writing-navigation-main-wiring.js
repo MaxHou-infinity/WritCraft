@@ -40,13 +40,13 @@ test('trusted IPC uses the dedicated handler and abort-aware provider adapter', 
   assert(!/proposeWritingNavigation: \([^)]*(?:content|revision|rootPath)/.test(preload));
 });
 
-test('opaque actions use one Main-owned handler and the preload exposes no trusted content', () => {
+test('opaque actions use one Main-owned handler plus bounded adjustment and source IDs', () => {
   assert.match(main, /ipcMain\.handle\('writcraft:project:run-writing-navigation-action'/);
   assert.match(main, /writingNavigationActionHandlerService\.createWritingNavigationActionHandler\(\{/);
   assert.match(main, /ipcMain\.handle\('writcraft:project:cancel-writing-navigation-action'/);
   assert.match(main, /createCancelWritingNavigationActionHandler\(\{/);
-  assert.match(main, /pendingChangeSets,\s*cacheReview: cacheReviewedChangeSet,/);
-  assert.match(preload, /runWritingNavigationAction: \(projectInstanceId, actionId, attemptId\) =>[\s\S]{0,220}'writcraft:project:run-writing-navigation-action',[\s\S]{0,120}attemptId/);
+  assert.match(main, /changeSetService,\s*sourceIndexService,\s*pendingChangeSets,/);
+  assert.match(preload, /runWritingNavigationAction: \(projectInstanceId, actionId, attemptId, adjustment = '', sourceIds = \[\]\) =>[\s\S]{0,260}'writcraft:project:run-writing-navigation-action',[\s\S]{0,180}sourceIds/);
   assert(!/runWritingNavigationAction: \([^)]*(?:content|revision|rootPath|suggestion)/.test(preload));
   assert.match(preload, /cancelWritingNavigationAction: \(projectInstanceId, actionId, attemptId\) =>[\s\S]{0,220}'writcraft:project:cancel-writing-navigation-action',[\s\S]{0,120}attemptId/);
 });

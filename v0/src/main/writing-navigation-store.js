@@ -430,7 +430,7 @@ function createWritingNavigationStore(options = {}) {
       'navigationEpoch', 'leaseId', 'outcome',
     ], 'INVALID_ACTION_SETTLEMENT');
     if (![
-      'success', 'review_in_progress', 'retryable_failure', 'cancelled', 'failed', 'stale',
+      'success', 'review_ready', 'review_in_progress', 'retryable_failure', 'cancelled', 'failed', 'stale',
     ].includes(raw.outcome)) {
       fail('INVALID_ACTION_SETTLEMENT', '写作导航动作结算无效');
     }
@@ -443,8 +443,9 @@ function createWritingNavigationStore(options = {}) {
     lease.controller.abort();
     action.leaseId = null;
     action.attemptId = null;
-    const reviewBlocked = raw.outcome === 'review_in_progress' && action.action === 'changes';
-    if (raw.outcome === 'review_in_progress' && action.action !== 'changes') {
+    const reviewBlocked = ['review_ready', 'review_in_progress'].includes(raw.outcome) &&
+      action.action === 'changes';
+    if (['review_ready', 'review_in_progress'].includes(raw.outcome) && action.action !== 'changes') {
       action.terminated = true;
       fail('INVALID_ACTION_SETTLEMENT', '只有 Changes 动作可以保留待审重试能力');
     }

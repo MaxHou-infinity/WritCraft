@@ -14,7 +14,9 @@ const RESULT_SCHEMA = 'writcraft.writing-navigation/v1';
 const TOOL_NAME = 'submit_writing_navigation';
 const MODEL = 'MiniMax-M3';
 const MAX_TOKENS = 8192;
-const DEADLINE_MS = 90_000;
+// Renderer owns the complete 60 second journey, including any pre-call save.
+// Main ends provider work earlier so the terminal result has time to cross IPC.
+const DEADLINE_MS = 50_000;
 const MAX_REQUEST_BYTES = 1024 * 1024;
 const MAX_TOOL_INPUT_BYTES = 64 * 1024;
 const MAX_CONTEXT_FILES = 8;

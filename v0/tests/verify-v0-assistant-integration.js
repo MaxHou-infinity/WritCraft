@@ -78,14 +78,16 @@ check('打开章节先打开文件再交给权威 locator 定位', () => {
   assert.match(integration, /window\.__workspace\?\.revealContextChip\?\.\(\{/);
 });
 
-check('补充来源进入 Sources 专用入口且不会自动运行 Research', () => {
-  assert.match(integration, /__sourcesView\?\.openWritingNavigation\?\.\(result\.handoff\)/);
+check('仅缺来源时进入 Sources，并把所选 ID 返回同一个任务', () => {
+  assert.match(integration, /__sourcesView\?\.openWritingNavigation\?\.\(/);
+  assert.match(integration, /resumeWithSources\?\.\(handoff\?\.suggestionId, sourceIds\)/);
   assert.match(sources, /window\.__workspace\?\.setSidebarView\?\.\('sources'\)/);
   assert.doesNotMatch(integration, /bridge\.(?:research|recordResearchJudgment)/);
 });
 
-check('生成修改建议只把 Main review 交给 Changes，路由失败回收新 capability', () => {
-  assert.match(integration, /__changesView\?\.acceptProposal\?\.\(result\)/);
+check('统一任务把 Main review 交给正文内 Diff，路由失败回收新 capability', () => {
+  assert.match(integration, /__changesView\?\.acceptProposal\?\.\(result, \{/);
+  assert.match(integration, /inlineReview:/);
   assert.match(integration, /bridge\.discardChanges\?\.\(projectInstanceId, result\.changeSetId\)/);
   assert.doesNotMatch(integration, /writeFile|applyChanges|createFile|innerHTML/);
 });

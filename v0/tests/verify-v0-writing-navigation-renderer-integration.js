@@ -83,6 +83,9 @@ function createHarness(overrides = {}) {
           updateTree(...args) { captured.updates.push(['tree', ...args]); },
           recover() { captured.recovered += 1; return Promise.resolve(true); },
           resume() { captured.resumed = (captured.resumed || 0) + 1; return Promise.resolve(true); },
+          resumeWithSources(...args) { captured.sourceResume = args; return Promise.resolve(true); },
+          reviewSettled(...args) { captured.reviewSettled = args; },
+          progress() {},
         };
       },
     },
@@ -149,6 +152,35 @@ async function test(name, fn) {
     ]);
   });
 
+  await test('generation timeout during save prevents a late paid navigation call', async () => {
+    const saved = deferred();
+    let providerCalls = 0;
+    const harness = createHarness({
+      workspace: { persistCurrent: () => saved.promise },
+      bridge: {
+        proposeWritingNavigation: async () => { providerCalls += 1; return { ok: false }; },
+        cancelWritingNavigation: async () => ({
+          ok: false,
+          error: 'NAVIGATION_ATTEMPT_NOT_FOUND',
+        }),
+      },
+    });
+    const projectId = harness.workspace.state.project.instanceId;
+    const attemptId = `wno_${'9'.repeat(32)}`;
+    const running = harness.captured.navigationOptions.onGenerate(
+      { schema: 'writcraft.writing-navigation-request/v1' },
+      attemptId,
+      projectId
+    );
+    const cancelled = await harness.captured.navigationOptions.onCancelGeneration(projectId, attemptId);
+    assert.strictEqual(cancelled.ok, true);
+    assert.strictEqual(cancelled.cancelled, true);
+    saved.resolve(true);
+    const result = await running;
+    assert.strictEqual(result.error, 'REQUEST_ABORTED');
+    assert.strictEqual(providerCalls, 0);
+  });
+
   await test('committed structure refresh is an optional post-commit callback', async () => {
     let refreshes = 0;
     const committed = {
@@ -169,7 +201,7 @@ async function test(name, fn) {
     assert.strictEqual(refreshes, 1);
   });
 
-  await test('Research and Changes success route through their existing review surfaces', async () => {
+  await test('unified success opens the anchored file and enters inline review without routing Research', async () => {
     let researchHandoff = null;
     let review = null;
     const harness = createHarness({
@@ -177,30 +209,18 @@ async function test(name, fn) {
         openWritingNavigation(value) { researchHandoff = value; return { ok: true }; },
       },
       changesView: {
-        acceptProposal(value) { review = value; return { ok: true }; },
+        acceptProposal(value, options) { review = [value, options]; return { ok: true }; },
         open() {},
       },
     });
     const projectId = harness.workspace.state.project.instanceId;
     harness.bridge.runWritingNavigationAction = async () => ({
       ok: true,
-      kind: 'research',
-      handoff: { schema: 'writcraft.writing-navigation-research/v1' },
-    });
-    const research = await harness.captured.navigationOptions.onRunAction(
-      projectId,
-      `wna_${'d'.repeat(32)}`,
-      `wno_${'e'.repeat(32)}`
-    );
-    assert.strictEqual(research.ok, true);
-    assert.strictEqual(researchHandoff, research.handoff);
-
-    harness.bridge.runWritingNavigationAction = async () => ({
-      ok: true,
       kind: 'changes',
       noChanges: false,
       changeSetId: `pc_${'f'.repeat(32)}`,
       review: { changeSetId: `pc_${'f'.repeat(32)}`, files: [] },
+      provenance: { evidence: [{ path: 'chapters/01.md' }] },
     });
     const changes = await harness.captured.navigationOptions.onRunAction(
       projectId,
@@ -208,70 +228,67 @@ async function test(name, fn) {
       `wno_${'2'.repeat(32)}`
     );
     assert.strictEqual(changes.ok, true);
-    assert.strictEqual(review, changes);
+    assert.strictEqual(review[0], changes);
+    assert.strictEqual(typeof review[1].inlineReview.onSettled, 'function');
+    assert.strictEqual(researchHandoff, null);
   });
 
-  await test('a failed Sources route can retry the same Research action without consuming Changes', async () => {
-    const researchId = `wna_${'3'.repeat(32)}`;
-    const changesId = `wna_${'4'.repeat(32)}`;
-    const calls = [];
-    let routes = 0;
-    let review = null;
+  await test('needs-sources recovery returns selected source IDs to the same suggestion task', async () => {
+    let selectedCallback = null;
+    let routedHandoff = null;
     const harness = createHarness({
-      bridge: {
-        runWritingNavigationAction: async (_projectId, actionId, attemptId) => {
-          calls.push([actionId, attemptId]);
-          if (actionId === researchId) return {
-            ok: true,
-            kind: 'research',
-            handoff: { schema: 'writcraft.writing-navigation-research/v1' },
-          };
-          return {
-            ok: true,
-            kind: 'changes',
-            noChanges: false,
-            changeSetId: `pc_${'5'.repeat(32)}`,
-            review: { changeSetId: `pc_${'5'.repeat(32)}`, files: [] },
-          };
-        },
-      },
       sourcesView: {
-        openWritingNavigation() {
-          routes += 1;
-          return { ok: routes > 1 };
+        openWritingNavigation(handoff, callback) {
+          routedHandoff = handoff;
+          selectedCallback = callback;
+          return { ok: true };
         },
       },
-      changesView: {
-        acceptProposal(value) { review = value; return { ok: true }; },
-        open() {},
+    });
+    const handoff = { suggestionId: 'suggestion_1' };
+    harness.captured.navigationOptions.onAddSources(handoff);
+    assert.strictEqual(routedHandoff, handoff);
+    selectedCallback([`src_${'a'.repeat(20)}`]);
+    assert.deepStrictEqual(harness.captured.sourceResume, [
+      'suggestion_1',
+      [`src_${'a'.repeat(20)}`],
+    ]);
+  });
+
+  await test('timeout during save prevents a late provider call even before Main acquired a lease', async () => {
+    const saved = deferred();
+    let providerCalls = 0;
+    const harness = createHarness({
+      workspace: { persistCurrent: () => saved.promise },
+      bridge: {
+        runWritingNavigationAction: async () => { providerCalls += 1; return { ok: false }; },
+        cancelWritingNavigationAction: async () => ({ ok: false, error: 'ACTION_NOT_FOUND' }),
       },
     });
     const projectId = harness.workspace.state.project.instanceId;
-    const first = await harness.captured.navigationOptions.onRunAction(
-      projectId, researchId, `wno_${'6'.repeat(32)}`
+    const actionId = `wna_${'6'.repeat(32)}`;
+    const attemptId = `wno_${'7'.repeat(32)}`;
+    const running = harness.captured.navigationOptions.onRunAction(
+      projectId, actionId, attemptId, () => {}, {}
     );
-    assert.strictEqual(first.error, 'RESEARCH_ROUTE_FAILED');
-    const second = await harness.captured.navigationOptions.onRunAction(
-      projectId, researchId, `wno_${'7'.repeat(32)}`
-    );
-    assert.strictEqual(second.ok, true);
-    assert.strictEqual(routes, 2);
-    assert.deepStrictEqual(calls.slice(0, 2).map(item => item[0]), [researchId, researchId]);
-    const changes = await harness.captured.navigationOptions.onRunAction(
-      projectId, changesId, `wno_${'8'.repeat(32)}`
-    );
-    assert.strictEqual(changes.ok, true);
-    assert.strictEqual(calls[2][0], changesId);
-    assert.strictEqual(review, changes);
+    await harness.captured.navigationOptions.onCancelAction(projectId, actionId, attemptId);
+    saved.resolve(true);
+    const result = await running;
+    assert.strictEqual(result.error, 'REQUEST_ABORTED');
+    assert.strictEqual(providerCalls, 0);
   });
 
   await test('a late project-A Changes result is discarded instead of entering project B', async () => {
     const pending = deferred();
+    const started = deferred();
     const discarded = [];
     let accepted = 0;
     const harness = createHarness({
       bridge: {
-        runWritingNavigationAction: () => pending.promise,
+        runWritingNavigationAction: () => {
+          started.resolve();
+          return pending.promise;
+        },
         discardChanges: async (projectId, changeSetId) => {
           discarded.push([projectId, changeSetId]);
           return { ok: true };
@@ -288,6 +305,7 @@ async function test(name, fn) {
       `wna_${'3'.repeat(32)}`,
       `wno_${'4'.repeat(32)}`
     );
+    await started.promise;
     harness.workspace.state.project = { instanceId: 'instance_abcdefabcdefabcdefabcdef' };
     pending.resolve({
       ok: true,

@@ -29,6 +29,7 @@
   const targetCount = document.getElementById('project-changes-target-count');
   const targetList = document.getElementById('project-changes-target-list');
   let pending = null;
+  let inlineReviewMode = null;
   let confirmationMode = null;
   let selectedContextPaths = [];
   let availableContextPaths = [];
@@ -921,8 +922,69 @@
     setStatus(message);
   }
 
+  function settleInlineReview(outcome) {
+    const active = inlineReviewMode;
+    inlineReviewMode = null;
+    const committed = Number(outcome?.appliedCount || 0) > 0;
+    window.__editor?.clearChangeReview?.({ keepRendered: committed });
+    if (committed) void window.__workspace?.reloadCurrent?.();
+    try { active?.onSettled?.(outcome); } catch (_) {}
+  }
+
+  function renderInlineReview() {
+    if (!inlineReviewMode || !pending?.reviewState || !window.__editor) return false;
+    const State = window.WritCraftChangesReviewState;
+    const callbacks = {
+      decide(hunkId, decision) {
+        if (!pending?.reviewState || !['accepted', 'rejected'].includes(decision)) return;
+        pending.reviewState = State.update(pending.reviewState, hunkId, decision);
+        window.__editor?.updateChangeReview?.(pending.reviewState);
+      },
+      decideAll(decision) {
+        if (!pending?.reviewState || !['accepted', 'rejected'].includes(decision)) return;
+        let next = pending.reviewState;
+        for (const file of next.review.files) next = State.updateFile(next, file.path, decision);
+        pending.reviewState = next;
+        window.__editor?.updateChangeReview?.(pending.reviewState);
+      },
+      async navigate(delta) {
+        if (!pending?.reviewState) return;
+        const entries = pending.reviewState.review.files.flatMap(file =>
+          file.hunks.map(hunk => ({ path: file.path, id: hunk.id }))
+        );
+        if (!entries.length) return;
+        const currentPath = window.__workspace?.getCurrentPath?.() || '';
+        const activeId = inlineReviewMode?.activeHunkId;
+        let index = entries.findIndex(entry => entry.id === activeId);
+        if (index < 0) index = Math.max(0, entries.findIndex(entry => entry.path === currentPath));
+        index = (index + delta + entries.length) % entries.length;
+        const target = entries[index];
+        inlineReviewMode.activeHunkId = target.id;
+        if (target.path !== currentPath) await window.__workspace?.openFile?.(target.path);
+        requestAnimationFrame(() => {
+          const node = document.querySelector(`.changes-inline-review__hunk[data-hunk-id="${target.id}"]`);
+          node?.scrollIntoView?.({ block: 'center', behavior: 'smooth' });
+          node?.focus?.();
+        });
+      },
+      apply: () => { void applySelected(); },
+      exit: () => { void discard(); },
+    };
+    if (window.__editor.hasChangeReview?.()) {
+      return window.__editor.updateChangeReview?.(pending.reviewState) === true;
+    }
+    return window.__editor.showChangeReview?.(pending.reviewState, callbacks) === true;
+  }
+
   function renderPendingReview() {
     stopGenerationProgress();
+    if (inlineReviewMode && pending?.reviewState) {
+      preview.replaceChildren();
+      applyButton.hidden = true;
+      discardButton.hidden = true;
+      renderInlineReview();
+      return;
+    }
     const existingOnboardingInputs = [...preview.querySelectorAll('[data-onboarding-path]')];
     const selectedOnboardingPaths = existingOnboardingInputs.length
       ? new Set(existingOnboardingInputs.filter(input => input.checked).map(input => input.dataset.onboardingPath))
@@ -1083,6 +1145,11 @@
       metric,
     };
     renderPendingReview();
+    if (inlineReviewMode && !window.__editor?.hasChangeReview?.()) {
+      pending = null;
+      inlineReviewMode = null;
+      return false;
+    }
     if (activePlanRequest) renderPlanMode(result.provenance);
     if (activeIssueRequest) renderIssueMode(result.provenance);
     return true;
@@ -1392,6 +1459,12 @@
         return setStatus('撤销未写入文件，项目状态已重新核对', true);
       }
       setStatus(`已撤销 ${result?.applied?.length || reconciled.recovery?.affectedPaths?.length || entry.files.length} 个文件`);
+      document.dispatchEvent(new CustomEvent('writcraft:history-undone', {
+        detail: {
+          projectInstanceId,
+          historyEntryId: entry.id,
+        },
+      }));
     } finally {
       if (historyUndoOwner !== undoOwner) return;
       const stillCurrentProject = window.__workspace?.state?.project?.instanceId === projectInstanceId;
@@ -1820,6 +1893,7 @@
 
   function settleRecoveredReviewState(message) {
     proposalTransactions?.invalidate?.();
+    if (inlineReviewMode) settleInlineReview({ status: 'recovery' });
     pending = null;
     confirmationMode = null;
     activePlanRequest = null;
@@ -1987,6 +2061,9 @@
         const message = result?.status === 'conflict'
           ? `文件 ${result.path || ''} 已变化，ChangeSet 未应用`
           : result?.message || result?.error?.message || mutationFailure?.message || '应用失败';
+        if (result?.status === 'conflict') {
+          try { inlineReviewMode?.onSettled?.({ status: 'conflict', path: result.path || null }); } catch (_) {}
+        }
         return setStatus(message, true);
       }
       if (!reconciled.mutationTrusted) {
@@ -2071,6 +2148,12 @@
         await settleOnboardingMetric('rejected', onboardingMetric);
       }
       pending = null;
+      if (inlineReviewMode) settleInlineReview({
+        status: appliedCount ? 'applied' : 'rejected',
+        appliedCount,
+        rejectedHunkCount: result.rejectedHunkCount || 0,
+        historyEntryId: result.historyEntry?.id || null,
+      });
       if (completedResearch) {
         activeResearchRequest = null;
         renderResearchMode();
@@ -2170,7 +2253,7 @@
   }
 
   async function discard() {
-    if (recoveryBlocked || reviewCommitInFlight || historyUndoInFlight) return;
+    if (recoveryBlocked || reviewCommitInFlight || historyUndoInFlight) return false;
     if (confirmationMode) {
       const activeConfirmation = confirmationMode;
       if (!bridge?.discardOnboardingConfirmation) return setStatus('初始文件确认释放服务未连接', true);
@@ -2235,12 +2318,21 @@
     }
     recordChangeMetric('discarded');
     completeIssueModeAfterReview();
+    if (inlineReviewMode) settleInlineReview({ status: 'discarded', appliedCount: 0 });
     pending = null;
     preview.innerHTML = '<div class="tree-empty">待审阅修改已丢弃，项目文件没有变化。</div>';
     applyButton.hidden = true;
     discardButton.hidden = true;
     resetCommitControls();
     setStatus('尚无待审阅修改');
+    return true;
+  }
+
+  async function discardInlineReview() {
+    if (!inlineReviewMode || !pending?.id) return false;
+    const changeSetId = pending.id;
+    const result = await discard();
+    return result === true && pending?.id !== changeSetId;
   }
 
   function invalidatePendingForFileLifecycle(event) {
@@ -2301,6 +2393,7 @@
       return;
     }
     completeIssueModeAfterReview();
+    if (inlineReviewMode) settleInlineReview({ status: 'stale', appliedCount: 0 });
     pending = null;
     preview.innerHTML = '<div class="tree-empty">项目文件结构已变化。旧提案已失效，请基于当前文件重新生成。</div>';
     applyButton.hidden = true;
@@ -2335,6 +2428,7 @@
         staleConfirmation.token
       )).catch(() => {});
     }
+    if (inlineReviewMode) settleInlineReview({ status: 'project_changed', appliedCount: 0 });
     pending = null;
     proposalTransactions?.invalidate();
     activePlanRequest = null;
@@ -2404,6 +2498,7 @@
     controlsBusyOwner = null;
     stopGenerationProgress();
     setBusy(false);
+    if (inlineReviewMode) settleInlineReview({ status: 'unloaded', appliedCount: 0 });
     const snapshot = snapshotResearchOwnership();
     if (snapshot) void releaseResearchOwnership(snapshot, { discardCard: false });
   }, { once: true });
@@ -2480,14 +2575,17 @@
 
   function acceptProposal(result, options = {}) {
     if (pending || confirmationMode || activePlanRequest || activeIssueRequest || activeResearchRequest) {
-      openPanel();
+      if (!options.inlineReview) openPanel();
       const availability = canStartOnboarding();
       setStatus(availability.message, true);
       return availability;
     }
     invalidateEditableProposal();
     invalidateNormalScopePlan();
-    openPanel();
+    inlineReviewMode = options.inlineReview && typeof options.inlineReview === 'object'
+      ? { ...options.inlineReview, activeHunkId: null }
+      : null;
+    if (!inlineReviewMode) openPanel();
     const onboardingAttempt = result?.proposalKind === 'onboarding_v2' &&
       /^[a-f0-9]{32}$/i.test(options?.onboardingAttempt?.operationId || '')
       ? options.onboardingAttempt : null;
@@ -2514,7 +2612,10 @@
       setStatus('项目卡提案提前携带创建令牌，已阻止进入审阅', true);
       return { ok: false, message: '项目卡两阶段契约无效' };
     }
-    if (!renderChangeSet(result, metric)) return { ok: false, message: 'Changes 审阅数据无效' };
+    if (!renderChangeSet(result, metric)) {
+      inlineReviewMode = null;
+      return { ok: false, message: 'Changes 审阅数据无效' };
+    }
     setStatus(result?.proposalKind === 'onboarding_v2'
       ? '项目卡已整理：先审阅 edit.md；当前选择不会创建文件'
       : `${result.fileCount || 0} 个文件待审阅`);
@@ -2736,6 +2837,7 @@
     acceptProposal,
     canStartOnboarding,
     discardPending,
+    discardInlineReview,
     openWithInstruction,
     openResearchCard,
     leaveResearchMode,

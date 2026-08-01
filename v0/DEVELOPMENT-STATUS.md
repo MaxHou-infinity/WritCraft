@@ -1,11 +1,11 @@
 # 笔触 · WritCraft · V0 开发状态与续作入口
 
-> 最后更新：2026-08-01（Asia/Shanghai，0.0CM · 统一写作任务流合同冻结）
+> 最后更新：2026-08-01（Asia/Shanghai，0.0CM · 统一写作任务流实现检查点，待真实 Electron/作者验收）
 > 当前状态：**`writ-craft@0.1.1` 已从 exact candidate `c65981e` 发布到 npm `preview`；registry 时间 `2026-07-29T14:30:16.176Z`，shasum `d370c500666e25cfb373852deafa21b232d2bc18` 与本地候选一致。公网隔离安装/启动/退出为 2/2。annotated tag `v0.1.1` 指向同一提交，GitHub prerelease 已公开：`https://github.com/MaxHou-infinity/WritCraft/releases/tag/v0.1.1`。**
 > 发布判断：**0.1.1 Developer Preview 已完成版本、自动化、双架构安装、独立复审、npm 发布、公网安装和 GitHub prerelease。registry 标签保持 `preview: 0.1.1`、`latest: 0.1.0`，因此本次没有把 Preview 冒充稳定版，也没有执行 unpublish、占位发布或上传未签名 App/ZIP。**
 > 当前目标版本：**`docs/ROADMAP.md` 的 `RM-1.2 / writ-craft@0.1.2` 真实作者可用性闭环。当前唯一开发纵切是 `UNIFIED-WRITING-TASK-V1-CONTRACT.md`：把 Navigation 建议、必要依据核对、正文内 Diff、决定和 Safe Undo 合并为同一任务。不得继续派发旧公开 Research→Changes 多步旅程，也不得插入驾驶舱或其他后续版本功能。**
 > 当前源码证据：**旧 Plan 公共入口已移除，右栏固定为 Chat / 导航 / Context / Changes。Navigation→Changes 使用 Main-owned revision-bound range 协议；刷新恢复、固定 Research/Changes 双动作及 Research handoff 安全重入均已实现。0.0CL 又把初始 Research 从模型自由文本 JSON 迁移为唯一具名 `submit_research_cards` tool-use：接口 Schema 限制来源 ID、字段、数量和长度，Main 再做 exact-key、字节、逐字 quote、locator、revision 与末端 stale 校验；围栏、解释文本、零/多 tool block、截断和越权来源均零写入失败。Research Main **12+15+12+10+4**、Main integration **12/12**、Renderer **17+13** 全绿；完整 `npm test` 与批准 GUI `npm run verify` 均 exit 0。真实 Electron 首次因夹具把未知请求误路由为 Research 而红，修正夹具后一次在完成 28 阶段时出现 CDP `Runtime.evaluate` 超时，随后同源复跑 **36/36**；该时序红灯保留为 P2，不用产品代码掩盖。**
-> 当前作者验收进度：**项目卡、Inline、Chapter、空项目结构规划、Navigation 生成/原文定位/帮助度，以及旧 Navigation→Changes→接受→Safe Undo 的技术链已关闭。新的真实红灯必须保留：作者在旧默认流程中经历 Navigation→Research→Changes 的重复跳转和选择，已忘记任务目标；另一次 AI 操作在底层网络时限后仍停留“处理中”超过三分钟。作者明确判定该体验不可接受，因此不再要求重测 Research 卡片判断。0.0CM 统一任务合同已冻结，生产实现、受影响测试、独立复审与真实作者最短链路均未开始，不能称为用户可用。**
+> 当前作者验收进度：**项目卡、Inline、Chapter、空项目结构规划、Navigation 生成/原文定位/帮助度，以及旧 Navigation→Changes→接受→Safe Undo 的技术链已关闭。新的真实红灯必须保留：作者在旧默认流程中经历 Navigation→Research→Changes 的重复跳转和选择，已忘记任务目标；另一次 AI 操作在底层网络时限后仍停留“处理中”超过三分钟。0.0CM 已完成一轮生产实现与定向自动化：单一“处理这个建议”、同任务 `needs_sources` 恢复、Main 具名结构输出、正文内瞬态 Diff、15 秒取消、60 秒 Renderer 终态/50 秒 Main deadline、接受/拒绝和 Safe Undo 状态回传均已接入。该批尚未完成当前源码的完整 `npm run verify`、真实 Electron、独立复审和真实作者最短链路，仍不能称为用户可用或 0.1.2 候选完成。**
 > 0.0AA 历史保留红灯：**首轮真实 Electron 暴露 Inspector 在上下文失效时被清空、旧 5-chip 断言和项目 Chat 等待诊断；完整 test 又暴露 Plan 测试把 generation 函数正文写死。独立复审发现新请求预检窗口可提交不可见旧轮、同项目重开 UI/Main 串话、失败重开提前清会话及两项测试/错误文案缺口，均转为生产边界和回归后关闭。真实 Electron 曾连续两次在旧 Graph 恢复阶段超时；加入只读失败快照后该阶段连续四次通过，未改 Graph 产品逻辑，按重复同源证据关闭 timing P2。另一次 Chat preflight 红灯证明测试在恢复 `edit.md` 后未等待权威 watcher barrier；改为生产 `flushExternalChanges()` 收敛，而未放宽 Chat guard。该里程碑所有红运行保留，最终源码连续两次 34/34；后续 0.0AB 当时推进到 35/35，当前总链只看本文顶部当前里程碑。**
 > Graph 历史签字基线：**性能修复前的既有源码曾完整 `npm test`、Electron-enabled `npm run verify`、强制真实 Electron 26/26 exit 0；Graph Filter 15/15、Workbench 14/14、dynamic 5/5、Large 5/5、Watcher 15/15、Network 11/11、Intelligence 17/17，第二轮复审 P0=0/P1=0/P2=2。该数字只保留为历史过程；0.0AB 后来推进到 35/35，当前总链只看顶部当前里程碑。**
 > Graph 动态边界：**300 文件/1279 节点 cold-to-interactive、cache/incremental、筛选/内存/布局、AX/键鼠、三类纠错、stale/Issue→Changes、failure live、重启与项目隔离均进入真实 Electron；正文/History/ledger 的零写入门禁通过。**  
@@ -24,7 +24,7 @@
 > npm Developer Preview 契约：`../docs/NPM-DEVELOPER-PREVIEW-V1-CONTRACT.md`（0.1.1 已公开到 `preview`，公网安装 2/2；`latest` 仍为 0.1.0）
 > 用户安装与首次使用：`../docs/GETTING-STARTED.md`
 
-## 0.0CM · 统一写作任务流（当前，合同冻结；生产代码未开始）
+## 0.0CM · 统一写作任务流（当前，实现检查点；验收未完成）
 
 ### 真实红灯证据
 
@@ -44,11 +44,15 @@
 ### 当前完成度与下一步
 
 - ✅ 产品/工程合同：`UNIFIED-WRITING-TASK-V1-CONTRACT.md` 已冻结。
-- ⬜ Main 统一 attempt 编排、60 秒 deadline、取消和 `needs_sources | changes` 结构协议。
-- ⬜ Renderer 同任务状态机、一个主按钮、来源恢复与同一任务保留。
-- ⬜ 主编辑器瞬态 inline ChangeSet review、逐项/批量决定、跨文件导航。
+- ✅ Main 统一 attempt 编排、50 秒 provider deadline、显式取消和唯一具名 `needs_sources | changes` 结构协议；单次严格限制 1–3 个局部修改，不自动付费重试。
+- ✅ Renderer 同任务状态机、单一主动作、同任务来源恢复、15 秒可取消与 60 秒硬终态；保存阶段超时也会阻止迟到 provider 调用。
+- ✅ 主编辑器瞬态 inline ChangeSet review：删除为红色删除线、新增为绿色插入，单块审阅移除冗余批量按钮；确认前稳定正文与磁盘保持不变。接受结果绑定 History，Safe Undo 会回传同一导航任务显示“已安全撤销”。
+- ✅ 2026-08-01 收口定向证据：Unified service **8/8**、action handler **20/20**、Renderer state **14/14**、dynamic **12/12**、production integration **8/8**、Changes review UX **12/12**，相关 JS 语法检查通过。此前本实现批完整 `npm test` 曾 exit 0，但最新 Safe Undo 状态回传之后只重跑了上述定向集合，不能冒充当前完整签字。
+- ⚠️ 红灯保留：首次完整 `npm test` 暴露已退休“自动重试”断言；新增全程 timeout 后，dynamic 测试曾误取已清除的旧 generation timer；integration 曾因跨 VM prototype 使用 `deepStrictEqual` 失败。三者均判定为测试漂移并修正，原始失败不能由复跑绿灯抹除。
 - ⬜ 受影响专项、完整回归、真实 Electron、独立复审 P0/P1=0。
 - ⬜ 作者授权隔离副本最短旅程验收。此前已签字的项目卡、Inline、Chapter、空项目结构、Chat、Graph 等不重测。
+
+**暂停点 / 唯一下一步（2026-08-01）**：从当前实现检查点继续时，先补统一任务流的确定性 provider fixture 与真实 Electron 最短阶段，验证“一次点击 → 正文内 Diff → 零写入 → 接受/拒绝/冲突 → Safe Undo”，再运行完整 `npm test`、`npm run verify`，最后做独立复审和作者隔离副本验收。不得回到旧 Research→Changes 人工转交旅程，也不得发布 0.1.2。
 
 ## 0. 续作口令
 

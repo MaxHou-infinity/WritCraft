@@ -8,6 +8,8 @@
   const contextHost = document.getElementById('context-inspector-host');
   const bridge = window.writCraft?.project;
   let navigationController = null;
+  const cancelledNavigationGenerations = new Set();
+  const cancelledNavigationActions = new Set();
   let contextController = null;
 
   function recordNavigationMetric(outcome, metric) {
@@ -57,6 +59,11 @@
       recordNavigationMetric('failed', metric);
       return { ok: false, error: 'PROJECT_SAVE_FAILED' };
     }
+    if (cancelledNavigationGenerations.has(attemptId)) {
+      cancelledNavigationGenerations.delete(attemptId);
+      recordNavigationMetric('failed', metric);
+      return { ok: false, error: 'REQUEST_ABORTED' };
+    }
     if (projectInstanceId !== window.__workspace?.state?.project?.instanceId) {
       recordNavigationMetric('failed', metric);
       return { ok: false, error: 'PROJECT_CHANGED' };
@@ -72,7 +79,19 @@
     } catch (error) {
       recordNavigationMetric('failed', metric);
       throw error;
+    } finally {
+      cancelledNavigationGenerations.delete(attemptId);
     }
+  }
+
+  async function cancelNavigationGeneration(projectInstanceId, attemptId) {
+    cancelledNavigationGenerations.add(attemptId);
+    if (!bridge?.cancelWritingNavigation) return { ok: false, error: 'CANCEL_UNAVAILABLE' };
+    const result = await bridge.cancelWritingNavigation(projectInstanceId, attemptId);
+    if (result?.error === 'NAVIGATION_ATTEMPT_NOT_FOUND') {
+      return { ok: true, cancelled: true };
+    }
+    return result;
   }
 
   async function confirmStructure(capabilityId) {
@@ -89,15 +108,33 @@
     return bridge.queryWritingStructureRecovery(projectInstanceId);
   }
 
-  async function runNavigationAction(projectInstanceId, actionId, attemptId) {
+  async function runNavigationAction(projectInstanceId, actionId, attemptId, onStage, taskInput = {}) {
     if (!bridge?.runWritingNavigationAction) {
       return { ok: false, error: 'ACTION_UNAVAILABLE' };
     }
-    const result = await bridge.runWritingNavigationAction(
-      projectInstanceId,
-      actionId,
-      attemptId
-    );
+    onStage?.('saving_current_content');
+    const saved = await window.__workspace?.persistCurrent?.(true);
+    if (!saved) return { ok: false, error: 'PROJECT_SAVE_FAILED' };
+    if (cancelledNavigationActions.has(attemptId)) {
+      cancelledNavigationActions.delete(attemptId);
+      return { ok: false, error: 'REQUEST_ABORTED' };
+    }
+    if (projectInstanceId !== window.__workspace?.state?.project?.instanceId) {
+      return { ok: false, error: 'PROJECT_CHANGED' };
+    }
+    onStage?.('checking_evidence');
+    let result;
+    try {
+      result = await bridge.runWritingNavigationAction(
+        projectInstanceId,
+        actionId,
+        attemptId,
+        taskInput.adjustment || '',
+        Array.isArray(taskInput.sourceIds) ? taskInput.sourceIds : []
+      );
+    } finally {
+      cancelledNavigationActions.delete(attemptId);
+    }
     if (projectInstanceId !== window.__workspace?.state?.project?.instanceId) {
       if (result?.kind === 'changes' && result.changeSetId) {
         try { await bridge.discardChanges?.(projectInstanceId, result.changeSetId); } catch (_) {}
@@ -105,14 +142,20 @@
       return { ok: false, error: 'PROJECT_CHANGED' };
     }
     if (result?.ok !== true) return result;
-    if (result.kind === 'research') {
-      const routed = window.__sourcesView?.openWritingNavigation?.(result.handoff);
-      return routed?.ok === true
-        ? result
-        : { ok: false, error: 'RESEARCH_ROUTE_FAILED' };
-    }
     if (result.kind === 'changes' && result.noChanges !== true) {
-      const accepted = window.__changesView?.acceptProposal?.(result);
+      const targetPath = result.provenance?.evidence?.[0]?.path || result.review?.files?.[0]?.path;
+      if (targetPath && window.__workspace?.getCurrentPath?.() !== targetPath) {
+        const opened = await window.__workspace?.openFile?.(targetPath);
+        if (!opened) {
+          try { await bridge.discardChanges?.(projectInstanceId, result.changeSetId); } catch (_) {}
+          return { ok: false, error: 'TARGET_OPEN_FAILED' };
+        }
+      }
+      const accepted = window.__changesView?.acceptProposal?.(result, {
+        inlineReview: {
+          onSettled: outcome => navigationController?.reviewSettled?.(result.changeSetId, outcome),
+        },
+      });
       if (accepted?.ok !== true) {
         try { await bridge.discardChanges?.(projectInstanceId, result.changeSetId); } catch (_) {}
         return {
@@ -125,12 +168,19 @@
     return result;
   }
 
+  async function cancelNavigationAction(projectInstanceId, actionId, attemptId) {
+    cancelledNavigationActions.add(attemptId);
+    if (!bridge?.cancelWritingNavigationAction) {
+      return { ok: false, error: 'CANCEL_UNAVAILABLE' };
+    }
+    return bridge.cancelWritingNavigationAction(projectInstanceId, actionId, attemptId);
+  }
+
   if (window.WritCraftWritingNavigationView && navigationHost) {
     navigationController = window.WritCraftWritingNavigationView.mount(navigationHost, {
       stateApi: window.WritCraftWritingNavigationState,
       onGenerate: generateNavigation,
-      onCancelGeneration: (projectInstanceId, attemptId) =>
-        bridge?.cancelWritingNavigation?.(projectInstanceId, attemptId),
+      onCancelGeneration: cancelNavigationGeneration,
       onResume: projectInstanceId =>
         bridge?.resumeWritingNavigation?.(projectInstanceId),
       onPrepareStructure: (projectInstanceId, navigationId, alternativeId, chapters) =>
@@ -148,13 +198,21 @@
       onAcknowledgeRecovery: (projectInstanceId, operationId) =>
         bridge?.acknowledgeWritingStructureRecovery?.(projectInstanceId, operationId),
       onRunAction: runNavigationAction,
-      onCancelAction: (projectInstanceId, actionId, attemptId) =>
-        bridge?.cancelWritingNavigationAction?.(projectInstanceId, actionId, attemptId),
+      onCancelAction: cancelNavigationAction,
       onOpenEvidence: openLocator,
+      onAddSources: handoff => window.__sourcesView?.openWritingNavigation?.(
+        handoff,
+        sourceIds => navigationController?.resumeWithSources?.(handoff?.suggestionId, sourceIds)
+      ),
+      onAdjustReview: () => window.__changesView?.discardInlineReview?.(),
       onOpenSettings: () => document.getElementById('activity-settings')?.click(),
       onOpenReview: () => window.__changesView?.open?.(),
     });
   }
+
+  bridge?.onWritingTaskProgress?.(payload => {
+    navigationController?.progress?.(payload);
+  });
 
   if (window.WritCraftContextInspector && contextHost) {
     contextController = window.WritCraftContextInspector.mount(contextHost, {
@@ -218,6 +276,9 @@
       window.__workspace?.state?.tree || [],
       window.__workspace?.getCurrentPath?.() || null
     );
+  });
+  document.addEventListener('writcraft:history-undone', event => {
+    navigationController?.historyUndone?.(event?.detail || null);
   });
 
   window.__assistantDock = dockController;

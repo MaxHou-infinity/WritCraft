@@ -41,6 +41,7 @@
   let selectionEpoch = 0;
   let ignoreNextRewriteSelectionChange = false;
   let rewriteCommand = null;
+  let pendingChangeReview = null;
 
   function recordRewriteMetric(outcome, entry, afterChars) {
     if (!entry?.operationId) return;
@@ -95,6 +96,12 @@
   }
 
   function getStableText() {
+    if (pendingChangeReview) {
+      const currentPath = window.__workspace?.getCurrentPath?.() || '';
+      if (pendingChangeReview.originalByPath.has(currentPath)) {
+        return pendingChangeReview.originalByPath.get(currentPath) || '';
+      }
+    }
     if (!pendingRewrite) return EDITOR_EL.innerText || '';
     const clone = EDITOR_EL.cloneNode(true);
     const transient = clone.querySelector('[data-writcraft-transient="rewrite"]');
@@ -103,6 +110,14 @@
   }
 
   function getStableHtml() {
+    if (pendingChangeReview) {
+      const currentPath = window.__workspace?.getCurrentPath?.() || '';
+      if (pendingChangeReview.originalByPath.has(currentPath)) {
+        const holder = document.createElement('div');
+        holder.textContent = pendingChangeReview.originalByPath.get(currentPath) || '';
+        return holder.innerHTML;
+      }
+    }
     const clone = EDITOR_EL.cloneNode(true);
     const transient = clone.querySelector('[data-writcraft-transient="rewrite"]');
     if (transient && pendingRewrite) {
@@ -503,6 +518,159 @@
     }
     appendRewriteContextChips(wrapper, contextManifest);
     appendActionBar(wrapper);
+  }
+
+  function reviewButton(label, action, options = {}) {
+    const control = document.createElement('button');
+    control.type = 'button';
+    control.className = `changes-inline-review__button${options.primary ? ' is-primary' : ''}`;
+    control.textContent = label;
+    control.disabled = options.disabled === true;
+    control.addEventListener('click', event => {
+      event.preventDefault();
+      event.stopPropagation();
+      action?.();
+    });
+    return control;
+  }
+
+  function appendReviewText(host, text, kind, hunkId) {
+    if (!text && kind !== 'add') return;
+    const span = document.createElement('span');
+    span.className = `changes-inline-review__text is-${kind}`;
+    span.textContent = `${text}\n`;
+    if (hunkId) span.dataset.hunkId = hunkId;
+    if (kind === 'remove') span.setAttribute('aria-label', 'AI 建议删除');
+    if (kind === 'add') span.setAttribute('aria-label', 'AI 建议新增');
+    host.appendChild(span);
+  }
+
+  function renderChangeReviewCurrent() {
+    const review = pendingChangeReview;
+    if (!review) return false;
+    const currentPath = window.__workspace?.getCurrentPath?.() || '';
+    const file = review.state?.review?.files?.find(item => item.path === currentPath);
+    if (!file) return false;
+    if (!review.originalByPath.has(currentPath)) {
+      const current = EDITOR_EL.querySelector('[data-writcraft-transient="changes-review"]')
+        ? '' : (EDITOR_EL.innerText || '');
+      if (current || current === '') review.originalByPath.set(currentPath, current);
+    }
+    const original = review.originalByPath.get(currentPath);
+    const sourceLines = original.split('\n');
+    if (original.endsWith('\n') && sourceLines[sourceLines.length - 1] === '') sourceLines.pop();
+    const wrapper = document.createElement('div');
+    wrapper.className = 'changes-inline-review';
+    wrapper.dataset.writcraftTransient = 'changes-review';
+    wrapper.setAttribute('contenteditable', 'false');
+    wrapper.setAttribute('aria-label', `AI 修改审阅：${currentPath}`);
+
+    const toolbar = document.createElement('div');
+    toolbar.className = 'changes-inline-review__toolbar';
+    const title = document.createElement('strong');
+    title.textContent = `校样 · ${file.hunks.length} 项修改`;
+    const decidedCount = Object.values(review.state?.decisions || {})
+      .filter(decision => decision !== 'pending').length;
+    const totalHunks = review.state.review.files.reduce(
+      (total, item) => total + item.hunks.length,
+      0
+    );
+    toolbar.append(title);
+    if (totalHunks > 1) {
+      toolbar.append(
+        reviewButton('上一项', () => review.callbacks?.navigate?.(-1)),
+        reviewButton('下一项', () => review.callbacks?.navigate?.(1)),
+        reviewButton('全部接受', () => review.callbacks?.decideAll?.('accepted')),
+        reviewButton('全部拒绝', () => review.callbacks?.decideAll?.('rejected'))
+      );
+    }
+    toolbar.append(
+      reviewButton('退出审阅', () => review.callbacks?.exit?.()),
+      reviewButton('确认并写入', () => review.callbacks?.apply?.(), {
+        primary: true,
+        disabled: decidedCount === 0,
+      })
+    );
+    wrapper.appendChild(toolbar);
+
+    let sourceIndex = 0;
+    for (const hunk of [...file.hunks].sort((left, right) => left.oldStart - right.oldStart)) {
+      const start = Math.max(0, hunk.oldStart - 1);
+      while (sourceIndex < start && sourceIndex < sourceLines.length) {
+        appendReviewText(wrapper, sourceLines[sourceIndex], 'equal');
+        sourceIndex += 1;
+      }
+      const decision = review.state.decisions[hunk.id] || 'pending';
+      const hunkSection = document.createElement('section');
+      hunkSection.className = `changes-inline-review__hunk is-${decision}`;
+      hunkSection.dataset.hunkId = hunk.id;
+      hunkSection.tabIndex = -1;
+      const hunkTools = document.createElement('div');
+      hunkTools.className = 'changes-inline-review__hunk-tools';
+      const status = document.createElement('span');
+      status.textContent = decision === 'accepted' ? '已选择接受 · 尚未写入'
+        : decision === 'rejected' ? '已选择拒绝 · 不会写入'
+        : '待决定';
+      hunkTools.append(
+        status,
+        reviewButton(decision === 'accepted' ? '已接受' : '接受',
+          () => review.callbacks?.decide?.(hunk.id, 'accepted'), { disabled: decision === 'accepted' }),
+        reviewButton(decision === 'rejected' ? '已拒绝' : '拒绝',
+          () => review.callbacks?.decide?.(hunk.id, 'rejected'), { disabled: decision === 'rejected' })
+      );
+      hunkSection.appendChild(hunkTools);
+      for (const line of hunk.lines) {
+        if (line.kind === 'meta') continue;
+        appendReviewText(hunkSection, line.text, line.kind === 'context' ? 'equal' : line.kind, hunk.id);
+        if (line.kind !== 'add') sourceIndex += 1;
+      }
+      wrapper.appendChild(hunkSection);
+    }
+    while (sourceIndex < sourceLines.length) {
+      appendReviewText(wrapper, sourceLines[sourceIndex], 'equal');
+      sourceIndex += 1;
+    }
+    EDITOR_EL.replaceChildren(wrapper);
+    EDITOR_EL.contentEditable = 'false';
+    EDITOR_EL.setAttribute('aria-readonly', 'true');
+    updateCount();
+    return true;
+  }
+
+  function showChangeReview(reviewState, callbacks = {}) {
+    if (!reviewState?.review?.files?.length || pendingRewrite || activeRewrite || rewritePreparing) {
+      return false;
+    }
+    const originalByPath = new Map();
+    const currentPath = window.__workspace?.getCurrentPath?.() || '';
+    if (reviewState.review.files.some(file => file.path === currentPath)) {
+      originalByPath.set(currentPath, EDITOR_EL.innerText || '');
+    }
+    pendingChangeReview = { state: reviewState, callbacks, originalByPath };
+    return renderChangeReviewCurrent();
+  }
+
+  function updateChangeReview(reviewState) {
+    if (!pendingChangeReview || !reviewState ||
+        pendingChangeReview.state.review.changeSetId !== reviewState.review?.changeSetId) return false;
+    pendingChangeReview.state = reviewState;
+    return renderChangeReviewCurrent();
+  }
+
+  function clearChangeReview(options = {}) {
+    const review = pendingChangeReview;
+    if (!review) return false;
+    const currentPath = window.__workspace?.getCurrentPath?.() || '';
+    const original = review.originalByPath.get(currentPath);
+    pendingChangeReview = null;
+    if (typeof original === 'string' && options.keepRendered !== true) {
+      EDITOR_EL.textContent = original;
+    }
+    const blocked = window.__workspace?.state?.inlineMutationBlocked === true;
+    EDITOR_EL.contentEditable = blocked ? 'false' : 'true';
+    EDITOR_EL.removeAttribute('aria-readonly');
+    updateCount();
+    return true;
   }
 
   function placeRewriteAnchor(range, original) {
@@ -1721,9 +1889,20 @@
       lastCaretRange = null;
       renderContextChips([]);
       EDITOR_EL.textContent = typeof content === 'string' ? content : '';
+      if (pendingChangeReview) {
+        const currentPath = window.__workspace?.getCurrentPath?.() || '';
+        if (pendingChangeReview.state.review.files.some(file => file.path === currentPath)) {
+          pendingChangeReview.originalByPath.set(currentPath, typeof content === 'string' ? content : '');
+          renderChangeReviewCurrent();
+        }
+      }
       updateCount();
       updateChatContextLabel();
       EDITOR_EL.focus();
     },
+    showChangeReview,
+    updateChangeReview,
+    clearChangeReview,
+    hasChangeReview: () => Boolean(pendingChangeReview),
   };
 })();

@@ -147,6 +147,19 @@ function deterministicBytes() {
     }
   });
 
+  await test('a review-ready Changes action remains reusable only after the review is settled', async () => {
+    const store = storeModule.createWritingNavigationStore({ randomBytes: deterministicBytes() });
+    const result = store.install(binding({ record: await record(31, 'changes') }));
+    const actionId = result.suggestions[0].actionIds.changes;
+    const lease = store.acquireAction(actionBinding({ actionId }));
+    const settled = store.settleAction(binding({ leaseId: lease.leaseId, outcome: 'review_ready' }));
+    assert.strictEqual(settled.consumed, false);
+    const adjusted = store.acquireAction(actionBinding({ actionId, attemptId: `wno_${'e'.repeat(32)}` }));
+    assert.strictEqual(adjusted.suggestion.action, 'changes');
+    store.settleAction(binding({ leaseId: adjusted.leaseId, outcome: 'success' }));
+    assert.throws(() => store.acquireAction(actionBinding({ actionId })), error => error.code === 'ACTION_NOT_FOUND');
+  });
+
   await test('concurrent Research reports busy without aborting or consuming the active lease', async () => {
     const store = storeModule.createWritingNavigationStore({ randomBytes: deterministicBytes() });
     const result = store.install(binding({ record: await record(45, 'research', '并发来源') }));

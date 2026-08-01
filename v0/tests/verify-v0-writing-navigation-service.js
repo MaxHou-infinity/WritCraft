@@ -139,7 +139,7 @@ const NAVIGATION = {
         calls += 1;
         assert.strictEqual(model, 'MiniMax-M3');
         assert.strictEqual(maxTokens, 8192);
-        assert.strictEqual(options.deadlineMs, 90_000);
+        assert.strictEqual(options.deadlineMs, 50_000);
         assert.strictEqual(options.tools[0].name, service.TOOL_NAME);
         assert.deepStrictEqual(options.tools[0].input_schema.required, ['mode', 'alternatives']);
         assert.strictEqual(options.signal.aborted, false);

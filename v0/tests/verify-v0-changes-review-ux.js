@@ -6,6 +6,7 @@ const path = require('path');
 
 const V0 = path.join(__dirname, '..');
 const view = fs.readFileSync(path.join(V0, 'src/renderer/changes-view.js'), 'utf8');
+const editor = fs.readFileSync(path.join(V0, 'src/renderer/editor.js'), 'utf8');
 const html = fs.readFileSync(path.join(V0, 'src/renderer/index.html'), 'utf8');
 
 let passed = 0;
@@ -90,4 +91,33 @@ test('history undo names its exact target and warns on older records', () => {
   assert(html.includes('.history-card.is-latest'));
 });
 
-console.log(`\nChanges review UX verification: ${passed}/9 passed.`);
+test('unified-task review renders Diff in the open editor instead of a narrow side card', () => {
+  assert(view.includes('inlineReviewMode'));
+  assert(view.includes('window.__editor.showChangeReview'));
+  assert(view.includes('window.__editor.updateChangeReview'));
+  assert(editor.includes('function showChangeReview'));
+  assert(editor.includes('changes-inline-review__hunk'));
+  assert(html.includes('.changes-inline-review__text.is-remove'));
+  assert(html.includes('text-decoration: line-through'));
+  assert(html.includes('.changes-inline-review__text.is-add'));
+  assert(editor.includes('if (totalHunks > 1)'));
+  assert(editor.includes("if (original.endsWith('\\n')"));
+});
+
+test('inline review remains zero-write until the explicit confirm callback', () => {
+  assert(editor.includes("reviewButton('确认并写入'"));
+  assert(editor.includes("? '已接受' : '接受'"));
+  assert(editor.includes("? '已拒绝' : '拒绝'"));
+  assert(view.includes('apply: () => { void applySelected(); }'));
+  assert(view.includes('exit: () => { void discard(); }'));
+  assert(!editor.includes('bridge.applyChanges'));
+});
+
+test('stable editor content excludes transient Diff and preserves non-target documents', () => {
+  assert(editor.includes('pendingChangeReview.originalByPath.has(currentPath)'));
+  assert(editor.includes('data-writcraft-transient="changes-review"'));
+  assert(editor.includes("EDITOR_EL.contentEditable = 'false'"));
+  assert(editor.includes('clearChangeReview'));
+});
+
+console.log(`\nChanges review UX verification: ${passed}/${passed} passed.`);

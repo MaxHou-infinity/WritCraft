@@ -197,6 +197,27 @@
         action: 'retry',
       });
     }
+    if (code === 'TIMEOUT') {
+      return Object.freeze({
+        code,
+        message: '本次处理已在 60 秒时自动停止；没有修改项目文件，可以直接重试。',
+        action: 'retry',
+      });
+    }
+    if (code === 'PROJECT_SAVE_FAILED') {
+      return Object.freeze({
+        code,
+        message: '当前内容没有保存成功，因此没有启动 AI，也没有修改项目文件。',
+        action: 'retry',
+      });
+    }
+    if (code === 'REVIEW_DISCARD_FAILED') {
+      return Object.freeze({
+        code,
+        message: '当前 Diff 还没有安全退出，因此未启动新的 AI 请求。请再试一次。',
+        action: 'retry',
+      });
+    }
     if (code === 'INVALID_MODEL_EVIDENCE') {
       return Object.freeze({
         code,
@@ -208,7 +229,7 @@
       'PATCH_NEW_TEXT_TOO_LARGE'].includes(code)) {
       return Object.freeze({
         code,
-        message: '系统已自动重新整理一次，但 AI 仍未能把修改收敛到安全审阅范围；本次没有修改项目文件。请不要继续重复点击本卡片，改用更小、更明确的导航目标后重新生成。',
+        message: 'AI 没有把修改收敛到单次安全审阅范围；系统没有自动重试，也没有修改项目文件。请缩小目标后再试。',
         action: 'retry',
       });
     }
@@ -365,6 +386,15 @@
     if (action.type === 'generation-cancelled') {
       if (!sameAttempt(state, action.attemptId)) return state;
       return deepFreeze({ ...state, phase: 'idle', generation: null, error: null });
+    }
+    if (action.type === 'generation-timeout') {
+      if (!sameAttempt(state, action.attemptId)) return state;
+      return deepFreeze({
+        ...state,
+        phase: 'failure',
+        generation: null,
+        error: publicFailure({ error: 'TIMEOUT' }),
+      });
     }
     if (action.type === 'generation-success') {
       if (!sameAttempt(state, action.attemptId)) return state;
@@ -577,9 +607,23 @@
       return updateAction(state, action.actionId, {
         status: 'running',
         attemptId: action.attemptId,
+        phase: 'saving_current_content',
+        cancelVisible: false,
         result: null,
         error: null,
       });
+    }
+    if (action.type === 'action-progress') {
+      const current = state.actions[action.actionId];
+      if (!current || current.attemptId !== action.attemptId || current.status !== 'running' ||
+          !['saving_current_content', 'checking_evidence', 'generating_changes', 'preparing_diff']
+            .includes(action.phase)) return state;
+      return updateAction(state, action.actionId, { ...current, phase: action.phase });
+    }
+    if (action.type === 'action-cancel-visible') {
+      const current = state.actions[action.actionId];
+      if (!current || current.attemptId !== action.attemptId || current.status !== 'running') return state;
+      return updateAction(state, action.actionId, { ...current, cancelVisible: true });
     }
     if (action.type === 'action-cancel-start') {
       const current = state.actions[action.actionId];
@@ -592,7 +636,13 @@
       const result = clone(action.result) || {};
       if (result.ok === true) {
         return updateAction(state, action.actionId, {
-          status: 'success', attemptId: null, result, error: null,
+          status: result.kind === 'needs_sources' ? 'needs_sources'
+            : result.noChanges === true ? 'no_changes' : 'review',
+          attemptId: null,
+          phase: null,
+          cancelVisible: false,
+          result,
+          error: null,
         });
       }
       const failure = publicFailure(result);
@@ -602,6 +652,8 @@
       return updateAction(state, action.actionId, {
         status: terminal ? 'stale' : 'retryable',
         attemptId: null,
+        phase: null,
+        cancelVisible: false,
         result: null,
         error: failure,
       });
@@ -612,8 +664,69 @@
       return updateAction(state, action.actionId, {
         status: 'retryable',
         attemptId: null,
+        phase: null,
+        cancelVisible: false,
         result: null,
         error: publicFailure({ error: 'REQUEST_ABORTED' }),
+      });
+    }
+    if (action.type === 'action-timeout') {
+      const current = state.actions[action.actionId];
+      if (!current || current.attemptId !== action.attemptId || current.status !== 'running') return state;
+      return updateAction(state, action.actionId, {
+        status: 'retryable',
+        attemptId: null,
+        phase: null,
+        cancelVisible: false,
+        result: null,
+        error: publicFailure({ error: 'TIMEOUT' }),
+      });
+    }
+    if (action.type === 'action-review-settled') {
+      const current = state.actions[action.actionId];
+      if (!current || current.status !== 'review' ||
+          current.result?.changeSetId !== action.changeSetId) return state;
+      const outcome = clone(action.outcome) || {};
+      const status = outcome.status === 'applied' ? 'committed'
+        : ['rejected', 'discarded'].includes(outcome.status) ? 'rejected'
+          : outcome.status === 'conflict' ? 'conflict' : 'retryable';
+      return updateAction(state, action.actionId, {
+        ...current,
+        status,
+        result: { ...current.result, outcome },
+        error: status === 'conflict'
+          ? publicFailure({ error: 'PROJECT_CHANGED' })
+          : current.error,
+      });
+    }
+    if (action.type === 'action-history-undone' && typeof action.historyEntryId === 'string') {
+      const match = Object.entries(state.actions).find(([, current]) =>
+        current?.status === 'committed' &&
+        current.result?.outcome?.historyEntryId === action.historyEntryId
+      );
+      if (!match) return state;
+      return updateAction(state, match[0], { ...match[1], status: 'undone' });
+    }
+    if (action.type === 'action-review-adjust-failed') {
+      const current = state.actions[action.actionId];
+      if (!current || current.status !== 'review') return state;
+      return updateAction(state, action.actionId, {
+        ...current,
+        error: publicFailure(action.error),
+      });
+    }
+    if (action.type === 'action-retry-ready') {
+      const current = state.actions[action.actionId];
+      if (!current || !['review', 'needs_sources', 'no_changes', 'rejected', 'retryable'].includes(current.status)) {
+        return state;
+      }
+      return updateAction(state, action.actionId, {
+        status: 'retryable',
+        attemptId: null,
+        phase: null,
+        cancelVisible: false,
+        result: null,
+        error: null,
       });
     }
     if (action.type === 'action-finally') return state;

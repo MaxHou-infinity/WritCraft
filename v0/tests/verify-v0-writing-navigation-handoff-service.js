@@ -208,7 +208,8 @@ async function authority(action, chapter = CHAPTER) {
     assert.deepStrictEqual(prepared.prepared.request.contextPaths, []);
     assert.match(prepared.prepared.request.instruction, /当前段落还缺少具体例子/);
     assert.strictEqual(prepared.prepared.structuredOutput, true);
-    assert.match(prepared.prepared.messages[0].content, /submit_localized_edits/);
+    assert.match(prepared.prepared.messages[0].content, /submit_unified_writing_task/);
+    assert.match(prepared.prepared.messages[0].content, /1–3 个 edits/);
     const result = handoffService.finalizeChangesHandoff({
       preparedHandoff: prepared,
       model: {
