@@ -272,6 +272,7 @@ async function setup(action, overrides = {}) {
     const state = await setup('changes');
     const result = await state.handler(EVENT, PROJECT.instanceId, state.actionId);
     assert.strictEqual(result.ok, true);
+    assert.strictEqual(result.fileCount, 1);
     assert.strictEqual(result.changeSetId, `pc_${'a'.repeat(32)}`);
     assert.strictEqual(state.modelCalls, 1);
     assert.strictEqual(state.cacheCalls, 1);

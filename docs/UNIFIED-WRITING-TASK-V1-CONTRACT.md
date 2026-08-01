@@ -4,7 +4,7 @@
 > Product version: `writ-craft@0.1.2`
 > Public journey: Writing Navigation suggestion → inline review → explicit decision
 
-> Implementation checkpoint (2026-08-01): Main/Renderer/inline Diff/Safe Undo state handoff is implemented. A real-Electron red run proved that asking the model to return an entire authorized range was incompatible with the 640-character local-change ceiling. The protocol now returns a short exact `oldText` anchor and its short `newText` replacement inside a Main-owned range; Main restores canonical path, revision and offsets and rejects missing, repeated, stale or overlapping anchors. Focused checks, full `npm test`, and real Electron 37/37 pass. The final `npm run verify` terminal receipt was lost and must be rerun; independent review and real-author acceptance remain open. This is not release sign-off.
+> Implementation checkpoint (2026-08-01): Main/Renderer/inline Diff/Safe Undo state handoff is implemented. A real-Electron red run proved that asking the model to return an entire authorized range was incompatible with the local-change ceiling. The protocol now returns a short exact `oldText` anchor and its short `newText` replacement inside a Main-owned range. Main restores canonical path, revision and offsets, binds each parsed result to the exact snapshots/ranges request identity, consumes it once, and rejects missing, repeated, stale, overlapping, forged, cross-request or replayed anchors. Focused checks, full `npm test`, `npm run verify`, and real Electron 37/37 pass; third-round independent review is P0=0/P1=0/P2=0. Real-author acceptance remains open, so this is not release sign-off.
 
 ## 1. Product decision
 
@@ -41,7 +41,7 @@ The result is exactly one branch:
 - `changes`: 1–3 localized, non-overlapping edits over at most 3 authorized manuscript files; or
 - `needs_sources`: no edits, a bounded author-facing reason, and a focused source question.
 
-Main requires each `oldText` to occur exactly once inside its frozen authorized range, converts that local UTF-16 position into canonical file offsets, and then performs exact-key, ID-membership, Unicode/byte-size, overlap, revision, project-instance, attempt-owner, deadline, and late-result validation. Missing or repeated anchors fail closed; Main never guesses, trims, fuzzy-matches, or repairs them. Free text is never parsed into authority. A timed-out, cancelled, stale, old-project, duplicated, or expired result is discarded.
+Main requires each `oldText` to occur exactly once inside its frozen authorized range, converts that local UTF-16 position into canonical file offsets, and then performs exact-key, ID-membership, Unicode/byte-size, overlap, revision, project-instance, attempt-owner, deadline, and late-result validation. The private parsed result is bound to the exact request-local snapshots and ranges by object identity and may construct at most one ChangeSet; a copied object, same-content request, or second use fails closed. Missing or repeated anchors fail closed; Main never guesses, trims, fuzzy-matches, or repairs them. Free text is never parsed into authority. A timed-out, cancelled, stale, old-project, duplicated, or expired result is discarded.
 
 ## 4. Inline Diff review
 

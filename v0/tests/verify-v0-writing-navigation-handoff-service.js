@@ -4,6 +4,7 @@ const assert = require('assert');
 const crypto = require('crypto');
 const navigationService = require('../src/main/writing-navigation-service');
 const handoffService = require('../src/main/writing-navigation-handoff-service');
+const unifiedWritingTaskService = require('../src/main/unified-writing-task-service');
 const changeSetService = require('../src/main/changeset-service');
 
 let passed = 0;
@@ -210,25 +211,41 @@ async function authority(action, chapter = CHAPTER) {
     assert.strictEqual(prepared.prepared.structuredOutput, true);
     assert.match(prepared.prepared.messages[0].content, /submit_unified_writing_task/);
     assert.match(prepared.prepared.messages[0].content, /1–3 个 edits/);
+    const oldText = '这是作者已经写下的正文证据。';
+    const parsed = unifiedWritingTaskService.parseResult({
+      ok: true,
+      stopReason: 'tool_use',
+      toolUseBlockCount: 1,
+      toolUse: {
+        name: unifiedWritingTaskService.TOOL_NAME,
+        input: {
+          status: 'changes',
+          edits: [{
+            rangeId: prepared.prepared.structuredRanges[0].rangeId,
+            oldText,
+            newText: '这是作者已经写下的正文证据，例如一次真实访谈。',
+            summary: '补充例子',
+          }],
+          reason: '',
+          question: '',
+        },
+      },
+    }, prepared.prepared.snapshots, prepared.prepared.structuredRanges);
     const result = handoffService.finalizeChangesHandoff({
       preparedHandoff: prepared,
-      parsed: {
-        kind: 'changes',
-        edits: [{
-          path: 'chapters/01.md',
-          revision: revision(CHAPTER),
-          start: CHAPTER.indexOf('这是作者已经写下的正文证据。'),
-          end: CHAPTER.indexOf('这是作者已经写下的正文证据。') + '这是作者已经写下的正文证据。'.length,
-          newText: '这是作者已经写下的正文证据，例如一次真实访谈。',
-          summary: '补充例子',
-        }],
-      },
+      parsed,
       changeSetService,
     });
     assert.strictEqual(result.ok, true);
     assert.strictEqual(result.noChanges, false);
+    assert.strictEqual(result.fileCount, 1);
     assert.strictEqual(result.changeSet.changes[0].path, 'chapters/01.md');
     assert.strictEqual(result.provenance.schema, handoffService.CHANGES_PROVENANCE_SCHEMA);
+    assert.throws(() => handoffService.finalizeChangesHandoff({
+      preparedHandoff: prepared,
+      parsed: Object.freeze({ kind: 'changes', edits: parsed.edits }),
+      changeSetService,
+    }), error => error.code === 'INVALID_MODEL_OUTPUT');
   });
 
   await test('an action cannot be routed through another handoff kind', async () => {

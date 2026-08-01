@@ -315,7 +315,8 @@ function finalizeChangesHandoff({ preparedHandoff, parsed, changeSetService }) {
   }
   const finalized = unifiedWritingTaskService.buildChangeSet({
     snapshots: preparedHandoff.prepared.snapshots,
-    edits: parsed.edits,
+    ranges: preparedHandoff.prepared.structuredRanges,
+    parsed,
     changeSetService,
   });
   if (finalized.noChanges) {
@@ -323,6 +324,7 @@ function finalizeChangesHandoff({ preparedHandoff, parsed, changeSetService }) {
       ok: true,
       noChanges: true,
       kind: 'changes',
+      fileCount: 0,
       provenance: preparedHandoff.provenance,
     });
   }

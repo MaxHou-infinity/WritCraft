@@ -5,11 +5,15 @@ const localizedEditService = require('./localized-edit-service');
 const TOOL_NAME = 'submit_unified_writing_task';
 const MAX_EDITS = 3;
 const MAX_RECOVERY_CHARS = 160;
-const MAX_OLD_TEXT_CHARS = 640;
+// JSON Schema and Main must describe the same legal envelope. A Unicode scalar
+// may take four UTF-8 bytes, so every schema-valid anchor must fit the existing
+// Main-owned byte ceiling without a hidden second constraint.
+const MAX_OLD_TEXT_CHARS = Math.floor(localizedEditService.MAX_OLD_TEXT_BYTES / 4);
 const MAX_TOOL_INPUT_BYTES = 20 * 1024;
 const SAFE_TEXT_PATTERN = '^(?!\\s)(?![\\s\\S]*\\s$)(?:[^\\u0000-\\u001f\\uD800-\\uDFFF]|[\\uD800-\\uDBFF][\\uDC00-\\uDFFF])+$';
 const SAFE_TEXT = /^(?:[^\u0000-\u001f\uD800-\uDFFF]|[\uD800-\uDBFF][\uDC00-\uDFFF])+$/u;
 const SAFE_MULTILINE = /^(?:[\t\n\r]|[^\u0000-\u001f\uD800-\uDFFF]|[\uD800-\uDBFF][\uDC00-\uDFFF])*$/u;
+const parsedChangesAuthority = new WeakMap();
 
 class UnifiedWritingTaskError extends Error {
   constructor(code, message) {
@@ -161,6 +165,7 @@ function canonicalLocalizedEdits(input, snapshots, ranges) {
       revision: range.revision,
       start: range.start + localStart,
       end: range.start + localStart + raw.oldText.length,
+      oldText: raw.oldText,
       newText: raw.newText,
       summary: raw.summary,
     }));
@@ -214,18 +219,77 @@ function parseResult(model, snapshots, ranges) {
     fail('INVALID_MODEL_OUTPUT', '修改结果不得同时请求补充来源');
   }
   const edits = canonicalLocalizedEdits(input, snapshots, ranges);
-  return Object.freeze({ kind: 'changes', edits });
+  const parsed = Object.freeze({ kind: 'changes', edits });
+  parsedChangesAuthority.set(parsed, {
+    snapshots,
+    ranges,
+    consumed: false,
+  });
+  return parsed;
 }
 
-function buildChangeSet({ snapshots, edits, changeSetService }) {
+function buildChangeSet({ snapshots, ranges, parsed, changeSetService }) {
   if (!changeSetService || typeof changeSetService.createChangeSet !== 'function') {
     fail('INVALID_PATCH_SERVICE', '统一任务修改结果处理器不可用');
   }
-  const proposals = localizedEditService.structuredEditsToProposals(snapshots, edits);
-  if (!proposals.length) return Object.freeze({ noChanges: true, editCount: edits.length });
+  const authority = parsedChangesAuthority.get(parsed);
+  if (!authority || authority.consumed || parsed.kind !== 'changes') {
+    fail('INVALID_MODEL_OUTPUT', '统一任务修改结果缺少本次解析权限');
+  }
+  authority.consumed = true;
+  if (authority.snapshots !== snapshots || authority.ranges !== ranges) {
+    fail('INVALID_MODEL_OUTPUT', '统一任务修改结果不属于本次请求');
+  }
+  const edits = parsed.edits;
+  localizedEditService.validateAuthorizedSnapshots(snapshots);
+  if (!Array.isArray(edits) || !edits.length || edits.length > MAX_EDITS) {
+    fail('INVALID_MODEL_OUTPUT', '统一任务局部修改数量无效');
+  }
+  const snapshotByPath = new Map(snapshots.map(snapshot => [snapshot.path, snapshot]));
+  let totalNewTextChars = 0;
+  const trustedEdits = edits.map((edit, index) => {
+    exactKeys(edit, ['path', 'revision', 'start', 'end', 'oldText', 'newText', 'summary'], `edits[${index}]`);
+    const snapshot = snapshotByPath.get(edit.path);
+    if (!snapshot || snapshot.revision !== edit.revision ||
+        !Number.isSafeInteger(edit.start) || !Number.isSafeInteger(edit.end) ||
+        edit.start < 0 || edit.end <= edit.start || edit.end > snapshot.content.length ||
+        typeof edit.oldText !== 'string' || snapshot.content.slice(edit.start, edit.end) !== edit.oldText) {
+      fail('INVALID_PATCH_RANGES', '统一任务局部锚点不再匹配权威快照');
+    }
+    if (!edit.oldText || typeof edit.newText !== 'string' || typeof edit.summary !== 'string' ||
+        !SAFE_MULTILINE.test(edit.oldText) || !SAFE_MULTILINE.test(edit.newText) ||
+        !SAFE_TEXT.test(edit.summary) || edit.summary !== edit.summary.trim() ||
+        Array.from(edit.oldText).length > MAX_OLD_TEXT_CHARS ||
+        Buffer.byteLength(edit.oldText, 'utf8') > localizedEditService.MAX_OLD_TEXT_BYTES ||
+        Array.from(edit.summary).length > localizedEditService.STRUCTURED_MAX_SUMMARY_CHARS) {
+      fail('INVALID_MODEL_OUTPUT', '统一任务局部修改字段无效');
+    }
+    const newTextChars = Array.from(edit.newText).length;
+    totalNewTextChars += newTextChars;
+    if (newTextChars > localizedEditService.STRUCTURED_MAX_NEW_TEXT_CHARS ||
+        totalNewTextChars > localizedEditService.STRUCTURED_MAX_TOTAL_NEW_TEXT_CHARS ||
+        Buffer.byteLength(edit.newText, 'utf8') > localizedEditService.MAX_NEW_TEXT_BYTES) {
+      fail('PATCH_NEW_TEXT_TOO_LARGE', '统一任务局部替换超过上限');
+    }
+    return Object.freeze({
+      path: edit.path,
+      revision: edit.revision,
+      start: edit.start,
+      end: edit.end,
+      newText: edit.newText,
+      summary: edit.summary,
+    });
+  });
+  const proposals = localizedEditService.structuredEditsToProposals(snapshots, trustedEdits);
+  if (!proposals.length) return Object.freeze({ noChanges: true, editCount: edits.length, fileCount: 0 });
   const changeSet = changeSetService.createChangeSet(snapshots, proposals);
-  if (!changeSet.changes.length) return Object.freeze({ noChanges: true, editCount: edits.length });
-  return Object.freeze({ noChanges: false, editCount: edits.length, changeSet });
+  if (!changeSet.changes.length) return Object.freeze({ noChanges: true, editCount: edits.length, fileCount: 0 });
+  return Object.freeze({
+    noChanges: false,
+    editCount: edits.length,
+    fileCount: changeSet.changes.length,
+    changeSet,
+  });
 }
 
 module.exports = Object.freeze({
