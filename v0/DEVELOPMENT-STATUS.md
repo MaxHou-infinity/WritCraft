@@ -34,6 +34,14 @@ Chat 的三级 scope/context、Main-owned 多轮连续性、Onboarding v2、Rese
 5. 每批合入后重跑定向测试；阶段完成时再运行完整 `npm test`、`npm run verify` 与 `WRITCRAFT_E2E_FORCE=1 npm run e2e:electron`，保存当次证据。
 6. 真实 API 只使用用户显式配置的 Key；记录延迟、限流、超时、故障和费用，不记录 Key、Prompt、模型原文或正文。Key 前缀只表示凭据/计费类型，不能代替官方能力与现场门禁。首发按 npm Developer Preview 合同执行；独立 App 发布才需要 Developer ID、公证与 Gatekeeper。
 
+### 0.0CI 2026-08-01 · Navigation→Changes 真实单项越界与范围协议收口
+
+- **第二次真实红灯**：作者在第九副本再次点击“生成修改建议”，Main 稳定码为 `PATCH_NEW_TEXT_TOO_LARGE`，不是旧的总输出超量。模型已返回唯一可解析工具调用，但至少一个 `newText` 超过 256 Unicode code points；系统未创建 Diff、待审 capability、History 或项目写入。
+- **根因与修复**：`targetId + oldText` 仍让模型决定原文锚点和改写粒度。现由 Main 从冻结目标快照建立 revision-bound、request-local 的 `range_1…range_96` 章节范围；模型只能提交 `rangeId/newText/summary`，路径、revision、原文和偏移均由 Main 恢复并重验。每次最多 8 项、单项 640 字、合计 1024 字、summary 40 字，完整工具参数最多 7 KiB，专用输出预算 8192 tokens。
+- **一次内部收敛**：首轮仅对严格列举的结构/容量错误（含 `INVALID_TOOL_USE`）自动纠正一次，且不回显被拒内容；第二次仍失败即终止，绝不第三次付费调用。第二次调用前后重新验证 action lease、项目、Navigation evidence 和所有文件 revision，失败不缓存审阅。
+- **验证**：localized **14/14**、proposal **12/12**、action **17/17**、handoff **6/6**、Renderer **12/12**；`npm run verify:navigation`、完整 `npm test`、批准 GUI `npm run verify` 均 exit 0。沙箱 verify 的 Electron `code=null` 由同命令批准 GUI exit 0 归类为环境限制。独立终审 **P0=0/P1=0**。强制真实 Electron 首跑在与本改动无关的“普通 Markdown 回收区可见列表”阶段超时，前五阶段通过；该红灯保留为时序 P2，不能用重跑抹除。
+- **开放门禁与 P2**：真实 MiniMax Diff 仍需作者在最新源码沿最短 Changes 链复验。非阻断 P2：范围正文当前使用伪 XML 分隔、单个章节区块超过 32 KiB 时 fail-closed、一次内部纠正最坏约 180 秒且缺少第二阶段专属进度文案。强制真实 Electron 第二次复跑越过回收区后又在 Graph CDP 鼠标事件超时；两个不同阶段的红灯共同表明整链时序不稳定，均保留且不算 Changes 产品回归已通过。没有发布 npm、移动 dist-tag、推送 GitHub Release 或分发 App/ZIP。
+
 ### 0.0CH 2026-07-31 · Navigation→Changes 超量输出真实红灯与结构化修复
 
 - **真实作者红灯**：作者复用第九副本当前 Navigation 建议点击“生成修改建议”。请求真实到达 provider，但 Main 以稳定码 `MODEL_OUTPUT_TOO_LARGE` 拒绝；Renderer 只显示了通用“调整目标或上下文”。没有 Diff 或待审 Changes，manifest 后 History **0**、recovery **0**，公开文件与授权源逐文件一致。该失败不是作者操作错误，也不是目标或上下文缺失。
@@ -986,7 +994,7 @@ Onboarding v2 已取代上述“容错解析完整 `editContent` + 部分创建�
 | 普通 Markdown 回收区恢复 UI | ✅ | Explorer 列表/刷新/单项恢复、窄 IPC、opaque token、watcher barrier、native journal recovery、冲突与替换 fail-closed 均已签字；真实 Electron 35/35 |
 | Chapter 生成/整体重写 | ✅ | strict plan/block、整文件审阅、撤销、完整异步所有权、no-op/provenance/result/capability 运行态门禁均已接入；最终复审 P0/P1/P2=0 |
 | Changes 分块审阅与历史 Plan→Changes 安全链 | ✅ | Changes 默认 pending、逐块/整文件决策、residual、审计/撤销和目标 revision 锁定仍有效；Plan→Changes 只算历史安全证据，不是现行入口 |
-| 结构规划 / 写作导航 | 🟡 | 空项目结构规划与已有稿件 Navigation 生成/canonical evidence/原文定位均已完成真实作者签字，作者明确判断建议“有帮助”；第九副本两次生成成功、公开文件零变化。现成建议的 Changes/Research 动作仍待验收，不再重复生成 |
+| 结构规划 / 写作导航 | 🟡 | 结构规划与 Navigation 生成/定位/帮助度已签字；Changes 的两次真实失败均零写入。0.0CI 已改为 Main-owned range 协议并完成自动化/独立复审，仍待最新源码真实 Diff；Research 动作仍待验收 |
 | Graph v2 核心与扩展验收 | ✅ | 300 文件/1279 节点、纠错/stale/failure live、AX/键鼠、布局/性能、重启/A→B 均有行为证据；韧性批关闭语义权威、不可变快照与异步所有权，复审 P0/P1/P2=0；0.0AB 当时总链为 35/35，当前见顶部当前里程碑 |
 | Diagnostic Preview / Export | ✅ | 设置页精确预览、递归脱敏 allowlist、token-only IPC、原生保存和不可覆盖 0600 写入均已接入；Service 13/13、Handler 10/10、Renderer 7/7、真实 Electron 可见旅程通过 |
 | 来源、PDF、脚注 | ✅ | 本地证据地基和可审查建议已接入 |
@@ -1003,7 +1011,7 @@ Onboarding v2 已取代上述“容错解析完整 `editContent` + 部分创建�
 ### RM-1.1 / 0.1.2：当前唯一目标
 
 - [x] 由作者显式指定满足合同的真实项目，完成只读预检与隔离副本；0.0AQ 的正式事务证明源不变，fresh 副本已合格创建并在当前 App 打开。
-- [ ] 项目卡、Inline、Chapter、空项目结构规划与第九副本 Navigation 原文定位/帮助度判断已完成；不再重复价值验收。重启后仅为取得最新 Main authority 用原目标重建一次 Navigation，再完成 Changes 与 Research，随后验收 image-01、Graph/恢复。
+- [ ] 项目卡、Inline、Chapter、结构规划与 Navigation 原文定位/帮助度已完成，不再重复价值验收。0.0CI 范围协议已技术签字；重启最新源码后仅重建一次进程内 Navigation authority并复验 Changes Diff，再完成 Research、image-01 与 Graph/恢复。
 - [x] 复现并诊断作者项目 `Graph INVALID_CACHE`；0.0AN / `a72a179` 已提供不删除作者数据、不手工清缓存的可理解诊断、自动重建与失败恢复终态，最终独立复审 P0/P1/P2=0。
 - [ ] Inline 接受率与导航帮助度已有真实作者证据；继续收集导航动作、Research 匹配判断、图片评分/采纳和耗时样本。
 - [ ] 只修复验收中发现的 P0/P1 与决定阻断发版的 P2；`⌘K` 必填作者指令 P1 已实现、完成自动化与独立复审，并作为 exact candidate `9b21a9d` 提交推送；不得插入 `0.2.0+` 功能。

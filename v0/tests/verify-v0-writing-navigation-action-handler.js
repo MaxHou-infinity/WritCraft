@@ -7,6 +7,7 @@ const navigationStoreService = require('../src/main/writing-navigation-store');
 const handoffService = require('../src/main/writing-navigation-handoff-service');
 const handlerModule = require('../src/main/writing-navigation-action-handler');
 const changeSetService = require('../src/main/changeset-service');
+const localizedEditService = require('../src/main/localized-edit-service');
 
 let passed = 0;
 async function test(name, fn) {
@@ -110,6 +111,7 @@ async function setup(action, overrides = {}) {
   let modelCalls = 0;
   let cacheCalls = 0;
   let providerOptionsSeen = null;
+  let maxTokensSeen = null;
   const discarded = [];
   const installed = store.install({
     ownerId: OWNER,
@@ -129,13 +131,13 @@ async function setup(action, overrides = {}) {
     writingNavigationStore: store,
     handoffService,
     projectService,
-    projectCallLLM: () => async (_messages, _model, _tokens, providerOptions) => {
+    projectCallLLM: () => async (_messages, _model, tokens, providerOptions) => {
         modelCalls += 1;
+        maxTokensSeen = tokens;
         providerOptionsSeen = providerOptions;
         return structuredModel([{
-              targetId: 'target_1',
-              oldText: '这是作者已经写下的正文证据。',
-              newText: '这是作者已经写下的正文证据，例如一次真实访谈。',
+              rangeId: 'range_1',
+              newText: '# 第一章\n\n这是作者已经写下的正文证据，例如一次真实访谈。\n',
               summary: '补充例子',
             }]);
       },
@@ -184,6 +186,7 @@ async function setup(action, overrides = {}) {
     get modelCalls() { return modelCalls; },
     get cacheCalls() { return cacheCalls; },
     get providerOptionsSeen() { return providerOptionsSeen; },
+    get maxTokensSeen() { return maxTokensSeen; },
     discarded,
     setPending(value) { pending = value; },
     setGeneration(value) { generation = value; },
@@ -243,8 +246,8 @@ async function setup(action, overrides = {}) {
     assert.strictEqual(state.cacheCalls, 1);
     assert.strictEqual(state.providerOptionsSeen.tools[0].name, 'submit_localized_edits');
     assert.deepStrictEqual(
-      state.providerOptionsSeen.tools[0].input_schema.properties.edits.items.properties.targetId.enum,
-      ['target_1']
+      state.providerOptionsSeen.tools[0].input_schema.properties.edits.items.properties.rangeId.enum,
+      ['range_1']
     );
     assert.deepStrictEqual(state.providerOptionsSeen.toolChoice, {
       type: 'tool', name: 'submit_localized_edits',
@@ -257,9 +260,8 @@ async function setup(action, overrides = {}) {
       projectCallLLM: () => async () => {
         state.setPending(true);
         return structuredModel([{
-            targetId: 'target_1',
-            oldText: '这是作者已经写下的正文证据。',
-            newText: '新的内容。',
+            rangeId: 'range_1',
+            newText: '# 第一章\n\n新的内容。\n',
             summary: '修改',
           }]);
       },
@@ -363,29 +365,109 @@ async function setup(action, overrides = {}) {
     assert.strictEqual(retry.noChanges, true);
   });
 
-  await test('oversized structured output installs no review and preserves one clean retry', async () => {
+  await test('one oversized range replacement is corrected internally before review install', async () => {
+    let providerCalls = 0;
+    let retryMessages = null;
+    const state = await setup('changes', {
+      projectCallLLM: () => async messages => {
+        providerCalls += 1;
+        return providerCalls === 1
+          ? structuredModel([{
+            rangeId: 'range_1',
+            newText: 'x'.repeat(641),
+            summary: '超大结果',
+          }])
+          : (retryMessages = messages, structuredModel([{
+            rangeId: 'range_1',
+            newText: '# 第一章\n\n纠正后的有界内容。\n',
+            summary: '有界修改',
+          }]));
+      },
+    });
+    const result = await state.handler(EVENT, PROJECT.instanceId, state.actionId);
+    assert.strictEqual(result.ok, true);
+    assert.strictEqual(result.noChanges, false);
+    assert.strictEqual(state.cacheCalls, 1);
+    assert.strictEqual(providerCalls, 2);
+    assert.strictEqual(retryMessages.length, 2);
+    assert.match(retryMessages[1].content, /PATCH_NEW_TEXT_TOO_LARGE/);
+    assert(!retryMessages[1].content.includes('x'.repeat(100)));
+  });
+
+  await test('the Changes model uses the dedicated bounded structured token budget', async () => {
+    const state = await setup('changes');
+    const result = await state.handler(EVENT, PROJECT.instanceId, state.actionId);
+    assert.strictEqual(result.ok, true);
+    assert.strictEqual(state.maxTokensSeen, localizedEditService.STRUCTURED_MAX_TOKENS);
+  });
+
+  await test('one invalid provider tool result is corrected internally', async () => {
     let providerCalls = 0;
     const state = await setup('changes', {
       projectCallLLM: () => async () => {
         providerCalls += 1;
         return providerCalls === 1
-          ? structuredModel([{
-            targetId: 'target_1',
-            oldText: '这是作者已经写下的正文证据。',
-            newText: 'x'.repeat(25 * 1024),
-            summary: '超大结果',
-          }])
+          ? { ok: false, error: 'INVALID_TOOL_USE' }
           : structuredModel([]);
       },
     });
-    const failed = await state.handler(EVENT, PROJECT.instanceId, state.actionId);
-    assert.strictEqual(failed.error, 'MODEL_OUTPUT_TOO_LARGE');
-    assert.strictEqual(state.cacheCalls, 0);
-    const retry = await state.handler(EVENT, PROJECT.instanceId, state.actionId);
-    assert.strictEqual(retry.ok, true);
-    assert.strictEqual(retry.noChanges, true);
-    assert.strictEqual(state.cacheCalls, 0);
+    const result = await state.handler(EVENT, PROJECT.instanceId, state.actionId);
+    assert.strictEqual(result.ok, true);
+    assert.strictEqual(result.noChanges, true);
     assert.strictEqual(providerCalls, 2);
+    assert.strictEqual(state.cacheCalls, 0);
+  });
+
+  await test('a second invalid provider tool result is terminal without a third call', async () => {
+    let providerCalls = 0;
+    const state = await setup('changes', {
+      projectCallLLM: () => async () => {
+        providerCalls += 1;
+        return { ok: false, error: 'INVALID_TOOL_USE' };
+      },
+    });
+    const result = await state.handler(EVENT, PROJECT.instanceId, state.actionId);
+    assert.strictEqual(result.error, 'INVALID_TOOL_USE');
+    assert.strictEqual(providerCalls, 2);
+    assert.strictEqual(state.cacheCalls, 0);
+  });
+
+  await test('a second malformed structure is terminal and never makes a third paid call', async () => {
+    let providerCalls = 0;
+    const state = await setup('changes', {
+      projectCallLLM: () => async () => {
+        providerCalls += 1;
+        return structuredModel([{
+          rangeId: 'range_1',
+          newText: 'x'.repeat(641),
+          summary: '仍然超限',
+        }]);
+      },
+    });
+    const result = await state.handler(EVENT, PROJECT.instanceId, state.actionId);
+    assert.strictEqual(result.error, 'PATCH_NEW_TEXT_TOO_LARGE');
+    assert.strictEqual(providerCalls, 2);
+    assert.strictEqual(state.cacheCalls, 0);
+  });
+
+  await test('dependency drift after the first structure failure blocks the paid retry', async () => {
+    let state;
+    let providerCalls = 0;
+    state = await setup('changes', {
+      projectCallLLM: () => async () => {
+        providerCalls += 1;
+        state.projectService.files.set('chapters/01.md', `${CHAPTER}\n外部变化`);
+        return structuredModel([{
+          rangeId: 'range_1',
+          newText: 'x'.repeat(641),
+          summary: '超限',
+        }]);
+      },
+    });
+    const result = await state.handler(EVENT, PROJECT.instanceId, state.actionId);
+    assert.strictEqual(result.error, 'NAVIGATION_STALE');
+    assert.strictEqual(providerCalls, 1);
+    assert.strictEqual(state.cacheCalls, 0);
   });
 
   await test('attempt A late cancel cannot abort active retry B', async () => {
@@ -446,7 +528,7 @@ async function setup(action, overrides = {}) {
     assert.strictEqual(state.discarded[0].capability, `pc_${'b'.repeat(32)}`);
   });
 
-  console.log(`\n${passed}/12 writing-navigation action handler checks passed.`);
+  console.log(`\n${passed}/${passed} writing-navigation action handler checks passed.`);
 })().catch(error => {
   console.error(error);
   process.exitCode = 1;

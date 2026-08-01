@@ -1,6 +1,5 @@
 'use strict';
 
-const minimaxTextService = require('./minimax-text-service');
 const localizedEditService = require('./localized-edit-service');
 const projectChangesProposalService = require('./project-changes-proposal-service');
 
@@ -85,7 +84,7 @@ function createWritingNavigationActionHandler(options = {}) {
       const provider = Promise.resolve().then(() => projectCallLLM(projectInstanceId)(
         messages,
         'MiniMax-M3',
-        minimaxTextService.MAX_MAX_TOKENS,
+        localizedEditService.STRUCTURED_MAX_TOKENS,
         { signal: controller.signal, ...providerOptions }
       ));
       return await Promise.race([provider, boundary]);
@@ -192,11 +191,14 @@ function createWritingNavigationActionHandler(options = {}) {
         rootPath: project.rootPath,
         authority: lease,
       });
-      const model = await runBoundedChangesModel(
+      const providerOptions = localizedEditService.structuredProviderOptions(
+        preparedHandoff.prepared.structuredRanges
+      );
+      let model = await runBoundedChangesModel(
         project.instanceId,
         preparedHandoff.prepared.messages,
         lease.signal,
-        localizedEditService.structuredProviderOptions(preparedHandoff.prepared.snapshots)
+        providerOptions
       );
       if (!isCurrent(project, mutationGeneration, navigationEpoch)) {
         throw new handoffService.WritingNavigationHandoffError(
@@ -211,11 +213,59 @@ function createWritingNavigationActionHandler(options = {}) {
         rootPath: project.rootPath,
         authority: lease,
       });
-      const result = handoffService.finalizeChangesHandoff({
-        preparedHandoff,
-        model,
-        changeSetService,
-      });
+      let result;
+      try {
+        const providerStructureError = localizedEditService.structuredProviderResultError(model);
+        if (providerStructureError) throw providerStructureError;
+        result = handoffService.finalizeChangesHandoff({
+          preparedHandoff,
+          model,
+          changeSetService,
+        });
+      } catch (firstError) {
+        if (!localizedEditService.isRetryableStructuredOutputError(firstError)) throw firstError;
+        projectChangesProposalService.validateProjectDependencies({
+          projectService,
+          rootPath: project.rootPath,
+          dependencies: preparedHandoff.prepared.dependencies,
+        });
+        assertLeaseCurrent();
+        const retryMessages = localizedEditService.structuredRetryMessages(
+          preparedHandoff.prepared.messages,
+          firstError
+        );
+        model = await runBoundedChangesModel(
+          project.instanceId,
+          retryMessages,
+          lease.signal,
+          providerOptions
+        );
+        if (!isCurrent(project, mutationGeneration, navigationEpoch)) {
+          throw new handoffService.WritingNavigationHandoffError(
+            'PROJECT_CHANGED',
+            '重新整理修改建议期间项目状态已变化'
+          );
+        }
+        await settleProjectAuthority(project);
+        assertLeaseCurrent();
+        handoffService.revalidateAuthority({
+          projectService,
+          rootPath: project.rootPath,
+          authority: lease,
+        });
+        projectChangesProposalService.validateProjectDependencies({
+          projectService,
+          rootPath: project.rootPath,
+          dependencies: preparedHandoff.prepared.dependencies,
+        });
+        const retryProviderStructureError = localizedEditService.structuredProviderResultError(model);
+        if (retryProviderStructureError) throw retryProviderStructureError;
+        result = handoffService.finalizeChangesHandoff({
+          preparedHandoff,
+          model,
+          changeSetService,
+        });
+      }
       if (!result.ok) {
         settle('retryable_failure');
         return result;

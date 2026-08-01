@@ -150,7 +150,7 @@ test('两文件 localized edits 由 Main 在权威 before 上构造 after', () =
   ]);
 });
 
-test('结构化目标编号在 prompt 与 Main 恢复中保持同一顺序', () => {
+test('结构化范围编号在 prompt 与 Main 恢复中保持同一顺序', () => {
   const project = fakeProject({ 'edit.md': '# Prompt', 'a.md': 'A OLD', 'b.md': 'B OLD' });
   const prepared = service.prepareProjectChangesProposal({
     projectService: project,
@@ -160,6 +160,8 @@ test('结构化目标编号在 prompt 与 Main 恢复中保持同一顺序', () 
   });
   assert(prepared.messages[0].content.includes('targetId="target_1" path="a.md"'));
   assert(prepared.messages[0].content.includes('targetId="target_2" path="b.md"'));
+  assert(prepared.messages[0].content.includes('<editable-range rangeId="range_1"'));
+  assert(prepared.messages[0].content.includes('<editable-range rangeId="range_2"'));
   const result = service.finalizeProjectChangesProposal({
     prepared,
     model: {
@@ -169,8 +171,7 @@ test('结构化目标编号在 prompt 与 Main 恢复中保持同一顺序', () 
       toolUse: {
         name: 'submit_localized_edits',
         input: { edits: [{
-          targetId: 'target_2',
-          oldText: 'B OLD',
+          rangeId: 'range_2',
           newText: 'B NEW',
           summary: '修改第二个目标',
         }] },

@@ -180,9 +180,8 @@ async function authority(action, chapter = CHAPTER) {
         toolUse: {
           name: 'submit_localized_edits',
           input: { edits: [{
-            targetId: 'target_1',
-            oldText: '这是作者已经写下的正文证据。',
-            newText: '这是作者已经写下的正文证据，例如一次真实访谈。',
+            rangeId: 'range_1',
+            newText: '# 第一章\n\n这是作者已经写下的正文证据，例如一次真实访谈。\n',
             summary: '补充例子',
           }] },
         },

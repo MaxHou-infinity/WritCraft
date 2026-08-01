@@ -3,7 +3,7 @@
 > 状态：`RM-1.1 / writ-craft@0.1.2` 当前冻结合同
 > 生效日期：2026-07-31
 > 取代：面向用户的 `writcraft.plan/v2` 里程碑、任务和依赖图
-> 实现进度：0.0CH 已完成 Main/IPC/Renderer 公共纵切、旧 Plan 入口移除、结构确认与章节骨架三态事务、open/Research/Changes 动作、取消/恢复。空项目结构旅程已绑定 `2f9f714` 完成真实作者验收；第九副本已有稿件 Navigation 的生成、原文定位和帮助度已验收。Navigation→Changes 首次真实调用以 `MODEL_OUTPUT_TOO_LARGE` 零写入失败后，已改为 Main-owned targetId + `submit_localized_edits`，完整回归和真实 Electron 36/36 通过；仍待作者在最新源码中取得真实 Diff。
+> 实现进度：0.0CI 已完成 Main/IPC/Renderer 公共纵切、结构确认、open/Research/Changes 与取消/恢复。结构旅程及 Navigation 生成、定位、帮助度已完成作者验收。Changes 两次真实失败均零写入；第二次 `PATCH_NEW_TEXT_TOO_LARGE` 后已改为 Main-owned revision-bound range 协议，并完成回归和独立复审；仍待作者在最新源码中取得真实 Diff。
 
 ## 1. 产品判断
 
@@ -94,7 +94,8 @@ Main 必须把模型锚点解析为 canonical block locator，并绑定当时 re
 - 模型不得获得写 capability。缓存最多保存 8 次结果、每次最多 3 张建议、TTL 30 分钟；按项目 instance 与 owner 隔离，超限淘汰最旧结果并使其 capability 失效。
 - `open` 可在同一有效建议上重复使用，但每次都重验项目、路径、locator 与 revision；只导航，不消费写权限。
 - `research` 和 `changes` 使用各自单次 opaque action capability。执行前重验全部证据、Context manifest、当前项目和 generation；成功交接或任何 stale/replay 都使该 action capability 终止。
-- `changes` 的模型执行必须且只能调用一次 `submit_localized_edits`：Main 按本次目标快照顺序生成并在 Prompt/Schema 同源绑定 `target_1…target_8`，模型不得返回路径；每次最多 8 个局部替换，old/new/summary 分别最多 128/256/40 Unicode code points，完整 tool input 不超过 24 KiB。Main 恢复路径后继续执行既有 byte、唯一锚点、重叠、revision、依赖和 ChangeSet 校验；任何失败在缓存审阅前结束并保留仍 current 的 action 供显式重试。
+- `changes` 必须且只能使用 `submit_localized_edits`：Main 从冻结目标快照建立最多 96 个 request-local、revision-bound 范围，Prompt/Schema 同源绑定 `rangeId`；模型只返回 `rangeId/newText/summary`，不得返回路径、revision、原文或偏移。每次最多 8 项，单项 `newText` 最多 640、合计最多 1024、summary 最多 40 Unicode code points，完整工具参数不超过 7 KiB，专用 `max_tokens=8192`。Main 重建范围目录并重验路径、revision、内容、偏移、重复、重叠、依赖和 ChangeSet。
+- 首轮只有列入 allowlist 的结构或容量失败可内部纠正一次，纠正请求不得回显被拒内容；第二次仍失败必须终止且不得第三次调用。第二次付费调用前后都必须重新验证 action lease、项目 authority 与全部依赖。失败在缓存审阅前结束，仍 current 的 action 按既有状态语义保留。
 - 每次执行另绑定一个 opaque attempt ID。普通失败、超时或作者取消只结束该 attempt，并保留仍 current 的 action 供显式重试；旧 attempt 的迟到取消或 finally 不得影响新 attempt。
 - 已有待审 Changes 时，`changes` 返回 `REVIEW_IN_PROGRESS` 并保留当前审阅，绝不替换或丢弃；作者处理完后须从仍有效的建议重新发起，过期则重新生成导航。
 - 项目 A 的迟到生成、handoff 或 finally 不得改变项目 B 的缓存、busy、Context manifest 或待审 Changes。

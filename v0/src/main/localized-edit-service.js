@@ -1,5 +1,7 @@
 'use strict';
 
+const blockAnchor = require('../renderer/block-anchor');
+
 // Main-owned boundary for model-authored localized edits. The provider never
 // returns a complete file: it identifies a unique, bounded substring in a
 // trusted snapshot and supplies its bounded replacement. Main resolves every
@@ -16,18 +18,31 @@ const MAX_SUMMARY_CHARS = 500;
 const MAX_SUMMARY_BYTES = 512;
 const MAX_TOTAL_EDIT_BYTES = 20 * 1024;
 const STRUCTURED_TOOL_NAME = 'submit_localized_edits';
-// Eight edits can cover a chapter's common 8-heading structure while the
-// smaller per-item limits keep the complete tool input below the existing
-// 24 KiB parser boundary. Model output contains only short request-local
-// target IDs plus bounded Unicode fields; Main restores canonical paths.
+// Main exposes revision-bound, request-local ranges. The model never repeats
+// canonical paths, source text, or offsets. Eight edits cover a chapter's
+// common heading structure; the aggregate replacement budget closes beneath
+// both the dedicated 7 KiB tool-input boundary and the provider's 8,192-token ceiling.
 const STRUCTURED_MAX_PATCH_EDITS = 8;
-const STRUCTURED_MAX_OLD_TEXT_CHARS = 128;
-const STRUCTURED_MAX_NEW_TEXT_CHARS = 256;
+const STRUCTURED_MAX_RANGES = 96;
+const STRUCTURED_MAX_RANGE_BYTES = 32 * 1024;
+const STRUCTURED_MAX_NEW_TEXT_CHARS = 640;
+const STRUCTURED_MAX_TOTAL_NEW_TEXT_CHARS = 1024;
 const STRUCTURED_MAX_SUMMARY_CHARS = 40;
+const STRUCTURED_MAX_TOOL_INPUT_BYTES = 7 * 1024;
+const STRUCTURED_MAX_TOKENS = 8_192;
 const SAFE_MULTILINE_TOOL_TEXT_PATTERN = '^(?:[\\t\\n\\r]|[^\\u0000-\\u001f\\uD800-\\uDFFF]|[\\uD800-\\uDBFF][\\uDC00-\\uDFFF])*$';
 const SAFE_SUMMARY_TOOL_TEXT_PATTERN = '^(?!\\s)(?![\\s\\S]*\\s$)(?:[^\\u0000-\\u001f\\uD800-\\uDFFF]|[\\uD800-\\uDBFF][\\uDC00-\\uDFFF])+$';
 const SAFE_MULTILINE_TOOL_TEXT = /^(?:[\t\n\r]|[^\u0000-\u001f\uD800-\uDFFF]|[\uD800-\uDBFF][\uDC00-\uDFFF])*$/u;
 const SAFE_SUMMARY_TOOL_TEXT = /^(?:[^\u0000-\u001f\uD800-\uDFFF]|[\uD800-\uDBFF][\uDC00-\uDFFF])+$/u;
+const STRUCTURED_RETRYABLE_CODES = new Set([
+  'INVALID_TOOL_USE',
+  'INVALID_MODEL_OUTPUT',
+  'MODEL_OUTPUT_TOO_LARGE',
+  'TOO_MANY_PATCH_EDITS',
+  'UNAUTHORIZED_PATCH_RANGE',
+  'DUPLICATE_PATCH_RANGE',
+  'PATCH_NEW_TEXT_TOO_LARGE',
+]);
 
 class LocalizedEditError extends Error {
   constructor(code, message) {
@@ -94,13 +109,106 @@ function validateEdits(value) {
   return Object.freeze(edits);
 }
 
-function structuredProviderOptions(snapshots) {
+function headingLevel(block) {
+  const matched = typeof block?.text === 'string' && block.text.match(/^\s{0,3}(#{1,6})\s+/);
+  return matched ? matched[1].length : null;
+}
+
+function buildStructuredRangeCatalog(snapshots) {
   const snapshotByPath = trustedSnapshots(snapshots);
   if (!snapshotByPath.size) fail('INVALID_PATCH_SNAPSHOTS', '结构化局部修改至少需要一个目标文件');
   if (snapshotByPath.size > STRUCTURED_MAX_PATCH_EDITS) {
     fail('INVALID_PATCH_SNAPSHOTS', `结构化局部修改最多允许 ${STRUCTURED_MAX_PATCH_EDITS} 个目标文件`);
   }
-  const targetIds = [...snapshotByPath.keys()].map((_, index) => `target_${index + 1}`);
+  const ranges = [];
+  for (const [filePath, snapshot] of snapshotByPath.entries()) {
+    let blocks;
+    try { blocks = blockAnchor.parseBlocks(snapshot.content, filePath); }
+    catch (_) { fail('INVALID_PATCH_SNAPSHOTS', '无法为结构化修改建立正文范围目录'); }
+    const headings = blocks.filter(block => block.type === 'heading');
+    const minimumLevel = headings.length
+      ? Math.min(...headings.map(headingLevel).filter(Number.isInteger))
+      : null;
+    const minimumHeadings = Number.isInteger(minimumLevel)
+      ? headings.filter(block => headingLevel(block) === minimumLevel)
+      : [];
+    const nextLevel = minimumHeadings.length === 1
+      ? Math.min(...headings.map(headingLevel).filter(level => level > minimumLevel))
+      : Infinity;
+    const sectionLevel = Number.isFinite(nextLevel) ? nextLevel : minimumLevel;
+    const sectionHeadings = Number.isInteger(sectionLevel)
+      ? headings.filter(block => headingLevel(block) === sectionLevel)
+      : [];
+    const sourceRanges = [];
+    if (sectionHeadings.length) {
+      const firstStart = sectionHeadings[0].start;
+      if (snapshot.content.slice(0, firstStart).trim()) {
+        sourceRanges.push({ start: 0, end: firstStart, label: '文首' });
+      }
+      for (const [index, heading] of sectionHeadings.entries()) {
+        sourceRanges.push({
+          start: heading.start,
+          end: sectionHeadings[index + 1]?.start ?? snapshot.content.length,
+          label: heading.text.replace(/^\s{0,3}#{1,6}\s+/, '').trim().slice(0, 80),
+        });
+      }
+    } else {
+      for (const block of blocks) {
+        sourceRanges.push({
+          start: block.start,
+          end: block.end,
+          label: block.headingKey || block.type,
+        });
+      }
+    }
+    for (const sourceRange of sourceRanges) {
+      const content = snapshot.content.slice(sourceRange.start, sourceRange.end);
+      if (!content || bytes(content) > STRUCTURED_MAX_RANGE_BYTES) {
+        fail('PATCH_RANGE_TOO_LARGE', `正文范围超过 ${STRUCTURED_MAX_RANGE_BYTES} 字节，不能交给结构化修改`);
+      }
+      ranges.push(Object.freeze({
+        rangeId: `range_${ranges.length + 1}`,
+        path: filePath,
+        revision: snapshot.revision,
+        start: sourceRange.start,
+        end: sourceRange.end,
+        label: sourceRange.label,
+        content,
+      }));
+      if (ranges.length > STRUCTURED_MAX_RANGES) {
+        fail('TOO_MANY_PATCH_RANGES', `结构化修改范围最多允许 ${STRUCTURED_MAX_RANGES} 个`);
+      }
+    }
+  }
+  if (!ranges.length) fail('INVALID_PATCH_SNAPSHOTS', '目标文件没有可修改的正文范围');
+  return Object.freeze(ranges);
+}
+
+function validateStructuredRangeCatalog(ranges, snapshots) {
+  const rebuilt = buildStructuredRangeCatalog(snapshots);
+  if (!Array.isArray(ranges) || ranges.length !== rebuilt.length) {
+    fail('INVALID_PATCH_RANGES', '结构化修改范围目录无效');
+  }
+  for (let index = 0; index < rebuilt.length; index += 1) {
+    const left = ranges[index];
+    const right = rebuilt[index];
+    if (!left || left.rangeId !== right.rangeId || left.path !== right.path ||
+        left.revision !== right.revision || left.start !== right.start ||
+        left.end !== right.end || left.content !== right.content) {
+      fail('INVALID_PATCH_RANGES', '结构化修改范围目录与权威快照不一致');
+    }
+  }
+  return rebuilt;
+}
+
+function structuredProviderOptions(ranges) {
+  if (!Array.isArray(ranges) || !ranges.length || ranges.length > STRUCTURED_MAX_RANGES) {
+    fail('INVALID_PATCH_RANGES', '结构化修改范围目录无效');
+  }
+  const rangeIds = ranges.map(range => range?.rangeId);
+  if (rangeIds.some((id, index) => id !== `range_${index + 1}`)) {
+    fail('INVALID_PATCH_RANGES', '结构化修改范围编号无效');
+  }
   const text = (minLength, maxLength, pattern = SAFE_MULTILINE_TOOL_TEXT_PATTERN) => ({
     type: 'string',
     minLength,
@@ -110,7 +218,7 @@ function structuredProviderOptions(snapshots) {
   return Object.freeze({
     tools: Object.freeze([Object.freeze({
       name: STRUCTURED_TOOL_NAME,
-      description: '提交最多八个有界的局部文本替换；不得返回完整文件。',
+      description: '选择 Main 提供的正文范围并提交有界替换；不得返回路径、原文、偏移或完整文件。',
       input_schema: {
         type: 'object',
         additionalProperties: false,
@@ -122,10 +230,9 @@ function structuredProviderOptions(snapshots) {
             items: {
               type: 'object',
               additionalProperties: false,
-              required: ['targetId', 'oldText', 'newText', 'summary'],
+              required: ['rangeId', 'newText', 'summary'],
               properties: {
-                targetId: { type: 'string', enum: targetIds },
-                oldText: text(1, STRUCTURED_MAX_OLD_TEXT_CHARS),
+                rangeId: { type: 'string', enum: rangeIds },
                 newText: text(0, STRUCTURED_MAX_NEW_TEXT_CHARS),
                 summary: text(1, STRUCTURED_MAX_SUMMARY_CHARS, SAFE_SUMMARY_TOOL_TEXT_PATTERN),
               },
@@ -138,7 +245,7 @@ function structuredProviderOptions(snapshots) {
   });
 }
 
-function parseStructuredModelEdits(model, snapshots) {
+function parseStructuredModelEdits(model, snapshots, ranges) {
   if (model?.stopReason === 'max_tokens') {
     fail('MODEL_OUTPUT_TRUNCATED', '局部修改达到模型输出上限');
   }
@@ -154,53 +261,56 @@ function parseStructuredModelEdits(model, snapshots) {
   assertExactObject(input, ['edits'], '局部修改');
   let serialized;
   try { serialized = JSON.stringify(input); } catch (_) { serialized = null; }
-  if (!serialized || bytes(serialized) > MAX_MODEL_OUTPUT_BYTES) {
-    fail('MODEL_OUTPUT_TOO_LARGE', `AI 局部修改输出不能超过 ${MAX_MODEL_OUTPUT_BYTES} 字节`);
+  if (!serialized || bytes(serialized) > STRUCTURED_MAX_TOOL_INPUT_BYTES) {
+    fail('MODEL_OUTPUT_TOO_LARGE', `AI 局部修改输出不能超过 ${STRUCTURED_MAX_TOOL_INPUT_BYTES} 字节`);
   }
   if (!Array.isArray(input.edits)) fail('INVALID_MODEL_OUTPUT', 'edits 必须是数组');
-  const snapshotByPath = trustedSnapshots(snapshots);
-  if (!snapshotByPath.size || snapshotByPath.size > STRUCTURED_MAX_PATCH_EDITS) {
-    fail('INVALID_PATCH_SNAPSHOTS', '结构化局部修改目标快照无效');
+  if (input.edits.length > STRUCTURED_MAX_PATCH_EDITS) {
+    fail('TOO_MANY_PATCH_EDITS', `本次最多允许 ${STRUCTURED_MAX_PATCH_EDITS} 个局部修改`);
   }
-  const pathByTargetId = new Map(
-    [...snapshotByPath.keys()].map((filePath, index) => [`target_${index + 1}`, filePath])
-  );
+  const trustedRanges = validateStructuredRangeCatalog(ranges, snapshots);
+  const rangeById = new Map(trustedRanges.map(range => [range.rangeId, range]));
   const canonicalEdits = [];
+  const seenRanges = new Set();
+  let totalNewTextChars = 0;
   for (const [index, raw] of input.edits.entries()) {
-    assertExactObject(raw, ['targetId', 'oldText', 'newText', 'summary'], `edits[${index}]`);
-    if (typeof raw.targetId !== 'string' || !pathByTargetId.has(raw.targetId)) {
-      fail('UNAUTHORIZED_PATCH_PATH', `edits[${index}] 试图修改未授权文件`);
+    assertExactObject(raw, ['rangeId', 'newText', 'summary'], `edits[${index}]`);
+    if (typeof raw.rangeId !== 'string' || !rangeById.has(raw.rangeId)) {
+      fail('UNAUTHORIZED_PATCH_RANGE', `edits[${index}] 试图修改未授权正文范围`);
     }
-    if (typeof raw.oldText !== 'string' ||
-        typeof raw.newText !== 'string' || typeof raw.summary !== 'string' ||
-        !SAFE_MULTILINE_TOOL_TEXT.test(raw.oldText) ||
+    if (seenRanges.has(raw.rangeId)) {
+      fail('DUPLICATE_PATCH_RANGE', `edits[${index}] 重复修改同一正文范围`);
+    }
+    seenRanges.add(raw.rangeId);
+    if (typeof raw.newText !== 'string' || typeof raw.summary !== 'string' ||
         !SAFE_MULTILINE_TOOL_TEXT.test(raw.newText) ||
         !SAFE_SUMMARY_TOOL_TEXT.test(raw.summary) || raw.summary !== raw.summary.trim()) {
       fail('INVALID_MODEL_OUTPUT', `edits[${index}] 包含未授权的控制字符或无效 Unicode`);
     }
-    canonicalEdits.push({
-      path: pathByTargetId.get(raw.targetId),
-      oldText: raw.oldText,
-      newText: raw.newText,
-      summary: raw.summary,
-    });
-  }
-  const edits = validateEdits(canonicalEdits);
-  if (edits.length > STRUCTURED_MAX_PATCH_EDITS) {
-    fail('TOO_MANY_PATCH_EDITS', `本次最多允许 ${STRUCTURED_MAX_PATCH_EDITS} 个局部修改`);
-  }
-  for (const [index, edit] of edits.entries()) {
-    if (Array.from(edit.oldText).length > STRUCTURED_MAX_OLD_TEXT_CHARS) {
-      fail('PATCH_OLD_TEXT_INVALID', `edits[${index}].oldText 超过结构化局部锚点上限`);
+    const range = rangeById.get(raw.rangeId);
+    const newTextChars = Array.from(raw.newText).length;
+    totalNewTextChars += newTextChars;
+    if (newTextChars > STRUCTURED_MAX_NEW_TEXT_CHARS ||
+        totalNewTextChars > STRUCTURED_MAX_TOTAL_NEW_TEXT_CHARS) {
+      fail('PATCH_NEW_TEXT_TOO_LARGE', '结构化替换文本超过单项或合计上限');
     }
-    if (Array.from(edit.newText).length > STRUCTURED_MAX_NEW_TEXT_CHARS) {
-      fail('PATCH_NEW_TEXT_TOO_LARGE', `edits[${index}].newText 超过结构化局部替换上限`);
-    }
-    if (Array.from(edit.summary).length > STRUCTURED_MAX_SUMMARY_CHARS) {
+    if (Array.from(raw.summary).length > STRUCTURED_MAX_SUMMARY_CHARS) {
       fail('INVALID_MODEL_OUTPUT', `edits[${index}].summary 超过结构化摘要上限`);
     }
+    canonicalEdits.push(Object.freeze({
+      rangeId: raw.rangeId,
+      path: range.path,
+      revision: range.revision,
+      start: range.start,
+      end: range.end,
+      newText: raw.newText,
+      summary: raw.summary,
+    }));
   }
-  return edits;
+  if (canonicalEdits.length > STRUCTURED_MAX_PATCH_EDITS) {
+    fail('TOO_MANY_PATCH_EDITS', `本次最多允许 ${STRUCTURED_MAX_PATCH_EDITS} 个局部修改`);
+  }
+  return Object.freeze(canonicalEdits);
 }
 
 function parseModelEdits(text) {
@@ -323,12 +433,46 @@ function buildLocalizedChangeSet({ snapshots, modelText, stopReason, changeSetSe
   return Object.freeze({ noChanges: false, editCount: edits.length, changeSet });
 }
 
-function buildStructuredLocalizedChangeSet({ snapshots, model, changeSetService }) {
+function structuredEditsToProposals(snapshots, edits) {
+  const snapshotByPath = trustedSnapshots(snapshots);
+  const editsByPath = new Map();
+  for (const edit of edits) {
+    const snapshot = snapshotByPath.get(edit.path);
+    if (!snapshot || snapshot.revision !== edit.revision ||
+        !Number.isSafeInteger(edit.start) || !Number.isSafeInteger(edit.end) ||
+        edit.start < 0 || edit.end <= edit.start || edit.end > snapshot.content.length) {
+      fail('INVALID_PATCH_RANGES', '结构化修改范围不再匹配权威快照');
+    }
+    if (!editsByPath.has(edit.path)) editsByPath.set(edit.path, []);
+    editsByPath.get(edit.path).push(edit);
+  }
+  const proposals = [];
+  for (const snapshot of snapshots) {
+    const fileEdits = editsByPath.get(snapshot.path);
+    if (!fileEdits?.length) continue;
+    const ascending = [...fileEdits].sort((left, right) => left.start - right.start);
+    for (let index = 1; index < ascending.length; index += 1) {
+      if (ascending[index].start < ascending[index - 1].end) {
+        fail('PATCH_OVERLAP', '结构化正文范围不得重叠');
+      }
+    }
+    let after = snapshot.content;
+    for (const edit of [...ascending].reverse()) {
+      after = `${after.slice(0, edit.start)}${edit.newText}${after.slice(edit.end)}`;
+    }
+    if (after !== snapshot.content) {
+      proposals.push({ path: snapshot.path, after, summary: boundedSummary(ascending) });
+    }
+  }
+  return proposals;
+}
+
+function buildStructuredLocalizedChangeSet({ snapshots, ranges, model, changeSetService }) {
   if (!changeSetService || typeof changeSetService.createChangeSet !== 'function') {
     fail('INVALID_PATCH_SERVICE', '局部修改结果处理器不可用');
   }
-  const edits = parseStructuredModelEdits(model, snapshots);
-  const proposals = editsToProposals(snapshots, edits);
+  const edits = parseStructuredModelEdits(model, snapshots, ranges);
+  const proposals = structuredEditsToProposals(snapshots, edits);
   if (!proposals.length) return Object.freeze({ noChanges: true, editCount: edits.length });
   const changeSet = changeSetService.createChangeSet(snapshots, proposals);
   if (!changeSet.changes.length) return Object.freeze({ noChanges: true, editCount: edits.length });
@@ -339,9 +483,9 @@ function protocolPromptLines(options = {}) {
   if (options.structured === true) {
     return [
       `必须且只能调用 ${STRUCTURED_TOOL_NAME} 一次；不要在文本中输出 JSON、Diff 或完整文件。`,
-      `最多 ${STRUCTURED_MAX_PATCH_EDITS} 个局部替换；oldText 最多 ${STRUCTURED_MAX_OLD_TEXT_CHARS} 字，newText 最多 ${STRUCTURED_MAX_NEW_TEXT_CHARS} 字，summary 最多 ${STRUCTURED_MAX_SUMMARY_CHARS} 字。`,
-      '只能选择工具 schema 列出的 targetId；Main 会把它恢复为权威路径。oldText 必须是对应原文中唯一的有界锚点。',
-      '插入时也必须在 newText 中保留 oldText 锚点；删除时使用空 newText。',
+      `最多 ${STRUCTURED_MAX_PATCH_EDITS} 个范围替换；每项 newText 最多 ${STRUCTURED_MAX_NEW_TEXT_CHARS} 字，全部 newText 合计最多 ${STRUCTURED_MAX_TOTAL_NEW_TEXT_CHARS} 字，summary 最多 ${STRUCTURED_MAX_SUMMARY_CHARS} 字。`,
+      '只能选择下方与工具 schema 同源列出的 rangeId；Main 会恢复权威路径、revision、原文和偏移。不得返回这些字段。',
+      'newText 必须是该范围替换后的完整内容；删除整个范围时使用空 newText。不得选择同一 rangeId 两次。',
       '未修改任何内容时提交空 edits 数组。',
     ];
   }
@@ -356,6 +500,36 @@ function protocolPromptLines(options = {}) {
   ];
 }
 
+function isRetryableStructuredOutputError(error) {
+  return error instanceof LocalizedEditError && STRUCTURED_RETRYABLE_CODES.has(error.code);
+}
+
+function structuredProviderResultError(model) {
+  if (model?.ok === false && model.error === 'INVALID_TOOL_USE') {
+    return new LocalizedEditError(
+      'INVALID_TOOL_USE',
+      'AI 没有提交唯一有效的结构化修改工具调用'
+    );
+  }
+  return null;
+}
+
+function structuredRetryMessages(messages, error) {
+  if (!Array.isArray(messages) || !isRetryableStructuredOutputError(error)) {
+    fail('INVALID_STRUCTURE_RETRY', '结构化结果纠正请求无效');
+  }
+  const correction = [
+    '上一份工具参数没有通过 Main 的安全结构校验；不要复述、引用或猜测上一份结果。',
+    `失败类别：${error.code}。请重新阅读原始请求，并且只调用 ${STRUCTURED_TOOL_NAME} 一次。`,
+    `只能使用列出的 rangeId；最多 ${STRUCTURED_MAX_PATCH_EDITS} 项；每项 newText 最多 ${STRUCTURED_MAX_NEW_TEXT_CHARS} 字，合计最多 ${STRUCTURED_MAX_TOTAL_NEW_TEXT_CHARS} 字；summary 最多 ${STRUCTURED_MAX_SUMMARY_CHARS} 字。`,
+    '如果无法在这些范围内完成，请提交空 edits；不要输出文本、JSON、路径、原文、偏移或完整文件。',
+  ].join('\n');
+  return Object.freeze([
+    ...messages,
+    Object.freeze({ role: 'user', content: correction }),
+  ]);
+}
+
 module.exports = {
   MAX_MODEL_OUTPUT_BYTES,
   MAX_PATCH_EDITS,
@@ -368,9 +542,13 @@ module.exports = {
   MAX_TOTAL_EDIT_BYTES,
   STRUCTURED_TOOL_NAME,
   STRUCTURED_MAX_PATCH_EDITS,
-  STRUCTURED_MAX_OLD_TEXT_CHARS,
+  STRUCTURED_MAX_RANGES,
+  STRUCTURED_MAX_RANGE_BYTES,
   STRUCTURED_MAX_NEW_TEXT_CHARS,
+  STRUCTURED_MAX_TOTAL_NEW_TEXT_CHARS,
   STRUCTURED_MAX_SUMMARY_CHARS,
+  STRUCTURED_MAX_TOOL_INPUT_BYTES,
+  STRUCTURED_MAX_TOKENS,
   LocalizedEditError,
   validateEdits,
   parseModelEdits,
@@ -378,8 +556,14 @@ module.exports = {
   editsToProposals,
   assertCompleteModelOutput,
   buildLocalizedChangeSet,
+  buildStructuredRangeCatalog,
+  validateStructuredRangeCatalog,
   structuredProviderOptions,
   parseStructuredModelEdits,
+  structuredEditsToProposals,
   buildStructuredLocalizedChangeSet,
   protocolPromptLines,
+  isRetryableStructuredOutputError,
+  structuredProviderResultError,
+  structuredRetryMessages,
 };

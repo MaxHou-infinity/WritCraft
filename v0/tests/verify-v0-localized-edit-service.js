@@ -39,8 +39,8 @@ function structuredModel(edits, overrides = {}) {
   };
 }
 
-function structuredEdit(targetId, oldText, newText, summary = '局部修改') {
-  return { targetId, oldText, newText, summary };
+function structuredEdit(rangeId, newText, summary = '局部修改') {
+  return { rangeId, newText, summary };
 }
 
 function expectCode(code, fn, secret = '') {
@@ -211,162 +211,164 @@ test('only a completed provider turn may enter the localized JSON parser', () =>
 });
 
 test('named localized tool closes the output envelope and still lets Main build after', () => {
-  const snapshots = [snapshot('chapters/one.md', 'UNIQUE anchor\n')];
-  const provider = service.structuredProviderOptions(snapshots);
+  const snapshots = [snapshot('chapters/one.md', '## One\nUNIQUE anchor\n')];
+  const ranges = service.buildStructuredRangeCatalog(snapshots);
+  const provider = service.structuredProviderOptions(ranges);
   assert.strictEqual(provider.tools[0].name, service.STRUCTURED_TOOL_NAME);
   assert.deepStrictEqual(
-    provider.tools[0].input_schema.properties.edits.items.properties.targetId.enum,
-    ['target_1']
+    provider.tools[0].input_schema.properties.edits.items.properties.rangeId.enum,
+    ['range_1']
   );
   assert.deepStrictEqual(
     provider.tools[0].input_schema.properties.edits.items.required,
-    ['targetId', 'oldText', 'newText', 'summary']
+    ['rangeId', 'newText', 'summary']
   );
   assert.strictEqual(
     provider.tools[0].input_schema.properties.edits.maxItems,
     service.STRUCTURED_MAX_PATCH_EDITS
   );
-  const worstSnapshots = Array.from({ length: service.STRUCTURED_MAX_PATCH_EDITS }, (_, index) =>
-    snapshot(`chapters/${index + 1}.md`, '😀'.repeat(service.STRUCTURED_MAX_OLD_TEXT_CHARS))
-  );
-  const worstProvider = service.structuredProviderOptions(worstSnapshots);
+  const worstSnapshots = [snapshot('chapters/worst.md', Array.from(
+    { length: service.STRUCTURED_MAX_PATCH_EDITS },
+    (_, index) => `## ${index + 1}\nbody-${index + 1}\n`
+  ).join(''))];
+  const worstRanges = service.buildStructuredRangeCatalog(worstSnapshots);
+  const worstProvider = service.structuredProviderOptions(worstRanges);
   assert.deepStrictEqual(
-    worstProvider.tools[0].input_schema.properties.edits.items.properties.targetId.enum,
-    Array.from({ length: service.STRUCTURED_MAX_PATCH_EDITS }, (_, index) => `target_${index + 1}`)
+    worstProvider.tools[0].input_schema.properties.edits.items.properties.rangeId.enum,
+    Array.from({ length: service.STRUCTURED_MAX_PATCH_EDITS }, (_, index) => `range_${index + 1}`)
   );
+  const perItem = Math.floor(service.STRUCTURED_MAX_TOTAL_NEW_TEXT_CHARS /
+    service.STRUCTURED_MAX_PATCH_EDITS);
   const worstLegal = Array.from({ length: service.STRUCTURED_MAX_PATCH_EDITS }, (_, index) => structuredEdit(
-    `target_${index + 1}`,
-    '😀'.repeat(service.STRUCTURED_MAX_OLD_TEXT_CHARS),
-    '😀'.repeat(service.STRUCTURED_MAX_NEW_TEXT_CHARS),
+    `range_${index + 1}`,
+    '😀'.repeat(perItem),
     '😀'.repeat(service.STRUCTURED_MAX_SUMMARY_CHARS)
   ));
-  assert.strictEqual(Array.from(worstLegal[0].oldText).length, service.STRUCTURED_MAX_OLD_TEXT_CHARS);
-  assert.strictEqual(Array.from(worstLegal[0].newText).length, service.STRUCTURED_MAX_NEW_TEXT_CHARS);
   assert.strictEqual(Array.from(worstLegal[0].summary).length, service.STRUCTURED_MAX_SUMMARY_CHARS);
   const worstBytes = Buffer.byteLength(JSON.stringify({ edits: worstLegal }), 'utf8');
-  assert(worstBytes > 13 * 1024, `fixture 应填满八项全 Unicode 边界，实际 ${worstBytes}`);
-  assert(worstBytes < service.MAX_MODEL_OUTPUT_BYTES, `fixture 必须闭合在 24 KiB 内，实际 ${worstBytes}`);
+  assert(worstBytes > 5 * 1024, `fixture 应填满合计 Unicode 边界，实际 ${worstBytes}`);
+  assert(
+    worstBytes <= service.STRUCTURED_MAX_TOOL_INPUT_BYTES,
+    `最坏合法工具参数必须闭合在 ${service.STRUCTURED_MAX_TOOL_INPUT_BYTES} 字节内，实际 ${worstBytes}`
+  );
+  // UTF-8 字节数是一种刻意保守的 token 上界：即使按每个非空字节计一个 token，仍可完整返回。
+  assert(
+    worstBytes <= service.STRUCTURED_MAX_TOKENS,
+    `最坏合法工具参数必须闭合在 ${service.STRUCTURED_MAX_TOKENS} token 预算内，实际 ${worstBytes}`
+  );
   assert.strictEqual(
-    service.parseStructuredModelEdits(structuredModel(worstLegal), worstSnapshots).length,
+    service.parseStructuredModelEdits(structuredModel(worstLegal), worstSnapshots, worstRanges).length,
     service.STRUCTURED_MAX_PATCH_EDITS
   );
   const result = service.buildStructuredLocalizedChangeSet({
     snapshots,
-    model: structuredModel([structuredEdit('target_1', 'UNIQUE', 'REVISED', '改写锚点')]),
+    ranges,
+    model: structuredModel([structuredEdit('range_1', '## One\nREVISED anchor\n', '改写范围')]),
     changeSetService,
   });
-  assert.strictEqual(result.changeSet.changes[0].after, 'REVISED anchor\n');
+  assert.strictEqual(result.changeSet.changes[0].after, '## One\nREVISED anchor\n');
+  const multiSnapshots = [snapshot('chapters/multi.md', '## 旧标题\n\n第一行\n第二行\n')];
+  const multiRanges = service.buildStructuredRangeCatalog(multiSnapshots);
   const multiline = service.buildStructuredLocalizedChangeSet({
-    snapshots: [snapshot('chapters/multi.md', '## 旧标题\n\n第一行\n第二行\n')],
-    model: structuredModel([structuredEdit(
-      'target_1',
-      '## 旧标题\n\n第一行\n第二行',
-      '## 新标题\n\n合并后的一行',
-      '合并结构'
-    )]),
+    snapshots: multiSnapshots,
+    ranges: multiRanges,
+    model: structuredModel([structuredEdit('range_1', '## 新标题\n\n合并后的一行\n', '合并结构')]),
     changeSetService,
   });
   assert.strictEqual(multiline.changeSet.changes[0].after, '## 新标题\n\n合并后的一行\n');
+  const sameSnapshots = [snapshot('chapters/same.md', '## One\nA\n## Two\nB\n')];
+  const sameRanges = service.buildStructuredRangeCatalog(sameSnapshots);
   const sameTarget = service.buildStructuredLocalizedChangeSet({
-    snapshots: [snapshot('chapters/same.md', 'ONE middle TWO')],
+    snapshots: sameSnapshots,
+    ranges: sameRanges,
     model: structuredModel([
-      structuredEdit('target_1', 'ONE', 'FIRST', '修改开头'),
-      structuredEdit('target_1', 'TWO', 'SECOND', '修改结尾'),
+      structuredEdit('range_1', '## One\nFIRST\n', '修改开头'),
+      structuredEdit('range_2', '## Two\nSECOND\n', '修改结尾'),
     ]),
     changeSetService,
   });
-  assert.strictEqual(sameTarget.changeSet.changes[0].after, 'FIRST middle SECOND');
+  assert.strictEqual(sameTarget.changeSet.changes[0].after, '## One\nFIRST\n## Two\nSECOND\n');
+});
+
+test('range catalog uses chapter sections beneath one title and keeps ranges revision-bound', () => {
+  const snapshots = [snapshot(
+    'chapters/nested.md',
+    '# Title\nintro\n## One\nbody one\n## Two\nbody two\n'
+  )];
+  const ranges = service.buildStructuredRangeCatalog(snapshots);
+  assert.deepStrictEqual(ranges.map(range => range.rangeId), ['range_1', 'range_2', 'range_3']);
+  assert.strictEqual(ranges[0].content, '# Title\nintro\n');
+  assert.strictEqual(ranges[1].content, '## One\nbody one\n');
+  assert.strictEqual(ranges[2].content, '## Two\nbody two\n');
+  const forged = ranges.map(range => ({ ...range }));
+  forged[1].end += 1;
+  expectCode('INVALID_PATCH_RANGES', () => service.parseStructuredModelEdits(
+    structuredModel([]), snapshots, forged
+  ));
 });
 
 test('named localized tool rejects text completion, duplicate tool blocks and action-envelope overflow', () => {
-  const snapshots = [snapshot('chapters/one.md', 'UNIQUE anchor\n')];
+  const snapshots = [snapshot('chapters/one.md', '## One\nUNIQUE anchor\n')];
+  const ranges = service.buildStructuredRangeCatalog(snapshots);
   expectCode('INVALID_MODEL_OUTPUT', () => service.buildStructuredLocalizedChangeSet({
-    snapshots,
+    snapshots, ranges,
     model: { ok: true, stopReason: 'end_turn', text: '{"edits":[]}' },
     changeSetService,
   }));
   expectCode('INVALID_MODEL_OUTPUT', () => service.buildStructuredLocalizedChangeSet({
-    snapshots,
+    snapshots, ranges,
     model: structuredModel([], { toolUseBlockCount: 2 }),
     changeSetService,
   }));
   expectCode('TOO_MANY_PATCH_EDITS', () => service.buildStructuredLocalizedChangeSet({
-    snapshots,
+    snapshots, ranges,
     model: structuredModel(Array.from(
       { length: service.STRUCTURED_MAX_PATCH_EDITS + 1 },
-      (_, index) => structuredEdit('target_1', `old-${index}`, `new-${index}`)
+      (_, index) => structuredEdit('range_1', `new-${index}`)
     )),
     changeSetService,
   }));
   expectCode('PATCH_NEW_TEXT_TOO_LARGE', () => service.buildStructuredLocalizedChangeSet({
-    snapshots,
-    model: structuredModel([structuredEdit(
-      'target_1',
-      'UNIQUE',
-      'x'.repeat(service.STRUCTURED_MAX_NEW_TEXT_CHARS + 1)
-    )]),
-    changeSetService,
-  }));
-  expectCode('PATCH_OLD_TEXT_INVALID', () => service.buildStructuredLocalizedChangeSet({
-    snapshots,
-    model: structuredModel([structuredEdit(
-      'target_1',
-      '😀'.repeat(service.STRUCTURED_MAX_OLD_TEXT_CHARS + 1),
-      'safe'
-    )]),
+    snapshots, ranges,
+    model: structuredModel([structuredEdit('range_1', 'x'.repeat(service.STRUCTURED_MAX_NEW_TEXT_CHARS + 1))]),
     changeSetService,
   }));
   expectCode('PATCH_NEW_TEXT_TOO_LARGE', () => service.buildStructuredLocalizedChangeSet({
-    snapshots,
-    model: structuredModel([structuredEdit(
-      'target_1',
-      'UNIQUE',
-      '😀'.repeat(service.STRUCTURED_MAX_NEW_TEXT_CHARS + 1)
-    )]),
+    snapshots, ranges,
+    model: structuredModel([structuredEdit('range_1', '😀'.repeat(service.STRUCTURED_MAX_NEW_TEXT_CHARS + 1))]),
     changeSetService,
   }));
   expectCode('INVALID_MODEL_OUTPUT', () => service.buildStructuredLocalizedChangeSet({
-    snapshots,
-    model: structuredModel([structuredEdit(
-      'target_1',
-      'UNIQUE',
-      'safe',
-      '😀'.repeat(service.STRUCTURED_MAX_SUMMARY_CHARS + 1)
-    )]),
+    snapshots, ranges,
+    model: structuredModel([structuredEdit('range_1', 'safe', '😀'.repeat(service.STRUCTURED_MAX_SUMMARY_CHARS + 1))]),
     changeSetService,
   }));
   for (const hostile of ['bad\u0001text', 'bad\u000btext', 'bad\uD800text', 'bad\uDC00text']) {
     expectCode('INVALID_MODEL_OUTPUT', () => service.buildStructuredLocalizedChangeSet({
-      snapshots,
-      model: structuredModel([structuredEdit('target_1', 'UNIQUE', hostile)]),
+      snapshots, ranges,
+      model: structuredModel([structuredEdit('range_1', hostile)]),
       changeSetService,
     }));
     expectCode('INVALID_MODEL_OUTPUT', () => service.buildStructuredLocalizedChangeSet({
-      snapshots,
-      model: structuredModel([structuredEdit('target_1', 'UNIQUE', 'safe', hostile)]),
+      snapshots, ranges,
+      model: structuredModel([structuredEdit('range_1', 'safe', hostile)]),
       changeSetService,
     }));
   }
-  const lineBreakSummary = structuredModel([structuredEdit('target_1', 'UNIQUE', 'safe', '无效\n摘要')]);
+  const lineBreakSummary = structuredModel([structuredEdit('range_1', 'safe', '无效\n摘要')]);
   expectCode('INVALID_MODEL_OUTPUT', () => service.buildStructuredLocalizedChangeSet({
-    snapshots, model: lineBreakSummary, changeSetService,
+    snapshots, ranges, model: lineBreakSummary, changeSetService,
   }));
-  for (const legacyCompatiblePath of ['bad\u0001.md', 'bad\u000b.md', 'bad\uD800.md', 'bad\uDC00.md']) {
-    const oddSnapshots = [snapshot(legacyCompatiblePath, 'UNIQUE body')];
-    const oddProvider = service.structuredProviderOptions(oddSnapshots);
-    assert.deepStrictEqual(
-      oddProvider.tools[0].input_schema.properties.edits.items.properties.targetId.enum,
-      ['target_1']
-    );
-    const mapped = service.parseStructuredModelEdits(
-      structuredModel([structuredEdit('target_1', 'UNIQUE', 'safe')]),
-      oddSnapshots
-    );
-    assert.strictEqual(mapped[0].path, legacyCompatiblePath);
-  }
-  expectCode('UNAUTHORIZED_PATCH_PATH', () => service.parseStructuredModelEdits(
-    structuredModel([structuredEdit('target_2', 'UNIQUE', 'safe')]),
-    snapshots
+  expectCode('UNAUTHORIZED_PATCH_RANGE', () => service.parseStructuredModelEdits(
+    structuredModel([structuredEdit('range_2', 'safe')]),
+    snapshots,
+    ranges
+  ));
+  expectCode('DUPLICATE_PATCH_RANGE', () => service.parseStructuredModelEdits(
+    structuredModel([
+      structuredEdit('range_1', 'safe'),
+      structuredEdit('range_1', 'again'),
+    ]), snapshots, ranges
   ));
 });
 

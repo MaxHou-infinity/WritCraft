@@ -76,7 +76,7 @@
 5. 修复旅程中发现的 P0/P1 阻断项；P2 必须明确记录、分级并决定是否允许发版。
 6. 记录内容无关的私有指标：Inline 接受率、导航建议帮助度/动作、Research 匹配判断、图片评分/采纳、耗时和稳定错误码。
 
-当前执行注记（2026-08-01，0.0CH）：项目卡、Inline、Chapter、空项目结构规划，以及第九副本的已有稿件 Navigation 原文定位与帮助度判断已关闭，不得重复。作者首次复用现成建议生成 Changes 时真实触发 `MODEL_OUTPUT_TOO_LARGE`；Diff 未创建，post-manifest History=0、recovery=0，公开文件仍与不变授权源逐文件一致。生产已把该 handoff 从自由文本 JSON 改为唯一 `submit_localized_edits` tool，并以 Main-owned `target_1…target_8` 恢复真实路径；最多 8 个局部替换，最大合法 Unicode input 14,083 bytes < 24 KiB。专项、完整 test/非沙箱 verify、真实 Electron 36/36 与独立复审 P0=0/P1=0 已通过。建议 action ID 只存在于 Main 进程内存，重启后不能迁移或伪造；因此最新源码必须用原目标最短重建一次 Navigation authority，再只重跑 Changes handoff。Diff 出现后先验证提交前零写入；无需再次评价建议帮助度。Research、image-01 与 Graph/recovery 仍开放，尚未进入 0.1.2 发布授权。
+当前执行注记（2026-08-01，0.0CI）：项目卡、Inline、Chapter、结构规划，以及 Navigation 生成/原文定位/帮助度均已关闭，不得重复。Changes 第二次真实调用以 `PATCH_NEW_TEXT_TOO_LARGE` 零写入失败，证明旧 target/锚点协议仍让模型决定过大的替换粒度。生产已改为 Main 从冻结快照建立 request-local、revision-bound 范围，模型只返回 `rangeId/newText/summary`；单项 640 字、合计 1024 字、工具参数 7 KiB、专用预算 8192 tokens，并仅对列举的结构错误内部收敛一次。专项、完整 test、批准 GUI verify 与独立复审 P0=0/P1=0 已通过；强制 Electron 两次分别在回收区列表和 Graph CDP 鼠标事件超时，作为整链时序 P2 保留，不能记作全绿。最新源码仍须用原目标最短重建一次进程内 Navigation authority，只复验 Changes Diff；然后继续 Research、image-01 与 Graph/recovery。尚未获得 0.1.2 发布授权。
 
 历史检查点（0.0BZ）：只读 Main/IPC 基础已独立签收，包括严格结构/导航工具协议、证据锚点、8 条/30 分钟隔离缓存、watcher barrier、真实 deadline abort 和零写入门禁；专项 53/53、Network 15/15，独立复审 P0/P1=0。其当时未覆盖的 Renderer、动作、骨架与 Electron 已由上方 0.0CC 当前注记覆盖，不得从本段派发旧“下一阶段”。
 

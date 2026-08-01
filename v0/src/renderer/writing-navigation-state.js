@@ -205,7 +205,7 @@
       'PATCH_NEW_TEXT_TOO_LARGE'].includes(code)) {
       return Object.freeze({
         code,
-        message: 'AI 返回的修改建议超过单次安全范围；本次没有修改项目文件。请直接重试；如果再次出现，请重新生成写作导航。',
+        message: '系统已自动重新整理一次，但 AI 仍未能把修改收敛到安全审阅范围；本次没有修改项目文件。请不要继续重复点击本卡片，改用更小、更明确的导航目标后重新生成。',
         action: 'retry',
       });
     }
