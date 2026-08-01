@@ -10,7 +10,18 @@ const preload = fs.readFileSync(path.join(root, 'src/main/preload.js'), 'utf8');
 const html = fs.readFileSync(path.join(root, 'src/renderer/index.html'), 'utf8');
 const dock = fs.readFileSync(path.join(root, 'src/renderer/assistant-dock.js'), 'utf8');
 const workspace = fs.readFileSync(path.join(root, 'src/renderer/assistant-workspace.js'), 'utf8');
+const navigationCss = fs.readFileSync(path.join(root, 'src/renderer/writing-navigation.css'), 'utf8');
 const packageJson = JSON.parse(fs.readFileSync(path.join(root, 'package.json'), 'utf8'));
+
+function contrastRatio(left, right) {
+  const luminance = value => {
+    const channels = value.match(/[a-f0-9]{2}/gi).map(part => parseInt(part, 16) / 255)
+      .map(channel => channel <= 0.03928 ? channel / 12.92 : ((channel + 0.055) / 1.055) ** 2.4);
+    return 0.2126 * channels[0] + 0.7152 * channels[1] + 0.0722 * channels[2];
+  };
+  const values = [luminance(left), luminance(right)].sort((a, b) => b - a);
+  return (values[0] + 0.05) / (values[1] + 0.05);
+}
 
 let passed = 0;
 function check(name, fn) {
@@ -68,6 +79,17 @@ check('Renderer exposes one Navigation workflow and loads no legacy Plan assets'
   assert(!dock.includes("'plan'"), 'Assistant Dock still registers Plan mode');
   assert(!workspace.includes('proposePlan'), 'Assistant workspace still calls legacy Plan');
   assert(!workspace.includes('openPlanTask'), 'Assistant workspace still routes legacy Plan');
+});
+
+check('suggestion actions use one compact editorial toolbar treatment', () => {
+  assert.match(navigationCss, /\.writing-navigation__action-row \{[\s\S]*?flex-wrap: wrap;[\s\S]*?gap: 6px;/);
+  assert.match(navigationCss, /\.writing-navigation__action-row \.writing-navigation__primary,[\s\S]*?min-height: 28px;[\s\S]*?padding: 4px 9px;[\s\S]*?border-radius: 999px;[\s\S]*?font-size: 11px;/);
+  assert.match(navigationCss, /\.writing-navigation__action-row button:disabled \{[\s\S]*?opacity: 1;/);
+  const primary = navigationCss.match(
+    /\.writing-navigation__action-row \.writing-navigation__primary \{[\s\S]*?background: (#[a-f0-9]{6});/i
+  );
+  assert(primary, 'compact primary action background is missing');
+  assert(contrastRatio(primary[1], '#ffffff') >= 4.5, 'compact primary action text contrast is too low');
 });
 
 check('active verification chains exclude legacy Plan while historical Main evidence stays isolated', () => {

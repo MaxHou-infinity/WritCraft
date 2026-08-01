@@ -211,6 +211,60 @@ async function test(name, fn) {
     assert.strictEqual(review, changes);
   });
 
+  await test('a failed Sources route can retry the same Research action without consuming Changes', async () => {
+    const researchId = `wna_${'3'.repeat(32)}`;
+    const changesId = `wna_${'4'.repeat(32)}`;
+    const calls = [];
+    let routes = 0;
+    let review = null;
+    const harness = createHarness({
+      bridge: {
+        runWritingNavigationAction: async (_projectId, actionId, attemptId) => {
+          calls.push([actionId, attemptId]);
+          if (actionId === researchId) return {
+            ok: true,
+            kind: 'research',
+            handoff: { schema: 'writcraft.writing-navigation-research/v1' },
+          };
+          return {
+            ok: true,
+            kind: 'changes',
+            noChanges: false,
+            changeSetId: `pc_${'5'.repeat(32)}`,
+            review: { changeSetId: `pc_${'5'.repeat(32)}`, files: [] },
+          };
+        },
+      },
+      sourcesView: {
+        openWritingNavigation() {
+          routes += 1;
+          return { ok: routes > 1 };
+        },
+      },
+      changesView: {
+        acceptProposal(value) { review = value; return { ok: true }; },
+        open() {},
+      },
+    });
+    const projectId = harness.workspace.state.project.instanceId;
+    const first = await harness.captured.navigationOptions.onRunAction(
+      projectId, researchId, `wno_${'6'.repeat(32)}`
+    );
+    assert.strictEqual(first.error, 'RESEARCH_ROUTE_FAILED');
+    const second = await harness.captured.navigationOptions.onRunAction(
+      projectId, researchId, `wno_${'7'.repeat(32)}`
+    );
+    assert.strictEqual(second.ok, true);
+    assert.strictEqual(routes, 2);
+    assert.deepStrictEqual(calls.slice(0, 2).map(item => item[0]), [researchId, researchId]);
+    const changes = await harness.captured.navigationOptions.onRunAction(
+      projectId, changesId, `wno_${'8'.repeat(32)}`
+    );
+    assert.strictEqual(changes.ok, true);
+    assert.strictEqual(calls[2][0], changesId);
+    assert.strictEqual(review, changes);
+  });
+
   await test('a late project-A Changes result is discarded instead of entering project B', async () => {
     const pending = deferred();
     const discarded = [];

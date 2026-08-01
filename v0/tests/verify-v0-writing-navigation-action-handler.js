@@ -207,13 +207,15 @@ async function setup(action, overrides = {}) {
 (async () => {
   console.log('\nWriting navigation action handler verification');
 
-  await test('research returns one evidence-bound handoff and consumes its action', async () => {
+  await test('research returns one evidence-bound handoff and remains safely repeatable', async () => {
     const state = await setup('research');
     const first = await state.handler(EVENT, PROJECT.instanceId, state.actionId);
     assert.strictEqual(first.kind, 'research');
     assert.strictEqual(first.handoff.evidence[0].path, 'chapters/01.md');
     const replay = await state.handler(EVENT, PROJECT.instanceId, state.actionId);
-    assert.strictEqual(replay.error, 'ACTION_NOT_FOUND');
+    assert.strictEqual(replay.kind, 'research');
+    assert.deepStrictEqual(replay.handoff, first.handoff);
+    assert.strictEqual(state.modelCalls, 0);
   });
 
   await test('an existing Changes review is preserved and the same action can retry', async () => {

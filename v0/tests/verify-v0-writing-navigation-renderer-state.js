@@ -387,6 +387,15 @@ test('public error mapping never exposes structured transport vocabulary', () =>
   assert(oversized.message.includes('安全审阅范围'));
   assert(oversized.message.includes('自动重新整理一次'));
   assert(oversized.message.includes('不要继续重复点击'));
+  const route = State.publicFailure({ error: 'RESEARCH_ROUTE_FAILED' });
+  assert.strictEqual(route.action, 'retry');
+  assert(route.message.includes('建议仍然保留'));
+  const pending = State.publicFailure({ error: 'CHANGES_RECOVERY_PENDING' });
+  assert.strictEqual(pending.action, 'review');
+  assert(pending.message.includes('先完成或丢弃审阅'));
+  assert(pending.message.includes('本次能力未消费'));
+  assert(pending.message.includes('仍在有效期内'));
+  assert(!pending.message.includes('不会过期'));
 });
 
 console.log(`\nWriting Navigation Renderer state passed: ${passed}/${passed}.`);

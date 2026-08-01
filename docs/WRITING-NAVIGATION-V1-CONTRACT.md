@@ -3,7 +3,7 @@
 > 状态：`RM-1.1 / writ-craft@0.1.2` 当前冻结合同
 > 生效日期：2026-07-31
 > 取代：面向用户的 `writcraft.plan/v2` 里程碑、任务和依赖图
-> 实现进度：0.0CJ 已完成 Main/IPC/Renderer 公共纵切、结构确认、Research/Changes 交接，以及同 App 刷新/重开的 Main 重验恢复；每张建议固定提供 Research/Changes 双动作。结构旅程、Navigation 帮助度及 Navigation→Changes→Safe Undo 已完成真实作者验收。当前待最终独立复审与刷新恢复/Research 最短作者复验。
+> 实现进度：0.0CK 已完成 Main/IPC/Renderer 公共纵切、结构确认、同 App 刷新重验恢复及固定 Research/Changes 双动作。Research 只读 handoff 现可在路由失败后安全重试，并发重入只返回 busy，不会中断当前动作或消费 Changes sibling。结构旅程、Navigation 帮助度及 Navigation→Changes→Safe Undo 已完成真实作者验收；当前只待 Research 最短作者复验。
 
 ## 1. 产品判断
 

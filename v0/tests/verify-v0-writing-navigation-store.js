@@ -122,7 +122,7 @@ function deterministicBytes() {
     assert.strictEqual(store.stats().actions, 2);
   });
 
-  await test('research and changes consume after successful handoff', async () => {
+  await test('research remains safely reusable while changes consumes after successful handoff', async () => {
     for (const action of ['research', 'changes']) {
       const store = storeModule.createWritingNavigationStore({ randomBytes: deterministicBytes() });
       const result = store.install(binding({ record: await record(action === 'research' ? 2 : 3, action) }));
@@ -131,12 +131,43 @@ function deterministicBytes() {
       }));
       assert.strictEqual(lease.suggestion.action, action);
       const settled = store.settleAction(binding({ leaseId: lease.leaseId, outcome: 'success' }));
-      assert.strictEqual(settled.consumed, true);
-      assert.throws(
-        () => store.acquireAction(actionBinding({ actionId: result.suggestions[0].actionIds[action] })),
-        error => error.code === 'ACTION_NOT_FOUND'
-      );
+      assert.strictEqual(settled.consumed, action === 'changes');
+      if (action === 'research') {
+        const reopened = store.acquireAction(actionBinding({
+          actionId: result.suggestions[0].actionIds.research,
+        }));
+        assert.strictEqual(reopened.repeatable, true);
+        store.settleAction(binding({ leaseId: reopened.leaseId, outcome: 'success' }));
+      } else {
+        assert.throws(
+          () => store.acquireAction(actionBinding({ actionId: result.suggestions[0].actionIds.changes })),
+          error => error.code === 'ACTION_NOT_FOUND'
+        );
+      }
     }
+  });
+
+  await test('concurrent Research reports busy without aborting or consuming the active lease', async () => {
+    const store = storeModule.createWritingNavigationStore({ randomBytes: deterministicBytes() });
+    const result = store.install(binding({ record: await record(45, 'research', '并发来源') }));
+    const actionId = result.suggestions[0].actionIds.research;
+    const first = store.acquireAction(actionBinding({ actionId }));
+    assert.strictEqual(first.signal.aborted, false);
+    assert.throws(
+      () => store.acquireAction(actionBinding({
+        actionId, attemptId: `wno_${'f'.repeat(32)}`,
+      })),
+      error => error.code === 'ACTION_BUSY'
+    );
+    assert.strictEqual(first.signal.aborted, false);
+    assert.strictEqual(store.assertLeaseCurrent(binding({ leaseId: first.leaseId })).action, 'research');
+    assert.strictEqual(store.settleAction(binding({
+      leaseId: first.leaseId, outcome: 'success',
+    })).consumed, false);
+    const reopened = store.acquireAction(actionBinding({
+      actionId, attemptId: `wno_${'e'.repeat(32)}`,
+    }));
+    assert.strictEqual(reopened.suggestion.action, 'research');
   });
 
   await test('the selected capability overrides the model-proposed suggestion action', async () => {
@@ -147,7 +178,7 @@ function deterministicBytes() {
     }));
     assert.strictEqual(research.suggestion.action, 'research');
     assert.strictEqual(research.record.result.suggestions[0].action, 'open');
-    assert.strictEqual(research.repeatable, false);
+    assert.strictEqual(research.repeatable, true);
     store.settleAction(binding({ leaseId: research.leaseId, outcome: 'success' }));
     const changes = store.acquireAction(actionBinding({
       actionId: result.suggestions[0].actionIds.changes,
@@ -223,10 +254,10 @@ function deterministicBytes() {
 
   await test('concurrent replay terminates the single-use action', async () => {
     const store = storeModule.createWritingNavigationStore({ randomBytes: deterministicBytes() });
-    const result = store.install(binding({ record: await record(6, 'research') }));
-    const actionId = result.suggestions[0].actionIds.research;
+    const result = store.install(binding({ record: await record(6, 'changes') }));
+    const actionId = result.suggestions[0].actionIds.changes;
     const first = store.acquireAction(actionBinding({ actionId }));
-    assert.strictEqual(store.assertLeaseCurrent(binding({ leaseId: first.leaseId })).action, 'research');
+    assert.strictEqual(store.assertLeaseCurrent(binding({ leaseId: first.leaseId })).action, 'changes');
     assert.throws(
       () => store.acquireAction(actionBinding({ actionId })),
       error => error.code === 'ACTION_REPLAYED'

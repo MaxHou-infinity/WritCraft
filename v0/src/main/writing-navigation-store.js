@@ -348,8 +348,10 @@ function createWritingNavigationStore(options = {}) {
       fail('STALE_NAVIGATION', '写作导航已因项目状态变化失效');
     }
     if (action.leaseId) {
-      if (action.action === 'open') {
-        fail('ACTION_BUSY', '正在打开这条写作导航建议，请稍候');
+      if (['open', 'research'].includes(action.action)) {
+        fail('ACTION_BUSY', action.action === 'research'
+          ? '正在打开这条建议的来源面板，请稍候'
+          : '正在打开这条写作导航建议，请稍候');
       }
       terminateAction(raw.actionId);
       fail('ACTION_REPLAYED', '写作导航动作已在处理中');
@@ -374,7 +376,7 @@ function createWritingNavigationStore(options = {}) {
     });
     const authority = deepCloneFreeze({
       leaseId,
-      repeatable: action.action === 'open',
+      repeatable: ['open', 'research'].includes(action.action),
       navigationId: entry.record.navigationId,
       suggestion: { ...suggestion, action: action.action },
       record: entry.record,
@@ -447,7 +449,7 @@ function createWritingNavigationStore(options = {}) {
       fail('INVALID_ACTION_SETTLEMENT', '只有 Changes 动作可以保留待审重试能力');
     }
     const retryable = ['retryable_failure', 'cancelled'].includes(raw.outcome);
-    if (!reviewBlocked && !retryable && action.action !== 'open') {
+    if (!reviewBlocked && !retryable && !['open', 'research'].includes(action.action)) {
       action.terminated = true;
     }
     if (raw.outcome === 'stale') action.terminated = true;

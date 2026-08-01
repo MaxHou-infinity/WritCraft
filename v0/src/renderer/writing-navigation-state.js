@@ -212,6 +212,20 @@
         action: 'retry',
       });
     }
+    if (code === 'RESEARCH_ROUTE_FAILED') {
+      return Object.freeze({
+        code,
+        message: '来源面板没有成功打开；这条建议仍然保留，请再试一次。',
+        action: 'retry',
+      });
+    }
+    if (['REVIEW_IN_PROGRESS', 'CHANGES_RECOVERY_PENDING'].includes(code)) {
+      return Object.freeze({
+        code,
+        message: '当前还有修改建议等待处理。请先完成或丢弃审阅，再重试刚才的操作；本次能力未消费，项目未变化且仍在有效期内时可以继续。',
+        action: 'review',
+      });
+    }
     return Object.freeze({
       code,
       message: 'AI 没有完成本次整理；没有修改项目文件。请调整目标或上下文后重试。',
