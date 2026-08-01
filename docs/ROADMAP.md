@@ -76,7 +76,7 @@
 5. 修复旅程中发现的 P0/P1 阻断项；P2 必须明确记录、分级并决定是否允许发版。
 6. 记录内容无关的私有指标：Inline 接受率、导航建议帮助度/动作、Research 匹配判断、图片评分/采纳、耗时和稳定错误码。
 
-当前执行注记（2026-08-01，0.0CI）：项目卡、Inline、Chapter、结构规划，以及 Navigation 生成/原文定位/帮助度均已关闭，不得重复。Changes 第二次真实调用以 `PATCH_NEW_TEXT_TOO_LARGE` 零写入失败，证明旧 target/锚点协议仍让模型决定过大的替换粒度。生产已改为 Main 从冻结快照建立 request-local、revision-bound 范围，模型只返回 `rangeId/newText/summary`；单项 640 字、合计 1024 字、工具参数 7 KiB、专用预算 8192 tokens，并仅对列举的结构错误内部收敛一次。专项、完整 test、批准 GUI verify 与独立复审 P0=0/P1=0 已通过；强制 Electron 两次分别在回收区列表和 Graph CDP 鼠标事件超时，作为整链时序 P2 保留，不能记作全绿。最新源码仍须用原目标最短重建一次进程内 Navigation authority，只复验 Changes Diff；然后继续 Research、image-01 与 Graph/recovery。尚未获得 0.1.2 发布授权。
+当前执行注记（2026-08-01，0.0CI）：项目卡、Inline、Chapter、结构规划，以及 Navigation 生成/原文定位/帮助度均已关闭，不得重复。Changes 两次真实零写入红灯后，生产已改为 Main-owned revision-bound range 协议；单项 640 字、合计 1024 字、工具参数 7 KiB、专用预算 8192 tokens，并仅内部收敛一次。提交 `da5e8d6` 的最新作者复验已真实生成右侧 3 项待审 Diff，目标章节 SHA 保持 `1bdb3a5c…`、recovery=0、无新增 History；真实生成门关闭，仍待作者决定、提交与 Safe Undo。专项、完整 test、批准 GUI verify 与独立复审 P0=0/P1=0 已通过；强制 Electron 两次分别在回收区列表和 Graph CDP 鼠标事件超时，作为整链时序 P2 保留。之后继续 Research、image-01 与 Graph/recovery；尚未获得 0.1.2 发布授权。
 
 历史检查点（0.0BZ）：只读 Main/IPC 基础已独立签收，包括严格结构/导航工具协议、证据锚点、8 条/30 分钟隔离缓存、watcher barrier、真实 deadline abort 和零写入门禁；专项 53/53、Network 15/15，独立复审 P0/P1=0。其当时未覆盖的 Renderer、动作、骨架与 Electron 已由上方 0.0CC 当前注记覆盖，不得从本段派发旧“下一阶段”。
 

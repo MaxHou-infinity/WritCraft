@@ -36,6 +36,7 @@ Chat 的三级 scope/context、Main-owned 多轮连续性、Onboarding v2、Rese
 
 ### 0.0CI 2026-08-01 · Navigation→Changes 真实单项越界与范围协议收口
 
+- **最新作者复验**：提交 `da5e8d6` 启动后，作者用原目标重建 Navigation authority 并点击“生成修改建议”。App 自动切换到右侧“修改 / Project Changes”，成功显示当前章节 **3 项修改、待决定**及逐块接受/拒绝控件；这就是当前统一 Changes Diff，不会把未接受内容叠加到左侧正文。目标章节 SHA-256 仍为 `1bdb3a5c…`，recovery=0，History 更新时间仍为 2026-07-29 的继承记录，证明真实 MiniMax Diff 生成前后零正文/History 写入。Changes 的真实生成门已关闭；作者决定、提交终态与 Safe Undo 仍待本轮完成。
 - **第二次真实红灯**：作者在第九副本再次点击“生成修改建议”，Main 稳定码为 `PATCH_NEW_TEXT_TOO_LARGE`，不是旧的总输出超量。模型已返回唯一可解析工具调用，但至少一个 `newText` 超过 256 Unicode code points；系统未创建 Diff、待审 capability、History 或项目写入。
 - **根因与修复**：`targetId + oldText` 仍让模型决定原文锚点和改写粒度。现由 Main 从冻结目标快照建立 revision-bound、request-local 的 `range_1…range_96` 章节范围；模型只能提交 `rangeId/newText/summary`，路径、revision、原文和偏移均由 Main 恢复并重验。每次最多 8 项、单项 640 字、合计 1024 字、summary 40 字，完整工具参数最多 7 KiB，专用输出预算 8192 tokens。
 - **一次内部收敛**：首轮仅对严格列举的结构/容量错误（含 `INVALID_TOOL_USE`）自动纠正一次，且不回显被拒内容；第二次仍失败即终止，绝不第三次付费调用。第二次调用前后重新验证 action lease、项目、Navigation evidence 和所有文件 revision，失败不缓存审阅。
