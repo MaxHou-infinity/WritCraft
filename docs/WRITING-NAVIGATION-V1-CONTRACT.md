@@ -3,7 +3,7 @@
 > 状态：`RM-1.1 / writ-craft@0.1.2` 当前冻结合同
 > 生效日期：2026-07-31
 > 取代：面向用户的 `writcraft.plan/v2` 里程碑、任务和依赖图
-> 实现进度：0.0CI 已完成 Main/IPC/Renderer 公共纵切、结构确认、open/Research/Changes 与取消/恢复。结构旅程及 Navigation 生成、定位、帮助度已完成作者验收。Changes 两次真实失败均零写入；第二次 `PATCH_NEW_TEXT_TOO_LARGE` 后已改为 Main-owned revision-bound range 协议，并完成回归和独立复审；仍待作者在最新源码中取得真实 Diff。
+> 实现进度：0.0CJ 已完成 Main/IPC/Renderer 公共纵切、结构确认、Research/Changes 交接，以及同 App 刷新/重开的 Main 重验恢复；每张建议固定提供 Research/Changes 双动作。结构旅程、Navigation 帮助度及 Navigation→Changes→Safe Undo 已完成真实作者验收。当前待最终独立复审与刷新恢复/Research 最短作者复验。
 
 ## 1. 产品判断
 
@@ -46,11 +46,10 @@ V1 只适用于除 `edit.md` 外尚无公开 Markdown 正文的新项目。已�
 - 建议采取什么动作；
 - 完成后预期改善什么。
 
-动作仅允许：
+每张卡片的原文依据链接都可本地打开章节，不调用 AI、不写盘。每张卡片还必须由产品固定同时提供两个后续动作，不得由模型二选一：
 
-1. **打开章节**：本地导航，不调用 AI、不写盘；
-2. **补充来源**：进入 Research，保留当前建议的证据锚点；
-3. **生成修改建议**：进入 Changes，重新读取权威 revision 后生成可审阅 Diff。
+1. **补充来源**：进入 Research，保留当前建议的证据锚点；
+2. **生成修改建议**：进入 Changes，重新读取权威 revision 后生成可审阅 Diff。
 
 建议不是待办列表，不显示任务 ID、依赖关系、里程碑、完成率或“交给 AI”。
 
@@ -92,8 +91,9 @@ Main 必须把模型锚点解析为 canonical block locator，并绑定当时 re
 - provider/tool/protocol 失败只向诊断环记录固定枚举码，不记录正文、路径、quote、Prompt、模型原文或远端错误正文；项目已经漂移时以 stale 真相为准，不把旧 provider 失败归入新项目。
 - Main 必须严格验证模式、数量、字符/字节上限、本次 evidenceRef membership、重复引用和允许动作；再从 frozen catalog 恢复路径、标题、quote、locator 与 revision。不猜测、不修补、不把字符串强制转换成数组。
 - 模型不得获得写 capability。缓存最多保存 8 次结果、每次最多 3 张建议、TTL 30 分钟；按项目 instance 与 owner 隔离，超限淘汰最旧结果并使其 capability 失效。
-- `open` 可在同一有效建议上重复使用，但每次都重验项目、路径、locator 与 revision；只导航，不消费写权限。
-- `research` 和 `changes` 使用各自单次 opaque action capability。执行前重验全部证据、Context manifest、当前项目和 generation；成功交接或任何 stale/replay 都使该 action capability 终止。
+- 原文依据链接直接使用 Main 已恢复的 locator 打开章节，不占用 Research/Changes capability。
+- Main 为每张建议分别签发 `research` 和 `changes` 单次 opaque action capability；模型输出中的历史 `action` 字段不得决定按钮是否出现。执行前重验全部证据、Context manifest、当前项目和 generation；成功交接或任何 stale/replay 都使对应 capability 终止。
+- Renderer 刷新或同一 App 进程内重新打开项目时，Main 可在 30 分钟 TTL 内暂存旧 record，但必须立即撤销旧 action/lease。恢复时 Renderer 只传 project instance ID；Main 重新经过 watcher barrier，核对 `edit.md`、所有已读正文 revision 及每个 quote/heading/locator，再绑定新 instance/generation/Renderer epoch 并签发全新动作。该恢复不调用 provider；任一依赖变化则 fail-closed。App 完全退出后不持久化正文、quote 或 capability，因此不承诺跨进程恢复。
 - `changes` 必须且只能使用 `submit_localized_edits`：Main 从冻结目标快照建立最多 96 个 request-local、revision-bound 范围，Prompt/Schema 同源绑定 `rangeId`；模型只返回 `rangeId/newText/summary`，不得返回路径、revision、原文或偏移。每次最多 8 项，单项 `newText` 最多 640、合计最多 1024、summary 最多 40 Unicode code points，完整工具参数不超过 7 KiB，专用 `max_tokens=8192`。Main 重建范围目录并重验路径、revision、内容、偏移、重复、重叠、依赖和 ChangeSet。
 - 首轮只有列入 allowlist 的结构或容量失败可内部纠正一次，纠正请求不得回显被拒内容；第二次仍失败必须终止且不得第三次调用。第二次付费调用前后都必须重新验证 action lease、项目 authority 与全部依赖。失败在缓存审阅前结束，仍 current 的 action 按既有状态语义保留。
 - 每次执行另绑定一个 opaque attempt ID。普通失败、超时或作者取消只结束该 attempt，并保留仍 current 的 action 供显式重试；旧 attempt 的迟到取消或 finally 不得影响新 attempt。
@@ -116,10 +116,11 @@ Main 必须把模型锚点解析为 canonical block locator，并绑定当时 re
 ### 6.1 自动化
 
 - 空项目返回 2–3 个结构方案；模型值和作者编辑值的 raw validator、精确骨架字节及三态提交恢复有动态证明；显式确认前零写入，precommit failure 零残留，committed/unknown 不谎报；已有正文时结构模式 fail-closed；
-- 已有项目返回 1–3 张完整建议，三种动作路由正确；
+- 已有项目返回 1–3 张完整建议，每张都有可打开的原文依据与固定 Research/Changes 双动作；
 - schema/input/request/context 的最大合法 fixture 与超一边界均有测试；一次点击至多一次 provider call；
 - unknown/duplicate/cross-request evidenceRef、locator/revision 漂移、Context 不完整披露、项目切换、缓存过期、重复消费和 A→B 迟到均 fail-closed；
 - 已有 pending Changes 时不替换审阅，Research/Changes 各自 capability 互不串用；
+- 同一 App 内刷新/重开恢复不产生第二次 provider 调用，旧 action ID 失效、新 ID 可用，依赖漂移、A→B 切换和迟到恢复均 fail-closed；
 - 所有生成失败证明 Markdown、History、Changes 和 mutation generation 零变化；
 - 任何正文修改都只能在 Changes 中接受后落盘；
 - 真实跨组件测试覆盖进度、取消、恢复、旧 finally/新项目重叠和无陈旧 busy 状态。

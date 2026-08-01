@@ -122,6 +122,7 @@ const PROJECT = { instanceId: 'instance_0123456789abcdef01234567' };
 const NAVIGATION_ID = `nav_${'a'.repeat(32)}`;
 const CAPABILITY_ID = `wsc_${'b'.repeat(32)}`;
 const ACTION_ID = `wna_${'c'.repeat(32)}`;
+const CHANGES_ACTION_ID = `wna_${'d'.repeat(32)}`;
 let id = 0;
 const nextId = () => `wno_${String(++id).padStart(32, '0')}`;
 
@@ -163,6 +164,7 @@ function navigation(action = 'open') {
       mode: 'navigation',
       suggestions: [{
         suggestionId: 'suggestion_1', actionId: ACTION_ID,
+        actionIds: { research: ACTION_ID, changes: CHANGES_ACTION_ID },
         finding: '开篇缺少边界',
         evidence: [{
           relativePath: 'chapters/01.md', revision: '2'.repeat(64),
@@ -362,7 +364,7 @@ async function flush() {
     assert.strictEqual(controller.getState().phase, 'idle');
   });
 
-  await test('navigation discloses X/Y and runs only the card action callback', async () => {
+  await test('navigation discloses X/Y and always offers Research plus Changes', async () => {
     const document = new Document();
     const host = document.createElement('div');
     document.body.append(host);
@@ -375,7 +377,7 @@ async function flush() {
         actionCalls += 1;
         assert.strictEqual(actionId, ACTION_ID);
         assert.match(attemptId, /^wno_[a-f0-9]{32}$/);
-        return { ok: true, kind: 'open', handoff: { path: 'chapters/01.md' } };
+        return { ok: true, kind: 'research', handoff: {} };
       },
       onOpenEvidence: async value => {
         assert.strictEqual(value.filePath, 'chapters/01.md');
@@ -395,13 +397,40 @@ async function flush() {
     assert(text(host).includes('基于本次已读取的 1/3 个正文文件'));
     assert(text(host).includes('以下建议仅在本次已读范围内优先'));
     assert(text(host).includes('开篇缺少边界'));
-    await byText(host, '打开章节').click();
+    assert(text(host).includes('补充来源'));
+    assert(text(host).includes('生成修改建议'));
+    await byText(host, '补充来源').click();
     await flush();
     assert.strictEqual(actionCalls, 1);
-    assert(text(host).includes('再次打开'));
-    await byText(host, '再次打开').click();
-    await flush();
-    assert.strictEqual(actionCalls, 2);
+    assert(text(host).includes('已进入 Research'));
+  });
+
+  await test('resume owns the UI until Main returns and does not permit a competing generation', async () => {
+    const document = new Document();
+    const host = document.createElement('div');
+    document.body.append(host);
+    const pending = deferred();
+    let generations = 0;
+    const controller = View.mount(host, {
+      stateApi: State,
+      createAttemptId: nextId,
+      onResume: () => pending.promise,
+      onGenerate: async () => { generations += 1; return navigation('changes'); },
+    });
+    controller.updateProject(PROJECT, [
+      { type: 'file', path: 'edit.md' },
+      { type: 'file', path: 'chapters/01.md' },
+    ], 'chapters/01.md');
+    const restoring = controller.resume();
+    assert.strictEqual(controller.getState().phase, 'restoring');
+    assert(text(host).includes('不会再次调用 AI'));
+    assert.strictEqual(await controller.request(), false);
+    assert.strictEqual(generations, 0);
+    pending.resolve(navigation('research'));
+    assert.strictEqual(await restoring, true);
+    assert.strictEqual(controller.getState().phase, 'navigation-ready');
+    assert(text(host).includes('补充来源'));
+    assert(text(host).includes('生成修改建议'));
   });
 
   await test('NO_KEY and REVIEW_IN_PROGRESS expose executable recovery actions', async () => {

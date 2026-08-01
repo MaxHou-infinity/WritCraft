@@ -35,6 +35,7 @@ function createWritingNavigationHandlers(options = {}) {
     settleProjectAuthority,
     writingNavigationService,
     writingNavigationStore,
+    handoffService,
     projectService,
     projectCallLLM,
     staleAiProjectResult,
@@ -182,7 +183,44 @@ function createWritingNavigationHandlers(options = {}) {
     }
   }
 
-  return Object.freeze({ propose, cancel });
+  async function resume(event, projectInstanceId) {
+    try {
+      assertTrustedSender(event);
+      const project = requireCurrentProject();
+      if (projectInstanceId !== project.instanceId) return staleAiProjectResult();
+      const owner = ownerId(event);
+      const entryNavigationEpoch = getRendererNavigationEpoch();
+      await settleProjectAuthority(project);
+      if (getRendererNavigationEpoch() !== entryNavigationEpoch) return staleAiProjectResult();
+      const mutationGeneration = getMutationGeneration();
+      const record = writingNavigationStore.peekRestorable(owner, project.rootPath);
+      if (!record || record.mode !== 'navigation') {
+        return Object.freeze({ ok: true, result: null });
+      }
+      handoffService.revalidateRecord({
+        projectService,
+        rootPath: project.rootPath,
+        record,
+      });
+      await settleProjectAuthority(project);
+      if (!isCurrent(project, mutationGeneration, entryNavigationEpoch)) {
+        return staleAiProjectResult();
+      }
+      const result = writingNavigationStore.restoreLatest({
+        ownerId: owner,
+        projectInstanceId: project.instanceId,
+        rootPath: project.rootPath,
+        mutationGeneration,
+        navigationEpoch: entryNavigationEpoch,
+        navigationId: record.navigationId,
+      });
+      return Object.freeze({ ok: true, result });
+    } catch (error) {
+      return projectFailure(error);
+    }
+  }
+
+  return Object.freeze({ propose, cancel, resume });
 }
 
 function createProposeWritingNavigationHandler(options = {}) {

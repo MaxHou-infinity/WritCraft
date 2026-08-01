@@ -76,9 +76,13 @@ function createHarness(overrides = {}) {
       mount(_host, options) {
         captured.navigationOptions = options;
         return {
-          updateProject(...args) { captured.updates.push(['project', ...args]); },
+          updateProject(...args) {
+            captured.updates.push(['project', ...args]);
+            return { mode: args[1].some(item => item.path !== 'edit.md') ? 'navigation' : 'structure' };
+          },
           updateTree(...args) { captured.updates.push(['tree', ...args]); },
           recover() { captured.recovered += 1; return Promise.resolve(true); },
+          resume() { captured.resumed = (captured.resumed || 0) + 1; return Promise.resolve(true); },
         };
       },
     },
@@ -244,12 +248,19 @@ async function test(name, fn) {
     assert.deepStrictEqual(discarded, [[projectA, `pc_${'5'.repeat(32)}`]]);
   });
 
-  await test('project-entered installs the current project then starts structure recovery', async () => {
-    const harness = createHarness();
+  await test('project-entered chooses navigation resume without starting structure recovery', async () => {
+    const harness = createHarness({ workspace: {
+      state: {
+        project: { instanceId: 'instance_0123456789abcdef01234567' },
+        tree: [{ type: 'file', path: 'chapters/01.md' }],
+        currentPath: 'chapters/01.md',
+      },
+    } });
     await harness.dispatch('writcraft:project-entered');
     assert.strictEqual(harness.captured.updates[0][0], 'project');
     assert.strictEqual(harness.captured.updates[0][1], harness.workspace.state.project);
-    assert.strictEqual(harness.captured.recovered, 1);
+    assert.strictEqual(harness.captured.recovered, 0);
+    assert.strictEqual(harness.captured.resumed, 1);
   });
 
   console.log(`\n${passed}/${passed} Writing Navigation production Renderer integration checks passed.`);

@@ -79,6 +79,7 @@ function navigationResult() {
     suggestions: [{
       suggestionId: 'suggestion_1',
       actionId: ACTION_ID,
+      actionIds: { research: ACTION_ID, changes: `wna_${'e'.repeat(32)}` },
       finding: '开篇缺少问题边界',
       evidence: [{
         relativePath: 'chapters/01.md',
@@ -281,6 +282,44 @@ test('navigation view model discloses X/Y scope and user-facing limited wording'
   assert.strictEqual(view.context.coverage, '基于本次已读取的 1/3 个正文文件');
   assert.strictEqual(view.context.priorityBoundary, '以下建议仅在本次已读范围内优先');
   assert.strictEqual(view.context.limitedIntent, false);
+});
+
+test('same-epoch restore installs navigation truth but cannot replace a new generation', () => {
+  let state = State.reduce(State.createState(), {
+    type: 'project-update', projectInstanceId: PROJECT_A,
+    tree: tree('edit.md', 'chapters/01.md'), currentFilePath: 'chapters/01.md',
+  });
+  const epoch = state.projectEpoch;
+  state = State.reduce(state, { type: 'restore-start' });
+  state = State.reduce(state, { type: 'restore-success', projectEpoch: epoch, result: navigationResult() });
+  assert.strictEqual(state.phase, 'navigation-ready');
+  assert.strictEqual(state.result.navigationId, NAVIGATION_ID);
+
+  state = State.reduce(State.createState(), {
+    type: 'project-update', projectInstanceId: PROJECT_A,
+    tree: tree('edit.md', 'chapters/01.md'), currentFilePath: 'chapters/01.md',
+  });
+  state = State.reduce(state, { type: 'goal-change', value: '重新整理' });
+  state = State.reduce(state, { type: 'generation-start', attemptId: GENERATION_A });
+  const busy = State.reduce(state, {
+    type: 'restore-success', projectEpoch: state.projectEpoch, result: navigationResult(),
+  });
+  assert.strictEqual(busy, state);
+});
+
+test('invalid restored authority releases restoring into an explicit retryable failure', () => {
+  let state = State.reduce(State.createState(), {
+    type: 'project-update', projectInstanceId: PROJECT_A,
+    tree: tree('edit.md', 'chapters/01.md'), currentFilePath: 'chapters/01.md',
+  });
+  const epoch = state.projectEpoch;
+  state = State.reduce(state, { type: 'restore-start' });
+  state = State.reduce(state, {
+    type: 'restore-success', projectEpoch: epoch, result: { schema: 'invalid' },
+  });
+  assert.strictEqual(state.phase, 'failure');
+  assert.strictEqual(state.result, null);
+  assert.strictEqual(state.error.code, 'INVALID_NAVIGATION_RESULT');
 });
 
 test('current正文 occupies one of eight context slots before request serialization', () => {

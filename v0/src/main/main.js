@@ -553,7 +553,7 @@ function advanceRendererNavigationEpoch() {
   abortActiveAiRequests();
   const ownerId = currentChatConversationOwnerId();
   if (ownerId && currentProject) {
-    writingNavigationStore.invalidateProject({
+    writingNavigationStore.parkProject({
       ownerId,
       projectInstanceId: currentProject.instanceId,
     });
@@ -961,7 +961,7 @@ function setCurrentProject(project) {
       researchHandoffStore.clearProject(currentProject.instanceId, currentProject.rootPath);
       const navigationOwnerId = currentChatConversationOwnerId();
       if (navigationOwnerId) {
-        writingNavigationStore.invalidateProject({
+        writingNavigationStore.parkProject({
           ownerId: navigationOwnerId,
           projectInstanceId: currentProject.instanceId,
         });
@@ -2099,6 +2099,7 @@ const writingNavigationHandlers = writingNavigationHandlerService.createWritingN
   settleProjectAuthority: settleWritingNavigationAuthority,
   writingNavigationService,
   writingNavigationStore,
+  handoffService: writingNavigationHandoffService,
   projectService,
   projectCallLLM: writingNavigationProjectCallLLM,
   staleAiProjectResult,
@@ -2112,6 +2113,10 @@ ipcMain.handle('writcraft:project:propose-writing-navigation',
 ipcMain.handle(
   'writcraft:project:cancel-writing-navigation',
   writingNavigationHandlers.cancel
+);
+ipcMain.handle(
+  'writcraft:project:resume-writing-navigation',
+  writingNavigationHandlers.resume
 );
 
 ipcMain.handle('writcraft:project:run-writing-navigation-action',

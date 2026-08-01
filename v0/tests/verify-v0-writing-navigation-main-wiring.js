@@ -51,10 +51,10 @@ test('opaque actions use one Main-owned handler and the preload exposes no trust
   assert.match(preload, /cancelWritingNavigationAction: \(projectInstanceId, actionId, attemptId\) =>[\s\S]{0,220}'writcraft:project:cancel-writing-navigation-action',[\s\S]{0,120}attemptId/);
 });
 
-test('renderer reload and project mutation invalidate cached navigation authority', () => {
+test('renderer reload parks navigation while project mutation hard-invalidates it', () => {
   const rendererAdvance = functionBlock('advanceRendererNavigationEpoch()', 'invalidatePendingOnboardingReviews(');
-  assert(rendererAdvance.includes('writingNavigationStore.invalidateProject({'));
-  assert(rendererAdvance.indexOf('writingNavigationStore.invalidateProject({') <
+  assert(rendererAdvance.includes('writingNavigationStore.parkProject({'));
+  assert(rendererAdvance.indexOf('writingNavigationStore.parkProject({') <
     rendererAdvance.indexOf('rendererNavigationEpoch += 1;'));
 
   const mutationAdvance = functionBlock('advanceAiContextGeneration(options = {})', 'rememberOwnMarkdownState(');
@@ -63,7 +63,9 @@ test('renderer reload and project mutation invalidate cached navigation authorit
     mutationAdvance.indexOf('projectMutationGeneration += 1;'));
 
   const switchBlock = functionBlock('setCurrentProject(project)', 'invalidateProjectDerivedState(');
-  assert(switchBlock.includes('writingNavigationStore.invalidateProject({'));
+  assert(switchBlock.includes('writingNavigationStore.parkProject({'));
+  assert.match(main, /'writcraft:project:resume-writing-navigation',\s*writingNavigationHandlers\.resume/);
+  assert.match(preload, /resumeWritingNavigation: projectInstanceId =>[\s\S]{0,180}'writcraft:project:resume-writing-navigation'/);
 });
 
 test('model protocol errors are mapped before generic safe-error passthrough', () => {

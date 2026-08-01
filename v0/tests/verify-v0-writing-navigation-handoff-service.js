@@ -37,7 +37,9 @@ function fakeProject(chapter = CHAPTER) {
       {
         type: 'directory',
         path: 'chapters',
-        children: [{ type: 'file', path: 'chapters/01.md' }],
+        children: [...files.keys()]
+          .filter(filePath => filePath.startsWith('chapters/'))
+          .map(filePath => ({ type: 'file', path: filePath })),
       },
     ],
     readFileWithRevision(_root, filePath) {
@@ -109,6 +111,42 @@ async function authority(action, chapter = CHAPTER) {
       projectService: item.project,
       rootPath: ROOT,
       authority: item.value,
+    }), error => error.code === 'NAVIGATION_STALE');
+  });
+
+  await test('record resume rejects an added manuscript that changes Context coverage', async () => {
+    const item = await authority('research');
+    item.project.files.set('chapters/02.md', '# 第二章\n\n新增正文。\n');
+    assert.throws(() => handoffService.revalidateRecord({
+      projectService: item.project,
+      rootPath: ROOT,
+      record: item.value.record,
+    }), error => error.code === 'NAVIGATION_STALE');
+  });
+
+  await test('resume shares generation tree rules through the 5000-entry project boundary', async () => {
+    const item = await authority('research');
+    const bodyFiles = Array.from({ length: 4998 }, (_, index) => ({
+      type: 'file', path: `chapters/extra-${String(index).padStart(4, '0')}.txt`,
+    }));
+    item.project.listTree = () => [
+      { type: 'file', path: 'edit.md' },
+      { type: 'directory', path: 'chapters', children: [
+        { type: 'file', path: 'chapters/01.md' }, ...bodyFiles,
+      ] },
+    ];
+    assert.strictEqual(handoffService.revalidateRecord({
+      projectService: item.project, rootPath: ROOT, record: item.value.record,
+    }), true);
+    item.project.listTree = () => [
+      { type: 'file', path: 'edit.md' },
+      { type: 'directory', path: 'chapters', children: [
+        { type: 'file', path: 'chapters/01.md' }, ...bodyFiles,
+        { type: 'symlink', path: 'chapters/linked.md' },
+      ] },
+    ];
+    assert.throws(() => handoffService.revalidateRecord({
+      projectService: item.project, rootPath: ROOT, record: item.value.record,
     }), error => error.code === 'NAVIGATION_STALE');
   });
 
@@ -210,7 +248,7 @@ async function authority(action, chapter = CHAPTER) {
     );
   });
 
-  console.log(`\n${passed}/6 writing-navigation handoff service checks passed.`);
+  console.log(`\n${passed}/${passed} writing-navigation handoff service checks passed.`);
 })().catch(error => {
   console.error(error);
   process.exitCode = 1;

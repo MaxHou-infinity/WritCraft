@@ -176,18 +176,27 @@ function createWritingNavigationStore(options = {}) {
     }
   }
 
-  function deleteResult(key) {
-    const entry = results.get(key);
-    if (!entry) return;
+  function revokeEntryActions(entry) {
     for (const actionId of entry.actionIds) {
       terminateAction(actionId);
       actions.delete(actionId);
       occupiedIds.delete(actionId);
     }
+    entry.actionIds = [];
+  }
+
+  function unlinkResult(key, entry) {
     results.delete(key);
     const bucket = buckets.get(entry.bucketKey);
     bucket?.delete(entry.record.navigationId);
     if (bucket?.size === 0) buckets.delete(entry.bucketKey);
+  }
+
+  function deleteResult(key) {
+    const entry = results.get(key);
+    if (!entry) return;
+    revokeEntryActions(entry);
+    unlinkResult(key, entry);
   }
 
   function purgeExpired() {
@@ -211,13 +220,67 @@ function createWritingNavigationStore(options = {}) {
   function requireEntry(id, binding) {
     purgeExpired();
     const entry = results.get(resultKey(binding, navigationId(id)));
-    if (!entry) fail('NAVIGATION_NOT_FOUND', '写作导航已过期或不存在');
+    if (!entry || entry.parked) fail('NAVIGATION_NOT_FOUND', '写作导航已过期或不存在');
     if (entry.rootPath !== binding.rootPath ||
         entry.mutationGeneration !== binding.mutationGeneration ||
         entry.navigationEpoch !== binding.navigationEpoch) {
       fail('STALE_NAVIGATION', '写作导航已因项目状态变化失效');
     }
     return entry;
+  }
+
+  function prepareActions(entry, key) {
+    const actionIds = [];
+    const actionBySuggestion = new Map();
+    const preparedActions = new Map();
+    const reservedIds = new Set(occupiedIds);
+    if (entry.record.mode === 'navigation') {
+      for (const suggestion of entry.record.result.suggestions) {
+        const suggestionActions = {};
+        for (const actionName of ['research', 'changes']) {
+          const actionId = randomId('wna_', randomBytes, reservedIds);
+          reservedIds.add(actionId);
+          actionIds.push(actionId);
+          suggestionActions[actionName] = actionId;
+          preparedActions.set(actionId, {
+            resultKey: key,
+            ownerId: entry.ownerId,
+            projectInstanceId: entry.projectInstanceId,
+            suggestionId: suggestion.suggestionId,
+            action: actionName,
+            terminated: false,
+            leaseId: null,
+            attemptId: null,
+          });
+        }
+        actionBySuggestion.set(suggestion.suggestionId, suggestionActions);
+      }
+    }
+    const result = deepCloneFreeze({
+      ...entry.record.result,
+      ...(entry.record.mode === 'navigation' ? {
+        suggestions: entry.record.result.suggestions.map(suggestion => {
+          const minted = actionBySuggestion.get(suggestion.suggestionId);
+          return {
+            ...suggestion,
+            // Compatibility-only alias: fixed to Changes so the model's legacy
+            // action hint never controls a public capability.
+            actionId: minted.changes,
+            actionIds: minted,
+          };
+        }),
+      } : {}),
+    });
+    return { actionIds, preparedActions, result };
+  }
+
+  function commitPreparedActions(entry, prepared) {
+    entry.actionIds = prepared.actionIds;
+    entry.result = prepared.result;
+    for (const [actionId, action] of prepared.preparedActions) {
+      occupiedIds.add(actionId);
+      actions.set(actionId, action);
+    }
   }
 
   function install(raw) {
@@ -234,48 +297,22 @@ function createWritingNavigationStore(options = {}) {
       bucket = new Map();
       buckets.set(ownerBucketKey, bucket);
     }
-    const actionIds = [];
-    const actionBySuggestion = new Map();
-    if (record.mode === 'navigation') {
-      for (const suggestion of record.result.suggestions) {
-        const actionId = randomId('wna_', randomBytes, occupiedIds);
-        occupiedIds.add(actionId);
-        actionIds.push(actionId);
-        actionBySuggestion.set(suggestion.suggestionId, actionId);
-        actions.set(actionId, {
-          resultKey: key,
-          ownerId: binding.ownerId,
-          projectInstanceId: binding.projectInstanceId,
-          suggestionId: suggestion.suggestionId,
-          action: suggestion.action,
-          terminated: false,
-          leaseId: null,
-          attemptId: null,
-        });
-      }
-    }
-    const result = deepCloneFreeze({
-      ...record.result,
-      ...(record.mode === 'navigation' ? {
-        suggestions: record.result.suggestions.map(suggestion => ({
-          ...suggestion,
-          actionId: actionBySuggestion.get(suggestion.suggestionId),
-        })),
-      } : {}),
-    });
     const createdAt = clock();
-    results.set(key, {
+    const entry = {
       ...binding,
       record,
-      result,
-      actionIds,
+      result: record.result,
+      actionIds: [],
       bucketKey: ownerBucketKey,
       createdAt,
       expiresAt: createdAt + ttlMs,
-    });
+      parked: false,
+    };
+    commitPreparedActions(entry, prepareActions(entry, key));
+    results.set(key, entry);
     bucket.set(record.navigationId, key);
     while (results.size > maxResults) deleteResult(results.keys().next().value);
-    return result;
+    return entry.result;
   }
 
   function get(raw) {
@@ -303,7 +340,7 @@ function createWritingNavigationStore(options = {}) {
       fail('ACTION_NOT_FOUND', '写作导航动作已过期或已使用');
     }
     const entry = results.get(action.resultKey);
-    if (!entry) fail('ACTION_NOT_FOUND', '写作导航动作已过期或已使用');
+    if (!entry || entry.parked) fail('ACTION_NOT_FOUND', '写作导航动作已过期或已使用');
     if (entry.rootPath !== binding.rootPath ||
         entry.mutationGeneration !== binding.mutationGeneration ||
         entry.navigationEpoch !== binding.navigationEpoch) {
@@ -320,7 +357,7 @@ function createWritingNavigationStore(options = {}) {
     const suggestion = entry.record.result.suggestions.find(
       item => item.suggestionId === action.suggestionId
     );
-    if (!suggestion || suggestion.action !== action.action) {
+    if (!suggestion || !['research', 'changes'].includes(action.action)) {
       action.terminated = true;
       fail('INVALID_NAVIGATION_RECORD', '写作导航动作与权威建议不一致');
     }
@@ -339,7 +376,7 @@ function createWritingNavigationStore(options = {}) {
       leaseId,
       repeatable: action.action === 'open',
       navigationId: entry.record.navigationId,
-      suggestion,
+      suggestion: { ...suggestion, action: action.action },
       record: entry.record,
     });
     return Object.freeze({ ...authority, signal: controller.signal });
@@ -473,6 +510,73 @@ function createWritingNavigationStore(options = {}) {
     return count;
   }
 
+  function parkProject(raw) {
+    exactKeys(raw, ['ownerId', 'projectInstanceId'], 'INVALID_NAVIGATION_REQUEST');
+    const owner = ownerId(raw.ownerId);
+    const project = projectInstanceId(raw.projectInstanceId);
+    purgeExpired();
+    let count = 0;
+    for (const entry of results.values()) {
+      if (entry.ownerId !== owner || entry.projectInstanceId !== project || entry.parked) continue;
+      revokeEntryActions(entry);
+      entry.parked = true;
+      count += 1;
+    }
+    return count;
+  }
+
+  function peekRestorable(rawOwnerId, rawRootPath) {
+    const owner = ownerId(rawOwnerId);
+    const root = rootPath(rawRootPath);
+    purgeExpired();
+    let latest = null;
+    for (const entry of results.values()) {
+      if (!entry.parked || entry.ownerId !== owner || entry.rootPath !== root) continue;
+      if (!latest || entry.createdAt >= latest.createdAt) latest = entry;
+    }
+    return latest ? latest.record : null;
+  }
+
+  function restoreLatest(raw) {
+    const binding = normalizeBinding(raw, [
+      'ownerId', 'projectInstanceId', 'rootPath', 'mutationGeneration', 'navigationEpoch',
+      'navigationId',
+    ]);
+    const selectedNavigationId = navigationId(raw.navigationId);
+    purgeExpired();
+    let oldKey;
+    let entry;
+    for (const [key, candidate] of results) {
+      if (!candidate.parked || candidate.ownerId !== binding.ownerId ||
+          candidate.rootPath !== binding.rootPath ||
+          candidate.record.navigationId !== selectedNavigationId) continue;
+      oldKey = key;
+      entry = candidate;
+      break;
+    }
+    if (!entry) return null;
+    const key = resultKey(binding, entry.record.navigationId);
+    if (key !== oldKey && results.has(key)) {
+      fail('NAVIGATION_COLLISION', '写作导航结果发生冲突');
+    }
+    const ownerBucketKey = bucketKey(binding);
+    const restoredEntry = Object.assign({}, entry, binding, {
+      bucketKey: ownerBucketKey,
+      parked: false,
+    });
+    const prepared = prepareActions(restoredEntry, key);
+    unlinkResult(oldKey, entry);
+    let bucket = buckets.get(ownerBucketKey);
+    if (!bucket) {
+      bucket = new Map();
+      buckets.set(ownerBucketKey, bucket);
+    }
+    commitPreparedActions(restoredEntry, prepared);
+    results.set(key, restoredEntry);
+    bucket.set(restoredEntry.record.navigationId, key);
+    return restoredEntry.result;
+  }
+
   function stats() {
     purgeExpired();
     return Object.freeze({ results: results.size, actions: actions.size, leases: leases.size });
@@ -485,6 +589,9 @@ function createWritingNavigationStore(options = {}) {
     assertLeaseCurrent,
     settleAction,
     cancelAction,
+    parkProject,
+    peekRestorable,
+    restoreLatest,
     invalidateProject,
     stats,
   });

@@ -43,6 +43,17 @@ const RECORD = Object.freeze({
     contextManifest: {},
   },
 });
+const NAV_RECORD = Object.freeze({
+  ...RECORD,
+  mode: 'navigation',
+  result: Object.freeze({
+    schema: RECORD.schema,
+    navigationId: RECORD.navigationId,
+    mode: 'navigation',
+    suggestions: Object.freeze([]),
+    contextManifest: Object.freeze({}),
+  }),
+});
 
 function setup(overrides = {}) {
   let currentProject = PROJECT;
@@ -53,6 +64,9 @@ function setup(overrides = {}) {
   let settleCalls = 0;
   let serviceCalls = 0;
   let attemptCounter = 0;
+  let restorable = null;
+  let revalidated = 0;
+  let restored = 0;
   const options = {
     assertTrustedSender() {},
     requireCurrentProject: () => currentProject,
@@ -71,6 +85,14 @@ function setup(overrides = {}) {
         installed.push(value);
         return { navigationId: value.record.navigationId };
       },
+      peekRestorable() { return restorable; },
+      restoreLatest(value) {
+        restored += 1;
+        return { navigationId: restorable.navigationId, binding: value };
+      },
+    },
+    handoffService: {
+      revalidateRecord() { revalidated += 1; },
     },
     projectService: {},
     projectCallLLM: () => async () => ({ ok: true }),
@@ -91,10 +113,14 @@ function setup(overrides = {}) {
       handlers.propose(event, projectInstanceId, request, attemptId),
     cancel: (event, projectInstanceId, attemptId) =>
       handlers.cancel(event, projectInstanceId, attemptId),
+    resume: (event, projectInstanceId) => handlers.resume(event, projectInstanceId),
     installed,
     recordedFailures,
     get settleCalls() { return settleCalls; },
     get serviceCalls() { return serviceCalls; },
+    get revalidated() { return revalidated; },
+    get restored() { return restored; },
+    setRestorable(value) { restorable = value; },
     setProject(value) { currentProject = value; },
     setGeneration(value) { generation = value; },
     setNavigationEpoch(value) { navigationEpoch = value; },
@@ -119,6 +145,34 @@ function setup(overrides = {}) {
       navigationEpoch: 2,
       record: RECORD,
     });
+  });
+
+  await test('resume revalidates parked Main truth and mints current capabilities without provider work', async () => {
+    const state = setup();
+    state.setRestorable(NAV_RECORD);
+    const result = await state.resume(EVENT, PROJECT.instanceId);
+    assert.strictEqual(result.ok, true);
+    assert.strictEqual(result.result.navigationId, NAV_RECORD.navigationId);
+    assert.strictEqual(state.revalidated, 1);
+    assert.strictEqual(state.restored, 1);
+    assert.strictEqual(state.serviceCalls, 0);
+    assert.strictEqual(state.settleCalls, 2);
+    assert.deepStrictEqual(result.result.binding, {
+      ownerId: 'webcontents:7',
+      projectInstanceId: PROJECT.instanceId,
+      rootPath: PROJECT.rootPath,
+      mutationGeneration: 5,
+      navigationEpoch: 2,
+      navigationId: NAV_RECORD.navigationId,
+    });
+  });
+
+  await test('resume returns empty when no parked navigation exists', async () => {
+    const state = setup();
+    assert.deepStrictEqual(await state.resume(EVENT, PROJECT.instanceId), { ok: true, result: null });
+    assert.strictEqual(state.revalidated, 0);
+    assert.strictEqual(state.restored, 0);
+    assert.strictEqual(state.serviceCalls, 0);
   });
 
   await test('stale project instance fails before settle or provider work', async () => {

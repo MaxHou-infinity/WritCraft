@@ -131,6 +131,8 @@
       onGenerate: generateNavigation,
       onCancelGeneration: (projectInstanceId, attemptId) =>
         bridge?.cancelWritingNavigation?.(projectInstanceId, attemptId),
+      onResume: projectInstanceId =>
+        bridge?.resumeWritingNavigation?.(projectInstanceId),
       onPrepareStructure: (projectInstanceId, navigationId, alternativeId, chapters) =>
         bridge?.prepareWritingStructure?.(
           projectInstanceId,
@@ -193,12 +195,13 @@
 
   document.addEventListener('writcraft:project-entered', () => {
     const workspace = window.__workspace;
-    navigationController?.updateProject?.(
+    const navigationState = navigationController?.updateProject?.(
       workspace?.state?.project || null,
       workspace?.state?.tree || [],
       workspace?.getCurrentPath?.() || null
     );
-    void navigationController?.recover?.();
+    if (navigationState?.mode === 'structure') void navigationController?.recover?.();
+    else if (navigationState?.mode === 'navigation') void navigationController?.resume?.();
     contextController?.update?.(
       { scope: 'file', budgetChars: 10000, usedChars: 0, usedBytes: 0, chips: [] },
       []

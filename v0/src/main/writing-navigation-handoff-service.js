@@ -2,6 +2,7 @@
 
 const blockAnchor = require('../renderer/block-anchor');
 const projectChangesProposalService = require('./project-changes-proposal-service');
+const { markdownPaths } = require('./writing-navigation-service');
 
 const OPEN_HANDOFF_SCHEMA = 'writcraft.writing-navigation-open/v1';
 const RESEARCH_HANDOFF_SCHEMA = 'writcraft.writing-navigation-research/v1';
@@ -79,29 +80,112 @@ function validateEvidence(snapshot, evidence) {
   }
 }
 
-function revalidateAuthority({ projectService, rootPath, authority }) {
-  if (!projectService || typeof projectService.readFileWithRevision !== 'function' ||
-      !authority?.record || !authority?.suggestion) {
+function availableBodyCount(projectService, rootPath) {
+  if (typeof projectService.listTree !== 'function') {
+    fail('INVALID_NAVIGATION_AUTHORITY', '写作导航项目清单无效');
+  }
+  let tree;
+  try { tree = projectService.listTree(rootPath); }
+  catch (_) { fail('NAVIGATION_STALE', '项目文件清单已经变化，请重新生成导航'); }
+  let paths;
+  try { paths = markdownPaths(tree); }
+  catch (_) { fail('NAVIGATION_STALE', '项目文件清单已经变化，请重新生成导航'); }
+  const identities = new Set();
+  for (const filePath of paths) {
+    const identity = filePath.normalize('NFC').toLocaleLowerCase('en-US');
+    if (identities.has(identity)) {
+      fail('NAVIGATION_STALE', '项目文件清单已经变化，请重新生成导航');
+    }
+    identities.add(identity);
+  }
+  return identities.size;
+}
+
+function validateManifest(projectService, rootPath, record, editSnapshot, snapshots) {
+  const manifest = record.result.contextManifest;
+  if (!exactKeys(manifest, [
+    'usedBodyCount', 'availableBodyCount', 'omittedBodyCount', 'totalBodyBytes',
+    'limitedProjectIntent', 'files', 'omissionReason', 'truncationReason', 'disclosure',
+  ]) || !Array.isArray(manifest.files) || manifest.files.length !== record.sources.length + 1 ||
+      typeof manifest.limitedProjectIntent !== 'boolean') {
+    fail('INVALID_NAVIGATION_AUTHORITY', '写作导航 Context 记录无效');
+  }
+  const available = availableBodyCount(projectService, rootPath);
+  const totalBodyBytes = [...snapshots.values()]
+    .reduce((sum, snapshot) => sum + Buffer.byteLength(snapshot.content, 'utf8'), 0);
+  const expectedFiles = [
+    {
+      path: 'edit.md', role: 'project_prompt', revision: editSnapshot.revision,
+      bytes: Buffer.byteLength(editSnapshot.content, 'utf8'),
+    },
+    ...record.sources.map(source => {
+      const snapshot = snapshots.get(source.path);
+      const existing = manifest.files.find(file => file.path === source.path);
+      if (!existing || !['current_file', 'explicit_context'].includes(existing.role)) {
+        fail('INVALID_NAVIGATION_AUTHORITY', '写作导航 Context 记录无效');
+      }
+      return {
+        path: source.path,
+        role: existing.role,
+        revision: snapshot.revision,
+        bytes: Buffer.byteLength(snapshot.content, 'utf8'),
+      };
+    }),
+  ];
+  const expected = {
+    usedBodyCount: record.sources.length,
+    availableBodyCount: available,
+    omittedBodyCount: Math.max(0, available - record.sources.length),
+    totalBodyBytes,
+    limitedProjectIntent: manifest.limitedProjectIntent,
+    files: expectedFiles,
+    omissionReason: available === record.sources.length ? null : 'not_selected',
+    truncationReason: null,
+    disclosure: available === record.sources.length
+      ? '已读取当前项目全部正文'
+      : `只基于本次已读取的 ${record.sources.length}/${available} 个正文文件`,
+  };
+  if (!sameJson(manifest, expected)) {
+    fail('NAVIGATION_STALE', '写作导航 Context 已经变化，请重新生成导航');
+  }
+}
+
+function revalidateRecord({ projectService, rootPath, record }) {
+  if (!projectService || typeof projectService.readFileWithRevision !== 'function' || !record) {
     fail('INVALID_NAVIGATION_AUTHORITY', '写作导航权威记录无效');
   }
-  const record = authority.record;
   if (record.schema !== 'writcraft.writing-navigation/v1' ||
       record.mode !== 'navigation' ||
       !Array.isArray(record.sources) ||
-      !Array.isArray(authority.suggestion.evidence)) {
+      !Array.isArray(record.result?.suggestions)) {
     fail('INVALID_NAVIGATION_AUTHORITY', '写作导航权威记录无效');
   }
-  readRevision(projectService, rootPath, record.edit);
+  const editSnapshot = readRevision(projectService, rootPath, record.edit);
   const snapshots = new Map();
   for (const source of record.sources) {
     const snapshot = readRevision(projectService, rootPath, source);
     snapshots.set(source.path, snapshot);
   }
-  for (const evidence of authority.suggestion.evidence) {
-    const snapshot = snapshots.get(evidence.relativePath);
-    if (!snapshot) fail('INVALID_NAVIGATION_AUTHORITY', '导航证据不在已读取上下文中');
-    validateEvidence(snapshot, evidence);
+  validateManifest(projectService, rootPath, record, editSnapshot, snapshots);
+  for (const suggestion of record.result.suggestions) {
+    if (!Array.isArray(suggestion?.evidence)) {
+      fail('INVALID_NAVIGATION_AUTHORITY', '写作导航权威记录无效');
+    }
+    for (const evidence of suggestion.evidence) {
+      const snapshot = snapshots.get(evidence.relativePath);
+      if (!snapshot) fail('INVALID_NAVIGATION_AUTHORITY', '导航证据不在已读取上下文中');
+      validateEvidence(snapshot, evidence);
+    }
   }
+  return true;
+}
+
+function revalidateAuthority({ projectService, rootPath, authority }) {
+  if (!authority?.record || !authority?.suggestion ||
+      !Array.isArray(authority.suggestion.evidence)) {
+    fail('INVALID_NAVIGATION_AUTHORITY', '写作导航权威记录无效');
+  }
+  revalidateRecord({ projectService, rootPath, record: authority.record });
   return true;
 }
 
@@ -219,6 +303,7 @@ module.exports = Object.freeze({
   RESEARCH_HANDOFF_SCHEMA,
   CHANGES_PROVENANCE_SCHEMA,
   WritingNavigationHandoffError,
+  revalidateRecord,
   revalidateAuthority,
   openHandoff,
   researchHandoff,

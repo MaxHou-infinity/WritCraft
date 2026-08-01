@@ -138,6 +138,9 @@
           copy.suggestions.length > 3) return null;
       for (const suggestion of copy.suggestions) {
         if (!ACTION_ID_RE.test(suggestion?.actionId || '') ||
+            !ACTION_ID_RE.test(suggestion?.actionIds?.research || '') ||
+            !ACTION_ID_RE.test(suggestion?.actionIds?.changes || '') ||
+            suggestion.actionIds.research === suggestion.actionIds.changes ||
             !ACTIONS.has(suggestion.action) ||
             !safeText(suggestion.finding, 160) ||
             !safeText(suggestion.whyNow, 160) ||
@@ -371,6 +374,37 @@
         actions: {},
         error: null,
       });
+    }
+    if (action.type === 'restore-start') {
+      if (state.mode !== 'navigation' || state.phase !== 'idle' || state.generation) return state;
+      return deepFreeze({ ...state, phase: 'restoring', error: null });
+    }
+    if (action.type === 'restore-success') {
+      if (state.generation || state.phase !== 'restoring' ||
+          action.projectEpoch !== state.projectEpoch) {
+        return state;
+      }
+      const result = validResult(action.result, 'navigation');
+      if (!result || state.mode !== 'navigation') {
+        return deepFreeze({
+          ...state,
+          phase: 'failure',
+          result: null,
+          actions: {},
+          error: publicFailure({ error: 'INVALID_NAVIGATION_RESULT' }),
+        });
+      }
+      return deepFreeze({
+        ...state,
+        phase: 'navigation-ready',
+        result,
+        actions: {},
+        error: null,
+      });
+    }
+    if (action.type === 'restore-empty' && state.phase === 'restoring' &&
+        action.projectEpoch === state.projectEpoch) {
+      return deepFreeze({ ...state, phase: 'idle', error: null });
     }
     if (action.type === 'generation-error') {
       if (!sameAttempt(state, action.attemptId)) return state;

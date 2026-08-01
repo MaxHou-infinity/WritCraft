@@ -89,7 +89,7 @@
     }
 
     async function request() {
-      if (destroyed || state.generation || state.phase === 'recovery' ||
+      if (destroyed || state.generation || state.phase === 'restoring' || state.phase === 'recovery' ||
           state.phase === 'recovery-querying') return false;
       const requestValue = State.requestPayload(state);
       if (!requestValue || typeof options.onGenerate !== 'function') {
@@ -257,6 +257,29 @@
       }
     }
 
+    async function resume() {
+      if (destroyed || state.mode !== 'navigation' || state.phase !== 'idle' ||
+          typeof options.onResume !== 'function') return false;
+      const projectId = state.projectInstanceId;
+      const epoch = state.projectEpoch;
+      dispatch({ type: 'restore-start' });
+      if (state.phase !== 'restoring') return false;
+      try {
+        const response = await options.onResume(projectId);
+        if (destroyed || state.projectInstanceId !== projectId ||
+            state.projectEpoch !== epoch || state.phase !== 'restoring' || state.generation) return false;
+        if (response?.ok === true && response.result) {
+          dispatch({ type: 'restore-success', projectEpoch: epoch, result: response.result });
+          return state.phase === 'navigation-ready';
+        }
+        dispatch({ type: 'restore-empty', projectEpoch: epoch });
+        return false;
+      } catch (_) {
+        dispatch({ type: 'restore-empty', projectEpoch: epoch });
+        return false;
+      }
+    }
+
     async function acknowledgeRecovery() {
       const recovery = state.recovery;
       if (state.phase !== 'recovery' || recovery?.state !== 'COMMITTED' ||
@@ -283,16 +306,17 @@
       }
     }
 
-    async function runAction(suggestion) {
-      if (state.phase !== 'navigation-ready' || !suggestion?.actionId ||
+    async function runAction(suggestion, kind) {
+      const actionId = suggestion?.actionIds?.[kind];
+      if (state.phase !== 'navigation-ready' || !actionId ||
           typeof options.onRunAction !== 'function') return false;
       const attemptId = createAttemptId();
       const projectId = state.projectInstanceId;
       const epoch = state.projectEpoch;
-      dispatch({ type: 'action-start', actionId: suggestion.actionId, attemptId });
-      if (state.actions[suggestion.actionId]?.attemptId !== attemptId) return false;
+      dispatch({ type: 'action-start', actionId, attemptId });
+      if (state.actions[actionId]?.attemptId !== attemptId) return false;
       try {
-        const result = await options.onRunAction(projectId, suggestion.actionId, attemptId);
+        const result = await options.onRunAction(projectId, actionId, attemptId);
         if (state.projectInstanceId !== projectId || state.projectEpoch !== epoch) return false;
         if (result?.ok === true && result.kind === 'open' && result.handoff?.locator) {
           await options.onOpenEvidence?.(result.handoff.locator, result.handoff.path);
@@ -300,7 +324,7 @@
         }
         dispatch({
           type: 'action-result',
-          actionId: suggestion.actionId,
+          actionId,
           attemptId,
           result,
         });
@@ -309,36 +333,37 @@
         if (state.projectInstanceId === projectId && state.projectEpoch === epoch) {
           dispatch({
             type: 'action-result',
-            actionId: suggestion.actionId,
+            actionId,
             attemptId,
             result: { ok: false, error: error?.code || 'ACTION_FAILED' },
           });
         }
         return false;
       } finally {
-        dispatch({ type: 'action-finally', actionId: suggestion.actionId, attemptId });
+        dispatch({ type: 'action-finally', actionId, attemptId });
       }
     }
 
-    async function cancelAction(suggestion) {
-      const active = state.actions[suggestion?.actionId];
+    async function cancelAction(suggestion, kind) {
+      const actionId = suggestion?.actionIds?.[kind];
+      const active = state.actions[actionId];
       if (!active || active.status !== 'running' ||
           typeof options.onCancelAction !== 'function') return false;
       dispatch({
         type: 'action-cancel-start',
-        actionId: suggestion.actionId,
+        actionId,
         attemptId: active.attemptId,
       });
       try {
         const result = await options.onCancelAction(
           state.projectInstanceId,
-          suggestion.actionId,
+          actionId,
           active.attemptId
         );
         if (result?.ok !== true || result.cancelled !== true) {
           dispatch({
             type: 'action-result',
-            actionId: suggestion.actionId,
+            actionId,
             attemptId: active.attemptId,
             result,
           });
@@ -346,14 +371,14 @@
         }
         dispatch({
           type: 'action-cancelled',
-          actionId: suggestion.actionId,
+          actionId,
           attemptId: active.attemptId,
         });
         return true;
       } catch (error) {
         dispatch({
           type: 'action-result',
-          actionId: suggestion.actionId,
+          actionId,
           attemptId: active.attemptId,
           result: { ok: false, error: error?.code || 'CANCEL_FAILED' },
         });
@@ -608,17 +633,16 @@
       return section;
     }
 
-    function actionCopy(suggestion, action) {
+    function actionCopy(kind, action) {
       if (action?.status === 'running') return '处理中…';
       if (action?.status === 'cancelling') return '正在停止…';
       if (action?.status === 'success') {
-        if (suggestion.action === 'open') return '再次打开';
-        if (suggestion.action === 'research') return '已进入 Research';
+        if (kind === 'research') return '已进入 Research';
         if (action.result?.noChanges) return '正文无需修改';
         return '已生成待审修改';
       }
       if (action?.status === 'stale') return '建议已过期';
-      return ACTION_LABELS[suggestion.action];
+      return ACTION_LABELS[kind];
     }
 
     function recoveryAction(error) {
@@ -638,7 +662,6 @@
       const section = element(document, 'section', 'writing-navigation__suggestions');
       section.append(element(document, 'h2', '', '现在最值得推进什么'));
       view.result.suggestions.forEach((suggestion, index) => {
-        const action = view.actions[suggestion.actionId];
         const card = element(document, 'article', 'writing-navigation__suggestion');
         card.append(
           element(document, 'span', 'writing-navigation__ordinal', `建议 ${index + 1}`),
@@ -658,20 +681,24 @@
           evidence.append(open);
         }
         card.append(evidence);
-        if (action?.error) {
-          card.append(element(document, 'p', 'writing-navigation__action-error', action.error.message));
-          const errorAction = recoveryAction(action.error);
-          if (errorAction) card.append(errorAction);
-        }
         const actionRow = element(document, 'div', 'writing-navigation__action-row');
-        const run = button(document, actionCopy(suggestion, action),
-          'writing-navigation__primary', () => runAction(suggestion));
-        run.disabled = ['running', 'cancelling', 'stale'].includes(action?.status) ||
-          (action?.status === 'success' && suggestion.action !== 'open');
-        actionRow.append(run);
-        if (suggestion.action === 'changes' && action?.status === 'running') {
-          actionRow.append(button(document, '停止生成修改建议',
-            'writing-navigation__secondary', () => cancelAction(suggestion)));
+        for (const kind of ['research', 'changes']) {
+          const actionId = suggestion.actionIds[kind];
+          const action = view.actions[actionId];
+          if (action?.error) {
+            card.append(element(document, 'p', 'writing-navigation__action-error', action.error.message));
+            const errorAction = recoveryAction(action.error);
+            if (errorAction) card.append(errorAction);
+          }
+          const run = button(document, actionCopy(kind, action),
+            kind === 'changes' ? 'writing-navigation__primary' : 'writing-navigation__secondary',
+            () => runAction(suggestion, kind));
+          run.disabled = ['running', 'cancelling', 'stale', 'success'].includes(action?.status);
+          actionRow.append(run);
+          if (kind === 'changes' && action?.status === 'running') {
+            actionRow.append(button(document, '停止生成修改建议',
+              'writing-navigation__secondary', () => cancelAction(suggestion, kind)));
+          }
         }
         card.append(actionRow);
         section.append(card);
@@ -689,6 +716,10 @@
       }
       if (view.phase === 'recovery-querying') {
         host.append(status('正在核对章节骨架', '正在读取本地恢复记录，请稍候。', 'loading'));
+        return;
+      }
+      if (view.phase === 'restoring') {
+        host.append(status('正在恢复写作导航', '正在核对项目文件，不会再次调用 AI。', 'loading'));
         return;
       }
       if (view.phase === 'recovery') {
@@ -766,6 +797,7 @@
       },
       request,
       recover,
+      resume,
       getState: () => state,
       destroy() {
         destroyed = true;

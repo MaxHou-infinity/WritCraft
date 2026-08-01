@@ -192,6 +192,11 @@ contextBridge.exposeInMainWorld('writCraft', {
         projectInstanceId,
         attemptId
       ),
+    resumeWritingNavigation: projectInstanceId =>
+      ipcRenderer.invoke(
+        'writcraft:project:resume-writing-navigation',
+        projectInstanceId
+      ),
     runWritingNavigationAction: (projectInstanceId, actionId, attemptId) =>
       ipcRenderer.invoke(
         'writcraft:project:run-writing-navigation-action',

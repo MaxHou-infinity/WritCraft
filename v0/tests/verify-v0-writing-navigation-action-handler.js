@@ -181,7 +181,7 @@ async function setup(action, overrides = {}) {
       rawCancelHandler(event, projectInstanceId, actionId, attemptId),
     nextAttempt,
     store,
-    actionId: installed.suggestions[0].actionId,
+    actionId: installed.suggestions[0].actionIds[action],
     projectService,
     get modelCalls() { return modelCalls; },
     get cacheCalls() { return cacheCalls; },
@@ -206,15 +206,6 @@ async function setup(action, overrides = {}) {
 
 (async () => {
   console.log('\nWriting navigation action handler verification');
-
-  await test('open is local, zero-model and repeatable', async () => {
-    const state = await setup('open');
-    const first = await state.handler(EVENT, PROJECT.instanceId, state.actionId);
-    const second = await state.handler(EVENT, PROJECT.instanceId, state.actionId);
-    assert.strictEqual(first.kind, 'open');
-    assert.strictEqual(second.kind, 'open');
-    assert.strictEqual(state.modelCalls, 0);
-  });
 
   await test('research returns one evidence-bound handoff and consumes its action', async () => {
     const state = await setup('research');
