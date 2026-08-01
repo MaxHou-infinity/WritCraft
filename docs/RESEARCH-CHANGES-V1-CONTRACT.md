@@ -1,6 +1,6 @@
 # Research → Changes v1 Contract
 
-> Status: product chain and committed-warning boundary signed, P0 = 0 / P1 = 0 / P2 = 0. Initial Research generation now uses one named `submit_research_cards` tool call rather than model-authored text JSON; current verification and author status live only in `v0/DEVELOPMENT-STATUS.md`. The forced Electron 20/20 result below is historical focused evidence, including reject-only and a true late-open A→B race; it is not the current project-wide total.
+> Status: **historical signed technical capability / advanced standalone workflow**. As of RM-1.2 checkpoint 0.0CM, this is no longer the default Writing Navigation journey. `UNIFIED-WRITING-TASK-V1-CONTRACT.md` owns the public suggestion-to-Diff path. The product-chain and committed-warning evidence below remains valid for internal reuse; it must not be used to require ordinary authors to classify claims, select the same target again, or manually transfer Research into Changes.
 > Schema: `writcraft.research-handoff/v1`
 
 ## 1. Product journey

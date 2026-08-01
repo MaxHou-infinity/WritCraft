@@ -1,6 +1,6 @@
 # WritCraft V0 · Research Accuracy v1
 
-> Status: **signed; persistent-watcher regression closed, final independent review P0=0/P1=0/P2=0**. Transaction ordering, watcher fail-closed behavior, commit-boundary authority, exact-project degraded gates, same-root recovery and Renderer recorded-but-locked semantics passed independent review. As historical focused evidence for this contract, full Node/verify exited successfully, the standard controlled forced Electron E2E completed **30/30**, and the real Main/IPC persistent-restart-failure zero-side-effect harness completed **3/3**. Project-wide current totals live only in `v0/DEVELOPMENT-STATUS.md`; real-author Research judgment samples remain open under `RM-1.1 / 0.1.2`.
+> Status: **signed advanced standalone capability; persistent-watcher regression closed, final independent review P0=0/P1=0/P2=0**. Transaction ordering, watcher fail-closed behavior, commit-boundary authority, exact-project degraded gates, same-root recovery and Renderer recorded-but-locked semantics passed independent review. As historical focused evidence for this contract, full Node/verify exited successfully, the standard controlled forced Electron E2E completed **30/30**, and the real Main/IPC persistent-restart-failure zero-side-effect harness completed **3/3**. Project-wide current totals live only in `v0/DEVELOPMENT-STATUS.md`; manual Research judgment is no longer part of the RM-1.2 default Navigation acceptance journey.
 
 ## 1. User journey
 

@@ -1,17 +1,18 @@
 # 笔触 · WritCraft · V0 开发状态与续作入口
 
-> 最后更新：2026-08-01（Asia/Shanghai，0.0CL · Research 具名结构化输出）
+> 最后更新：2026-08-01（Asia/Shanghai，0.0CM · 统一写作任务流合同冻结）
 > 当前状态：**`writ-craft@0.1.1` 已从 exact candidate `c65981e` 发布到 npm `preview`；registry 时间 `2026-07-29T14:30:16.176Z`，shasum `d370c500666e25cfb373852deafa21b232d2bc18` 与本地候选一致。公网隔离安装/启动/退出为 2/2。annotated tag `v0.1.1` 指向同一提交，GitHub prerelease 已公开：`https://github.com/MaxHou-infinity/WritCraft/releases/tag/v0.1.1`。**
 > 发布判断：**0.1.1 Developer Preview 已完成版本、自动化、双架构安装、独立复审、npm 发布、公网安装和 GitHub prerelease。registry 标签保持 `preview: 0.1.1`、`latest: 0.1.0`，因此本次没有把 Preview 冒充稳定版，也没有执行 unpublish、占位发布或上传未签名 App/ZIP。**
-> 当前目标版本：**`docs/ROADMAP.md` 的 `RM-1.1 / writ-craft@0.1.2` 真实作者可用性闭环。必须以 `WRITING-NAVIGATION-V1-CONTRACT.md` 的结构规划/写作导航替代旧 Plan，再完成 Research、image-01、Graph/recovery 和完整签字。不得插入驾驶舱或其他后续版本功能。**
+> 当前目标版本：**`docs/ROADMAP.md` 的 `RM-1.2 / writ-craft@0.1.2` 真实作者可用性闭环。当前唯一开发纵切是 `UNIFIED-WRITING-TASK-V1-CONTRACT.md`：把 Navigation 建议、必要依据核对、正文内 Diff、决定和 Safe Undo 合并为同一任务。不得继续派发旧公开 Research→Changes 多步旅程，也不得插入驾驶舱或其他后续版本功能。**
 > 当前源码证据：**旧 Plan 公共入口已移除，右栏固定为 Chat / 导航 / Context / Changes。Navigation→Changes 使用 Main-owned revision-bound range 协议；刷新恢复、固定 Research/Changes 双动作及 Research handoff 安全重入均已实现。0.0CL 又把初始 Research 从模型自由文本 JSON 迁移为唯一具名 `submit_research_cards` tool-use：接口 Schema 限制来源 ID、字段、数量和长度，Main 再做 exact-key、字节、逐字 quote、locator、revision 与末端 stale 校验；围栏、解释文本、零/多 tool block、截断和越权来源均零写入失败。Research Main **12+15+12+10+4**、Main integration **12/12**、Renderer **17+13** 全绿；完整 `npm test` 与批准 GUI `npm run verify` 均 exit 0。真实 Electron 首次因夹具把未知请求误路由为 Research 而红，修正夹具后一次在完成 28 阶段时出现 CDP `Runtime.evaluate` 超时，随后同源复跑 **36/36**；该时序红灯保留为 P2，不用产品代码掩盖。**
-> 当前作者验收进度：**项目卡、Inline、Chapter、空项目结构规划、Navigation 生成/原文定位/帮助度，以及 Navigation→Changes→接受→Safe Undo 已关闭。作者已确认 Research 页正确收到建议问题、导航发现和 canonical 原文依据；首次真实 Research 运行暴露“AI 研究结果不是严格 JSON”，本次已修复但尚待作者在最新 App 中只重跑“研究所选来源”。Research 卡片质量判断及后续 Research→Changes、image-01 与 Graph/recovery 仍开放；不重做已签字的帮助度、Changes 或 Navigation 生成。**
+> 当前作者验收进度：**项目卡、Inline、Chapter、空项目结构规划、Navigation 生成/原文定位/帮助度，以及旧 Navigation→Changes→接受→Safe Undo 的技术链已关闭。新的真实红灯必须保留：作者在旧默认流程中经历 Navigation→Research→Changes 的重复跳转和选择，已忘记任务目标；另一次 AI 操作在底层网络时限后仍停留“处理中”超过三分钟。作者明确判定该体验不可接受，因此不再要求重测 Research 卡片判断。0.0CM 统一任务合同已冻结，生产实现、受影响测试、独立复审与真实作者最短链路均未开始，不能称为用户可用。**
 > 0.0AA 历史保留红灯：**首轮真实 Electron 暴露 Inspector 在上下文失效时被清空、旧 5-chip 断言和项目 Chat 等待诊断；完整 test 又暴露 Plan 测试把 generation 函数正文写死。独立复审发现新请求预检窗口可提交不可见旧轮、同项目重开 UI/Main 串话、失败重开提前清会话及两项测试/错误文案缺口，均转为生产边界和回归后关闭。真实 Electron 曾连续两次在旧 Graph 恢复阶段超时；加入只读失败快照后该阶段连续四次通过，未改 Graph 产品逻辑，按重复同源证据关闭 timing P2。另一次 Chat preflight 红灯证明测试在恢复 `edit.md` 后未等待权威 watcher barrier；改为生产 `flushExternalChanges()` 收敛，而未放宽 Chat guard。该里程碑所有红运行保留，最终源码连续两次 34/34；后续 0.0AB 当时推进到 35/35，当前总链只看本文顶部当前里程碑。**
 > Graph 历史签字基线：**性能修复前的既有源码曾完整 `npm test`、Electron-enabled `npm run verify`、强制真实 Electron 26/26 exit 0；Graph Filter 15/15、Workbench 14/14、dynamic 5/5、Large 5/5、Watcher 15/15、Network 11/11、Intelligence 17/17，第二轮复审 P0=0/P1=0/P2=2。该数字只保留为历史过程；0.0AB 后来推进到 35/35，当前总链只看顶部当前里程碑。**
 > Graph 动态边界：**300 文件/1279 节点 cold-to-interactive、cache/incremental、筛选/内存/布局、AX/键鼠、三类纠错、stale/Issue→Changes、failure live、重启与项目隔离均进入真实 Electron；正文/History/ledger 的零写入门禁通过。**  
 > Graph 保留 P2：**200% 仍采用 CDP DeviceMetrics 等价模拟，未调用 Electron `setZoomFactor(2)`；pan/zoom 以 Long Task observer 为性能证据，空数组也会通过，但 transform 的真实变化已有断言。这两项不阻塞签字，后续不得误记为已关闭。**  
 > 产品权威规格：`../docs/WRITCRAFT-PRD-V3.md`  
-> 产品开发路线图：`../docs/ROADMAP.md`（`RM-1.1`；当前目标产品版本 `0.1.2`）
+> 产品开发路线图：`../docs/ROADMAP.md`（`RM-1.2`；当前目标产品版本 `0.1.2`）
+> 统一写作任务合同：`../docs/UNIFIED-WRITING-TASK-V1-CONTRACT.md`（0.0CM 已冻结；当前唯一实现纵切）
 > 写作导航合同：`../docs/WRITING-NAVIGATION-V1-CONTRACT.md`（已冻结；替代公开 `writcraft.plan/v2`）
 > Phase A 工程契约：`../docs/PHASE-A-IMPLEMENTATION.md`
 > 真实作者验收契约：`../docs/AUTHOR-ACCEPTANCE-V1-CONTRACT.md`（已冻结；0.0U 不改变真实作者门禁）
@@ -23,13 +24,39 @@
 > npm Developer Preview 契约：`../docs/NPM-DEVELOPER-PREVIEW-V1-CONTRACT.md`（0.1.1 已公开到 `preview`，公网安装 2/2；`latest` 仍为 0.1.0）
 > 用户安装与首次使用：`../docs/GETTING-STARTED.md`
 
+## 0.0CM · 统一写作任务流（当前，合同冻结；生产代码未开始）
+
+### 真实红灯证据
+
+1. 作者从 Navigation 建议进入 Research，再返回 Changes，期间需要重复选择来源、判断匹配、再次选择锚点已经确定的正文，并在多个页面间转交同一目标。作者明确反馈已经忘记自己正在处理什么，判断该体验不会让真实用户满意。
+2. 一次生成在底层网络等待结束后仍显示“处理中”超过三分钟，没有可靠取消和终态。该红灯说明现有 Renderer busy/finally 并未与 Main/provider deadline 共用同一 attempt authority。
+3. 以上证据不得被后续绿灯覆盖。旧 0.0CL 的具名 Research tool-use、安全 handoff 和零写入验证仍是可复用技术资产，但不再代表当前产品旅程合格。
+
+### 已冻结方向
+
+- 每张建议只有一个主要动作“处理这个建议”；正常路径一次点击后，在当前正文编辑区进入可审阅 Diff。
+- Main 使用 suggestion 的 canonical evidence 和默认正文目标；普通作者不再进入独立 Research/Changes 页面，不再重复选择目标或人工转交依据。
+- 只有严格 `needs_sources` 零修改终态显示“添加来源”，补充后返回同一任务。
+- 右栏持续展示当前目标、真实阶段、折叠依据和范围；正文内用红色删除线、绿色新增及非颜色标识审阅，跨文件通过标签/文件树徽标导航。
+- 15 秒显示取消，60 秒硬终止；单次最多 1–3 个局部修改且不自动付费重试。取消、超时、失败、迟到与项目切换均零写入并保留可重试任务。
+- 继续复用 Main-owned revision、locator、range、ChangeSet、History、冲突检测和 Safe Undo；不得解析自由文本、降低校验或扩大写 capability。
+
+### 当前完成度与下一步
+
+- ✅ 产品/工程合同：`UNIFIED-WRITING-TASK-V1-CONTRACT.md` 已冻结。
+- ⬜ Main 统一 attempt 编排、60 秒 deadline、取消和 `needs_sources | changes` 结构协议。
+- ⬜ Renderer 同任务状态机、一个主按钮、来源恢复与同一任务保留。
+- ⬜ 主编辑器瞬态 inline ChangeSet review、逐项/批量决定、跨文件导航。
+- ⬜ 受影响专项、完整回归、真实 Electron、独立复审 P0/P1=0。
+- ⬜ 作者授权隔离副本最短旅程验收。此前已签字的项目卡、Inline、Chapter、空项目结构、Chat、Graph 等不重测。
+
 ## 0. 续作口令
 
-Chat 的三级 scope/context、Main-owned 多轮连续性、Onboarding v2、Research→Changes 与 Inline Rewrite v2 已经完成技术签字。项目卡、Inline 与 Chapter 已真实完成。旧 Plan 在九次真实失败后停止；当前先实现 `WRITING-NAVIGATION-V1-CONTRACT.md`，不再执行旧 canary、不重复前三段、不分发现有 `release/` 产物。
+Chat 的三级 scope/context、Main-owned 多轮连续性、Onboarding v2、Research→Changes 技术底座与 Inline Rewrite v2 已经完成技术签字。项目卡、Inline、Chapter、空项目结构和 Navigation 建议价值已真实完成。旧 Plan 在九次真实失败后停止；当前只实现 `UNIFIED-WRITING-TASK-V1-CONTRACT.md`，不再执行旧 canary、Research 人工判断链或已签字旅程，不分发现有 `release/` 产物。
 
 1. 先读 `../docs/ROADMAP.md` 的当前目标，再读本文、`package.json`、对应合同、当前源码文件与 `git log -1 --stat`；本地 Git 历史从 2026-07-26 V0 基线开始，不得据此臆测更早的开发过程。
 2. **Diagnostic Export v1、Research Accuracy v1、committed-warning、Graph 三项韧性缺口、Changes/History durable recovery、Image Review v1 与 Image Trash 本地链均已完整签收，不再重开这些协议。**
-3. 0.0AB 已完成普通 Markdown 项目回收区；0.0AC 的 npm Preview/Coding Plan 图片改造已在提交 `71571b8` 与权威 Nowledge 记忆中收口，0.1.1 的 npm/GitHub 发布链也已关闭。恢复顺序必须是：核对 Git HEAD 与顶部证据 → 只推进 `RM-1.1 / 0.1.2`。不得重开已关闭的发布、回收区、Chat、Prompt 或 watcher 安全链。
+3. 0.0AB 已完成普通 Markdown 项目回收区；0.0AC 的 npm Preview/Coding Plan 图片改造已在提交 `71571b8` 与权威 Nowledge 记忆中收口，0.1.1 的 npm/GitHub 发布链也已关闭。恢复顺序必须是：核对 Git HEAD 与顶部证据 → 只推进 `RM-1.2 / 0.1.2 / 0.0CM`。不得重开已关闭的发布、回收区、Chat、Prompt 或 watcher 安全链。
 4. 不重写已经签字的 Onboarding v2 service、capability store、batch、Main/preload 与 Renderer 契约；Main 动态 admission、single-flight 和 Renderer 生命周期 authority 清理均已关闭。
 5. 每批合入后重跑定向测试；阶段完成时再运行完整 `npm test`、`npm run verify` 与 `WRITCRAFT_E2E_FORCE=1 npm run e2e:electron`，保存当次证据。
 6. 真实 API 只使用用户显式配置的 Key；记录延迟、限流、超时、故障和费用，不记录 Key、Prompt、模型原文或正文。Key 前缀只表示凭据/计费类型，不能代替官方能力与现场门禁。首发按 npm Developer Preview 合同执行；独立 App 发布才需要 Developer ID、公证与 Gatekeeper。
@@ -80,7 +107,7 @@ Chat 的三级 scope/context、Main-owned 多轮连续性、Onboarding v2、Rese
 - **作者操作与可见终态**：作者在第九隔离副本输入真实简化目标并完成生成。可见界面返回 **3 条**建议，每条均展示 Main 恢复的原文依据；作者通过依据链接打开对应章节，导航页、建议卡和章节编辑器同时保留。自动化没有代替作者输入、生成或点击。
 - **内容无关运行证据**：manifest 后记录两条 `plan/generated`（metrics v1 的历史 action 名），耗时 **18,314 ms / 13,562 ms**，均为 before/after 0；没有 `failed`。这证明 `d28c440` 的 request-local evidenceRef 协议在真实 MiniMax 调用中越过了第八副本连续失败的 `INVALID_MODEL_EVIDENCE` 边界。两次成功均保留，但后续不再要求重复生成。
 - **零写入与隔离**：post-manifest History **0**、recovery **0**；验收副本除 `.writcraft` 私有状态外，与授权源逐文件一致。授权源仍 eligible：20 files / 608,433 bytes、12 chapters、4,748 可见中文字符、1 source，digest **`9d089886…`**。打开章节是本地定位，不产生正文或 History 写入。
-- **作者价值判断与下一步**：作者已明确判断当前 3 条建议“有帮助”。已有稿件 Navigation 的“生成建议 + canonical evidence + 原文定位 + 帮助度判断”关闭，不再重复第八/第九副本的该段旅程，也不重开结构规划或旧 Plan。Changes 和 Research 动作仍开放；下一步只复用当前现成建议，先验收一条 Changes 审阅，再验收一条 Research，不再发起新的 Navigation 生成。
+- **作者价值判断与当时下一步（已被 0.0CM 取代）**：作者已明确判断当前 3 条建议“有帮助”。Navigation 的生成、canonical evidence、定位和帮助度关闭且不再重复。当时计划分别验收 Changes/Research；后续真实反馈否定该公开多步旅程，现只按 0.0CM 统一任务合同续作。
 
 ### 0.0CF 2026-07-31 · 已有稿件导航 evidenceRef 协议修复
 
@@ -1019,12 +1046,12 @@ Onboarding v2 已取代上述“容错解析完整 `editContent` + 部分创建�
 | 普通 Markdown 回收区恢复 UI | ✅ | Explorer 列表/刷新/单项恢复、窄 IPC、opaque token、watcher barrier、native journal recovery、冲突与替换 fail-closed 均已签字；真实 Electron 35/35 |
 | Chapter 生成/整体重写 | ✅ | strict plan/block、整文件审阅、撤销、完整异步所有权、no-op/provenance/result/capability 运行态门禁均已接入；最终复审 P0/P1/P2=0 |
 | Changes 分块审阅与历史 Plan→Changes 安全链 | ✅ | Changes 默认 pending、逐块/整文件决策、residual、审计/撤销和目标 revision 锁定仍有效；Plan→Changes 只算历史安全证据，不是现行入口 |
-| 结构规划 / 写作导航 | 🟡 | 结构规划、Navigation 生成/定位/帮助度及 Changes 的真实 3 项 Diff→全接受→单文件落盘→History→Safe Undo 已签字，最终公开文件恢复源字节；Research 动作仍待验收 |
+| 结构规划 / 写作导航 | 🟡 | 结构规划与 Navigation 生成/定位/帮助度已签字；旧 Changes 技术链可复用。统一写作任务流合同已冻结，但同任务正文内 Diff、60 秒终态和真实作者最短链仍未实现/验收 |
 | Graph v2 核心与扩展验收 | ✅ | 300 文件/1279 节点、纠错/stale/failure live、AX/键鼠、布局/性能、重启/A→B 均有行为证据；韧性批关闭语义权威、不可变快照与异步所有权，复审 P0/P1/P2=0；0.0AB 当时总链为 35/35，当前见顶部当前里程碑 |
 | Diagnostic Preview / Export | ✅ | 设置页精确预览、递归脱敏 allowlist、token-only IPC、原生保存和不可覆盖 0600 写入均已接入；Service 13/13、Handler 10/10、Renderer 7/7、真实 Electron 可见旅程通过 |
 | 来源、PDF、脚注 | ✅ | 本地证据地基和可审查建议已接入 |
 | AI metrics | 🟡 | 真实 GUI 已验证项目内记录、聚合与落盘；项目切换隔离有专项动态证据，仍待真实作者样本 |
-| Research / A–D 溯源 | 🟡 | Main-owned Research→Changes v1 与 committed-warning 异常边界已签字；A–D 非事实背书，仍待真实作者准确率样本 |
+| Research / A–D 溯源 | ✅ | Main-owned Research→Changes v1 与 committed-warning 技术边界已签字；作为独立高级能力保留，不再是 0.1.2 默认作者旅程或当前人工验收待办 |
 | image-01 插图 | 🟡 | Coding Plan 真实合成调用、解码尺寸/比例和零正文插入已通过；安全审阅/废纸篓链保持签字，仍待真实作者质量、采纳、费用/限流样本 |
 | 6→7 章 Electron E2E | 🟡 | 0.1.1 发布候选连续两轮真实 Electron 37/37；本地稳定性通过，仍待合格真实作者项目 |
 | 10 名作者内测与 Continue 指标 | ⬜ | 尚无真实样本，不得做 Go/No-Go 结论 |
@@ -1033,12 +1060,12 @@ Onboarding v2 已取代上述“容错解析完整 `editContent` + 部分创建�
 
 ## 4. 后续 TODO（严格顺序）
 
-### RM-1.1 / 0.1.2：当前唯一目标
+### RM-1.2 / 0.1.2：当前唯一目标
 
 - [x] 由作者显式指定满足合同的真实项目，完成只读预检与隔离副本；0.0AQ 的正式事务证明源不变，fresh 副本已合格创建并在当前 App 打开。
-- [ ] 项目卡、Inline、Chapter、结构规划、Navigation 原文定位/帮助度及 Changes 完整闭环均已完成，不再重复。下一步只完成 Research，随后验收 image-01 与 Graph/恢复。
+- [ ] 项目卡、Inline、Chapter、结构规划、Navigation 原文定位/帮助度及旧 Changes 技术闭环均已完成，不再重复。当前只实现并验收统一写作任务流：单一主动作、同任务依据恢复、正文内 Diff、15 秒取消、60 秒终态、接受/拒绝/冲突/Safe Undo。
 - [x] 复现并诊断作者项目 `Graph INVALID_CACHE`；0.0AN / `a72a179` 已提供不删除作者数据、不手工清缓存的可理解诊断、自动重建与失败恢复终态，最终独立复审 P0/P1/P2=0。
-- [ ] Inline 接受率与导航帮助度已有真实作者证据；继续收集导航动作、Research 匹配判断、图片评分/采纳和耗时样本。
+- [ ] Inline 接受率与导航帮助度已有真实作者证据；统一任务完成后只收集本链的动作、耗时、取消/终态和作者可理解性样本。旧 Research 匹配判断不再补测。
 - [ ] 只修复验收中发现的 P0/P1 与决定阻断发版的 P2；`⌘K` 必填作者指令 P1 已实现、完成自动化与独立复审，并作为 exact candidate `9b21a9d` 提交推送；不得插入 `0.2.0+` 功能。
 - [ ] 完成完整回归、连续真实 Electron、独立复审、文档/Git/Nowledge 同步，并在另获授权后发布 0.1.2 Preview。
 
@@ -1072,7 +1099,7 @@ Onboarding v2 已取代上述“容错解析完整 `editContent` + 部分创建�
 - [x] Inline Rewrite 自动化链：既有写入/恢复链保持签字；0.0BJ 新增必填作者指令 composer 与 exact request v2，定向 Context 15/15、Main 11/11、transaction 14/14、integration 7/7、Renderer 11/11，完整 test/批准 GUI verify 与最终 Electron 37/37 通过，第三轮独立复审 P0=0/P1=0/P2=0。
 - [x] Inline Rewrite 当前候选真实作者旅程：第五副本已完成接受、独立拒绝与精确 Safe Undo，正文、History 和全项目 Markdown 摘要均回到操作前基线；项目卡与 Inline 均不再重跑。
 - [x] 旧 Plan 的 named-tool 安全链保留为历史证据；九次真实零写入失败后，产品假设已由 0.0BY 正式关闭，不再运行 MiniMax canary。
-- [x] 按 `WRITING-NAVIGATION-V1-CONTRACT.md` 完成结构规划/写作导航 Main、IPC/preload、Renderer、进度/取消/恢复、Changes/Research 路由、完整专项和真实 Electron 技术验收；真实作者双旅程仍由 RM-1.1 总 TODO 单独跟踪。
+- [x] 按 `WRITING-NAVIGATION-V1-CONTRACT.md` 完成结构规划/写作导航 Main、IPC/preload、Renderer、进度/取消/恢复、旧 Changes/Research 路由、完整专项和真实 Electron 技术验收；其后续公开双动作已由 RM-1.2 / 0.0CM 统一任务合同取代。
 
 ### P2：Chat/Chapter 独立复审保留的非阻塞测试增强
 

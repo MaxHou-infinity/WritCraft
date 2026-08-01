@@ -1,9 +1,9 @@
 # WritCraft 写作导航 v1 产品与工程合同
 
-> 状态：`RM-1.1 / writ-craft@0.1.2` 当前冻结合同
-> 生效日期：2026-07-31
+> 状态：`RM-1.2 / writ-craft@0.1.2` 导航生成合同；后续动作由 `UNIFIED-WRITING-TASK-V1-CONTRACT.md` 取代
+> 生效日期：2026-08-01
 > 取代：面向用户的 `writcraft.plan/v2` 里程碑、任务和依赖图
-> 实现进度：0.0CL 已完成 Main/IPC/Renderer 公共纵切、结构确认、同 App 刷新重验恢复及固定 Research/Changes 双动作。Research 只读 handoff 可安全重试，且作者已确认建议问题与 canonical 原文依据正确到达 Research；初始 Research 生成现使用唯一具名结构化工具而非自由文本 JSON。结构旅程、Navigation 帮助度及 Navigation→Changes→Safe Undo 已完成真实作者验收；当前只待最新 App 中重跑一次“研究所选来源”并继续 Research 判断。
+> 实现进度：结构规划和建议生成的既有证据保留。0.0CM 真实作者验收否定了固定 Research/Changes 双动作和跨页面交接；不得再从本文派发该旧旅程。当前实现目标是同一建议卡内的统一写作任务。
 
 ## 1. 产品判断
 
@@ -46,10 +46,9 @@ V1 只适用于除 `edit.md` 外尚无公开 Markdown 正文的新项目。已�
 - 建议采取什么动作；
 - 完成后预期改善什么。
 
-每张卡片的原文依据链接都可本地打开章节，不调用 AI、不写盘。每张卡片还必须由产品固定同时提供两个后续动作，不得由模型二选一：
+每张卡片的原文依据链接都可本地打开章节，不调用 AI、不写盘。每张卡片只保留一个主要动作：**处理这个建议**。正常路径由 Main 使用既有证据锚点和默认正文目标，在同一任务中核对依据并生成正文内 Diff；不跳转独立 Research/Changes 页面，也不要求作者重复选择已由锚点确定的目标文件。
 
-1. **补充来源**：进入 Research，保留当前建议的证据锚点；
-2. **生成修改建议**：进入 Changes，重新读取权威 revision 后生成可审阅 Diff。
+只有统一任务严格返回 `needs_sources` 且没有任何修改时，当前卡片才显示 **添加来源**。添加后回到同一任务，保留目标、锚点和范围。完整状态、时限、inline Diff 和安全要求见 `UNIFIED-WRITING-TASK-V1-CONTRACT.md`。
 
 建议不是待办列表，不显示任务 ID、依赖关系、里程碑、完成率或“交给 AI”。
 
@@ -85,6 +84,8 @@ Main 必须把模型锚点解析为 canonical block locator，并绑定当时 re
 
 ## 4. Main 权威、缓存与交接
 
+> 0.0CM 说明：以下双 capability、独立 Research/Changes handoff 语义是 0.0CL 的历史实现证据。统一任务可复用其 Main-owned locator、revision、range 与 ChangeSet 边界，但不得把旧公开步骤重新暴露给普通作者。
+
 - Renderer 只提交模式、用户目标和显式选择的上下文标识；不得提交自称可信的文件内容。
 - Main 读取已保存的 `edit.md` 和总计最多 8 个正文文件；当前正文若存在则占用一个名额，其余名额来自作者显式选择。Main 绑定 project instance、navigation/mutation generation、路径、block locator 与 revision。正文不足或 `edit.md` 栏目为空不会被模型伪装成已知信息。
 - 模型的结构化传输格式属于内部协议，不向作者展示 JSON 或字段错误。
@@ -116,7 +117,7 @@ Main 必须把模型锚点解析为 canonical block locator，并绑定当时 re
 ### 6.1 自动化
 
 - 空项目返回 2–3 个结构方案；模型值和作者编辑值的 raw validator、精确骨架字节及三态提交恢复有动态证明；显式确认前零写入，precommit failure 零残留，committed/unknown 不谎报；已有正文时结构模式 fail-closed；
-- 已有项目返回 1–3 张完整建议，每张都有可打开的原文依据与固定 Research/Changes 双动作；
+- 已有项目返回 1–3 张完整建议，每张都有可打开的原文依据和唯一主要动作“处理这个建议”；
 - schema/input/request/context 的最大合法 fixture 与超一边界均有测试；一次点击至多一次 provider call；
 - unknown/duplicate/cross-request evidenceRef、locator/revision 漂移、Context 不完整披露、项目切换、缓存过期、重复消费和 A→B 迟到均 fail-closed；
 - 已有 pending Changes 时不替换审阅，Research/Changes 各自 capability 互不串用；
@@ -129,6 +130,6 @@ Main 必须把模型锚点解析为 canonical block locator，并绑定当时 re
 
 空项目必须由作者明确选择新的独立目录，初始只含应用创建的 `edit.md` 与 `.writcraft/project.json`；验收前记录内容无关的相对文件清单与摘要，完成“比较方案 → 编辑骨架 → 确认创建”后证明只新增作者确认的骨架，失败/拒绝时零新增。它不从真实原稿复制，也不扫描其他目录。
 
-已有稿件使用作者授权的全新合格隔离副本，完成“查看 Context 覆盖 → 查看建议 → 打开章节”以及“建议 → Changes → 拒绝或接受 → Safe Undo”，并继续证明原始项目快照不变。验收只记录内容无关的模式、覆盖计数、动作、耗时、稳定错误码和作者是否认为建议有帮助，不保存提示词、建议文本、quote 或正文。
+已有稿件使用作者授权的全新合格隔离副本，完成“查看 Context 覆盖 → 查看建议 → 处理这个建议 → 正文内 Diff → 拒绝或接受 → Safe Undo”，并继续证明原始项目快照不变。普通路径不得进入独立 Research/Changes 页面。验收只记录内容无关的模式、覆盖计数、动作、耗时、稳定错误码和作者是否认为建议有帮助，不保存提示词、建议文本、quote 或正文。
 
 旧 Plan 的九次真实失败保留为历史证据，不再要求作者继续付费复测。完成定向测试、完整回归、真实 Electron 和独立复审 P0/P1=0 后，才能把本合同标为实现完成。

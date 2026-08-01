@@ -8,8 +8,8 @@
 
 > **历史工程交接（2026-07-29，0.0AC npm Developer Preview 本地签字收口）**：0.0AC 新增 macOS CLI、窄 npm 包、Node `>=22.12.0`、npm 10/11 fail-closed、Electron `43.2.0`、Main 观测 `did-finish-load` 后的 CLI readiness IPC 和零网络 `--check`；同时让 `sk-cp-` 图片能力进入 provider 现场门禁。该 readiness 只证明页面加载完成，不单独证明全部 workspace/bootstrap 逻辑成功。该批历史证据为 Persistent **3/3**、npm Preview **10/10**、installed **2/2**、真实 Electron **35/35**；当前候选只看下条。
 > **下一阶段合同**：`docs/AUTHOR-ACCEPTANCE-V1-CONTRACT.md` 已冻结，明确付费网络门禁、允许记录的隐私安全证据、真实长文旅程与发布前签字顺序。
-> **当前实现停点**：`writ-craft@0.1.1` 已公开到 npm `preview`，`latest` 仍为 `0.1.0`；唯一目标是 `RM-1.1 / 0.1.2` 真实作者闭环。项目卡、Inline 与 Chapter 已完成。旧 Plan 在九次真实零写入失败后停止 canary，其任务图产品假设已由 `WRITING-NAVIGATION-V1-CONTRACT.md` 的“结构规划 / 写作导航”取代；替代实现尚未开始，旧安全代码仅作迁移保护。0.1.2 尚未发布；精确红绿只看 `v0/DEVELOPMENT-STATUS.md`。
-> **路线图入口**：Phase A 已是工程地基，不再负责后续版本排期。当前唯一目标是 `docs/ROADMAP.md` 的 `RM-1.1 / writ-craft@0.1.2` 真实作者可用性闭环。
+> **当前实现停点**：`writ-craft@0.1.1` 已公开到 npm `preview`，`latest` 仍为 `0.1.0`；唯一目标是 `RM-1.2 / 0.1.2` 真实作者闭环。项目卡、Inline、Chapter、空项目结构与 Navigation 建议价值已完成。真实作者否定固定 Navigation → Research → Changes 多步旅程后，0.0CM 已冻结 `UNIFIED-WRITING-TASK-V1-CONTRACT.md`；生产实现和最短链验收尚未完成。0.1.2 尚未发布；精确红绿只看 `v0/DEVELOPMENT-STATUS.md`。
+> **路线图入口**：Phase A 已是工程地基，不再负责后续版本排期。当前唯一目标是 `docs/ROADMAP.md` 的 `RM-1.2 / writ-craft@0.1.2` 真实作者可用性闭环。
 
 ## 1. 阶段目标
 
@@ -375,7 +375,7 @@ Main 为当前窗口保存不可伪造的 project session，不允许 renderer �
 - **Inline Rewrite**：已冻结并实现 selection/block anchor、target revision、`end_turn`、输出边界、保留路径禁写、Main capability/ACK、接受时依赖复核、durable reconciliation 和 Change History。0.1.2 真实作者验收进一步证明“快捷键存在”不等于用户旅程完整：`⌘K` 必须先冻结选区并打开本次改写要求输入框，提交前零保存/IPC/AI/指标；提交时再次校验 Range 与项目/文件/编辑会话身份。请求使用 exact v2 私有指令，公开 History/recovery/metrics 保持 v1 且不得保存原始指令或其 hash。`⌘L` 只负责项目/文件/选区 Chat。
 - **Chapter 生成**：真实作者的 `b5.content` 红灯证明 strict envelope 通过不等于每个内容区块可用。只允许把 CRLF/外层换行规范化为传输格式；strict JSON/schema/block id 不修补、不重试。内容为空、NUL、字符或字节越界时，全章最多原位重生当前区块一次；retry 前必须重验 `edit.md`、目标与上下文 revision，不得携带失败模型正文。第二次失败零写入终止，不得拼出部分 ChangeSet。协议 prompt 中的 schema、blockId 和边界示例必须从当前 Main 权威对象动态生成；测试必须读取实际 prompt，并以非默认 ID 证明示例与后置校验一致，禁止 fixture 只返回预期答案而不验证收到的协议。
 - **Changes 提交终态**：hunk 的“尚未写入”只属于预提交审阅态。Main/History 已确认可信提交且无 residual 后，Renderer 必须销毁全部旧 Diff、决定按钮和预提交文案，只发布一个与权威结果一致的完成终态；不得同时显示“尚未写入”和“已安全应用”。动态测试和真实 Electron 都必须断言旧 hunk DOM 为 0。
-- **写作导航**：当前唯一合同为 `docs/WRITING-NAVIGATION-V1-CONTRACT.md`。空项目只比较 2–3 个可解释结构并在显式确认后全有或全无地创建空白骨架；已有稿件只给 1–3 张带证据、时机、动作和预期结果的下一步建议。模型永不持有写 capability，正文只经 Changes/Diff 落盘；打开章节不调用 AI，补充来源和修改建议分别通过 Main opaque identifier 路由到 Research/Changes。
+- **写作导航与统一任务**：结构/建议生成由 `docs/WRITING-NAVIGATION-V1-CONTRACT.md` 约束；建议后续由 `docs/UNIFIED-WRITING-TASK-V1-CONTRACT.md` 约束。每张建议只显示“处理这个建议”，Main 使用 canonical evidence 和默认正文目标，在同一任务中核对依据并把瞬态 Diff 显示于主编辑器。只有严格零修改的 `needs_sources` 才显示“添加来源”。模型永不持有写 capability，接受仍经既有 ChangeSet/History/Undo 权威边界。
 - **旧 Plan 历史边界**：`docs/PLAN-STRICT-V1-CONTRACT.md` 及 `submit_project_plan` 的工具协议、6,120-byte envelope、fail-closed 校验与测试只保留为九次真实零写入失败的安全证据。0.0BY 已终止其产品路线；不得再运行 provider canary、延长字段、扩大 token、增加重试或把旧任务图重新暴露给作者。
 - **Graph 扩展验收**：`docs/GRAPH-ACCEPTANCE-V1-CONTRACT.md` 已签字；筛选/双证据/stale/作者纠错、failure live、键盘/AX、布局及大图性能已覆盖。后续韧性批又关闭 deferred async ownership、缓存/分析器完整语义权威、有界不可变 Renderer 快照与 Unicode quote 边界，独立二审 P0/P1/P2=0；0.0AB 当时总链为真实 Electron 35/35，当前证据见文首“当前实现停点”与 `v0/DEVELOPMENT-STATUS.md` 顶部。
 - **Diagnostic Export**：`docs/DIAGNOSTIC-EXPORT-V1-CONTRACT.md` 已实现；Main 构造递归 allowlist JSON，Renderer 只显示精确预览并回传 token，原生保存拒绝覆盖并在失败时只清理由本次创建且 inode 相同的文件；取消、项目/导航漂移、TTL 跨 fsync 与并发替换均有动态门禁。
