@@ -57,6 +57,7 @@
 - ✅ exact candidate 已提交为 **`1b51595 fix(navigation): bind unified edit authority`**；该提交包含最终生产修复、回归和本批文档，未推送、未发布。
 - ✅ 作者确认源再次只读预检为 eligible：20 files / 608,433 bytes / 12 chapters / 4,748 可见中文字符 / 1 source，digest 仍为 **`9d0898863636da74615481a669c3e40362a60176249870e6d1793380c85b4380`**。已通过生产复制事务创建新副本 **`/Users/maxhou/Desktop/Max 项目-2026/WritCraft 作者验收/WritCraft-0.1.2-作者验收-10`**，返回 `copyCreated=true / sourceUnchanged=true`；manifest `createdAt=2026-08-01T14:54:22.350Z`。副本继承的 3 条 History 与 23 条 metrics 均早于本次 manifest，不计入新旅程证据。
 - ✅ exact candidate `2bb9052` 后已通过同一生产事务创建 fresh **作者验收-11**：`copyCreated=true / sourceUnchanged=true`，源再次为 20 files / 608,433 bytes、digest **`9d0898863636da74615481a669c3e40362a60176249870e6d1793380c85b4380`**。新副本为 eligible：21 files / 608,701 bytes / 12 chapters / 4,748 可见中文字符 / 1 source，digest **`02aa6257f7d089b76fd1aeaa1621d029a1fe6db565500c2abf50379d07bd08d1`**；manifest `createdAt=2026-08-01T15:49:19.263Z`。继承的 3 条 History 与 23 条 metrics 均早于该切点，新旅程计数为 0。
+- ✅ 当前源码 App 已恢复作者验收-11并正确显示 Navigation，不再复现“项目已打开但导航要求打开项目”的握手红灯。启动只更新了允许持久化的私有 `.writcraft/workspace.json`，因此包含私有状态的全树摘要变化为 `927283fec97af50db44bc4ae5ac5725a693605ba063531197770071a83322869`（608,530 bytes）；源摘要仍未变，源与副本的 **14 个 Markdown 文件逐文件 SHA-256 全部相同**，manifest 后 History 仍为 0。这是会话恢复状态，不得误报为正文写入或候选漂移。
 - ⬜ 作者授权隔离副本最短旅程验收。稳定 profile 仅核验为 `configured=true / keyType=CODING_PLAN`，未读取或迁移 Key；开发 App 曾以 exact candidate 打开后已在本次暂停时用 SIGINT 正常关闭，尚未代作者触发 AI、接受、拒绝或撤销。此前已签字的项目卡、Inline、Chapter、空项目结构、Chat、Graph 等不重测。
 
 ### 2026-08-01 recent-project 握手 P1（已关闭，exact candidate `2bb9052`）

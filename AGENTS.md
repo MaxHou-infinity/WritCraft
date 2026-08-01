@@ -133,6 +133,8 @@ A stable pre-provider error must lead to an executable recovery action, not a ge
 
 A fresh author copy may legitimately inherit private `.writcraft` History and metrics from its source. Bind journey evidence to the copy manifest `createdAt`: only later events and History entries count as the fresh run. Report inherited totals separately or omit them; never inflate a real-author sample with pre-copy activity.
 
+Opening that copy may immediately update private `.writcraft/workspace.json` for tabs, current file, or scroll restoration. Therefore the post-launch whole-tree digest is not a manuscript zero-write oracle. Prove preview safety with exact Markdown hashes, post-manifest History/recovery counts, and the unchanged source snapshot; record the private workspace-only delta separately.
+
 Destructive History UX must identify the exact target at the decision point. Mark the newest record, name single-file paths directly, and warn separately when an author selects a non-latest record or `edit.md` because that changes the Project Prompt used by later AI calls. A generic file count, identical button labels, or a confirmation that omits the target is a P1 anti-misoperation gap; a green storage transaction does not make the user journey safe.
 
 Progress UI is part of the operation authority boundary. A local History undo must never reuse AI-generation copy or leave an AI timer/generation flag alive after its promise settles. Name the actual operation, state whether AI/network is involved, and clear timers, busy controls, and generation state on every success, failure, cancellation, and recovery path. Real-Electron tests must assert both the terminal status and the absence of stale in-flight UI.
