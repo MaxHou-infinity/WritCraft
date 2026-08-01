@@ -1,11 +1,11 @@
 # 笔触 · WritCraft · V0 开发状态与续作入口
 
-> 最后更新：2026-08-01（Asia/Shanghai，0.0CM · recent-project 握手 P1 已关闭，待新候选作者验收）
+> 最后更新：2026-08-01（Asia/Shanghai，0.0CM · exact candidate `2bb9052` 已保存，等待新副本作者验收）
 > 当前状态：**`writ-craft@0.1.1` 已从 exact candidate `c65981e` 发布到 npm `preview`；registry 时间 `2026-07-29T14:30:16.176Z`，shasum `d370c500666e25cfb373852deafa21b232d2bc18` 与本地候选一致。公网隔离安装/启动/退出为 2/2。annotated tag `v0.1.1` 指向同一提交，GitHub prerelease 已公开：`https://github.com/MaxHou-infinity/WritCraft/releases/tag/v0.1.1`。**
 > 发布判断：**0.1.1 Developer Preview 已完成版本、自动化、双架构安装、独立复审、npm 发布、公网安装和 GitHub prerelease。registry 标签保持 `preview: 0.1.1`、`latest: 0.1.0`，因此本次没有把 Preview 冒充稳定版，也没有执行 unpublish、占位发布或上传未签名 App/ZIP。**
 > 当前目标版本：**`docs/ROADMAP.md` 的 `RM-1.2 / writ-craft@0.1.2` 真实作者可用性闭环。当前唯一开发纵切是 `UNIFIED-WRITING-TASK-V1-CONTRACT.md`：把 Navigation 建议、必要依据核对、正文内 Diff、决定和 Safe Undo 合并为同一任务。不得继续派发旧公开 Research→Changes 多步旅程，也不得插入驾驶舱或其他后续版本功能。**
 > 当前源码证据：**旧 Plan 公共入口已移除，右栏固定为 Chat / 导航 / Context / Changes。Navigation→Changes 使用 Main-owned revision-bound range 协议；刷新恢复、固定 Research/Changes 双动作及 Research handoff 安全重入均已实现。0.0CL 又把初始 Research 从模型自由文本 JSON 迁移为唯一具名 `submit_research_cards` tool-use：接口 Schema 限制来源 ID、字段、数量和长度，Main 再做 exact-key、字节、逐字 quote、locator、revision 与末端 stale 校验；围栏、解释文本、零/多 tool block、截断和越权来源均零写入失败。Research Main **12+15+12+10+4**、Main integration **12/12**、Renderer **17+13** 全绿；完整 `npm test` 与批准 GUI `npm run verify` 均 exit 0。真实 Electron 首次因夹具把未知请求误路由为 Research 而红，修正夹具后一次在完成 28 阶段时出现 CDP `Runtime.evaluate` 超时，随后同源复跑 **36/36**；该时序红灯保留为 P2，不用产品代码掩盖。**
-> 当前作者验收进度：**项目卡、Inline、Chapter、空项目结构规划、Navigation 生成/原文定位/帮助度，以及旧 Navigation→Changes→接受→Safe Undo 的技术链已关闭。统一写作任务流主体在 `1b51595` 后暴露的 recent-project 握手 P1 现已关闭：project entry 使用 single-flight request owner、exact generation + project instance，Prompt、Inline/Changes recovery、孤儿恢复和旧草稿 helper 均在内部 await 与副作用边界复验；Assistant 对监听前已 ready 的项目主动同步。真实 A→B deferred 回归为 Project Entry **7/7**，Navigation 全链、完整 `npm test`、批准 GUI `npm run verify`、强制真实 Electron **37/37** 全部通过；第四轮独立复审 **P0=0/P1=0/P2=0，可以技术签字**。作者验收-10 已因生产源码变化失效，下一步必须从新 exact candidate 创建作者验收-11；0.1.2 仍不是候选完成。**
+> 当前作者验收进度：**项目卡、Inline、Chapter、空项目结构规划、Navigation 生成/原文定位/帮助度，以及旧 Navigation→Changes→接受→Safe Undo 的技术链已关闭。统一写作任务流主体在 `1b51595` 后暴露的 recent-project 握手 P1 现已关闭：project entry 使用 single-flight request owner、exact generation + project instance，Prompt、Inline/Changes recovery、孤儿恢复和旧草稿 helper 均在内部 await 与副作用边界复验；Assistant 对监听前已 ready 的项目主动同步。真实 A→B deferred 回归为 Project Entry **7/7**，Navigation 全链、完整 `npm test`、批准 GUI `npm run verify`、强制真实 Electron **37/37** 全部通过；第四轮独立复审 **P0=0/P1=0/P2=0，可以技术签字**。本批 exact candidate 已保存为 **`2bb9052 fix(workspace): bind project entry ownership`**；作者验收-10 已因生产源码变化失效，下一步必须从该候选创建作者验收-11；0.1.2 仍不是候选完成。**
 > 0.0AA 历史保留红灯：**首轮真实 Electron 暴露 Inspector 在上下文失效时被清空、旧 5-chip 断言和项目 Chat 等待诊断；完整 test 又暴露 Plan 测试把 generation 函数正文写死。独立复审发现新请求预检窗口可提交不可见旧轮、同项目重开 UI/Main 串话、失败重开提前清会话及两项测试/错误文案缺口，均转为生产边界和回归后关闭。真实 Electron 曾连续两次在旧 Graph 恢复阶段超时；加入只读失败快照后该阶段连续四次通过，未改 Graph 产品逻辑，按重复同源证据关闭 timing P2。另一次 Chat preflight 红灯证明测试在恢复 `edit.md` 后未等待权威 watcher barrier；改为生产 `flushExternalChanges()` 收敛，而未放宽 Chat guard。该里程碑所有红运行保留，最终源码连续两次 34/34；后续 0.0AB 当时推进到 35/35，当前总链只看本文顶部当前里程碑。**
 > Graph 历史签字基线：**性能修复前的既有源码曾完整 `npm test`、Electron-enabled `npm run verify`、强制真实 Electron 26/26 exit 0；Graph Filter 15/15、Workbench 14/14、dynamic 5/5、Large 5/5、Watcher 15/15、Network 11/11、Intelligence 17/17，第二轮复审 P0=0/P1=0/P2=2。该数字只保留为历史过程；0.0AB 后来推进到 35/35，当前总链只看顶部当前里程碑。**
 > Graph 动态边界：**300 文件/1279 节点 cold-to-interactive、cache/incremental、筛选/内存/布局、AX/键鼠、三类纠错、stale/Issue→Changes、failure live、重启与项目隔离均进入真实 Electron；正文/History/ledger 的零写入门禁通过。**  
@@ -58,7 +58,7 @@
 - ✅ 作者确认源再次只读预检为 eligible：20 files / 608,433 bytes / 12 chapters / 4,748 可见中文字符 / 1 source，digest 仍为 **`9d0898863636da74615481a669c3e40362a60176249870e6d1793380c85b4380`**。已通过生产复制事务创建新副本 **`/Users/maxhou/Desktop/Max 项目-2026/WritCraft 作者验收/WritCraft-0.1.2-作者验收-10`**，返回 `copyCreated=true / sourceUnchanged=true`；manifest `createdAt=2026-08-01T14:54:22.350Z`。副本继承的 3 条 History 与 23 条 metrics 均早于本次 manifest，不计入新旅程证据。
 - ⬜ 作者授权隔离副本最短旅程验收。稳定 profile 仅核验为 `configured=true / keyType=CODING_PLAN`，未读取或迁移 Key；开发 App 曾以 exact candidate 打开后已在本次暂停时用 SIGINT 正常关闭，尚未代作者触发 AI、接受、拒绝或撤销。此前已签字的项目卡、Inline、Chapter、空项目结构、Chat、Graph 等不重测。
 
-### 2026-08-01 recent-project 握手 P1（已关闭，待形成 exact candidate）
+### 2026-08-01 recent-project 握手 P1（已关闭，exact candidate `2bb9052`）
 
 - **现场红灯**：作者验收-10 已由编辑器正常恢复，但 Navigation 显示“打开写作项目后使用导航”。根因是 `workspace.js` 的 recent-project 自动恢复可能在 `assistant-workspace.js` 注册 `writcraft:project-entered` 监听器之前完成。
 - **最终实现**：`workspace.js` 增加 `projectReady`、entry generation 与 single-flight request owner；open/create/recent 共用 owner。`loadEditContext`、Inline/Changes reconciliation、孤儿恢复和旧草稿迁移在每个内部 await 后、每次 state/UI/bridge mutation 前复验 exact generation + project instance；stale preview 只释放自己取得的 capability。Assistant 在 entering/failed 时清旧 Navigation，并在监听注册后同步已 ready 项目；`canUseAI` 与 Dock 入口要求 ready。
@@ -67,7 +67,7 @@
 - **验证红灯保留**：产品 P1 关闭后的首次完整 `npm test` 因两项旧源码字符串断言仍要求无参数 recovery 调用而红；修正为 owner-aware 精确顺序并补 deferred 覆盖后，完整 `npm test` exit 0。不得用最终绿灯抹去该测试漂移红灯。
 - **最终门禁**：`npm run verify:navigation`、完整 `npm test`、批准 GUI `npm run verify` exit 0；强制真实 Electron **37/37**，包含统一任务 Diff/接受/Safe Undo、退出重启与 recent-project 恢复。第四轮独立只读复审 **P0=0/P1=0/P2=0，签字 YES**。
 
-**唯一续作动作**：将本批源码、测试和文档提交为新的本地 exact candidate（不推送、不发布），从未变作者验收源创建作者验收-11，再只验“一张建议→一次点击处理→正文内 Diff→作者接受→Safe Undo”。Diff 出现后先核验源不变、副本预览零写入以及 History/recovery 基线，再由作者决定。
+**唯一续作动作**：从本地 exact candidate `2bb9052`（未推送、未发布）和未变作者验收源创建作者验收-11，再只验“一张建议→一次点击处理→正文内 Diff→作者接受→Safe Undo”。Diff 出现后先核验源不变、副本预览零写入以及 History/recovery 基线，再由作者决定。
 
 **旧暂停点仍失效**：不得从 `1b51595` 或作者验收-10续跑。此前已签字模块仍不重测，不得回到旧 Research→Changes 人工转交，也不得发布 0.1.2。
 

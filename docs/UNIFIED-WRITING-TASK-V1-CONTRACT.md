@@ -4,7 +4,7 @@
 > Product version: `writ-craft@0.1.2`
 > Public journey: Writing Navigation suggestion → inline review → explicit decision
 
-> Implementation checkpoint (2026-08-01): the project-entry handshake race found after `1b51595` is closed. Recent/open/create share a single-flight request owner; readiness, Prompt context, Inline/Changes reconciliation, orphan recovery, and legacy migration bind the exact entry generation plus project instance at their internal async mutation boundaries. Production-helper deferred A→B tests pass at 7/7, full `npm test`, approved GUI `npm run verify`, and forced real Electron 37/37 pass, and fourth-round independent review is P0=0/P1=0/P2=0. The first full test red caused by two obsolete no-argument call assertions remains recorded. Author copy 10 is invalidated by production changes; acceptance resumes only from a new exact candidate and author copy 11.
+> Implementation checkpoint (2026-08-01): the project-entry handshake race found after `1b51595` is closed in local exact candidate `2bb9052` (not pushed or released). Recent/open/create share a single-flight request owner; readiness, Prompt context, Inline/Changes reconciliation, orphan recovery, and legacy migration bind the exact entry generation plus project instance at their internal async mutation boundaries. Production-helper deferred A→B tests pass at 7/7, full `npm test`, approved GUI `npm run verify`, and forced real Electron 37/37 pass, and fourth-round independent review is P0=0/P1=0/P2=0. The first full test red caused by two obsolete no-argument call assertions remains recorded. Author copy 10 is invalidated by production changes; acceptance resumes only from candidate `2bb9052` and a fresh author copy 11.
 
 ## 1. Product decision
 
