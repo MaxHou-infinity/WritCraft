@@ -76,7 +76,7 @@
 5. 修复旅程中发现的 P0/P1 阻断项；P2 必须明确记录、分级并决定是否允许发版。
 6. 记录内容无关的私有指标：Inline 接受率、导航建议帮助度/动作、Research 匹配判断、图片评分/采纳、耗时和稳定错误码。
 
-当前执行注记（2026-08-01，0.0CM）：`1b51595` 后暴露的 recent-project/Assistant 握手竞态已关闭。项目进入现由 single-flight request owner 与 exact generation + project instance 约束；Prompt、Inline/Changes recovery、孤儿恢复和旧草稿 helper 均在内部 await 与副作用边界复验，Assistant 也会同步监听注册前已 ready 的项目。Project Entry 7/7、Navigation 全链、完整 `npm test`、批准 GUI `npm run verify`、强制真实 Electron 37/37 通过；第四轮独立复审 P0/P1/P2=0。首次完整 test 因两处旧无参数调用断言而红的证据保留。新的本地 exact candidate 已保存为 `2bb9052`（未推送、未发布）；下一步只从该候选创建作者验收-11并重验统一任务最短旅程；不得复用作者验收-10、重跑已签字模块或发布 0.1.2。
+当前执行注记（2026-08-01，0.0CM）：`1b51595` 后暴露的 recent-project/Assistant 握手竞态已关闭。项目进入现由 single-flight request owner 与 exact generation + project instance 约束；Prompt、Inline/Changes recovery、孤儿恢复和旧草稿 helper 均在内部 await 与副作用边界复验，Assistant 也会同步监听注册前已 ready 的项目。Project Entry 7/7、Navigation 全链、完整 `npm test`、批准 GUI `npm run verify`、强制真实 Electron 37/37 通过；第四轮独立复审 P0/P1/P2=0。首次完整 test 因两处旧无参数调用断言而红的证据保留。本地 exact candidate `2bb9052` 及 fresh 作者验收-11 已就绪，复制事务证明源未变且新旅程 History/metrics 基线为 0；下一步只运行统一任务最短旅程；不得复用作者验收-10、重跑已签字模块或发布 0.1.2。
 
 历史检查点（0.0BZ）：只读 Main/IPC 基础已独立签收，包括严格结构/导航工具协议、证据锚点、8 条/30 分钟隔离缓存、watcher barrier、真实 deadline abort 和零写入门禁；专项 53/53、Network 15/15，独立复审 P0/P1=0。其当时未覆盖的 Renderer、动作、骨架与 Electron 已由上方 0.0CC 当前注记覆盖，不得从本段派发旧“下一阶段”。
 
