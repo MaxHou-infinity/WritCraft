@@ -38,7 +38,7 @@ const GRAPH_CACHE_BUDGET_MS = 700;
 const GRAPH_INCREMENTAL_BUDGET_MS = 800;
 const GRAPH_INTERACTION_BUDGET_MS = 100;
 const GRAPH_RENDERER_HEAP_BUDGET_BYTES = 150 * 1024 * 1024;
-const EXPECTED_STAGE_COUNT = ONBOARDING_FOCUS ? 2 : 36;
+const EXPECTED_STAGE_COUNT = ONBOARDING_FOCUS ? 2 : 37;
 
 let passed = 0;
 const activeElectronInstances = new Set();
@@ -599,6 +599,7 @@ async function run() {
     electronAiFixture.REWRITE_TARGET,
     electronAiFixture.REWRITE_AFTER,
     electronAiFixture.REWRITE_FAR,
+    electronAiFixture.UNIFIED_BEFORE,
     electronAiFixture.CHANGES_BEFORE[0],
     ...Array.from({ length: 12 }, (_, index) => `E2E_CHANGES_FILLER_A_${index + 1}`),
     electronAiFixture.CHANGES_BEFORE[1],
@@ -1923,20 +1924,25 @@ async function run() {
       assert.strictEqual(fs.existsSync(markerPath), false);
     });
 
-    await stage('opens Writing Navigation as the only public planning surface without modifying the manuscript', async () => {
+    await stage('generates one Writing Navigation suggestion and rejects its inline Diff with zero manuscript writes', async () => {
+      await first.client.evaluate(`window.__workspace.openFile(${JSON.stringify(createdPath)})`);
+      await waitForValue(first.client, `(() =>
+        window.__workspace.state.currentPath === ${JSON.stringify(createdPath)} &&
+        window.__editor.getContent().includes(${JSON.stringify(electronAiFixture.UNIFIED_BEFORE)})
+      )()`, 'the unified writing task target file');
       const markdownBefore = snapshotMarkdownFiles(project.rootPath);
       const navigation = await first.client.evaluate(`(() => {
         document.querySelector('[data-assistant-mode="navigation"]').click();
         const host = document.getElementById('writing-navigation-host');
         const goal = host.querySelector('textarea');
-        goal.value = '根据现有章节，找出下一步最值得推进的写作动作';
+        goal.value = ${JSON.stringify(electronAiFixture.UNIFIED_NAVIGATION_GOAL)};
         goal.dispatchEvent(new Event('input', { bubbles: true }));
+        host.querySelector('[data-navigation-action="generate"]').click();
         return {
           planTabExists: Boolean(document.querySelector('[data-assistant-mode="plan"]')),
           navigationSelected: document.querySelector('[data-assistant-mode="navigation"]')
             .getAttribute('aria-selected'),
           hasGoal: goal.value.length > 0,
-          hasGenerate: host.textContent.includes('生成写作导航'),
           hasEvidencePromise: host.textContent.includes('原文依据'),
         };
       })()`);
@@ -1944,15 +1950,110 @@ async function run() {
         planTabExists: false,
         navigationSelected: 'true',
         hasGoal: true,
-        hasGenerate: true,
         hasEvidencePromise: true,
+      });
+      const suggestion = await waitForValue(first.client, `(() => {
+        const card = document.querySelector('.writing-navigation__suggestion');
+        const primary = card?.querySelector('.writing-navigation__primary');
+        if (!card || primary?.textContent !== '处理这个建议') return null;
+        return {
+          mode: window.__assistantDock.getMode(),
+          primaryCount: [...document.querySelectorAll('.writing-navigation__suggestion .writing-navigation__primary')]
+            .filter(node => node.textContent === '处理这个建议').length,
+          hasFinding: card.textContent.includes('待验证的冗余表达'),
+          hasEvidence: card.textContent.includes(${JSON.stringify(electronAiFixture.UNIFIED_BEFORE)}),
+        };
+      })()`, 'one unified Writing Navigation suggestion');
+      assert.deepStrictEqual(suggestion, {
+        mode: 'navigation', primaryCount: 1, hasFinding: true, hasEvidence: true,
       });
       assert.deepStrictEqual(
         snapshotMarkdownFiles(project.rootPath),
         markdownBefore,
-        'opening and drafting a navigation request must remain zero-write'
+        'generating a navigation suggestion must remain zero-write'
       );
-      await first.client.evaluate(`window.__assistantDock.close()`);
+
+      await first.client.evaluate(`document.querySelector('.writing-navigation__suggestion .writing-navigation__primary').click()`);
+      const inlineReview = await waitForValue(first.client, `(() => {
+        const wrapper = document.querySelector('.changes-inline-review');
+        if (!wrapper || !wrapper.textContent.includes(${JSON.stringify(electronAiFixture.UNIFIED_AFTER)})) return null;
+        return {
+          mode: window.__assistantDock.getMode(),
+          hasRemove: Boolean(wrapper.querySelector('.changes-inline-review__text.is-remove[aria-label="AI 建议删除"]')),
+          hasAdd: Boolean(wrapper.querySelector('.changes-inline-review__text.is-add[aria-label="AI 建议新增"]')),
+          writeState: document.querySelector('.writing-navigation__write-state')?.textContent || '',
+        };
+      })()`, 'the inline unified-task Diff');
+      assert.deepStrictEqual(inlineReview, {
+        mode: 'navigation', hasRemove: true, hasAdd: true,
+        writeState: '尚未写入；接受后才会修改文件',
+      });
+      assert.deepStrictEqual(snapshotMarkdownFiles(project.rootPath), markdownBefore,
+        'inline Diff must remain a transient zero-write visual layer');
+
+      await first.client.evaluate(`(() => {
+        const hunk = document.querySelector('.changes-inline-review__hunk');
+        [...hunk.querySelectorAll('button')].find(node => node.textContent === '拒绝').click();
+        [...document.querySelectorAll('.changes-inline-review__toolbar button')]
+          .find(node => node.textContent === '确认并写入').click();
+      })()`);
+      await waitForValue(first.client, `(() =>
+        document.querySelector('.writing-navigation__task-stage')?.textContent === '本次审阅已经结束' &&
+        !document.querySelector('.changes-inline-review')
+      )()`, 'the rejected unified-task review');
+      assert.deepStrictEqual(snapshotMarkdownFiles(project.rootPath), markdownBefore,
+        'rejecting the inline Diff must not change manuscript bytes');
+    });
+
+    await stage('accepts the same unified task through inline Diff and exposes exact Safe Undo state', async () => {
+      const beforeDisk = projectService.readFile(project.rootPath, createdPath);
+      assert(beforeDisk.includes(electronAiFixture.UNIFIED_BEFORE));
+      await first.client.evaluate(`(() => {
+        const host = document.getElementById('writing-navigation-host');
+        host.querySelector('[data-navigation-action="generate"]').click();
+      })()`);
+      await waitForValue(first.client, `document.querySelector('.writing-navigation__suggestion .writing-navigation__primary')?.textContent === '处理这个建议'`, 'the regenerated unified suggestion');
+      await first.client.evaluate(`document.querySelector('.writing-navigation__suggestion .writing-navigation__primary').click()`);
+      await waitForValue(first.client, `document.querySelector('.changes-inline-review')?.textContent.includes(${JSON.stringify(electronAiFixture.UNIFIED_AFTER)})`, 'the second inline unified-task Diff');
+      await first.client.evaluate(`(() => {
+        const hunk = document.querySelector('.changes-inline-review__hunk');
+        [...hunk.querySelectorAll('button')].find(node => node.textContent === '接受').click();
+        [...document.querySelectorAll('.changes-inline-review__toolbar button')]
+          .find(node => node.textContent === '确认并写入').click();
+      })()`);
+      await waitForValue(first.client, `(() =>
+        document.querySelector('.writing-navigation__task-stage')?.textContent === '修改已经写入项目文件' &&
+        window.__editor.getContent().includes(${JSON.stringify(electronAiFixture.UNIFIED_AFTER)})
+      )()`, 'the committed unified-task review');
+      const committed = projectService.readFile(project.rootPath, createdPath);
+      assert(committed.includes(electronAiFixture.UNIFIED_AFTER));
+      assert(!committed.includes(electronAiFixture.UNIFIED_BEFORE));
+
+      const history = await first.client.evaluate(`window.writCraft.project.listChangeHistory()`);
+      assert.strictEqual(history.ok, true);
+      const applied = history.history.find(entry => entry.status === 'applied' &&
+        entry.files?.some(file => file.path === createdPath) &&
+        entry.provenance?.schema === 'writcraft.writing-navigation-changes/v1');
+      assert(applied, 'unified task commit must create one writing-navigation History entry');
+
+      await first.client.evaluate(`(() => {
+        document.querySelector('[data-assistant-mode="changes"]').click();
+        window.__e2eUnifiedOriginalConfirm = window.confirm;
+        window.confirm = () => true;
+      })()`);
+      await waitForValue(first.client, `document.querySelector('.history-card.is-latest .history-undo')`, 'the unified-task Safe Undo control');
+      await first.client.evaluate(`document.querySelector('.history-card.is-latest .history-undo').click()`);
+      await first.client.evaluate(`document.querySelector('[data-assistant-mode="navigation"]').click()`);
+      await waitForValue(first.client, `(() => {
+        return document.querySelector('.writing-navigation__task-stage')?.textContent === '这次写入已经安全撤销' &&
+          window.__editor.getContent().includes(${JSON.stringify(electronAiFixture.UNIFIED_BEFORE)});
+      })()`, 'the unified-task Safe Undo terminal state');
+      assert.strictEqual(projectService.readFile(project.rootPath, createdPath), beforeDisk);
+      await first.client.evaluate(`(() => {
+        window.confirm = window.__e2eUnifiedOriginalConfirm;
+        delete window.__e2eUnifiedOriginalConfirm;
+        window.__assistantDock.close();
+      })()`);
     });
 
     // Historical Plan-only journeys remain below as isolated source evidence.

@@ -4,7 +4,7 @@
 > Product version: `writ-craft@0.1.2`
 > Public journey: Writing Navigation suggestion → inline review → explicit decision
 
-> Implementation checkpoint (2026-08-01): Main/Renderer/inline Diff/Safe Undo state handoff and focused automated checks are implemented locally. Full verification, real Electron, independent review, and real-author acceptance remain open; this is not release sign-off.
+> Implementation checkpoint (2026-08-01): Main/Renderer/inline Diff/Safe Undo state handoff and focused automated checks are implemented locally. The deterministic provider fixture and 37-stage real-Electron script now cover one-click Diff, reject-zero-write, accept/History, and exact Safe Undo, but that GUI script has not run on this checkpoint because the Codex usage gate rejected launch. Full regression must be rerun because the last `npm test` session lost its terminal result. Real Electron, independent review, and real-author acceptance remain open; this is not release sign-off.
 
 ## 1. Product decision
 

@@ -46,6 +46,9 @@ const REWRITE_OUTPUT = 'E2E Inline Rewrite 已由 Main 权威上下文生成。'
 const RESEARCH_TARGET_PATH = CHAT_CURRENT_PATH;
 const RESEARCH_BEFORE = REWRITE_FAR;
 const RESEARCH_AFTER = 'E2E_RESEARCH_APPLIED_WITH_PROVENANCE';
+const UNIFIED_NAVIGATION_GOAL = 'E2E 一次点击进入正文内 Diff';
+const UNIFIED_BEFORE = 'E2E_UNIFIED_TASK_BEFORE';
+const UNIFIED_AFTER = 'E2E_UNIFIED_TASK_AFTER';
 const CHANGES_REVIEW_GOAL = 'E2E 验证两个文件三块修改的独立审阅';
 const CHANGES_SECOND_PATH = 'chapters/01-arrival.md';
 const CHANGES_BEFORE = Object.freeze([
@@ -478,6 +481,81 @@ function assertResearchToolRequest(request) {
   }
 }
 
+function assertWritingNavigationToolRequest(request) {
+  const tool = request.tools?.[0];
+  const suggestionSchema = tool?.input_schema?.properties?.suggestions;
+  const evidenceSchema = suggestionSchema?.items?.properties?.evidenceRefs;
+  if (request.max_tokens !== 8_192 || request.tools?.length !== 1 ||
+      tool?.name !== 'submit_writing_navigation' ||
+      request.tool_choice?.type !== 'tool' || request.tool_choice?.name !== 'submit_writing_navigation' ||
+      tool?.input_schema?.type !== 'object' || tool?.input_schema?.additionalProperties !== false ||
+      suggestionSchema?.minItems !== 1 || suggestionSchema?.maxItems !== 3 ||
+      !Array.isArray(evidenceSchema?.items?.enum) || !evidenceSchema.items.enum.length) {
+    throw new Error('E2E_FIXTURE_INVALID_WRITING_NAVIGATION_TOOL_PROTOCOL');
+  }
+}
+
+function writingNavigationAnswer(prompt, request) {
+  if (!prompt.includes(`用户目标：${UNIFIED_NAVIGATION_GOAL}`) ||
+      !prompt.includes('WRITCRAFT_EVIDENCE_REF') || !prompt.includes(UNIFIED_BEFORE)) {
+    throw new Error('E2E_FIXTURE_INVALID_WRITING_NAVIGATION_PROMPT');
+  }
+  const candidates = request.tools[0].input_schema.properties.suggestions
+    .items.properties.evidenceRefs.items.enum;
+  const marker = [...prompt.matchAll(/<!-- WRITCRAFT_EVIDENCE_REF:(er_[a-f0-9]{16}_[1-9][0-9]{0,3}) -->\n([^\n]*)/g)]
+    .find(match => match[2].includes(UNIFIED_BEFORE));
+  if (!marker || !candidates.includes(marker[1])) {
+    throw new Error('E2E_FIXTURE_MISSING_WRITING_NAVIGATION_EVIDENCE');
+  }
+  return {
+    mode: 'navigation',
+    suggestions: [{
+      finding: '当前章节保留了一处待验证的冗余表达。',
+      evidenceRefs: [marker[1]],
+      whyNow: '这是验证统一写作任务流最小安全闭环的明确位置。',
+      recommendedAction: '精简这一处表达',
+      expectedResult: '作者可在正文中审阅一处有界修改。',
+      action: 'changes',
+    }],
+  };
+}
+
+function assertUnifiedWritingTaskRequest(request) {
+  const tool = request.tools?.[0];
+  const edits = tool?.input_schema?.properties?.edits;
+  if (request.max_tokens !== 8_192 || request.tools?.length !== 1 ||
+      tool?.name !== 'submit_unified_writing_task' ||
+      request.tool_choice?.type !== 'tool' || request.tool_choice?.name !== 'submit_unified_writing_task' ||
+      tool?.input_schema?.type !== 'object' || tool?.input_schema?.additionalProperties !== false ||
+      edits?.maxItems !== 3 || !Array.isArray(edits?.items?.properties?.rangeId?.enum)) {
+    throw new Error('E2E_FIXTURE_INVALID_UNIFIED_WRITING_TASK_PROTOCOL');
+  }
+}
+
+function unifiedWritingTaskAnswer(prompt, request) {
+  if (!prompt.includes('必须且只能调用 submit_unified_writing_task 一次') ||
+      !prompt.includes(`建议动作：精简这一处表达`) || !prompt.includes(UNIFIED_BEFORE)) {
+    throw new Error('E2E_FIXTURE_INVALID_UNIFIED_WRITING_TASK_PROMPT');
+  }
+  const rangeIds = request.tools[0].input_schema.properties.edits.items.properties.rangeId.enum;
+  const ranges = [...prompt.matchAll(/<editable-range rangeId=("range_[1-9][0-9]*") label=("(?:[^"\\]|\\.)*") content=("(?:[^"\\]|\\.)*") \/>/g)]
+    .map(match => ({ rangeId: JSON.parse(match[1]), content: JSON.parse(match[3]) }));
+  const target = ranges.find(range => range.content.includes(UNIFIED_BEFORE));
+  if (!target || !rangeIds.includes(target.rangeId)) {
+    throw new Error('E2E_FIXTURE_MISSING_UNIFIED_WRITING_TASK_RANGE');
+  }
+  return {
+    status: 'changes',
+    edits: [{
+      rangeId: target.rangeId,
+      newText: target.content.replace(UNIFIED_BEFORE, UNIFIED_AFTER),
+      summary: '验证正文内统一任务 Diff',
+    }],
+    reason: '',
+    question: '',
+  };
+}
+
 function planChangesAnswer(prompt) {
   if (!prompt.includes(`"planGoal":"${PLAN_GOAL}"`)) throw new Error('E2E_FIXTURE_INVALID_PLAN_HANDOFF');
   const file = planTargetFile(prompt, PLAN_BEFORE);
@@ -546,6 +624,8 @@ function createElectronAiProvider() {
       let output;
       let planToolInput = null;
       let researchToolInput = null;
+      let writingNavigationToolInput = null;
+      let unifiedWritingTaskToolInput = null;
       if (prompt.includes('WritCraft Onboarding v2 项目建立助手')) {
         if (request.max_tokens !== 4096) throw new Error('E2E_FIXTURE_INVALID_ONBOARDING_V2_MAX_TOKENS');
         onboardingCalls += 1;
@@ -655,6 +735,12 @@ function createElectronAiProvider() {
       } else if (prompt.includes('WritCraft 的本地证据 Research 助手')) {
         assertResearchToolRequest(request);
         researchToolInput = researchCard(prompt);
+      } else if (prompt.includes('你是 WritCraft 的写作导航助手。')) {
+        assertWritingNavigationToolRequest(request);
+        writingNavigationToolInput = writingNavigationAnswer(prompt, request);
+      } else if (prompt.includes('必须且只能调用 submit_unified_writing_task 一次')) {
+        assertUnifiedWritingTaskRequest(request);
+        unifiedWritingTaskToolInput = unifiedWritingTaskAnswer(prompt, request);
       } else {
         throw new Error('E2E_FIXTURE_UNHANDLED_TEXT');
       }
@@ -683,6 +769,32 @@ function createElectronAiProvider() {
             id: 'call_research_1',
             name: 'submit_research_cards',
             input: researchToolInput,
+          }],
+          stop_reason: 'tool_use',
+          usage: { input_tokens: 128, output_tokens: 64 },
+        });
+      }
+      if (writingNavigationToolInput) {
+        return jsonResponse({
+          model: 'MiniMax-M3',
+          content: [{
+            type: 'tool_use',
+            id: 'call_writing_navigation_1',
+            name: 'submit_writing_navigation',
+            input: writingNavigationToolInput,
+          }],
+          stop_reason: 'tool_use',
+          usage: { input_tokens: 128, output_tokens: 64 },
+        });
+      }
+      if (unifiedWritingTaskToolInput) {
+        return jsonResponse({
+          model: 'MiniMax-M3',
+          content: [{
+            type: 'tool_use',
+            id: 'call_unified_writing_task_1',
+            name: 'submit_unified_writing_task',
+            input: unifiedWritingTaskToolInput,
           }],
           stop_reason: 'tool_use',
           usage: { input_tokens: 128, output_tokens: 64 },
@@ -753,6 +865,9 @@ module.exports = {
   RESEARCH_TARGET_PATH,
   RESEARCH_BEFORE,
   RESEARCH_AFTER,
+  UNIFIED_NAVIGATION_GOAL,
+  UNIFIED_BEFORE,
+  UNIFIED_AFTER,
   CHANGES_REVIEW_GOAL,
   CHANGES_SECOND_PATH,
   CHANGES_BEFORE,

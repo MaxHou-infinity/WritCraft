@@ -76,7 +76,7 @@
 5. 修复旅程中发现的 P0/P1 阻断项；P2 必须明确记录、分级并决定是否允许发版。
 6. 记录内容无关的私有指标：Inline 接受率、导航建议帮助度/动作、Research 匹配判断、图片评分/采纳、耗时和稳定错误码。
 
-当前执行注记（2026-08-01，0.0CM）：真实作者明确否定 Navigation → Research → Changes 默认旅程；一次任务曾在底层网络时限之后仍持续“处理中”超过三分钟。旧 0.0CL 结构化 Research 修复保留为内部技术证据，但不再派发“再测卡片判断/Research→Changes”。`UNIFIED-WRITING-TASK-V1-CONTRACT.md` 已冻结替代旅程：每张建议只有“处理这个建议”，正常路径一次点击在正文中显示 Diff；仅来源确实不足时在同一任务内恢复；15 秒可取消、60 秒硬终止、默认 1–3 个局部修改。Main/Renderer/正文内 Diff/Safe Undo 状态回传已形成实现检查点并通过定向自动化；完整回归、真实 Electron、独立复审和真实作者最短链路仍开放。尚未获得 0.1.2 发布授权。
+当前执行注记（2026-08-01，0.0CM）：真实作者明确否定 Navigation → Research → Changes 默认旅程；一次任务曾在底层网络时限之后仍持续“处理中”超过三分钟。旧 0.0CL 结构化 Research 修复保留为内部技术证据，但不再派发“再测卡片判断/Research→Changes”。`UNIFIED-WRITING-TASK-V1-CONTRACT.md` 已冻结替代旅程：每张建议只有“处理这个建议”，正常路径一次点击在正文中显示 Diff；仅来源确实不足时在同一任务内恢复；15 秒可取消、60 秒硬终止、默认 1–3 个局部修改。Main/Renderer/正文内 Diff/Safe Undo 状态回传已形成实现检查点并通过定向自动化；确定性 provider fixture 与现行 37 阶段真实 Electron 最短旅程已写入测试代码，但 GUI 启动被 Codex 当前使用额度门禁拒绝，未形成产品结论。最后一次完整 `npm test` 会话终态丢失，恢复后必须重跑；真实 Electron、独立复审和真实作者最短链路仍开放。尚未获得 0.1.2 发布授权。
 
 历史检查点（0.0BZ）：只读 Main/IPC 基础已独立签收，包括严格结构/导航工具协议、证据锚点、8 条/30 分钟隔离缓存、watcher barrier、真实 deadline abort 和零写入门禁；专项 53/53、Network 15/15，独立复审 P0/P1=0。其当时未覆盖的 Renderer、动作、骨架与 Electron 已由上方 0.0CC 当前注记覆盖，不得从本段派发旧“下一阶段”。
 
