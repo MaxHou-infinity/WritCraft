@@ -76,7 +76,7 @@
 5. 修复旅程中发现的 P0/P1 阻断项；P2 必须明确记录、分级并决定是否允许发版。
 6. 记录内容无关的私有指标：Inline 接受率、导航建议帮助度/动作、Research 匹配判断、图片评分/采纳、耗时和稳定错误码。
 
-当前执行注记（2026-07-31，0.0CH）：项目卡、Inline、Chapter、空项目结构规划，以及第九副本的已有稿件 Navigation 生成、原文定位与帮助度判断已关闭，不得重复。作者首次复用现成建议生成 Changes 时真实触发 `MODEL_OUTPUT_TOO_LARGE`；Diff 未创建，post-manifest History=0、recovery=0，公开文件仍与不变授权源逐文件一致。生产已把该 handoff 从自由文本 JSON 改为唯一 `submit_localized_edits` tool，并以 Main-owned `target_1…target_8` 恢复真实路径；最多 8 个局部替换，最大合法 Unicode input 14,083 bytes < 24 KiB。专项、完整 test/非沙箱 verify、真实 Electron 36/36 与独立复审 P0=0/P1=0 已通过。下一步只在重启后的最新源码中复用同一建议重试，Diff 出现后先验证提交前零写入；Research、image-01 与 Graph/recovery 仍开放，尚未进入 0.1.2 发布授权。
+当前执行注记（2026-08-01，0.0CH）：项目卡、Inline、Chapter、空项目结构规划，以及第九副本的已有稿件 Navigation 原文定位与帮助度判断已关闭，不得重复。作者首次复用现成建议生成 Changes 时真实触发 `MODEL_OUTPUT_TOO_LARGE`；Diff 未创建，post-manifest History=0、recovery=0，公开文件仍与不变授权源逐文件一致。生产已把该 handoff 从自由文本 JSON 改为唯一 `submit_localized_edits` tool，并以 Main-owned `target_1…target_8` 恢复真实路径；最多 8 个局部替换，最大合法 Unicode input 14,083 bytes < 24 KiB。专项、完整 test/非沙箱 verify、真实 Electron 36/36 与独立复审 P0=0/P1=0 已通过。建议 action ID 只存在于 Main 进程内存，重启后不能迁移或伪造；因此最新源码必须用原目标最短重建一次 Navigation authority，再只重跑 Changes handoff。Diff 出现后先验证提交前零写入；无需再次评价建议帮助度。Research、image-01 与 Graph/recovery 仍开放，尚未进入 0.1.2 发布授权。
 
 历史检查点（0.0BZ）：只读 Main/IPC 基础已独立签收，包括严格结构/导航工具协议、证据锚点、8 条/30 分钟隔离缓存、watcher barrier、真实 deadline abort 和零写入门禁；专项 53/53、Network 15/15，独立复审 P0/P1=0。其当时未覆盖的 Renderer、动作、骨架与 Electron 已由上方 0.0CC 当前注记覆盖，不得从本段派发旧“下一阶段”。
 
