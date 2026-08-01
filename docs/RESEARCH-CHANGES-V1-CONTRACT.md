@@ -1,6 +1,6 @@
 # Research → Changes v1 Contract
 
-> Status: product chain and committed-warning boundary signed, P0 = 0 / P1 = 0 / P2 = 0. The forced Electron 20/20 result below is historical focused evidence, including reject-only and a true late-open A→B race; it is not the current project-wide total. The production Research apply transaction remains signed; project-wide current totals and restart order live only in `v0/DEVELOPMENT-STATUS.md`.
+> Status: product chain and committed-warning boundary signed, P0 = 0 / P1 = 0 / P2 = 0. Initial Research generation now uses one named `submit_research_cards` tool call rather than model-authored text JSON; current verification and author status live only in `v0/DEVELOPMENT-STATUS.md`. The forced Electron 20/20 result below is historical focused evidence, including reject-only and a true late-open A→B race; it is not the current project-wide total.
 > Schema: `writcraft.research-handoff/v1`
 
 ## 1. Product journey
@@ -105,7 +105,7 @@ Required coverage includes:
 - selected-source mapping/metadata, quote/locator, `edit.md` and target drift before/after model, before apply and post-commit;
 - reserved/alias/source-target overlap and unrelated Source Index drift;
 - strict pending dependencies, expiry inheritance, no-op/provenance match, residual replacement and committed-warning faults;
-- full-text strict JSON plus `stopReason: end_turn` for both initial Research cards and the localized handoff; preview and failure paths produce zero disk writes;
+- exactly one raw `submit_research_cards` tool-use block with `stopReason: tool_use` for initial Research cards; schema and Main both constrain source IDs, fields, counts and lengths. The localized handoff retains its own independently bounded structured contract; preview and failure paths produce zero disk writes;
 - 30-second review delivery acknowledgement, wrong/stale ack rejection, sender reload/crash cleanup and retry without waiting for TTL;
 - Renderer persist failure and every project/rerun/detach/destroy/target-change/late-result race, including `persist → unsaved typing → late result` with zero surviving capability;
 - V1/V2→V3 history migration, provenance integrity/size/privacy, application/reject-only/undo retention;

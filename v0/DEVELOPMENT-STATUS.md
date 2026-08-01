@@ -1,11 +1,11 @@
 # 笔触 · WritCraft · V0 开发状态与续作入口
 
-> 最后更新：2026-08-01（Asia/Shanghai，0.0CK · Research 能力重入与卡片工具条）
+> 最后更新：2026-08-01（Asia/Shanghai，0.0CL · Research 具名结构化输出）
 > 当前状态：**`writ-craft@0.1.1` 已从 exact candidate `c65981e` 发布到 npm `preview`；registry 时间 `2026-07-29T14:30:16.176Z`，shasum `d370c500666e25cfb373852deafa21b232d2bc18` 与本地候选一致。公网隔离安装/启动/退出为 2/2。annotated tag `v0.1.1` 指向同一提交，GitHub prerelease 已公开：`https://github.com/MaxHou-infinity/WritCraft/releases/tag/v0.1.1`。**
 > 发布判断：**0.1.1 Developer Preview 已完成版本、自动化、双架构安装、独立复审、npm 发布、公网安装和 GitHub prerelease。registry 标签保持 `preview: 0.1.1`、`latest: 0.1.0`，因此本次没有把 Preview 冒充稳定版，也没有执行 unpublish、占位发布或上传未签名 App/ZIP。**
 > 当前目标版本：**`docs/ROADMAP.md` 的 `RM-1.1 / writ-craft@0.1.2` 真实作者可用性闭环。必须以 `WRITING-NAVIGATION-V1-CONTRACT.md` 的结构规划/写作导航替代旧 Plan，再完成 Research、image-01、Graph/recovery 和完整签字。不得插入驾驶舱或其他后续版本功能。**
-> 当前源码证据：**旧 Plan 公共入口已移除，右栏固定为 Chat / 导航 / Context / Changes。Navigation→Changes 使用 Main-owned revision-bound range 协议。刷新/同 App 重开由 Main 暂存权威 record、全依赖重验后零 provider 恢复；每张卡片固定同时提供 Research/Changes。0.0CK 又把只读 Research capability 改为安全可重入：Renderer 路由失败不再烧毁建议，并发第二次只返回 busy，不中断第一条 lease；Changes sibling 仍独立且单次消费。卡片底部改为 28px 紧凑编辑工具条，主按钮小字对比度 ≥4.5:1。`npm run verify:navigation` 当前 Renderer state **14/14**、dynamic **9/9**、integration **6/6**、public surface **5/5**、service **29/29**、store **20/20**、handler **14/14**、handoff **8/8**、action handler **16/16**、Main wiring **4/4**、zero-write **2/2** 及结构全链全绿；本轮完整 `npm test` 与批准 GUI `npm run verify` 均 exit 0，最终独立复审 **P0=0/P1=0/P2=0**。0.0CJ 的三次不同阶段 E2E 时序红灯继续保留为上一个候选证据。**
-> 当前作者验收进度：**项目卡、Inline、Chapter、空项目结构规划、Navigation 生成/原文定位/帮助度，以及 Navigation→Changes→接受→Safe Undo 已关闭。随后作者刷新页面发现 Navigation 进度丢失并被迫重新付费生成，且 Research 按钮随模型的单一 action 不稳定。该 0.0CJ P1 已进入修复与自动化验证；只待最新源码重启后做一次刷新恢复和固定“补充来源”作者复验，不重做已签字的 Changes 或帮助度判断。Research 完整旅程、image-01 与 Graph/recovery 仍开放。**
+> 当前源码证据：**旧 Plan 公共入口已移除，右栏固定为 Chat / 导航 / Context / Changes。Navigation→Changes 使用 Main-owned revision-bound range 协议；刷新恢复、固定 Research/Changes 双动作及 Research handoff 安全重入均已实现。0.0CL 又把初始 Research 从模型自由文本 JSON 迁移为唯一具名 `submit_research_cards` tool-use：接口 Schema 限制来源 ID、字段、数量和长度，Main 再做 exact-key、字节、逐字 quote、locator、revision 与末端 stale 校验；围栏、解释文本、零/多 tool block、截断和越权来源均零写入失败。Research Main **12+15+12+10+4**、Main integration **12/12**、Renderer **17+13** 全绿；完整 `npm test` 与批准 GUI `npm run verify` 均 exit 0。真实 Electron 首次因夹具把未知请求误路由为 Research 而红，修正夹具后一次在完成 28 阶段时出现 CDP `Runtime.evaluate` 超时，随后同源复跑 **36/36**；该时序红灯保留为 P2，不用产品代码掩盖。**
+> 当前作者验收进度：**项目卡、Inline、Chapter、空项目结构规划、Navigation 生成/原文定位/帮助度，以及 Navigation→Changes→接受→Safe Undo 已关闭。作者已确认 Research 页正确收到建议问题、导航发现和 canonical 原文依据；首次真实 Research 运行暴露“AI 研究结果不是严格 JSON”，本次已修复但尚待作者在最新 App 中只重跑“研究所选来源”。Research 卡片质量判断及后续 Research→Changes、image-01 与 Graph/recovery 仍开放；不重做已签字的帮助度、Changes 或 Navigation 生成。**
 > 0.0AA 历史保留红灯：**首轮真实 Electron 暴露 Inspector 在上下文失效时被清空、旧 5-chip 断言和项目 Chat 等待诊断；完整 test 又暴露 Plan 测试把 generation 函数正文写死。独立复审发现新请求预检窗口可提交不可见旧轮、同项目重开 UI/Main 串话、失败重开提前清会话及两项测试/错误文案缺口，均转为生产边界和回归后关闭。真实 Electron 曾连续两次在旧 Graph 恢复阶段超时；加入只读失败快照后该阶段连续四次通过，未改 Graph 产品逻辑，按重复同源证据关闭 timing P2。另一次 Chat preflight 红灯证明测试在恢复 `edit.md` 后未等待权威 watcher barrier；改为生产 `flushExternalChanges()` 收敛，而未放宽 Chat guard。该里程碑所有红运行保留，最终源码连续两次 34/34；后续 0.0AB 当时推进到 35/35，当前总链只看本文顶部当前里程碑。**
 > Graph 历史签字基线：**性能修复前的既有源码曾完整 `npm test`、Electron-enabled `npm run verify`、强制真实 Electron 26/26 exit 0；Graph Filter 15/15、Workbench 14/14、dynamic 5/5、Large 5/5、Watcher 15/15、Network 11/11、Intelligence 17/17，第二轮复审 P0=0/P1=0/P2=2。该数字只保留为历史过程；0.0AB 后来推进到 35/35，当前总链只看顶部当前里程碑。**
 > Graph 动态边界：**300 文件/1279 节点 cold-to-interactive、cache/incremental、筛选/内存/布局、AX/键鼠、三类纠错、stale/Issue→Changes、failure live、重启与项目隔离均进入真实 Electron；正文/History/ledger 的零写入门禁通过。**  
@@ -34,7 +34,14 @@ Chat 的三级 scope/context、Main-owned 多轮连续性、Onboarding v2、Rese
 5. 每批合入后重跑定向测试；阶段完成时再运行完整 `npm test`、`npm run verify` 与 `WRITCRAFT_E2E_FORCE=1 npm run e2e:electron`，保存当次证据。
 6. 真实 API 只使用用户显式配置的 Key；记录延迟、限流、超时、故障和费用，不记录 Key、Prompt、模型原文或正文。Key 前缀只表示凭据/计费类型，不能代替官方能力与现场门禁。首发按 npm Developer Preview 合同执行；独立 App 发布才需要 Developer ID、公证与 Gatekeeper。
 
-### 0.0CK 2026-08-01 · “补充来源”过早失效与卡片动作视觉修复（进行中）
+### 0.0CL 2026-08-01 · Research 自由文本 JSON 迁移为具名结构化工具（待作者复验）
+
+- **真实红灯**：作者从 Navigation 正确进入 Research、勾选 1 个来源并运行后，界面显示“AI 研究结果不是严格 JSON”。导航问题、发现和 canonical 原文依据已正确到达；失败发生在真实 provider 返回后的初始 Research 解析，项目文件零写入。
+- **根因**：`research-service` 仍要求模型在普通 text block 中自行输出 JSON。真实 MiniMax 可以附加解释或 Markdown 围栏；继续加重提示词只能降低概率，不能形成协议保证，也会重复消耗作者时间与额度。
+- **生产修复**：新增唯一 `submit_research_cards` tool choice。动态 Schema 只允许本次显式选择的 source ID，并冻结卡片字段、1–20 数量及文本长度；Main 要求 raw tool-use 总数恰好为 1，再执行原有逐字 quote/UTF-16 locator/revision/来源末端重验。普通文本 JSON 不再有兼容降级或自动修补。
+- **验证**：Research Main/集成/事务/Watcher **12+12+15+12+10+4**，Renderer **17+13**；`npm test`、批准 GUI `npm run verify` exit 0。真实 Electron：夹具协议迁移后一次 28 阶段 CDP timing 红灯，原样复跑 **36/36**；P2 timing 保留。下一动作仅为最新源码下再次点击“研究所选来源”，不重新生成 Navigation。
+
+### 0.0CK 2026-08-01 · “补充来源”过早失效与卡片动作视觉修复（已完成）
 
 - **作者现场**：在建议 2 已成功生成待审修改后点击“补充来源”，界面显示“建议已过期”，并错误附带通用“AI 没有完成整理”文案；两个动作按钮尺寸、填充和排版过重，不像写作卡片中的次级工具。
 - **根因**：Research handoff 在 Main 返回成功时即永久消费 action；若 Renderer 打开 Sources 路由失败，UI 虽允许重试，Main 已只会返回 `ACTION_NOT_FOUND`。并发 Research 还会把第一条 lease 当重放主动终止。通用错误映射没有区分来源路由、待审 Changes 与模型生成失败。

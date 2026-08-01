@@ -466,6 +466,18 @@ function assertPlanToolRequest(request) {
   }
 }
 
+function assertResearchToolRequest(request) {
+  const tool = request.tools?.[0];
+  const cardSchema = tool?.input_schema?.properties?.cards;
+  if (request.max_tokens !== 4096 || request.tools?.length !== 1 ||
+      tool?.name !== 'submit_research_cards' ||
+      request.tool_choice?.type !== 'tool' || request.tool_choice?.name !== 'submit_research_cards' ||
+      tool?.input_schema?.type !== 'object' || tool?.input_schema?.additionalProperties !== false ||
+      cardSchema?.type !== 'array' || cardSchema?.minItems !== 1 || cardSchema?.maxItems !== 20) {
+    throw new Error('E2E_FIXTURE_INVALID_RESEARCH_TOOL_PROTOCOL');
+  }
+}
+
 function planChangesAnswer(prompt) {
   if (!prompt.includes(`"planGoal":"${PLAN_GOAL}"`)) throw new Error('E2E_FIXTURE_INVALID_PLAN_HANDOFF');
   const file = planTargetFile(prompt, PLAN_BEFORE);
@@ -533,6 +545,7 @@ function createElectronAiProvider() {
       }
       let output;
       let planToolInput = null;
+      let researchToolInput = null;
       if (prompt.includes('WritCraft Onboarding v2 项目建立助手')) {
         if (request.max_tokens !== 4096) throw new Error('E2E_FIXTURE_INVALID_ONBOARDING_V2_MAX_TOKENS');
         onboardingCalls += 1;
@@ -639,8 +652,11 @@ function createElectronAiProvider() {
         output = projectChatAnswer(prompt);
       } else if (prompt.includes(`问题：${SELECTION_CHAT_QUESTION}`)) {
         output = selectionChatAnswer(prompt);
+      } else if (prompt.includes('WritCraft 的本地证据 Research 助手')) {
+        assertResearchToolRequest(request);
+        researchToolInput = researchCard(prompt);
       } else {
-        output = JSON.stringify(researchCard(prompt));
+        throw new Error('E2E_FIXTURE_UNHANDLED_TEXT');
       }
       if (planToolInput) {
         return jsonResponse({
@@ -655,6 +671,19 @@ function createElectronAiProvider() {
               input: planToolInput,
             },
           ],
+          stop_reason: 'tool_use',
+          usage: { input_tokens: 128, output_tokens: 64 },
+        });
+      }
+      if (researchToolInput) {
+        return jsonResponse({
+          model: 'MiniMax-M3',
+          content: [{
+            type: 'tool_use',
+            id: 'call_research_1',
+            name: 'submit_research_cards',
+            input: researchToolInput,
+          }],
           stop_reason: 'tool_use',
           usage: { input_tokens: 128, output_tokens: 64 },
         });

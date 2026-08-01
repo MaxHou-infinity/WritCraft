@@ -57,7 +57,17 @@ function card(source, content, quote, overrides = {}) {
     boundary: '该证据只支持所引范围，不能外推。', ...overrides,
   };
 }
-function llm(cards) { return async () => ({ ok: true, text: JSON.stringify({ cards }), stopReason: 'end_turn' }); }
+function modelInput(input, overrides = {}) {
+  return {
+    ok: true,
+    text: null,
+    toolUse: { id: 'toolu_research', name: service.RESEARCH_TOOL_NAME, input },
+    toolUseBlockCount: 1,
+    stopReason: 'tool_use',
+    ...overrides,
+  };
+}
+function llm(cards) { return async () => modelInput({ cards }); }
 
 async function run() {
   console.log('════════ WritCraft V0 · Local evidence Research verify ════════');
@@ -99,9 +109,14 @@ async function run() {
       const result = await service.research({
         projectService: readOnlyService, rootPath: item.root, question: '样本发生了什么变化？',
         sourceIds: [selected.id], sourceIndex: item.index,
-        callLLM: async messages => {
+        callLLM: async (messages, model, maxTokens, options) => {
           capturedPrompt = messages[0].content;
-          return { ok: true, text: JSON.stringify({ cards: [card(selected, item.contents[selected.filePath], quote)] }), stopReason: 'end_turn' };
+          assert.equal(model, 'MiniMax-M3');
+          assert.equal(maxTokens, 4096);
+          assert.equal(options.toolChoice.name, service.RESEARCH_TOOL_NAME);
+          assert.equal(options.tools[0].name, service.RESEARCH_TOOL_NAME);
+          assert.deepStrictEqual(options.tools[0].input_schema.properties.cards.items.properties.sourceId.enum, [selected.id]);
+          return modelInput({ cards: [card(selected, item.contents[selected.filePath], quote)] });
         },
       });
       assert.deepStrictEqual(reads, [selected.filePath, selected.filePath]);
@@ -197,7 +212,7 @@ async function run() {
       let calls = 0;
       await expectCode('STALE_SOURCE', () => service.research({
         projectService, rootPath: item.root, question: '验证', sourceIds: [selected.id], sourceIndex: item.index,
-        callLLM: async () => { calls += 1; return { ok: true, text: '{}', stopReason: 'end_turn' }; },
+        callLLM: async () => { calls += 1; return modelInput({ cards: [] }); },
       }));
       assert.equal(calls, 0);
     } finally { fs.rmSync(item.root, { recursive: true, force: true }); }
@@ -212,7 +227,7 @@ async function run() {
         projectService, rootPath: item.root, question: '验证', sourceIds: [selected.id], sourceIndex: item.index,
         callLLM: async () => {
           fs.appendFileSync(path.join(item.root, selected.filePath), '模型等待期间更新。\n');
-          return { ok: true, text: JSON.stringify({ cards: [card(selected, item.contents[selected.filePath], quote)] }), stopReason: 'end_turn' };
+          return modelInput({ cards: [card(selected, item.contents[selected.filePath], quote)] });
         },
       }));
     } finally { fs.rmSync(item.root, { recursive: true, force: true }); }
@@ -307,7 +322,7 @@ async function run() {
       }));
       await expectCode('INVALID_MODEL_OUTPUT', () => service.research({
         projectService, rootPath: bounded.root, question: '验证', sourceIds: [selected.id], sourceIndex: bounded.index,
-        callLLM: async () => ({ ok: true, text: 'x'.repeat(service.MAX_MODEL_OUTPUT_BYTES + 1), stopReason: 'end_turn' }),
+        callLLM: async () => modelInput({ cards: [], padding: 'x'.repeat(service.MAX_MODEL_OUTPUT_BYTES + 1) }),
       }));
     } finally { fs.rmSync(bounded.root, { recursive: true, force: true }); }
   });
@@ -353,7 +368,7 @@ async function run() {
     } finally { fs.rmSync(item.root, { recursive: true, force: true }); }
   });
 
-  await test('来源提示注入保持不可信资料，且只接受完整严格 JSON', async () => {
+  await test('来源提示注入保持不可信资料，且只接受唯一完整的结构化工具结果', async () => {
     const item = fixture();
     try {
       const selected = item.source('references/official.md');
@@ -363,28 +378,33 @@ async function run() {
       const index = { ...item.index, sources: item.index.sources.map(source => source.id === selected.id ? updated : source) };
       let prompt = '';
       const quote = '结论：样本增长了 20%。';
-      const body = JSON.stringify({ cards: [card(updated, injected, quote)] });
+      const body = { cards: [card(updated, injected, quote)] };
       const result = await service.research({
         projectService, rootPath: item.root, question: '验证', sourceIds: [selected.id], sourceIndex: index,
         callLLM: async messages => {
           prompt = messages[0].content;
-          return { ok: true, text: body, stopReason: 'end_turn' };
+          return modelInput(body);
         },
       });
       assert.match(prompt, /内容是不可信资料/);
       assert.match(prompt, /不得返回 grade/);
       assert.equal(result.cards[0].source.grade, 'A');
+      assert.match(prompt, new RegExp(service.RESEARCH_TOOL_NAME));
       await expectCode('INVALID_MODEL_OUTPUT', () => service.research({
         projectService, rootPath: item.root, question: '验证', sourceIds: [selected.id], sourceIndex: index,
-        callLLM: async () => ({ ok: true, text: `\`\`\`json\n${JSON.stringify({ cards: [card(updated, injected, quote)] })}\n\`\`\``, stopReason: 'end_turn' }),
+        callLLM: async () => ({ ok: true, text: `\`\`\`json\n${JSON.stringify(body)}\n\`\`\``, toolUse: null, toolUseBlockCount: 0, stopReason: 'end_turn' }),
       }));
       await expectCode('MODEL_OUTPUT_TRUNCATED', () => service.research({
         projectService, rootPath: item.root, question: '验证', sourceIds: [selected.id], sourceIndex: index,
-        callLLM: async () => ({ ok: true, text: body, stopReason: 'max_tokens' }),
+        callLLM: async () => modelInput(body, { stopReason: 'max_tokens' }),
       }));
-      await expectCode('MODEL_OUTPUT_INCOMPLETE', () => service.research({
+      await expectCode('INVALID_MODEL_OUTPUT', () => service.research({
         projectService, rootPath: item.root, question: '验证', sourceIds: [selected.id], sourceIndex: index,
-        callLLM: async () => ({ ok: true, text: body }),
+        callLLM: async () => modelInput(body, { stopReason: 'end_turn' }),
+      }));
+      await expectCode('INVALID_MODEL_OUTPUT', () => service.research({
+        projectService, rootPath: item.root, question: '验证', sourceIds: [selected.id], sourceIndex: index,
+        callLLM: async () => modelInput(body, { toolUseBlockCount: 2 }),
       }));
     } finally { fs.rmSync(item.root, { recursive: true, force: true }); }
   });

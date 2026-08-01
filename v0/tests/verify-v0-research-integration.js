@@ -47,6 +47,20 @@ function quoteCard(source, content, quote) {
   };
 }
 
+function researchModel(cards) {
+  return {
+    ok: true,
+    text: null,
+    toolUse: {
+      id: 'toolu_research',
+      name: researchService.RESEARCH_TOOL_NAME,
+      input: { cards },
+    },
+    toolUseBlockCount: 1,
+    stopReason: 'tool_use',
+  };
+}
+
 // Dynamic equivalent of the production ownership boundary: caller data is
 // destructured to the two renderer-owned fields; all authority is rebuilt.
 async function invokeMainBoundary({ rendererPayload, state, callLLM }) {
@@ -126,7 +140,7 @@ async function run() {
           rootPath: '/tmp/forged',
         },
         state,
-        callLLM: async () => ({ ok: true, text: JSON.stringify({ cards: [quoteCard(source, content, '第三方认为产品体验流畅。')] }), stopReason: 'end_turn' }),
+        callLLM: async () => researchModel([quoteCard(source, content, '第三方认为产品体验流畅。')]),
       });
       assert.equal(result.ok, true);
       assert.equal(result.cards[0].source.grade, 'C');
@@ -149,7 +163,7 @@ async function run() {
         callLLM: async () => {
           state.currentProject = { ...first, rootPath: path.join(scratch, 'Second') };
           state.generation += 1;
-          return { ok: true, text: JSON.stringify({ cards: [quoteCard(source, content, '权威结论。')] }), stopReason: 'end_turn' };
+          return researchModel([quoteCard(source, content, '权威结论。')]);
         },
       });
       assert.deepStrictEqual(result, { ok: false, error: 'PROJECT_CHANGED' });

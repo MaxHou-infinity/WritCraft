@@ -358,8 +358,10 @@ async function runAcceptance(options = {}) {
         question: '这份纪要能支持哪一条关于试运行状态的主张？',
         sourceIds: [source.id],
         sourceIndex,
-        callLLM: (messages, model, maxTokens) => minimaxText.callMessages({
+        callLLM: (messages, model, maxTokens, requestOptions = {}) => minimaxText.callMessages({
           apiKey: credential.apiKey, messages, model, maxTokens,
+          tools: requestOptions.tools,
+          toolChoice: requestOptions.toolChoice,
         }),
       });
       if (!result.ok) throw { code: result.error };

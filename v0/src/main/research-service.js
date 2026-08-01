@@ -16,6 +16,7 @@ const MAX_QUOTE_CHARS = 2000;
 const SOURCE_ID_RE = /^src_[a-f0-9]{20}$/;
 const REVISION_RE = /^[a-f0-9]{64}$/;
 const SOURCE_INDEX_REVISION_RE = /^sha256:[a-f0-9]{64}$/;
+const RESEARCH_TOOL_NAME = 'submit_research_cards';
 const SOURCE_INDEX_KEYS = new Set(['schema', 'status', 'revision', 'sources', 'errors', 'counts']);
 const SOURCE_KEYS = new Set([
   'id', 'filePath', 'revision', 'title', 'metadata', 'indexStatus', 'errors', 'isReferenced', 'citationCount',
@@ -163,11 +164,7 @@ function normalizeSelection(sourceIds, sourceIndex) {
   return selected;
 }
 
-function parseModelJson(text) {
-  if (typeof text !== 'string') fail('INVALID_MODEL_OUTPUT', 'AI 没有返回文本');
-  if (Buffer.byteLength(text, 'utf8') > MAX_MODEL_OUTPUT_BYTES) fail('INVALID_MODEL_OUTPUT', `AI 研究结果不能超过 ${MAX_MODEL_OUTPUT_BYTES} 字节`);
-  let parsed;
-  try { parsed = JSON.parse(text); } catch (_) { fail('INVALID_MODEL_OUTPUT', 'AI 研究结果不是严格 JSON'); }
+function validateModelCards(parsed) {
   exactKeys(parsed, new Set(['cards']), 'AI 研究结果');
   if (!Array.isArray(parsed.cards) || !parsed.cards.length || parsed.cards.length > MAX_CARDS) fail('INVALID_MODEL_OUTPUT', `AI 研究结果必须包含 1–${MAX_CARDS} 张卡片`);
   return parsed.cards.map(card => {
@@ -181,9 +178,53 @@ function parseModelJson(text) {
   });
 }
 
-function assertCompleteModelOutput(stopReason) {
-  if (stopReason === 'max_tokens') fail('MODEL_OUTPUT_TRUNCATED', 'AI 研究结果被 token 上限截断，未进入 JSON 解析');
-  if (stopReason !== 'end_turn') fail('MODEL_OUTPUT_INCOMPLETE', 'AI 研究结果未正常结束，请重新生成');
+function parseModelResult(model) {
+  if (model?.stopReason === 'max_tokens') fail('MODEL_OUTPUT_TRUNCATED', 'AI 研究结果被 token 上限截断，未进入结构校验');
+  if (!model || model.ok !== true) return null;
+  if (model.stopReason !== 'tool_use' || model.toolUseBlockCount !== 1 ||
+      !model.toolUse || typeof model.toolUse !== 'object' || Array.isArray(model.toolUse) ||
+      model.toolUse.name !== RESEARCH_TOOL_NAME ||
+      !Object.prototype.hasOwnProperty.call(model.toolUse, 'input')) {
+    fail('INVALID_MODEL_OUTPUT', 'AI 没有完整提交一次结构化研究结果');
+  }
+  let serialized;
+  try { serialized = JSON.stringify(model.toolUse.input); } catch (_) { serialized = null; }
+  if (!serialized || Buffer.byteLength(serialized, 'utf8') > MAX_MODEL_OUTPUT_BYTES) {
+    fail('INVALID_MODEL_OUTPUT', `AI 研究结果不能超过 ${MAX_MODEL_OUTPUT_BYTES} 字节`);
+  }
+  return validateModelCards(model.toolUse.input);
+}
+
+function researchTools(sourceIds) {
+  return Object.freeze([Object.freeze({
+    name: RESEARCH_TOOL_NAME,
+    description: '从用户明确选择的本地来源中提交可逐字核验的研究卡片。',
+    input_schema: {
+      type: 'object',
+      additionalProperties: false,
+      required: ['cards'],
+      properties: {
+        cards: {
+          type: 'array',
+          minItems: 1,
+          maxItems: MAX_CARDS,
+          items: {
+            type: 'object',
+            additionalProperties: false,
+            required: ['claim', 'sourceId', 'quote', 'offset', 'end', 'boundary'],
+            properties: {
+              claim: { type: 'string', minLength: 1, maxLength: MAX_CLAIM_CHARS },
+              sourceId: { type: 'string', enum: sourceIds },
+              quote: { type: 'string', minLength: 1, maxLength: MAX_QUOTE_CHARS },
+              offset: { type: 'integer', minimum: 0 },
+              end: { type: 'integer', minimum: 1 },
+              boundary: { type: 'string', minLength: 1, maxLength: MAX_BOUNDARY_CHARS },
+            },
+          },
+        },
+      },
+    },
+  })]);
 }
 
 function sha256(value) {
@@ -257,16 +298,20 @@ async function research({ projectService, rootPath, question, sourceIds, sourceI
     '每张卡片必须提供可由 Main 精确验证的原文 quote、UTF-16 offset 与 end。',
     'quote 必须从单个 local-source 连续逐字复制，不得改写、概括或增删标点；offset/end 使用 JavaScript 字符串的 UTF-16 索引。',
     '证据等级由 Main 根据来源元数据冻结计算；你不得返回 grade、revision、path、locator 或任何其他字段。',
-    '只返回 JSON：{"cards":[{"claim":"可支持的主张","sourceId":"src_...","quote":"逐字原文","offset":0,"end":4,"boundary":"该证据不能支持什么或仍缺什么"}]}。',
+    `必须且只能调用 ${RESEARCH_TOOL_NAME} 一次提交研究卡片；不要在文本中输出 JSON、卡片或解释。`,
+    '工具 input 不得新增 schema 之外的字段；sourceId 只能从本次选择的来源中选取。',
     `研究问题：${cleanQuestion}`,
     '',
     snapshots.map(promptSource).join('\n\n'),
   ].join('\n');
-  const model = await callLLM([{ role: 'user', content: prompt }], 'MiniMax-M3', 4096);
+  const tools = researchTools(snapshots.map(source => source.id));
+  const model = await callLLM([{ role: 'user', content: prompt }], 'MiniMax-M3', 4096, {
+    tools,
+    toolChoice: { type: 'tool', name: RESEARCH_TOOL_NAME },
+  });
   if (!model || model.ok !== true) return { ok: false, error: safeModelError(model?.error), message: '本地证据研究生成失败' };
 
-  assertCompleteModelOutput(model.stopReason);
-  const proposals = parseModelJson(model.text);
+  const proposals = parseModelResult(model);
   const byId = new Map(snapshots.map(source => [source.id, source]));
   let locatorRepairs = 0;
   let rejectedQuoteCards = 0;
@@ -353,7 +398,7 @@ async function research({ projectService, rootPath, question, sourceIds, sourceI
 
 module.exports = {
   SOURCE_INDEX_SCHEMA, RESEARCH_SCHEMA, MAX_QUESTION_CHARS, MAX_SELECTED_SOURCES, MAX_CONTEXT_BYTES, MAX_CARDS,
-  MAX_SOURCE_INDEX_ITEMS, MAX_MODEL_OUTPUT_BYTES,
+  MAX_SOURCE_INDEX_ITEMS, MAX_MODEL_OUTPUT_BYTES, RESEARCH_TOOL_NAME,
   EVIDENCE_RUBRIC, RESEARCH_CALL_CONTRACT, ResearchError, gradeSource, resolveQuoteRange,
-  parseModelJson, assertCompleteModelOutput, canonicalMetadataGradeDigest, research,
+  validateModelCards, parseModelResult, researchTools, canonicalMetadataGradeDigest, research,
 };

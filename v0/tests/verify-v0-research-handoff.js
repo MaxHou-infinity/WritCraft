@@ -64,11 +64,16 @@ async function canonicalRun(item) {
     sourceIndex: item.sourceIndex,
     callLLM: async () => ({
       ok: true,
-      stopReason: 'end_turn',
-      text: JSON.stringify({ cards: [{
-        claim: '样本增长了 20%，但范围有限。', sourceId: item.source.id, quote,
-        offset, end: offset + quote.length, boundary: '不能外推到其他地区。',
-      }] }),
+      stopReason: 'tool_use',
+      toolUseBlockCount: 1,
+      toolUse: {
+        id: 'toolu_research',
+        name: researchService.RESEARCH_TOOL_NAME,
+        input: { cards: [{
+          claim: '样本增长了 20%，但范围有限。', sourceId: item.source.id, quote,
+          offset, end: offset + quote.length, boundary: '不能外推到其他地区。',
+        }] },
+      },
     }),
   });
   return result.canonicalRun;
