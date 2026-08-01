@@ -169,19 +169,23 @@ async function authority(action, chapter = CHAPTER) {
     assert.deepStrictEqual(prepared.prepared.request.targetPaths, ['chapters/01.md']);
     assert.deepStrictEqual(prepared.prepared.request.contextPaths, []);
     assert.match(prepared.prepared.request.instruction, /当前段落还缺少具体例子/);
+    assert.strictEqual(prepared.prepared.structuredOutput, true);
+    assert.match(prepared.prepared.messages[0].content, /submit_localized_edits/);
     const result = handoffService.finalizeChangesHandoff({
       preparedHandoff: prepared,
       model: {
         ok: true,
-        stopReason: 'end_turn',
-        text: JSON.stringify({
-          edits: [{
-            path: 'chapters/01.md',
+        stopReason: 'tool_use',
+        toolUseBlockCount: 1,
+        toolUse: {
+          name: 'submit_localized_edits',
+          input: { edits: [{
+            targetId: 'target_1',
             oldText: '这是作者已经写下的正文证据。',
             newText: '这是作者已经写下的正文证据，例如一次真实访谈。',
             summary: '补充例子',
-          }],
-        }),
+          }] },
+        },
       },
       changeSetService,
     });

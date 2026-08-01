@@ -15,6 +15,19 @@ const MAX_NEW_TEXT_BYTES = 4 * 1024;
 const MAX_SUMMARY_CHARS = 500;
 const MAX_SUMMARY_BYTES = 512;
 const MAX_TOTAL_EDIT_BYTES = 20 * 1024;
+const STRUCTURED_TOOL_NAME = 'submit_localized_edits';
+// Eight edits can cover a chapter's common 8-heading structure while the
+// smaller per-item limits keep the complete tool input below the existing
+// 24 KiB parser boundary. Model output contains only short request-local
+// target IDs plus bounded Unicode fields; Main restores canonical paths.
+const STRUCTURED_MAX_PATCH_EDITS = 8;
+const STRUCTURED_MAX_OLD_TEXT_CHARS = 128;
+const STRUCTURED_MAX_NEW_TEXT_CHARS = 256;
+const STRUCTURED_MAX_SUMMARY_CHARS = 40;
+const SAFE_MULTILINE_TOOL_TEXT_PATTERN = '^(?:[\\t\\n\\r]|[^\\u0000-\\u001f\\uD800-\\uDFFF]|[\\uD800-\\uDBFF][\\uDC00-\\uDFFF])*$';
+const SAFE_SUMMARY_TOOL_TEXT_PATTERN = '^(?!\\s)(?![\\s\\S]*\\s$)(?:[^\\u0000-\\u001f\\uD800-\\uDFFF]|[\\uD800-\\uDBFF][\\uDC00-\\uDFFF])+$';
+const SAFE_MULTILINE_TOOL_TEXT = /^(?:[\t\n\r]|[^\u0000-\u001f\uD800-\uDFFF]|[\uD800-\uDBFF][\uDC00-\uDFFF])*$/u;
+const SAFE_SUMMARY_TOOL_TEXT = /^(?:[^\u0000-\u001f\uD800-\uDFFF]|[\uD800-\uDBFF][\uDC00-\uDFFF])+$/u;
 
 class LocalizedEditError extends Error {
   constructor(code, message) {
@@ -79,6 +92,115 @@ function validateEdits(value) {
     return Object.freeze({ path: edit.path, oldText: edit.oldText, newText: edit.newText, summary });
   });
   return Object.freeze(edits);
+}
+
+function structuredProviderOptions(snapshots) {
+  const snapshotByPath = trustedSnapshots(snapshots);
+  if (!snapshotByPath.size) fail('INVALID_PATCH_SNAPSHOTS', '结构化局部修改至少需要一个目标文件');
+  if (snapshotByPath.size > STRUCTURED_MAX_PATCH_EDITS) {
+    fail('INVALID_PATCH_SNAPSHOTS', `结构化局部修改最多允许 ${STRUCTURED_MAX_PATCH_EDITS} 个目标文件`);
+  }
+  const targetIds = [...snapshotByPath.keys()].map((_, index) => `target_${index + 1}`);
+  const text = (minLength, maxLength, pattern = SAFE_MULTILINE_TOOL_TEXT_PATTERN) => ({
+    type: 'string',
+    minLength,
+    maxLength,
+    pattern,
+  });
+  return Object.freeze({
+    tools: Object.freeze([Object.freeze({
+      name: STRUCTURED_TOOL_NAME,
+      description: '提交最多八个有界的局部文本替换；不得返回完整文件。',
+      input_schema: {
+        type: 'object',
+        additionalProperties: false,
+        required: ['edits'],
+        properties: {
+          edits: {
+            type: 'array',
+            maxItems: STRUCTURED_MAX_PATCH_EDITS,
+            items: {
+              type: 'object',
+              additionalProperties: false,
+              required: ['targetId', 'oldText', 'newText', 'summary'],
+              properties: {
+                targetId: { type: 'string', enum: targetIds },
+                oldText: text(1, STRUCTURED_MAX_OLD_TEXT_CHARS),
+                newText: text(0, STRUCTURED_MAX_NEW_TEXT_CHARS),
+                summary: text(1, STRUCTURED_MAX_SUMMARY_CHARS, SAFE_SUMMARY_TOOL_TEXT_PATTERN),
+              },
+            },
+          },
+        },
+      },
+    })]),
+    toolChoice: Object.freeze({ type: 'tool', name: STRUCTURED_TOOL_NAME }),
+  });
+}
+
+function parseStructuredModelEdits(model, snapshots) {
+  if (model?.stopReason === 'max_tokens') {
+    fail('MODEL_OUTPUT_TRUNCATED', '局部修改达到模型输出上限');
+  }
+  if (!model || model.ok !== true) {
+    fail(typeof model?.error === 'string' ? model.error : 'LLM_FAILED', '局部修改生成失败');
+  }
+  if (model.stopReason !== 'tool_use' || model.toolUseBlockCount !== 1 ||
+      !isPlainObject(model.toolUse) || model.toolUse.name !== STRUCTURED_TOOL_NAME ||
+      !Object.prototype.hasOwnProperty.call(model.toolUse, 'input')) {
+    fail('INVALID_MODEL_OUTPUT', '局部修改必须且只能提交一次结构化结果');
+  }
+  const input = model.toolUse.input;
+  assertExactObject(input, ['edits'], '局部修改');
+  let serialized;
+  try { serialized = JSON.stringify(input); } catch (_) { serialized = null; }
+  if (!serialized || bytes(serialized) > MAX_MODEL_OUTPUT_BYTES) {
+    fail('MODEL_OUTPUT_TOO_LARGE', `AI 局部修改输出不能超过 ${MAX_MODEL_OUTPUT_BYTES} 字节`);
+  }
+  if (!Array.isArray(input.edits)) fail('INVALID_MODEL_OUTPUT', 'edits 必须是数组');
+  const snapshotByPath = trustedSnapshots(snapshots);
+  if (!snapshotByPath.size || snapshotByPath.size > STRUCTURED_MAX_PATCH_EDITS) {
+    fail('INVALID_PATCH_SNAPSHOTS', '结构化局部修改目标快照无效');
+  }
+  const pathByTargetId = new Map(
+    [...snapshotByPath.keys()].map((filePath, index) => [`target_${index + 1}`, filePath])
+  );
+  const canonicalEdits = [];
+  for (const [index, raw] of input.edits.entries()) {
+    assertExactObject(raw, ['targetId', 'oldText', 'newText', 'summary'], `edits[${index}]`);
+    if (typeof raw.targetId !== 'string' || !pathByTargetId.has(raw.targetId)) {
+      fail('UNAUTHORIZED_PATCH_PATH', `edits[${index}] 试图修改未授权文件`);
+    }
+    if (typeof raw.oldText !== 'string' ||
+        typeof raw.newText !== 'string' || typeof raw.summary !== 'string' ||
+        !SAFE_MULTILINE_TOOL_TEXT.test(raw.oldText) ||
+        !SAFE_MULTILINE_TOOL_TEXT.test(raw.newText) ||
+        !SAFE_SUMMARY_TOOL_TEXT.test(raw.summary) || raw.summary !== raw.summary.trim()) {
+      fail('INVALID_MODEL_OUTPUT', `edits[${index}] 包含未授权的控制字符或无效 Unicode`);
+    }
+    canonicalEdits.push({
+      path: pathByTargetId.get(raw.targetId),
+      oldText: raw.oldText,
+      newText: raw.newText,
+      summary: raw.summary,
+    });
+  }
+  const edits = validateEdits(canonicalEdits);
+  if (edits.length > STRUCTURED_MAX_PATCH_EDITS) {
+    fail('TOO_MANY_PATCH_EDITS', `本次最多允许 ${STRUCTURED_MAX_PATCH_EDITS} 个局部修改`);
+  }
+  for (const [index, edit] of edits.entries()) {
+    if (Array.from(edit.oldText).length > STRUCTURED_MAX_OLD_TEXT_CHARS) {
+      fail('PATCH_OLD_TEXT_INVALID', `edits[${index}].oldText 超过结构化局部锚点上限`);
+    }
+    if (Array.from(edit.newText).length > STRUCTURED_MAX_NEW_TEXT_CHARS) {
+      fail('PATCH_NEW_TEXT_TOO_LARGE', `edits[${index}].newText 超过结构化局部替换上限`);
+    }
+    if (Array.from(edit.summary).length > STRUCTURED_MAX_SUMMARY_CHARS) {
+      fail('INVALID_MODEL_OUTPUT', `edits[${index}].summary 超过结构化摘要上限`);
+    }
+  }
+  return edits;
 }
 
 function parseModelEdits(text) {
@@ -201,7 +323,28 @@ function buildLocalizedChangeSet({ snapshots, modelText, stopReason, changeSetSe
   return Object.freeze({ noChanges: false, editCount: edits.length, changeSet });
 }
 
-function protocolPromptLines() {
+function buildStructuredLocalizedChangeSet({ snapshots, model, changeSetService }) {
+  if (!changeSetService || typeof changeSetService.createChangeSet !== 'function') {
+    fail('INVALID_PATCH_SERVICE', '局部修改结果处理器不可用');
+  }
+  const edits = parseStructuredModelEdits(model, snapshots);
+  const proposals = editsToProposals(snapshots, edits);
+  if (!proposals.length) return Object.freeze({ noChanges: true, editCount: edits.length });
+  const changeSet = changeSetService.createChangeSet(snapshots, proposals);
+  if (!changeSet.changes.length) return Object.freeze({ noChanges: true, editCount: edits.length });
+  return Object.freeze({ noChanges: false, editCount: edits.length, changeSet });
+}
+
+function protocolPromptLines(options = {}) {
+  if (options.structured === true) {
+    return [
+      `必须且只能调用 ${STRUCTURED_TOOL_NAME} 一次；不要在文本中输出 JSON、Diff 或完整文件。`,
+      `最多 ${STRUCTURED_MAX_PATCH_EDITS} 个局部替换；oldText 最多 ${STRUCTURED_MAX_OLD_TEXT_CHARS} 字，newText 最多 ${STRUCTURED_MAX_NEW_TEXT_CHARS} 字，summary 最多 ${STRUCTURED_MAX_SUMMARY_CHARS} 字。`,
+      '只能选择工具 schema 列出的 targetId；Main 会把它恢复为权威路径。oldText 必须是对应原文中唯一的有界锚点。',
+      '插入时也必须在 newText 中保留 oldText 锚点；删除时使用空 newText。',
+      '未修改任何内容时提交空 edits 数组。',
+    ];
+  }
   return [
     '只返回严格 JSON（不得使用 Markdown 代码围栏或额外说明）：{"edits":[{"path":"...","oldText":"当前文件中唯一的原文锚点","newText":"局部替换文本","summary":"修改摘要"}]}',
     `最多 ${MAX_PATCH_EDITS} 个 edits；path 不超过 ${MAX_PATH_BYTES} 字节；oldText 必须非空、在对应文件原始快照中只出现一次且不超过 ${MAX_OLD_TEXT_BYTES} 字节；newText 不超过 ${MAX_NEW_TEXT_BYTES} 字节。`,
@@ -223,6 +366,11 @@ module.exports = {
   MAX_SUMMARY_CHARS,
   MAX_SUMMARY_BYTES,
   MAX_TOTAL_EDIT_BYTES,
+  STRUCTURED_TOOL_NAME,
+  STRUCTURED_MAX_PATCH_EDITS,
+  STRUCTURED_MAX_OLD_TEXT_CHARS,
+  STRUCTURED_MAX_NEW_TEXT_CHARS,
+  STRUCTURED_MAX_SUMMARY_CHARS,
   LocalizedEditError,
   validateEdits,
   parseModelEdits,
@@ -230,5 +378,8 @@ module.exports = {
   editsToProposals,
   assertCompleteModelOutput,
   buildLocalizedChangeSet,
+  structuredProviderOptions,
+  parseStructuredModelEdits,
+  buildStructuredLocalizedChangeSet,
   protocolPromptLines,
 };

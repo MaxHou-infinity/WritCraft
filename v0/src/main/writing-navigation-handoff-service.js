@@ -171,6 +171,7 @@ function prepareChangesHandoff({ projectService, rootPath, authority }) {
   const prepared = projectChangesProposalService.prepareProjectChangesProposal({
     projectService,
     rootPath,
+    structuredOutput: true,
     request: {
       schema: projectChangesProposalService.REQUEST_SCHEMA,
       instruction,

@@ -150,6 +150,39 @@ test('两文件 localized edits 由 Main 在权威 before 上构造 after', () =
   ]);
 });
 
+test('结构化目标编号在 prompt 与 Main 恢复中保持同一顺序', () => {
+  const project = fakeProject({ 'edit.md': '# Prompt', 'a.md': 'A OLD', 'b.md': 'B OLD' });
+  const prepared = service.prepareProjectChangesProposal({
+    projectService: project,
+    rootPath: '/project',
+    request: request(['a.md', 'b.md']),
+    structuredOutput: true,
+  });
+  assert(prepared.messages[0].content.includes('targetId="target_1" path="a.md"'));
+  assert(prepared.messages[0].content.includes('targetId="target_2" path="b.md"'));
+  const result = service.finalizeProjectChangesProposal({
+    prepared,
+    model: {
+      ok: true,
+      stopReason: 'tool_use',
+      toolUseBlockCount: 1,
+      toolUse: {
+        name: 'submit_localized_edits',
+        input: { edits: [{
+          targetId: 'target_2',
+          oldText: 'B OLD',
+          newText: 'B NEW',
+          summary: '修改第二个目标',
+        }] },
+      },
+    },
+    changeSetService,
+  });
+  assert.deepStrictEqual(result.changeSet.changes.map(change => [change.path, change.after]), [
+    ['b.md', 'B NEW'],
+  ]);
+});
+
 test('重复重叠局部修改与越权路径都被拒绝', () => {
   const project = fakeProject({ 'edit.md': '# Prompt', 'a.md': 'UNIQUE' });
   const prepared = service.prepareProjectChangesProposal({

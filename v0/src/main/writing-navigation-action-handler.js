@@ -1,6 +1,7 @@
 'use strict';
 
 const minimaxTextService = require('./minimax-text-service');
+const localizedEditService = require('./localized-edit-service');
 const projectChangesProposalService = require('./project-changes-proposal-service');
 
 function createWritingNavigationActionHandler(options = {}) {
@@ -56,7 +57,7 @@ function createWritingNavigationActionHandler(options = {}) {
       getRendererNavigationEpoch() === navigationEpoch);
   }
 
-  async function runBoundedChangesModel(projectInstanceId, messages, sourceSignal) {
+  async function runBoundedChangesModel(projectInstanceId, messages, sourceSignal, providerOptions) {
     const controller = new AbortController();
     let rejectBoundary;
     let timeoutId;
@@ -85,7 +86,7 @@ function createWritingNavigationActionHandler(options = {}) {
         messages,
         'MiniMax-M3',
         minimaxTextService.MAX_MAX_TOKENS,
-        { signal: controller.signal }
+        { signal: controller.signal, ...providerOptions }
       ));
       return await Promise.race([provider, boundary]);
     } finally {
@@ -194,7 +195,8 @@ function createWritingNavigationActionHandler(options = {}) {
       const model = await runBoundedChangesModel(
         project.instanceId,
         preparedHandoff.prepared.messages,
-        lease.signal
+        lease.signal,
+        localizedEditService.structuredProviderOptions(preparedHandoff.prepared.snapshots)
       );
       if (!isCurrent(project, mutationGeneration, navigationEpoch)) {
         throw new handoffService.WritingNavigationHandoffError(

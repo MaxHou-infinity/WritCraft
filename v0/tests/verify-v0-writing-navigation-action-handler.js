@@ -32,6 +32,18 @@ function revision(content) {
   return crypto.createHash('sha256').update(content).digest('hex');
 }
 
+function structuredModel(edits) {
+  return {
+    ok: true,
+    stopReason: 'tool_use',
+    toolUseBlockCount: 1,
+    toolUse: {
+      name: 'submit_localized_edits',
+      input: { edits },
+    },
+  };
+}
+
 function fakeProject() {
   const files = new Map([
     ['edit.md', '# 项目说明\n\n项目 Prompt。\n'],
@@ -97,6 +109,7 @@ async function setup(action, overrides = {}) {
   let pending = false;
   let modelCalls = 0;
   let cacheCalls = 0;
+  let providerOptionsSeen = null;
   const discarded = [];
   const installed = store.install({
     ownerId: OWNER,
@@ -116,20 +129,15 @@ async function setup(action, overrides = {}) {
     writingNavigationStore: store,
     handoffService,
     projectService,
-    projectCallLLM: () => async () => {
+    projectCallLLM: () => async (_messages, _model, _tokens, providerOptions) => {
         modelCalls += 1;
-        return {
-          ok: true,
-          stopReason: 'end_turn',
-          text: JSON.stringify({
-            edits: [{
-              path: 'chapters/01.md',
+        providerOptionsSeen = providerOptions;
+        return structuredModel([{
+              targetId: 'target_1',
               oldText: '这是作者已经写下的正文证据。',
               newText: '这是作者已经写下的正文证据，例如一次真实访谈。',
               summary: '补充例子',
-            }],
-          }),
-        };
+            }]);
       },
     changeSetService,
     pendingChangeSets: {
@@ -175,6 +183,7 @@ async function setup(action, overrides = {}) {
     projectService,
     get modelCalls() { return modelCalls; },
     get cacheCalls() { return cacheCalls; },
+    get providerOptionsSeen() { return providerOptionsSeen; },
     discarded,
     setPending(value) { pending = value; },
     setGeneration(value) { generation = value; },
@@ -232,6 +241,14 @@ async function setup(action, overrides = {}) {
     assert.strictEqual(result.changeSetId, `pc_${'a'.repeat(32)}`);
     assert.strictEqual(state.modelCalls, 1);
     assert.strictEqual(state.cacheCalls, 1);
+    assert.strictEqual(state.providerOptionsSeen.tools[0].name, 'submit_localized_edits');
+    assert.deepStrictEqual(
+      state.providerOptionsSeen.tools[0].input_schema.properties.edits.items.properties.targetId.enum,
+      ['target_1']
+    );
+    assert.deepStrictEqual(state.providerOptionsSeen.toolChoice, {
+      type: 'tool', name: 'submit_localized_edits',
+    });
   });
 
   await test('a pending review arriving during generation wins without replacement', async () => {
@@ -239,16 +256,12 @@ async function setup(action, overrides = {}) {
     state = await setup('changes', {
       projectCallLLM: () => async () => {
         state.setPending(true);
-        return {
-          ok: true,
-          stopReason: 'end_turn',
-          text: JSON.stringify({ edits: [{
-            path: 'chapters/01.md',
+        return structuredModel([{
+            targetId: 'target_1',
             oldText: '这是作者已经写下的正文证据。',
             newText: '新的内容。',
             summary: '修改',
-          }] }),
-        };
+          }]);
       },
     });
     const result = await state.handler(EVENT, PROJECT.instanceId, state.actionId);
@@ -261,7 +274,7 @@ async function setup(action, overrides = {}) {
     state = await setup('changes', {
       projectCallLLM: () => async () => {
         state.setGeneration(6);
-        return { ok: true, stopReason: 'end_turn', text: '{"edits":[]}' };
+        return structuredModel([]);
       },
     });
     const result = await state.handler(EVENT, PROJECT.instanceId, state.actionId);
@@ -304,7 +317,7 @@ async function setup(action, overrides = {}) {
           firstSignal = options.signal;
           return new Promise(() => {});
         }
-        return { ok: true, stopReason: 'end_turn', text: '{"edits":[]}' };
+        return structuredModel([]);
       },
     });
     const attemptId = state.nextAttempt();
@@ -340,7 +353,7 @@ async function setup(action, overrides = {}) {
         providerCalls += 1;
         return providerCalls === 1
           ? { ok: false, error: 'LLM_FAILED' }
-          : { ok: true, stopReason: 'end_turn', text: '{"edits":[]}' };
+          : structuredModel([]);
       },
     });
     const failed = await state.handler(EVENT, PROJECT.instanceId, state.actionId);
@@ -348,6 +361,31 @@ async function setup(action, overrides = {}) {
     const retry = await state.handler(EVENT, PROJECT.instanceId, state.actionId);
     assert.strictEqual(retry.ok, true);
     assert.strictEqual(retry.noChanges, true);
+  });
+
+  await test('oversized structured output installs no review and preserves one clean retry', async () => {
+    let providerCalls = 0;
+    const state = await setup('changes', {
+      projectCallLLM: () => async () => {
+        providerCalls += 1;
+        return providerCalls === 1
+          ? structuredModel([{
+            targetId: 'target_1',
+            oldText: '这是作者已经写下的正文证据。',
+            newText: 'x'.repeat(25 * 1024),
+            summary: '超大结果',
+          }])
+          : structuredModel([]);
+      },
+    });
+    const failed = await state.handler(EVENT, PROJECT.instanceId, state.actionId);
+    assert.strictEqual(failed.error, 'MODEL_OUTPUT_TOO_LARGE');
+    assert.strictEqual(state.cacheCalls, 0);
+    const retry = await state.handler(EVENT, PROJECT.instanceId, state.actionId);
+    assert.strictEqual(retry.ok, true);
+    assert.strictEqual(retry.noChanges, true);
+    assert.strictEqual(state.cacheCalls, 0);
+    assert.strictEqual(providerCalls, 2);
   });
 
   await test('attempt A late cancel cannot abort active retry B', async () => {
@@ -408,7 +446,7 @@ async function setup(action, overrides = {}) {
     assert.strictEqual(state.discarded[0].capability, `pc_${'b'.repeat(32)}`);
   });
 
-  console.log(`\n${passed}/11 writing-navigation action handler checks passed.`);
+  console.log(`\n${passed}/12 writing-navigation action handler checks passed.`);
 })().catch(error => {
   console.error(error);
   process.exitCode = 1;

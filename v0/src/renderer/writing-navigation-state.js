@@ -201,6 +201,14 @@
         action: 'retry',
       });
     }
+    if (['MODEL_OUTPUT_TOO_LARGE', 'TOO_MANY_PATCH_EDITS', 'PATCH_TEXT_TOO_LARGE',
+      'PATCH_NEW_TEXT_TOO_LARGE'].includes(code)) {
+      return Object.freeze({
+        code,
+        message: 'AI 返回的修改建议超过单次安全范围；本次没有修改项目文件。请直接重试；如果再次出现，请重新生成写作导航。',
+        action: 'retry',
+      });
+    }
     return Object.freeze({
       code,
       message: 'AI 没有完成本次整理；没有修改项目文件。请调整目标或上下文后重试。',
