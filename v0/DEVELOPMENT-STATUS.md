@@ -1,6 +1,6 @@
 # 笔触 · WritCraft · V0 开发状态与续作入口
 
-> 最后更新：2026-08-02（Asia/Shanghai，0.0CM · exact candidate `f2775cf` 与作者验收-12 已就绪）
+> 最后更新：2026-08-02（Asia/Shanghai，0.0CM · 作者验收-12 的 Navigation 生成已由作者确认正常）
 > 当前状态：**`writ-craft@0.1.1` 已从 exact candidate `c65981e` 发布到 npm `preview`；registry 时间 `2026-07-29T14:30:16.176Z`，shasum `d370c500666e25cfb373852deafa21b232d2bc18` 与本地候选一致。公网隔离安装/启动/退出为 2/2。annotated tag `v0.1.1` 指向同一提交，GitHub prerelease 已公开：`https://github.com/MaxHou-infinity/WritCraft/releases/tag/v0.1.1`。**
 > 发布判断：**0.1.1 Developer Preview 已完成版本、自动化、双架构安装、独立复审、npm 发布、公网安装和 GitHub prerelease。registry 标签保持 `preview: 0.1.1`、`latest: 0.1.0`，因此本次没有把 Preview 冒充稳定版，也没有执行 unpublish、占位发布或上传未签名 App/ZIP。**
 > 当前目标版本：**`docs/ROADMAP.md` 的 `RM-1.2 / writ-craft@0.1.2` 真实作者可用性闭环。当前唯一开发纵切是 `UNIFIED-WRITING-TASK-V1-CONTRACT.md`：把 Navigation 建议、必要依据核对、正文内 Diff、决定和 Safe Undo 合并为同一任务。不得继续派发旧公开 Research→Changes 多步旅程，也不得插入驾驶舱或其他后续版本功能。**
@@ -63,7 +63,8 @@
 - ⚠️ 诊断时首次按应用名读取界面，Computer Use 自动拉起了 packaged App，与既有开发版短暂并存并共用 userData；这是助手造成的验收环境污染，不是用户遗留。该 packaged 进程启动在红灯之后，不改变根因/零写入证据；两个进程已全部正常关闭。继续验收前必须只启动一个新候选进程。
 - ✅ 新 local exact candidate 已保存为 `f2775cf`，未推送、未发布。
 - ✅ 生产复制事务创建 fresh **作者验收-12**：源仍 eligible，20 files / 608,433 bytes，digest `9d0898863636da74615481a669c3e40362a60176249870e6d1793380c85b4380`，返回 `copyCreated=true / sourceUnchanged=true`。新副本 eligible：21 files / 608,701 bytes，digest `78f9bbf5fccf6ef9f33621d5869dfcaf90164f38871b01869b512a70f3402d1d`；manifest `createdAt=2026-08-02T02:54:11.703Z`，继承 History=3 / metrics=23，切点后均为 0。
-- ⬜ 仅用一个 `f2775cf` 源码 App 进程打开作者验收-12，由作者执行最短旅程。作者验收-11 只保留本次红灯和零写入证据，不可继续作为最终签字副本。
+- ✅ 作者已在唯一源码 App 进程和作者验收-12 中确认“生成写作导航”正常；该门禁不再重复测试。此绿灯只覆盖 Navigation 生成，不提前代表统一任务 Diff/写入/撤销链签字。
+- ⬜ 从本次已生成的建议中只选择一张，点击“处理这个建议”，验证正文内 Diff；随后由作者接受并执行一次 Safe Undo。作者验收-11 只保留红灯和零写入证据，不可继续作为最终签字副本。
 
 ### 2026-08-01 recent-project 握手 P1（已关闭，exact candidate `2bb9052`）
 
@@ -74,7 +75,7 @@
 - **验证红灯保留**：产品 P1 关闭后的首次完整 `npm test` 因两项旧源码字符串断言仍要求无参数 recovery 调用而红；修正为 owner-aware 精确顺序并补 deferred 覆盖后，完整 `npm test` exit 0。不得用最终绿灯抹去该测试漂移红灯。
 - **最终门禁**：`npm run verify:navigation`、完整 `npm test`、批准 GUI `npm run verify` exit 0；强制真实 Electron **37/37**，包含统一任务 Diff/接受/Safe Undo、退出重启与 recent-project 恢复。第四轮独立只读复审 **P0=0/P1=0/P2=0，签字 YES**。
 
-**唯一续作动作**：只启动一个 `f2775cf` 源码 App 进程并打开 fresh 作者验收-12；先确认 `edit.md + 0/8` 时生成按钮被禁用并显示恢复说明，再打开目标正文，只验“生成一张建议→一次点击处理→正文内 Diff→作者接受→Safe Undo”。
+**唯一续作动作**：Navigation 生成已由作者确认正常，不再重跑。留在作者验收-12 的本次建议列表中，选择一张建议并点击“处理这个建议”；看到正文内 Diff 后，再由作者接受并执行一次 Safe Undo。
 
 **旧暂停点仍失效**：不得从 `1b51595` 或作者验收-10续跑。此前已签字模块仍不重测，不得回到旧 Research→Changes 人工转交，也不得发布 0.1.2。
 
