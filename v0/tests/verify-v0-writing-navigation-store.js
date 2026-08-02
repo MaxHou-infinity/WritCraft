@@ -66,7 +66,7 @@ async function record(index = 1, action = 'changes', goal = `下一步 ${index}`
                 .evidenceRefs.items.enum[0],
             ],
             whyNow: '现在处理最清晰。',
-            recommendedAction: '继续处理。',
+            editIntent: 'clarify',
             expectedResult: '结构更清楚。',
             action,
           }],
@@ -125,7 +125,7 @@ function deterministicBytes() {
   await test('research remains safely reusable while changes consumes after successful handoff', async () => {
     for (const action of ['research', 'changes']) {
       const store = storeModule.createWritingNavigationStore({ randomBytes: deterministicBytes() });
-      const result = store.install(binding({ record: await record(action === 'research' ? 2 : 3, action) }));
+      const result = store.install(binding({ record: await record(action === 'research' ? 2 : 3) }));
       const lease = store.acquireAction(actionBinding({
         actionId: result.suggestions[0].actionIds[action],
       }));
@@ -162,7 +162,7 @@ function deterministicBytes() {
 
   await test('concurrent Research reports busy without aborting or consuming the active lease', async () => {
     const store = storeModule.createWritingNavigationStore({ randomBytes: deterministicBytes() });
-    const result = store.install(binding({ record: await record(45, 'research', '并发来源') }));
+    const result = store.install(binding({ record: await record(45, 'changes', '并发来源') }));
     const actionId = result.suggestions[0].actionIds.research;
     const first = store.acquireAction(actionBinding({ actionId }));
     assert.strictEqual(first.signal.aborted, false);
@@ -183,14 +183,14 @@ function deterministicBytes() {
     assert.strictEqual(reopened.suggestion.action, 'research');
   });
 
-  await test('the selected capability overrides the model-proposed suggestion action', async () => {
+  await test('an internal source-recovery capability does not change the model-approved local-edit action', async () => {
     const store = storeModule.createWritingNavigationStore({ randomBytes: deterministicBytes() });
-    const result = store.install(binding({ record: await record(4, 'open') }));
+    const result = store.install(binding({ record: await record(4) }));
     const research = store.acquireAction(actionBinding({
       actionId: result.suggestions[0].actionIds.research,
     }));
     assert.strictEqual(research.suggestion.action, 'research');
-    assert.strictEqual(research.record.result.suggestions[0].action, 'open');
+    assert.strictEqual(research.record.result.suggestions[0].action, 'changes');
     assert.strictEqual(research.repeatable, true);
     store.settleAction(binding({ leaseId: research.leaseId, outcome: 'success' }));
     const changes = store.acquireAction(actionBinding({

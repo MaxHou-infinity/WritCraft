@@ -184,6 +184,86 @@ function buildStructuredRangeCatalog(snapshots) {
   return Object.freeze(ranges);
 }
 
+function buildSelectedStructuredRangeCatalog(snapshots, selections) {
+  const snapshotByPath = trustedSnapshots(snapshots);
+  if (!Array.isArray(selections) || !selections.length ||
+      selections.length > STRUCTURED_MAX_PATCH_EDITS) {
+    fail('INVALID_PATCH_RANGES', '证据修改范围数量无效');
+  }
+  const ranges = [];
+  const seen = new Set();
+  for (const [index, selection] of selections.entries()) {
+    if (!isPlainObject(selection) ||
+        Object.keys(selection).sort().join(',') !== 'end,path,revision,start') {
+      fail('INVALID_PATCH_RANGES', '证据修改范围字段无效');
+    }
+    const snapshot = snapshotByPath.get(selection.path);
+    if (!snapshot || selection.revision !== snapshot.revision ||
+        !Number.isSafeInteger(selection.start) || !Number.isSafeInteger(selection.end) ||
+        selection.start < 0 || selection.end <= selection.start ||
+        selection.end > snapshot.content.length) {
+      fail('INVALID_PATCH_RANGES', '证据修改范围不属于权威快照');
+    }
+    for (const boundary of [selection.start, selection.end]) {
+      const before = boundary > 0 ? snapshot.content.charCodeAt(boundary - 1) : -1;
+      const after = boundary < snapshot.content.length ? snapshot.content.charCodeAt(boundary) : -1;
+      if (before >= 0xD800 && before <= 0xDBFF && after >= 0xDC00 && after <= 0xDFFF) {
+        fail('INVALID_PATCH_RANGES', '证据修改范围不得截断 Unicode 字符');
+      }
+    }
+    const identity = `${selection.path}\0${selection.start}\0${selection.end}`;
+    if (seen.has(identity)) fail('DUPLICATE_PATCH_RANGE', '证据修改范围不得重复');
+    seen.add(identity);
+    const content = snapshot.content.slice(selection.start, selection.end);
+    if (!content || bytes(content) > STRUCTURED_MAX_RANGE_BYTES) {
+      fail('PATCH_RANGE_TOO_LARGE', '证据修改范围超过安全上限');
+    }
+    ranges.push(Object.freeze({
+      rangeId: `range_${index + 1}`,
+      path: selection.path,
+      revision: selection.revision,
+      start: selection.start,
+      end: selection.end,
+      label: '导航证据',
+      content,
+    }));
+  }
+  const ordered = [...ranges].sort((left, right) =>
+    left.path.localeCompare(right.path) || left.start - right.start || left.end - right.end);
+  for (let index = 1; index < ordered.length; index += 1) {
+    const previous = ordered[index - 1];
+    const current = ordered[index];
+    if (current.path === previous.path && current.start < previous.end) {
+      fail('PATCH_OVERLAP', '证据修改范围不得重叠');
+    }
+  }
+  return Object.freeze(ranges);
+}
+
+function validateSelectedStructuredRangeCatalog(ranges, snapshots) {
+  if (!Array.isArray(ranges)) fail('INVALID_PATCH_RANGES', '证据修改范围目录无效');
+  const selections = ranges.map(range => ({
+    path: range?.path,
+    revision: range?.revision,
+    start: range?.start,
+    end: range?.end,
+  }));
+  const rebuilt = buildSelectedStructuredRangeCatalog(snapshots, selections);
+  if (ranges.length !== rebuilt.length) fail('INVALID_PATCH_RANGES', '证据修改范围目录无效');
+  for (let index = 0; index < rebuilt.length; index += 1) {
+    const left = ranges[index];
+    const right = rebuilt[index];
+    if (!isPlainObject(left) ||
+        Object.keys(left).sort().join(',') !== 'content,end,label,path,rangeId,revision,start' ||
+        left.rangeId !== right.rangeId || left.path !== right.path ||
+        left.revision !== right.revision || left.start !== right.start ||
+        left.end !== right.end || left.label !== right.label || left.content !== right.content) {
+      fail('INVALID_PATCH_RANGES', '证据修改范围目录与权威快照不一致');
+    }
+  }
+  return rebuilt;
+}
+
 function validateStructuredRangeCatalog(ranges, snapshots) {
   const rebuilt = buildStructuredRangeCatalog(snapshots);
   if (!Array.isArray(ranges) || ranges.length !== rebuilt.length) {
@@ -557,7 +637,9 @@ module.exports = {
   assertCompleteModelOutput,
   buildLocalizedChangeSet,
   buildStructuredRangeCatalog,
+  buildSelectedStructuredRangeCatalog,
   validateStructuredRangeCatalog,
+  validateSelectedStructuredRangeCatalog,
   structuredProviderOptions,
   parseStructuredModelEdits,
   structuredEditsToProposals,

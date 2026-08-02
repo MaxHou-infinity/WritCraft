@@ -76,7 +76,7 @@
 5. 修复旅程中发现的 P0/P1 阻断项；P2 必须明确记录、分级并决定是否允许发版。
 6. 记录内容无关的私有指标：Inline 接受率、导航建议帮助度/动作、Research 匹配判断、图片评分/采纳、耗时和稳定错误码。
 
-当前执行注记（2026-08-02，0.0CM）：fresh 作者验收-11 在 `edit.md` 为当前文件、未显式选择正文时暴露 P1：Renderer 允许提交，Main 在联网前以 `CONTEXT_REQUIRED` 正确拒绝，但 UI 错误显示为“AI 没有完成”。14 个 Markdown 哈希与源一致，manifest 后 History=0。local exact candidate `f2775cf` 已加入“当前正文或显式上下文”前端门禁、未联网/零写入恢复文案与从 0/8 勾选正文后单次恢复的动态回归；Renderer state 15/15、dynamic 13/13、Navigation 全链、完整 `npm test`、批准 GUI `npm run verify`、真实 Electron 37/37 全绿，最终独立复审 P0/P1/P2=0。生产复制事务已从 digest 未变的原稿创建 fresh 作者验收-12，manifest 后 History/metrics 均为 0。下一步仍只运行统一任务最短旅程；不得发布 0.1.2。
+当前执行注记（2026-08-02，0.0CN）：fresh 作者验收-11 的 `CONTEXT_REQUIRED` P1 已由 `f2775cf` 关闭；fresh 作者验收-12 随后确认 Navigation 生成，却在“处理这个建议”连续两次返回 `INVALID_MODEL_OUTPUT`。两次都发生在 ChangeSet 前，14/14 Markdown 与源一致、manifest 后 History=0。现场未保存具体拒绝字段；代码复审确认了一个合同缺陷及高可信原因：统一任务一边禁止模型返回原文、一边要求 `oldText`，且完美 fixture 掩盖了真实 provider 差异。首张建议还错误地产生了“先审计全文再决定”的不可执行动作。当前技术候选让每张建议只绑定一个同文件 canonical evidence；Main 以私有 `rangeId` 恢复 path/revision/offset/原文并提供有界相邻只读上下文，模型只返回 `rangeId/newText/summary`。模型只选择有限 `editIntent`，Main 将其映射为可直接落成局部 Diff 的动作。专项、完整 `npm test`、批准 GUI `npm run verify` 均全绿；最新源码首次强制 E2E 因夹具仍断言旧“精简”文案而红，仅修正该测试漂移后真实 Electron 37/37。独立复审已达到 P0=0/P1=0，最后两个 P2（Unicode 范围边界防御和证据措辞）已补齐并待最终确认。MiniMax 官方文档未明确列出 `oneOf`/`const` 兼容性，因此 fresh 作者的一次“处理这个建议”同时是唯一真实 canary；不得额外付费重试。作者验收-12 只保留红灯，不再重试；不得发布 0.1.2。
 
 历史检查点（0.0BZ）：只读 Main/IPC 基础已独立签收，包括严格结构/导航工具协议、证据锚点、8 条/30 分钟隔离缓存、watcher barrier、真实 deadline abort 和零写入门禁；专项 53/53、Network 15/15，独立复审 P0/P1=0。其当时未覆盖的 Renderer、动作、骨架与 Electron 已由上方 0.0CC 当前注记覆盖，不得从本段派发旧“下一阶段”。
 

@@ -118,7 +118,7 @@ const NAVIGATION = {
       finding: '第一章已经提出能力组合，但触发条件还不够具体。',
       evidenceRefs: ['e2'],
       whyNow: '先补清触发条件，后续四个维度才有共同起点。',
-      recommendedAction: '补充一个可识别的业务触发案例。',
+      editIntent: 'strengthen_evidence',
       expectedResult: '读者能判断何时需要使用 COPE。',
       action: 'changes',
     },
@@ -252,6 +252,7 @@ const NAVIGATION = {
     assert.strictEqual(result.result.contextManifest.usedBodyCount, 2);
     assert.strictEqual(result.result.contextManifest.availableBodyCount, 2);
     assert.strictEqual(result.result.contextManifest.disclosure, '已读取当前项目全部正文');
+    assert.strictEqual(result.result.suggestions[0].recommendedAction, '强化这一处论据');
     assert.deepStrictEqual(result.result.contextManifest.files.map(file => file.role), [
       'project_prompt', 'current_file', 'explicit_context',
     ]);
@@ -755,6 +756,8 @@ const NAVIGATION = {
       .evidenceRefs;
     const evidenceRef = evidenceRefs.items;
     assert.strictEqual(evidenceRefs.uniqueItems, true);
+    assert.strictEqual(evidenceRefs.minItems, 1);
+    assert.strictEqual(evidenceRefs.maxItems, 1);
     assert.deepStrictEqual(evidenceRef, {
       type: 'string',
       pattern: '^er_[a-f0-9]{16}_[1-9][0-9]{0,3}$',
@@ -772,9 +775,9 @@ const NAVIGATION = {
         finding: '发'.repeat(160),
         evidenceRefs: ['e1'],
         whyNow: '时'.repeat(160),
-        recommendedAction: '动'.repeat(80),
+        editIntent: 'compress',
         expectedResult: '果'.repeat(160),
-        action: 'open',
+        action: 'changes',
       }],
     };
     assert(Buffer.byteLength(JSON.stringify(maximum), 'utf8') < service.MAX_TOOL_INPUT_BYTES);
@@ -790,7 +793,6 @@ const NAVIGATION = {
     for (const [field, value] of [
       ['finding', '发'.repeat(161)],
       ['whyNow', '时'.repeat(161)],
-      ['recommendedAction', '动'.repeat(81)],
       ['expectedResult', '果'.repeat(161)],
     ]) {
       const oversized = JSON.parse(JSON.stringify(maximum));
@@ -813,15 +815,17 @@ const NAVIGATION = {
         navigationToolResult(unknownReference, options),
     }), error => error.code === 'INVALID_MODEL_EVIDENCE');
 
-    const duplicateReference = JSON.parse(JSON.stringify(maximum));
-    duplicateReference.suggestions[0].evidenceRefs = ['e1', 'e1'];
+    const chapterAudit = JSON.parse(JSON.stringify(maximum));
+    chapterAudit.suggestions[0].finding = '先审计本章全部证据，再决定整体压缩比例。';
+    chapterAudit.suggestions[0].editIntent = 'compress';
+    chapterAudit.suggestions[0].evidenceRefs = ['e1', 'e2'];
     await assert.rejects(() => service.proposeWritingNavigation({
       projectService: project,
       rootPath: '/tmp/project',
       request: request('navigation', [], 'chapters/01.md'),
       callLLM: async (_messages, _model, _tokens, options) =>
-        navigationToolResult(duplicateReference, options),
-    }), error => error.code === 'INVALID_MODEL_EVIDENCE');
+        navigationToolResult(chapterAudit, options),
+    }), error => error.code === 'INVALID_MODEL_OUTPUT');
   });
 
   await test('missing or extra exact keys fail without a format retry', async () => {

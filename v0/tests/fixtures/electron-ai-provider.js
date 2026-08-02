@@ -513,7 +513,7 @@ function writingNavigationAnswer(prompt, request) {
       finding: '当前章节保留了一处待验证的冗余表达。',
       evidenceRefs: [marker[1]],
       whyNow: '这是验证统一写作任务流最小安全闭环的明确位置。',
-      recommendedAction: '精简这一处表达',
+      editIntent: 'compress',
       expectedResult: '作者可在正文中审阅一处有界修改。',
       action: 'changes',
     }],
@@ -522,33 +522,42 @@ function writingNavigationAnswer(prompt, request) {
 
 function assertUnifiedWritingTaskRequest(request) {
   const tool = request.tools?.[0];
-  const edits = tool?.input_schema?.properties?.edits;
+  const changes = tool?.input_schema?.oneOf?.find(branch =>
+    branch?.properties?.status?.const === 'changes');
+  const needsSources = tool?.input_schema?.oneOf?.find(branch =>
+    branch?.properties?.status?.const === 'needs_sources');
+  const edits = changes?.properties?.edits;
   if (request.max_tokens !== 8_192 || request.tools?.length !== 1 ||
       tool?.name !== 'submit_unified_writing_task' ||
       request.tool_choice?.type !== 'tool' || request.tool_choice?.name !== 'submit_unified_writing_task' ||
-      tool?.input_schema?.type !== 'object' || tool?.input_schema?.additionalProperties !== false ||
-      edits?.maxItems !== 3 || !Array.isArray(edits?.items?.properties?.rangeId?.enum)) {
+      tool?.input_schema?.oneOf?.length !== 2 || changes?.additionalProperties !== false ||
+      edits?.minItems !== 1 || edits?.maxItems !== 3 ||
+      needsSources?.properties?.edits?.maxItems !== 0 ||
+      !Array.isArray(edits?.items?.properties?.rangeId?.enum) ||
+      edits.items.required.includes('oldText')) {
     throw new Error('E2E_FIXTURE_INVALID_UNIFIED_WRITING_TASK_PROTOCOL');
   }
 }
 
 function unifiedWritingTaskAnswer(prompt, request) {
   if (!prompt.includes('必须且只能调用 submit_unified_writing_task 一次') ||
-      !prompt.includes(`建议动作：精简这一处表达`) || !prompt.includes(UNIFIED_BEFORE)) {
+      !prompt.includes(`建议动作：压缩这一处表达`) || !prompt.includes(UNIFIED_BEFORE)) {
     throw new Error('E2E_FIXTURE_INVALID_UNIFIED_WRITING_TASK_PROMPT');
   }
-  const rangeIds = request.tools[0].input_schema.properties.edits.items.properties.rangeId.enum;
-  const ranges = [...prompt.matchAll(/<editable-range rangeId=("range_[1-9][0-9]*") label=("(?:[^"\\]|\\.)*") content=("(?:[^"\\]|\\.)*") \/>/g)]
-    .map(match => ({ rangeId: JSON.parse(match[1]), content: JSON.parse(match[3]) }));
-  const target = ranges.find(range => range.content.includes(UNIFIED_BEFORE));
-  if (!target || !rangeIds.includes(target.rangeId)) {
+  const rangeIds = request.tools[0].input_schema.oneOf
+    .find(branch => branch.properties.status.const === 'changes')
+    .properties.edits.items.properties.rangeId.enum;
+  const target = { rangeId: rangeIds[0] };
+  if (rangeIds.length !== 1 ||
+      !prompt.includes(`rangeId=${JSON.stringify(target.rangeId)}`) ||
+      !prompt.includes(`content=${JSON.stringify(UNIFIED_BEFORE)}`) ||
+      !prompt.includes('beforeContext=') || !prompt.includes('afterContext=')) {
     throw new Error('E2E_FIXTURE_MISSING_UNIFIED_WRITING_TASK_RANGE');
   }
   return {
     status: 'changes',
     edits: [{
       rangeId: target.rangeId,
-      oldText: UNIFIED_BEFORE,
       newText: UNIFIED_AFTER,
       summary: '验证正文内统一任务 Diff',
     }],

@@ -3,7 +3,7 @@
 > 状态：`RM-1.2 / writ-craft@0.1.2` 导航生成合同；后续动作由 `UNIFIED-WRITING-TASK-V1-CONTRACT.md` 取代
 > 生效日期：2026-08-01
 > 取代：面向用户的 `writcraft.plan/v2` 里程碑、任务和依赖图
-> 实现进度：结构规划和建议生成的既有证据保留。0.0CM 真实作者验收否定了固定 Research/Changes 双动作和跨页面交接；不得再从本文派发该旧旅程。当前实现目标是同一建议卡内的统一写作任务。
+> 实现进度：结构规划和建议生成的既有证据保留。0.0CM 真实作者验收否定了固定 Research/Changes 双动作和跨页面交接；不得再从本文派发该旧旅程。0.0CN 已实现同一建议卡内的统一写作任务技术候选：每张 Navigation 建议只绑定一个同文件 canonical evidence，模型只选择有限 `editIntent`，Main 映射为可直接执行的局部动作并以私有 `rangeId` 承担正文 authority；仍待 fresh 作者最短旅程签字。
 
 ## 1. 产品判断
 

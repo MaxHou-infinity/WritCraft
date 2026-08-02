@@ -232,6 +232,13 @@
         action: 'retry',
       });
     }
+    if (['INVALID_MODEL_OUTPUT', 'INVALID_TOOL_USE'].includes(code)) {
+      return Object.freeze({
+        code,
+        message: 'AI 返回的修改格式没有通过安全校验；本次没有修改项目文件。可以重新处理这条建议。',
+        action: 'retry',
+      });
+    }
     if (['MODEL_OUTPUT_TOO_LARGE', 'TOO_MANY_PATCH_EDITS', 'PATCH_TEXT_TOO_LARGE',
       'PATCH_NEW_TEXT_TOO_LARGE'].includes(code)) {
       return Object.freeze({

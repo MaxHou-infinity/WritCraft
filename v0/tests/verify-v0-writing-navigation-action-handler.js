@@ -48,7 +48,6 @@ function structuredModel(edits) {
 function noopModel() {
   return structuredModel([{
     rangeId: 'range_1',
-    oldText: '这是作者已经写下的正文证据。',
     newText: '这是作者已经写下的正文证据。',
     summary: '保持原文',
   }]);
@@ -128,7 +127,7 @@ async function setup(action, overrides = {}) {
                 .evidenceRefs.items.enum[0],
             ],
             whyNow: '现在补充便于后文展开。',
-            recommendedAction: '补充一个具体例子。',
+            editIntent: 'strengthen_evidence',
             expectedResult: '读者更容易理解。',
             action,
           }],
@@ -169,7 +168,6 @@ async function setup(action, overrides = {}) {
         providerOptionsSeen = providerOptions;
         return structuredModel([{
               rangeId: 'range_1',
-              oldText: '这是作者已经写下的正文证据。',
               newText: '这是作者已经写下的正文证据，例如一次真实访谈。',
               summary: '补充例子',
             }]);
@@ -245,17 +243,6 @@ async function setup(action, overrides = {}) {
 (async () => {
   console.log('\nWriting navigation action handler verification');
 
-  await test('research returns one evidence-bound handoff and remains safely repeatable', async () => {
-    const state = await setup('research');
-    const first = await state.handler(EVENT, PROJECT.instanceId, state.actionId);
-    assert.strictEqual(first.kind, 'research');
-    assert.strictEqual(first.handoff.evidence[0].path, 'chapters/01.md');
-    const replay = await state.handler(EVENT, PROJECT.instanceId, state.actionId);
-    assert.strictEqual(replay.kind, 'research');
-    assert.deepStrictEqual(replay.handoff, first.handoff);
-    assert.strictEqual(state.modelCalls, 0);
-  });
-
   await test('an existing Changes review is preserved and the same action can retry', async () => {
     const state = await setup('changes');
     state.setPending(true);
@@ -278,7 +265,8 @@ async function setup(action, overrides = {}) {
     assert.strictEqual(state.cacheCalls, 1);
     assert.strictEqual(state.providerOptionsSeen.tools[0].name, 'submit_unified_writing_task');
     assert.deepStrictEqual(
-      state.providerOptionsSeen.tools[0].input_schema.properties.edits.items.properties.rangeId.enum,
+      state.providerOptionsSeen.tools[0].input_schema.oneOf[0]
+        .properties.edits.items.properties.rangeId.enum,
       ['range_1']
     );
     assert.deepStrictEqual(state.providerOptionsSeen.toolChoice, {
@@ -362,7 +350,6 @@ async function setup(action, overrides = {}) {
         state.setPending(true);
         return structuredModel([{
             rangeId: 'range_1',
-            oldText: '这是作者已经写下的正文证据。',
             newText: '新的内容。',
             summary: '修改',
           }]);
@@ -474,7 +461,6 @@ async function setup(action, overrides = {}) {
         providerCalls += 1;
         return structuredModel([{
           rangeId: 'range_1',
-          oldText: '这是作者已经写下的正文证据。',
           newText: 'x'.repeat(641),
           summary: '超大结果',
         }]);
@@ -528,7 +514,6 @@ async function setup(action, overrides = {}) {
         providerCalls += 1;
         return structuredModel([{
           rangeId: 'range_1',
-          oldText: '这是作者已经写下的正文证据。',
           newText: 'x'.repeat(641),
           summary: '仍然超限',
         }]);
@@ -549,7 +534,6 @@ async function setup(action, overrides = {}) {
         state.projectService.files.set('chapters/01.md', `${CHAPTER}\n外部变化`);
         return structuredModel([{
           rangeId: 'range_1',
-          oldText: '这是作者已经写下的正文证据。',
           newText: 'x'.repeat(641),
           summary: '超限',
         }]);

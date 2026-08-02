@@ -248,11 +248,20 @@ function prepareChangesHandoff({
     fail('ACTION_MISMATCH', '这条建议不是生成修改建议动作');
   }
   const suggestion = authority.suggestion;
-  // The public unified task defaults to the first canonical evidence file.
-  // Other files stay read-only context unless a later explicit advanced scope
-  // contract authorizes them.
+  // The public unified task edits only the canonical evidence file selected by
+  // Navigation. Main turns those frozen evidence locators into request-local
+  // ranges; the model never repeats source text, paths, revisions or offsets.
   const targetPaths = [suggestion.evidence[0].relativePath];
   const targetSet = new Set(targetPaths);
+  if (suggestion.evidence.some(evidence => !targetSet.has(evidence.relativePath))) {
+    fail('ACTION_SCOPE_MISMATCH', '这条建议跨越多个正文文件，不能直接生成局部修改');
+  }
+  const structuredRangeSelections = suggestion.evidence.map(evidence => ({
+    path: evidence.relativePath,
+    revision: evidence.revision,
+    start: evidence.locator?.offset,
+    end: evidence.locator?.endOffset,
+  }));
   const contextPaths = [...new Set([
     ...extraContextPaths,
     ...authority.record.sources.map(item => item.path),
@@ -269,6 +278,7 @@ function prepareChangesHandoff({
     rootPath,
     structuredOutput: true,
     structuredProtocolLines: unifiedWritingTaskService.protocolPromptLines(),
+    structuredRangeSelections,
     request: {
       schema: projectChangesProposalService.REQUEST_SCHEMA,
       instruction,

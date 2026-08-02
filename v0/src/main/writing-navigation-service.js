@@ -27,7 +27,10 @@ const MAX_ALTERNATIVES = 3;
 const MIN_ALTERNATIVES = 2;
 const MAX_CHAPTERS = 8;
 const MAX_SUGGESTIONS = 3;
-const MAX_EVIDENCE = 3;
+// One public suggestion owns one exact local edit anchor. This keeps a broad
+// author goal from being represented as a chapter audit that cannot become a
+// single reviewable Diff.
+const MAX_EVIDENCE = 1;
 const MAX_EVIDENCE_CANDIDATES = 4096;
 const MAX_JSON_DEPTH = 32;
 const MAX_JSON_NODES = 4096;
@@ -35,7 +38,19 @@ const MAX_TREE_DEPTH = 24;
 const MAX_TREE_NODES = 20_000;
 const REVISION_RE = /^[a-f0-9]{64}$/;
 const DANGEROUS_KEYS = new Set(['__proto__', 'prototype', 'constructor']);
-const ACTIONS = Object.freeze(['open', 'research', 'changes']);
+// Public Navigation is a one-click path to a local Diff. Reading and Research
+// remain internal recovery mechanics; they are not model-selectable public
+// actions in the unified task contract.
+const ACTIONS = Object.freeze(['changes']);
+const EDIT_INTENTS = Object.freeze({
+  compress: '压缩这一处表达',
+  clarify: '澄清这一处表达',
+  remove_repetition: '删减这一处重复',
+  strengthen_transition: '改善这一处衔接',
+  strengthen_evidence: '强化这一处论据',
+  align_style: '统一这一处语气',
+  improve_scene: '改善这一处场景',
+});
 const SAFE_RAW_TEXT = /^(?:[^\u0000-\u001f\uD800-\uDFFF]|[\uD800-\uDBFF][\uDC00-\uDFFF])*$/u;
 const PROVIDER_ERROR = /^[A-Z][A-Z0-9_]{0,63}$/;
 const AUTHENTIC_RECORDS = new WeakSet();
@@ -54,7 +69,6 @@ const LIMITS = Object.freeze({
   purpose: 120,
   finding: 160,
   whyNow: 160,
-  recommendedAction: 80,
   expectedResult: 160,
   sectionHeading: 120,
   quote: 160,
@@ -131,7 +145,7 @@ const NAVIGATION_SCHEMA = Object.freeze({
         type: 'object',
         additionalProperties: false,
         required: [
-          'finding', 'evidenceRefs', 'whyNow', 'recommendedAction', 'expectedResult', 'action',
+          'finding', 'evidenceRefs', 'whyNow', 'editIntent', 'expectedResult', 'action',
         ],
         properties: {
           finding: TEXT_SCHEMA(LIMITS.finding),
@@ -143,7 +157,7 @@ const NAVIGATION_SCHEMA = Object.freeze({
             items: EVIDENCE_REF_SCHEMA,
           },
           whyNow: TEXT_SCHEMA(LIMITS.whyNow),
-          recommendedAction: TEXT_SCHEMA(LIMITS.recommendedAction),
+          editIntent: { type: 'string', enum: Object.keys(EDIT_INTENTS) },
           expectedResult: TEXT_SCHEMA(LIMITS.expectedResult),
           action: { type: 'string', enum: ACTIONS },
         },
@@ -542,10 +556,11 @@ function buildPrompt(request, inputs, evidenceCatalog = []) {
     );
   } else {
     common.push(
-      '返回 mode=navigation 与 1–3 个在本次已读范围内优先的下一步建议。',
-      `顶层精确键为 mode,suggestions；建议精确键为 finding,evidenceRefs,whyNow,recommendedAction,expectedResult,action。finding/whyNow/expectedResult 最多 ${LIMITS.finding} 字，recommendedAction 最多 ${LIMITS.recommendedAction} 字。`,
-      '每条建议的 evidenceRefs 必须选择 1–3 个下方 WRITCRAFT_EVIDENCE_REF 标记中的完整 ID；标记只说明它后面的一个正文区块。不要抄写、改写或自行生成路径、标题和引文。Main 会把引用编号绑定到原文快照。',
-      'action 只能是 open、research、changes；不要声称已经阅读未提供的文件或整个项目。',
+      '返回 mode=navigation 与 1–3 个在本次已读范围内、现在就能落为局部 Diff 的下一步建议。',
+      `顶层精确键为 mode,suggestions；建议精确键为 finding,evidenceRefs,whyNow,editIntent,expectedResult,action。finding/whyNow/expectedResult 最多 ${LIMITS.finding} 字。editIntent 只能是 ${Object.keys(EDIT_INTENTS).join('、')}。`,
+      '每条建议的 evidenceRefs 必须且只能选择 1 个下方 WRITCRAFT_EVIDENCE_REF 标记中的完整 ID；该标记只说明它后面的一个正文区块。不要抄写、改写或自行生成路径、标题和引文。Main 会把引用编号绑定到原文快照。',
+      'action 必须是 changes。建议动作必须能通过替换这一个证据区块直接完成；不得把该证据当成审计整章或全文的入口。',
+      '不得生成“先审计全文、比较多章、制定比例、继续规划、再决定”等前置分析建议；若用户目标很大，先收敛为证据所在单文件内最值得执行的一步。不要声称已经阅读未提供的文件或整个项目。',
     );
   }
   common.push('', promptFile(inputs.edit, 'project_prompt'));
@@ -633,24 +648,31 @@ function validateNavigation(input, inputs, evidenceCatalog = []) {
   const catalogByRef = new Map(evidenceCatalog.map(item => [item.evidenceRef, item]));
   return Object.freeze(input.suggestions.map((raw, suggestionIndex) => {
     exactKeys(raw, [
-      'finding', 'evidenceRefs', 'whyNow', 'recommendedAction', 'expectedResult', 'action',
+      'finding', 'evidenceRefs', 'whyNow', 'editIntent', 'expectedResult', 'action',
     ], `导航建议 ${suggestionIndex + 1}`);
     if (!Array.isArray(raw.evidenceRefs) ||
         raw.evidenceRefs.length < 1 || raw.evidenceRefs.length > MAX_EVIDENCE) {
-      fail('INVALID_MODEL_OUTPUT', `导航建议 ${suggestionIndex + 1} 证据必须是 1–${MAX_EVIDENCE} 项`);
+      fail('INVALID_MODEL_OUTPUT', `导航建议 ${suggestionIndex + 1} 必须且只能选择一个局部证据区块`);
     }
     if (new Set(raw.evidenceRefs).size !== raw.evidenceRefs.length) {
       fail('INVALID_MODEL_EVIDENCE', `导航建议 ${suggestionIndex + 1} 证据引用不得重复`);
     }
-    if (!ACTIONS.includes(raw.action)) fail('INVALID_MODEL_OUTPUT', '导航建议动作无效');
+    if (!ACTIONS.includes(raw.action)) fail('INVALID_MODEL_OUTPUT', '导航建议动作必须可直接生成局部修改');
+    if (typeof raw.editIntent !== 'string' || !Object.prototype.hasOwnProperty.call(EDIT_INTENTS, raw.editIntent)) {
+      fail('INVALID_MODEL_OUTPUT', '导航建议必须选择一个局部编辑意图');
+    }
+    const evidence = raw.evidenceRefs.map((item, index) =>
+      canonicalEvidence(item, catalogByRef, `导航建议 ${suggestionIndex + 1} 证据 ${index + 1}`)
+    );
+    if (new Set(evidence.map(item => item.relativePath)).size !== 1) {
+      fail('INVALID_MODEL_EVIDENCE', `导航建议 ${suggestionIndex + 1} 必须锚定同一个正文文件`);
+    }
     return Object.freeze({
       suggestionId: `suggestion_${suggestionIndex + 1}`,
       finding: rawText(raw.finding, '发现', LIMITS.finding),
-      evidence: Object.freeze(raw.evidenceRefs.map((item, index) =>
-        canonicalEvidence(item, catalogByRef, `导航建议 ${suggestionIndex + 1} 证据 ${index + 1}`)
-      )),
+      evidence: Object.freeze(evidence),
       whyNow: rawText(raw.whyNow, '处理时机', LIMITS.whyNow),
-      recommendedAction: rawText(raw.recommendedAction, '建议动作', LIMITS.recommendedAction),
+      recommendedAction: EDIT_INTENTS[raw.editIntent],
       expectedResult: rawText(raw.expectedResult, '预期结果', LIMITS.expectedResult),
       action: raw.action,
     });
