@@ -1,11 +1,11 @@
 # 笔触 · WritCraft · V0 开发状态与续作入口
 
-> 最后更新：2026-08-02（Asia/Shanghai，0.0CN · 统一任务 Main-owned rangeId 技术候选已全量验证并完成 P0/P1 复审，待 final P2 确认与 fresh 作者验收）
+> 最后更新：2026-08-02（Asia/Shanghai，0.0CN · exact candidate `e8b9588` 已完成 P0/P1/P2=0 复审；fresh 作者验收-13 已就绪）
 > 当前状态：**`writ-craft@0.1.1` 已从 exact candidate `c65981e` 发布到 npm `preview`；registry 时间 `2026-07-29T14:30:16.176Z`，shasum `d370c500666e25cfb373852deafa21b232d2bc18` 与本地候选一致。公网隔离安装/启动/退出为 2/2。annotated tag `v0.1.1` 指向同一提交，GitHub prerelease 已公开：`https://github.com/MaxHou-infinity/WritCraft/releases/tag/v0.1.1`。**
 > 发布判断：**0.1.1 Developer Preview 已完成版本、自动化、双架构安装、独立复审、npm 发布、公网安装和 GitHub prerelease。registry 标签保持 `preview: 0.1.1`、`latest: 0.1.0`，因此本次没有把 Preview 冒充稳定版，也没有执行 unpublish、占位发布或上传未签名 App/ZIP。**
 > 当前目标版本：**`docs/ROADMAP.md` 的 `RM-1.2 / writ-craft@0.1.2` 真实作者可用性闭环。当前唯一开发纵切是 `UNIFIED-WRITING-TASK-V1-CONTRACT.md`：把 Navigation 建议、必要依据核对、正文内 Diff、决定和 Safe Undo 合并为同一任务。不得继续派发旧公开 Research→Changes 多步旅程，也不得插入驾驶舱或其他后续版本功能。**
-> 当前源码证据：**旧 Plan 公共入口已移除，右栏固定为 Chat / 导航 / Context / Changes。0.0CN 的默认 Navigation 只生成同文件、可直接落成 1–3 个局部 Diff 的 `changes` 建议；Main 把 canonical evidence 冻结为 request-local `rangeId`，模型不再复述 path/revision/offset/原文。`changes` 与 `needs_sources` 使用互斥工具分支，Main 继续执行 exact-key、范围成员、重叠、Unicode/字节、revision、owner、deadline、迟到结果与私有单次 ChangeSet authority 校验。专项、完整 `npm test`、批准 GUI `npm run verify` 和强制真实 Electron 均已通过；独立复审与 fresh 作者验收仍开放。**
-> 当前作者验收进度：**此前签字模块仍保持关闭。fresh 作者验收-11 的 pre-provider `CONTEXT_REQUIRED` P1 已由 `f2775cf` 关闭；fresh 作者验收-12 已确认 Navigation 生成，但“处理这个建议”连续两次 `INVALID_MODEL_OUTPUT`，且首条建议为不可一次执行的跨全文审计。两次均在 ChangeSet 前失败，源与副本 14/14 Markdown 一致、manifest 后 History=0。0.0CN 已修复结构协议和建议粒度并完成技术验证；作者验收-12 作为红灯保留，不再重试。下一步仅在独立复审后的 exact candidate 上创建 fresh 副本，验收“一张建议→处理→正文内 Diff→接受→Safe Undo”。0.1.2 仍未完成、未发布。**
+> 当前源码证据：**exact candidate `e8b9588 fix(navigation): bind one local edit anchor` 已冻结。旧 Plan 公共入口已移除，右栏固定为 Chat / 导航 / Context / Changes。0.0CN 的默认 Navigation 只生成同文件、可直接落成 1–3 个局部 Diff 的 `changes` 建议；Main 把 canonical evidence 冻结为 request-local `rangeId`，模型不再复述 path/revision/offset/原文。`changes` 与 `needs_sources` 使用互斥工具分支，Main 继续执行 exact-key、范围成员、重叠、Unicode/字节、revision、owner、deadline、迟到结果与私有单次 ChangeSet authority 校验。专项、完整 `npm test`、批准 GUI `npm run verify`、强制真实 Electron 37/37 与最终独立复审 P0/P1/P2=0 均已通过。**
+> 当前作者验收进度：**此前签字模块仍保持关闭。fresh 作者验收-11 的 pre-provider `CONTEXT_REQUIRED` P1 已由 `f2775cf` 关闭；fresh 作者验收-12 已确认 Navigation 生成，但“处理这个建议”连续两次 `INVALID_MODEL_OUTPUT`，且首条建议为不可一次执行的跨全文审计。两次均在 ChangeSet 前失败，源与副本 14/14 Markdown 一致、manifest 后 History=0。作者验收-12 作为红灯保留，不再重试。生产 no-clobber 复制事务已从 digest 未变的作者源创建 **作者验收-13**；cutoff `2026-08-02T06:33:47.698Z`，继承 History=3 / metrics=23，切点后均为 0。下一步只验收“一张建议→处理→正文内 Diff→接受→Safe Undo”。0.1.2 仍未完成、未发布。**
 > 0.0AA 历史保留红灯：**首轮真实 Electron 暴露 Inspector 在上下文失效时被清空、旧 5-chip 断言和项目 Chat 等待诊断；完整 test 又暴露 Plan 测试把 generation 函数正文写死。独立复审发现新请求预检窗口可提交不可见旧轮、同项目重开 UI/Main 串话、失败重开提前清会话及两项测试/错误文案缺口，均转为生产边界和回归后关闭。真实 Electron 曾连续两次在旧 Graph 恢复阶段超时；加入只读失败快照后该阶段连续四次通过，未改 Graph 产品逻辑，按重复同源证据关闭 timing P2。另一次 Chat preflight 红灯证明测试在恢复 `edit.md` 后未等待权威 watcher barrier；改为生产 `flushExternalChanges()` 收敛，而未放宽 Chat guard。该里程碑所有红运行保留，最终源码连续两次 34/34；后续 0.0AB 当时推进到 35/35，当前总链只看本文顶部当前里程碑。**
 > Graph 历史签字基线：**性能修复前的既有源码曾完整 `npm test`、Electron-enabled `npm run verify`、强制真实 Electron 26/26 exit 0；Graph Filter 15/15、Workbench 14/14、dynamic 5/5、Large 5/5、Watcher 15/15、Network 11/11、Intelligence 17/17，第二轮复审 P0=0/P1=0/P2=2。该数字只保留为历史过程；0.0AB 后来推进到 35/35，当前总链只看顶部当前里程碑。**
 > Graph 动态边界：**300 文件/1279 节点 cold-to-interactive、cache/incremental、筛选/内存/布局、AX/键鼠、三类纠错、stale/Issue→Changes、failure live、重启与项目隔离均进入真实 Electron；正文/History/ledger 的零写入门禁通过。**  
@@ -67,9 +67,11 @@
 - 🔴 作者点击建议一“处理这个建议”后，两次均在 Main 结构校验阶段返回稳定 `INVALID_MODEL_OUTPUT`，发生在 ChangeSet/cacheReview 之前；14/14 Markdown 与源一致、manifest 后 History=0。现场没有保留具体拒绝字段；代码复审确认了合同缺陷及高可信原因：工具描述禁止模型返回原文，Schema 却强制 edit 带 `oldText`。完美构造 `oldText` 的 E2E 夹具未覆盖真实模型遵循冲突描述的情况。泛化“调整目标或上下文”文案也是次生 P1。
 - ✅ 已实现 Main-owned 证据 `rangeId` 协议：每张建议严格绑定一个同文件 canonical evidence；Main 冻结精确范围、提供各 240 UTF-16 单元以内的相邻只读上下文，并私有恢复原文/path/revision/offset。模型只返回 `rangeId/newText/summary`，且仅选择有限 `editIntent`；Main 将其确定性映射为局部动作。工具 Schema 用互斥分支闭合 changes/needs_sources，重复/未知/重叠/夹带范围、Unicode scalar 截断、复制/重放、超限与迟到结果均 fail-closed；Renderer 单列结构校验零写入恢复说明。
 - ✅ 技术验证：专项 `npm run verify:navigation` 全绿（unified service **14/14**、Navigation service 29/29、store 21/21、handoff 5/5、action handler 19/19 等）；完整 `npm test` exit 0，批准 GUI `npm run verify` exit 0。最新源码首次强制真实 Electron 在统一任务阶段红：产品已使用 Main-owned“压缩”动作，E2E 夹具仍断言旧“精简”文案并抛出 `REQUEST_FAILED`；只修正夹具漂移后同一真实 Electron 全链 **37/37**，包含统一任务拒绝零写入、接受写入和 Safe Undo。不得用绿灯抹去该首轮红灯。
-- ✅ 独立复审在第二轮达到 **P0=0、P1=0**；其两个非阻塞 P2 已继续修复：selected-range builder 现在显式拒绝 UTF-16 surrogate pair 中间边界并有 14/14 回归，合同也把“唯一确定根因”改为“已确认合同缺陷及高可信原因”。等待最终只读确认后提交 exact candidate。
+- ✅ 独立复审在第二轮达到 **P0=0、P1=0**；其两个非阻塞 P2 已继续修复：selected-range builder 现在显式拒绝 UTF-16 surrogate pair 中间边界并有 14/14 回归，合同也把“唯一确定根因”改为“已确认合同缺陷及高可信原因”。最终只读复审为 **P0=0、P1=0、P2=0**。
 - ⚠️ MiniMax 官方 Anthropic-compatible 文档确认 tools/tool_choice，但未明确枚举 `oneOf`/`const` 支持。下一 fresh 作者副本的一次“处理这个建议”同时是唯一真实结构 canary；不得单独、隐藏或自动付费重试。
-- ⬜ 提交 exact candidate、创建 fresh 作者验收副本；作者验收-12 仅保留本次红灯与零写入证据。
+- ✅ exact candidate 已提交为 **`e8b9588 fix(navigation): bind one local edit anchor`**，未推送、未发布。
+- ✅ 生产复制事务创建 fresh **作者验收-13**：源仍 eligible，20 files / 608,433 bytes，digest `9d0898863636da74615481a669c3e40362a60176249870e6d1793380c85b4380`，返回 `copyCreated=true / sourceUnchanged=true`。manifest cutoff `2026-08-02T06:33:47.698Z`；继承 History=3 / metrics=23，切点后均为 0。
+- ⬜ 只在作者验收-13 执行“一张建议→处理这个建议→正文内 Diff→接受→Safe Undo”；这一次点击同时是 MiniMax 结构兼容 canary。作者验收-12 只保留红灯与零写入证据。
 
 ### 2026-08-01 recent-project 握手 P1（已关闭，exact candidate `2bb9052`）
 
@@ -80,7 +82,7 @@
 - **验证红灯保留**：产品 P1 关闭后的首次完整 `npm test` 因两项旧源码字符串断言仍要求无参数 recovery 调用而红；修正为 owner-aware 精确顺序并补 deferred 覆盖后，完整 `npm test` exit 0。不得用最终绿灯抹去该测试漂移红灯。
 - **最终门禁**：`npm run verify:navigation`、完整 `npm test`、批准 GUI `npm run verify` exit 0；强制真实 Electron **37/37**，包含统一任务 Diff/接受/Safe Undo、退出重启与 recent-project 恢复。第四轮独立只读复审 **P0=0/P1=0/P2=0，签字 YES**。
 
-**唯一续作动作**：不要让作者重试作者验收-12。完成独立复审、保存 exact candidate 并创建 fresh 验收副本；随后只重验“一张已生成建议→处理这个建议→正文内 Diff→接受→Safe Undo”。
+**唯一续作动作**：只打开作者验收-13；生成一张局部建议，点击一次“处理这个建议”。若出现正文内 Diff，由作者接受并执行一次 Safe Undo。不得重试作者验收-12，也不得另做付费 canary。
 
 **旧暂停点仍失效**：不得从 `1b51595` 或作者验收-10续跑。此前已签字模块仍不重测，不得回到旧 Research→Changes 人工转交，也不得发布 0.1.2。
 
