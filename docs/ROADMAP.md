@@ -76,7 +76,7 @@
 5. 修复旅程中发现的 P0/P1 阻断项；P2 必须明确记录、分级并决定是否允许发版。
 6. 记录内容无关的私有指标：Inline 接受率、导航建议帮助度/动作、Research 匹配判断、图片评分/采纳、耗时和稳定错误码。
 
-当前执行注记（2026-08-02，0.0CM）：fresh 作者验收-11 在 `edit.md` 为当前文件、未显式选择正文时暴露 P1：Renderer 允许提交，Main 在联网前以 `CONTEXT_REQUIRED` 正确拒绝，但 UI 错误显示为“AI 没有完成”。14 个 Markdown 哈希与源一致，manifest 后 History=0。实现现已加入“当前正文或显式上下文”前端门禁、未联网/零写入恢复文案与从 0/8 勾选正文后单次恢复的动态回归；Renderer state 15/15、dynamic 13/13、Navigation 全链、完整 `npm test`、批准 GUI `npm run verify`、真实 Electron 37/37 全绿，最终独立复审 P0/P1/P2=0。`2bb9052` 与作者验收-11 均为历史红灯证据；保存新 exact candidate 后创建 fresh 作者验收-12，仍只运行统一任务最短旅程。不得发布 0.1.2。
+当前执行注记（2026-08-02，0.0CM）：fresh 作者验收-11 在 `edit.md` 为当前文件、未显式选择正文时暴露 P1：Renderer 允许提交，Main 在联网前以 `CONTEXT_REQUIRED` 正确拒绝，但 UI 错误显示为“AI 没有完成”。14 个 Markdown 哈希与源一致，manifest 后 History=0。local exact candidate `f2775cf` 已加入“当前正文或显式上下文”前端门禁、未联网/零写入恢复文案与从 0/8 勾选正文后单次恢复的动态回归；Renderer state 15/15、dynamic 13/13、Navigation 全链、完整 `npm test`、批准 GUI `npm run verify`、真实 Electron 37/37 全绿，最终独立复审 P0/P1/P2=0。生产复制事务已从 digest 未变的原稿创建 fresh 作者验收-12，manifest 后 History/metrics 均为 0。下一步仍只运行统一任务最短旅程；不得发布 0.1.2。
 
 历史检查点（0.0BZ）：只读 Main/IPC 基础已独立签收，包括严格结构/导航工具协议、证据锚点、8 条/30 分钟隔离缓存、watcher barrier、真实 deadline abort 和零写入门禁；专项 53/53、Network 15/15，独立复审 P0/P1=0。其当时未覆盖的 Renderer、动作、骨架与 Electron 已由上方 0.0CC 当前注记覆盖，不得从本段派发旧“下一阶段”。
 

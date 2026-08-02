@@ -1,11 +1,11 @@
 # 笔触 · WritCraft · V0 开发状态与续作入口
 
-> 最后更新：2026-08-02（Asia/Shanghai，0.0CM · 无正文上下文 P1 已技术签字，待新候选与作者验收-12）
+> 最后更新：2026-08-02（Asia/Shanghai，0.0CM · exact candidate `f2775cf` 与作者验收-12 已就绪）
 > 当前状态：**`writ-craft@0.1.1` 已从 exact candidate `c65981e` 发布到 npm `preview`；registry 时间 `2026-07-29T14:30:16.176Z`，shasum `d370c500666e25cfb373852deafa21b232d2bc18` 与本地候选一致。公网隔离安装/启动/退出为 2/2。annotated tag `v0.1.1` 指向同一提交，GitHub prerelease 已公开：`https://github.com/MaxHou-infinity/WritCraft/releases/tag/v0.1.1`。**
 > 发布判断：**0.1.1 Developer Preview 已完成版本、自动化、双架构安装、独立复审、npm 发布、公网安装和 GitHub prerelease。registry 标签保持 `preview: 0.1.1`、`latest: 0.1.0`，因此本次没有把 Preview 冒充稳定版，也没有执行 unpublish、占位发布或上传未签名 App/ZIP。**
 > 当前目标版本：**`docs/ROADMAP.md` 的 `RM-1.2 / writ-craft@0.1.2` 真实作者可用性闭环。当前唯一开发纵切是 `UNIFIED-WRITING-TASK-V1-CONTRACT.md`：把 Navigation 建议、必要依据核对、正文内 Diff、决定和 Safe Undo 合并为同一任务。不得继续派发旧公开 Research→Changes 多步旅程，也不得插入驾驶舱或其他后续版本功能。**
 > 当前源码证据：**旧 Plan 公共入口已移除，右栏固定为 Chat / 导航 / Context / Changes。Navigation→Changes 使用 Main-owned revision-bound range 协议；刷新恢复、固定 Research/Changes 双动作及 Research handoff 安全重入均已实现。0.0CL 又把初始 Research 从模型自由文本 JSON 迁移为唯一具名 `submit_research_cards` tool-use：接口 Schema 限制来源 ID、字段、数量和长度，Main 再做 exact-key、字节、逐字 quote、locator、revision 与末端 stale 校验；围栏、解释文本、零/多 tool block、截断和越权来源均零写入失败。Research Main **12+15+12+10+4**、Main integration **12/12**、Renderer **17+13** 全绿；完整 `npm test` 与批准 GUI `npm run verify` 均 exit 0。真实 Electron 首次因夹具把未知请求误路由为 Research 而红，修正夹具后一次在完成 28 阶段时出现 CDP `Runtime.evaluate` 超时，随后同源复跑 **36/36**；该时序红灯保留为 P2，不用产品代码掩盖。**
-> 当前作者验收进度：**此前签字模块仍保持关闭。fresh 作者验收-11 暴露新的 P1：作者在 `edit.md` 活跃且未选正文时可以点击“生成写作导航”，Main 于联网前约 19 ms 以 `CONTEXT_REQUIRED` 拒绝，但 Renderer 把它折叠成通用 AI 失败。源与副本 14 个 Markdown SHA-256 全部一致，manifest 后 History=0；因此是零写入的产品门禁/错误恢复缺口，不是模型失败。实现现已在 Renderer 请求序列化前要求“当前正文或显式正文上下文”，按钮禁用时给出恢复说明，并为 Main 竞态返回提供“尚未调用 AI”文案；动态测试覆盖 0/8 禁用、零调用、勾选正文、提示消失、按钮启用和恰好一次生成。Renderer state **15/15**、dynamic **13/13**、`npm run verify:navigation`、完整 `npm test`、批准 GUI `npm run verify` 与真实 Electron **37/37** 全绿；最终独立复审 **P0=0/P1=0/P2=0**。只差提交新 exact candidate 和创建 fresh 作者验收-12；0.1.2 仍不是候选完成。**
+> 当前作者验收进度：**此前签字模块仍保持关闭。fresh 作者验收-11 暴露新的 P1：作者在 `edit.md` 活跃且未选正文时可以点击“生成写作导航”，Main 于联网前约 19 ms 以 `CONTEXT_REQUIRED` 拒绝，但 Renderer 把它折叠成通用 AI 失败。源与副本 14 个 Markdown SHA-256 全部一致，manifest 后 History=0；因此是零写入的产品门禁/错误恢复缺口，不是模型失败。local exact candidate **`f2775cf fix(navigation): require manuscript context`** 已在 Renderer 请求序列化前要求“当前正文或显式正文上下文”，按钮禁用时给出恢复说明，并为 Main 竞态返回提供“尚未调用 AI”文案；动态测试覆盖 0/8 禁用、零调用、勾选正文、提示消失、按钮启用和恰好一次生成。Renderer state **15/15**、dynamic **13/13**、`npm run verify:navigation`、完整 `npm test`、批准 GUI `npm run verify` 与真实 Electron **37/37** 全绿；最终独立复审 **P0=0/P1=0/P2=0**。生产复制事务已创建 fresh 作者验收-12；0.1.2 仍不是候选完成，尚需作者最短旅程。**
 > 0.0AA 历史保留红灯：**首轮真实 Electron 暴露 Inspector 在上下文失效时被清空、旧 5-chip 断言和项目 Chat 等待诊断；完整 test 又暴露 Plan 测试把 generation 函数正文写死。独立复审发现新请求预检窗口可提交不可见旧轮、同项目重开 UI/Main 串话、失败重开提前清会话及两项测试/错误文案缺口，均转为生产边界和回归后关闭。真实 Electron 曾连续两次在旧 Graph 恢复阶段超时；加入只读失败快照后该阶段连续四次通过，未改 Graph 产品逻辑，按重复同源证据关闭 timing P2。另一次 Chat preflight 红灯证明测试在恢复 `edit.md` 后未等待权威 watcher barrier；改为生产 `flushExternalChanges()` 收敛，而未放宽 Chat guard。该里程碑所有红运行保留，最终源码连续两次 34/34；后续 0.0AB 当时推进到 35/35，当前总链只看本文顶部当前里程碑。**
 > Graph 历史签字基线：**性能修复前的既有源码曾完整 `npm test`、Electron-enabled `npm run verify`、强制真实 Electron 26/26 exit 0；Graph Filter 15/15、Workbench 14/14、dynamic 5/5、Large 5/5、Watcher 15/15、Network 11/11、Intelligence 17/17，第二轮复审 P0=0/P1=0/P2=2。该数字只保留为历史过程；0.0AB 后来推进到 35/35，当前总链只看顶部当前里程碑。**
 > Graph 动态边界：**300 文件/1279 节点 cold-to-interactive、cache/incremental、筛选/内存/布局、AX/键鼠、三类纠错、stale/Issue→Changes、failure live、重启与项目隔离均进入真实 Electron；正文/History/ledger 的零写入门禁通过。**  
@@ -61,7 +61,9 @@
 - ✅ 当前源码 App 已恢复作者验收-11并正确显示 Navigation，不再复现“项目已打开但导航要求打开项目”的握手红灯。启动只更新了允许持久化的私有 `.writcraft/workspace.json`，因此包含私有状态的全树摘要变化为 `927283fec97af50db44bc4ae5ac5725a693605ba063531197770071a83322869`（608,530 bytes）；源摘要仍未变，源与副本的 **14 个 Markdown 文件逐文件 SHA-256 全部相同**，manifest 后 History 仍为 0。这是会话恢复状态，不得误报为正文写入或候选漂移。
 - ✅ 当前修复已完成完整 `npm test`、批准 GUI `npm run verify`、真实 Electron 37/37 与最终独立复审 P0/P1/P2=0。
 - ⚠️ 诊断时首次按应用名读取界面，Computer Use 自动拉起了 packaged App，与既有开发版短暂并存并共用 userData；这是助手造成的验收环境污染，不是用户遗留。该 packaged 进程启动在红灯之后，不改变根因/零写入证据；两个进程已全部正常关闭。继续验收前必须只启动一个新候选进程。
-- ⬜ 保存新 exact candidate 后创建 fresh 作者验收-12，再由作者执行最短旅程。作者验收-11 只保留本次红灯和零写入证据，不可继续作为最终签字副本。
+- ✅ 新 local exact candidate 已保存为 `f2775cf`，未推送、未发布。
+- ✅ 生产复制事务创建 fresh **作者验收-12**：源仍 eligible，20 files / 608,433 bytes，digest `9d0898863636da74615481a669c3e40362a60176249870e6d1793380c85b4380`，返回 `copyCreated=true / sourceUnchanged=true`。新副本 eligible：21 files / 608,701 bytes，digest `78f9bbf5fccf6ef9f33621d5869dfcaf90164f38871b01869b512a70f3402d1d`；manifest `createdAt=2026-08-02T02:54:11.703Z`，继承 History=3 / metrics=23，切点后均为 0。
+- ⬜ 仅用一个 `f2775cf` 源码 App 进程打开作者验收-12，由作者执行最短旅程。作者验收-11 只保留本次红灯和零写入证据，不可继续作为最终签字副本。
 
 ### 2026-08-01 recent-project 握手 P1（已关闭，exact candidate `2bb9052`）
 
@@ -72,7 +74,7 @@
 - **验证红灯保留**：产品 P1 关闭后的首次完整 `npm test` 因两项旧源码字符串断言仍要求无参数 recovery 调用而红；修正为 owner-aware 精确顺序并补 deferred 覆盖后，完整 `npm test` exit 0。不得用最终绿灯抹去该测试漂移红灯。
 - **最终门禁**：`npm run verify:navigation`、完整 `npm test`、批准 GUI `npm run verify` exit 0；强制真实 Electron **37/37**，包含统一任务 Diff/接受/Safe Undo、退出重启与 recent-project 恢复。第四轮独立只读复审 **P0=0/P1=0/P2=0，签字 YES**。
 
-**唯一续作动作**：先完成当前无正文上下文门禁修复的完整验证、独立复审和 exact candidate；随后从未变源创建 fresh 作者验收-12，只验“打开目标正文→生成一张建议→一次点击处理→正文内 Diff→作者接受→Safe Undo”。
+**唯一续作动作**：只启动一个 `f2775cf` 源码 App 进程并打开 fresh 作者验收-12；先确认 `edit.md + 0/8` 时生成按钮被禁用并显示恢复说明，再打开目标正文，只验“生成一张建议→一次点击处理→正文内 Diff→作者接受→Safe Undo”。
 
 **旧暂停点仍失效**：不得从 `1b51595` 或作者验收-10续跑。此前已签字模块仍不重测，不得回到旧 Research→Changes 人工转交，也不得发布 0.1.2。
 
