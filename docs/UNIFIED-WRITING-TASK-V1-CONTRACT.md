@@ -4,13 +4,15 @@
 > Product version: `writ-craft@0.1.2`
 > Public journey: Writing Navigation suggestion → inline review → explicit decision
 
-> Implementation checkpoint (2026-08-01): the project-entry handshake race found after `1b51595` is closed in local exact candidate `2bb9052` (not pushed or released). Recent/open/create share a single-flight request owner; readiness, Prompt context, Inline/Changes reconciliation, orphan recovery, and legacy migration bind the exact entry generation plus project instance at their internal async mutation boundaries. Production-helper deferred A→B tests pass at 7/7, full `npm test`, approved GUI `npm run verify`, and forced real Electron 37/37 pass, and fourth-round independent review is P0=0/P1=0/P2=0. The first full test red caused by two obsolete no-argument call assertions remains recorded. Author copy 10 is invalidated; the production copy transaction has created fresh author copy 11 from unchanged source, with all inherited History and metrics before its manifest cutoff. Acceptance now resumes only with the shortest author journey on candidate `2bb9052`.
+> Implementation checkpoint (2026-08-02): fresh author copy 11 exposed a pre-provider context-admission P1. With `edit.md` active and no explicit manuscript selected, the UI enabled generation; Main correctly rejected `CONTEXT_REQUIRED` before any provider call, but the Renderer collapsed it into a generic AI failure. Markdown remained 14/14 identical to the source and no post-manifest History entry was created. The implementation now blocks generation until a manuscript is active or explicitly selected and explains that no AI call occurred. Renderer state 15/15, dynamic 13/13, `npm run verify:navigation`, full `npm test`, approved GUI `npm run verify`, and real Electron 37/37 pass; final independent review is P0=0/P1=0/P2=0. Candidate `2bb9052` and author copy 11 remain historical red evidence; save a new exact candidate and create fresh copy 12 before author acceptance.
 
 ## 1. Product decision
 
 The default author journey is one continuous writing task. Navigation, evidence checking, localized generation, Diff review, decision, and Safe Undo may retain separate internal services, but must not appear as a chain of public workspaces.
 
 Each suggestion has one primary action: **处理这个建议**. A normal run uses the suggestion's Main-owned evidence anchors and defaults to its manuscript file. The author does not reselect that file, classify a Research card, or manually transfer evidence into Changes.
+
+Navigation generation itself requires one explicit manuscript scope. When `edit.md` or a protected source is active and no manuscript is selected, the primary button is disabled and the current task explains how to open or select a manuscript. Main retains the same `CONTEXT_REQUIRED` fail-closed boundary for races; the Renderer must state that no provider call and no file write occurred instead of reporting a generic AI failure.
 
 Only when Main receives and validates an explicit `needs_sources` outcome with zero edits may the task show **添加来源**. Source selection returns to the same task, preserving its goal, anchors, scope, and attempt history. Standalone Research and Changes remain advanced tools; they are not the default Navigation path.
 

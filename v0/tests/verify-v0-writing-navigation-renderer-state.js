@@ -135,6 +135,7 @@ test('old generation results and finally cannot mutate a newer project attempt',
   state = State.reduce(state, { type: 'generation-start', attemptId: GENERATION_A });
   state = State.reduce(state, {
     type: 'project-update', projectInstanceId: PROJECT_B, tree: tree('edit.md', 'one.md'),
+    currentFilePath: 'one.md',
   });
   state = State.reduce(state, { type: 'goal-change', value: '找下一步' });
   state = State.reduce(state, { type: 'generation-start', attemptId: GENERATION_B });
@@ -350,6 +351,17 @@ test('current正文 occupies one of eight context slots before request serializa
   assert.strictEqual(new Set([request.currentFilePath, ...request.contextPaths]).size, 8);
 });
 
+test('navigation requires a current正文 or explicit context before generation', () => {
+  let state = State.reduce(State.createState(), {
+    type: 'project-update', projectInstanceId: PROJECT_A,
+    tree: tree('edit.md', 'chapters/01.md'), currentFilePath: 'edit.md',
+  });
+  state = State.reduce(state, { type: 'goal-change', value: '找下一步' });
+  assert.strictEqual(State.requestPayload(state), null);
+  state = State.reduce(state, { type: 'context-change', paths: ['chapters/01.md'] });
+  assert.deepStrictEqual(State.requestPayload(state).contextPaths, ['chapters/01.md']);
+});
+
 test('action attempts are isolated and retryable outcomes keep the action available', () => {
   let state = State.reduce(State.createState(), {
     type: 'project-update', projectInstanceId: PROJECT_A,
@@ -380,6 +392,10 @@ test('public error mapping never exposes structured transport vocabulary', () =>
   const noKey = State.publicFailure({ error: 'NO_KEY' });
   assert.strictEqual(noKey.action, 'settings');
   assert(noKey.message.includes('未联网'));
+  const contextRequired = State.publicFailure({ error: 'CONTEXT_REQUIRED' });
+  assert(contextRequired.message.includes('打开一篇正文'));
+  assert(contextRequired.message.includes('尚未调用 AI'));
+  assert(contextRequired.message.includes('没有修改项目文件'));
   const evidence = State.publicFailure({ error: 'INVALID_MODEL_EVIDENCE' });
   assert(evidence.message.includes('原文依据没有通过核对'));
   assert.strictEqual(evidence.action, 'retry');

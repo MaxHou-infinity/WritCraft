@@ -211,6 +211,13 @@
         action: 'retry',
       });
     }
+    if (code === 'CONTEXT_REQUIRED') {
+      return Object.freeze({
+        code,
+        message: '请先打开一篇正文，或从“补充上下文”中选择至少一篇。尚未调用 AI，也没有修改项目文件。',
+        action: 'retry',
+      });
+    }
     if (code === 'REVIEW_DISCARD_FAILED') {
       return Object.freeze({
         code,
@@ -263,15 +270,17 @@
     if (!state.projectInstanceId || !state.mode || !safeText(state.goal, 2000)) return null;
     const current = state.mode === 'navigation' && bodyPath(state.currentFilePath)
       ? state.currentFilePath : null;
+    const contextPaths = state.mode === 'navigation'
+      ? [...new Set(state.contextPaths.filter(path => bodyPath(path) && path !== current))]
+        .slice(0, current ? 7 : 8)
+      : [];
+    if (state.mode === 'navigation' && !current && contextPaths.length === 0) return null;
     return deepFreeze({
       schema: REQUEST_SCHEMA,
       mode: state.mode,
       goal: state.goal,
       currentFilePath: current,
-      contextPaths: state.mode === 'navigation'
-        ? [...new Set(state.contextPaths.filter(path => bodyPath(path) && path !== current))]
-          .slice(0, current ? 7 : 8)
-        : [],
+      contextPaths,
     });
   }
 

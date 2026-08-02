@@ -333,6 +333,46 @@ async function flush() {
     assert(text(host).includes('下一步：预览即将创建的文件，确认无误后再创建章节骨架。'));
   });
 
+  await test('edit.md without explicit正文 blocks generation and explains the recovery', async () => {
+    const document = new Document();
+    const host = document.createElement('div');
+    document.body.append(host);
+    let calls = 0;
+    const controller = View.mount(host, {
+      stateApi: State,
+      createAttemptId: nextId,
+      onGenerate: async request => {
+        calls += 1;
+        assert.strictEqual(request.currentFilePath, null);
+        assert.deepStrictEqual(request.contextPaths, ['chapters/01.md']);
+        return navigation();
+      },
+    });
+    controller.updateProject(PROJECT, [
+      { type: 'file', path: 'edit.md' },
+      { type: 'file', path: 'chapters/01.md' },
+    ], 'edit.md');
+    const goal = host.querySelector('[data-navigation-focus="goal"]');
+    goal.value = '精简当前文章';
+    await goal.dispatch('input');
+    const generate = byText(host, '生成写作导航');
+    assert.strictEqual(generate.disabled, true);
+    assert(text(host).includes('请先打开一篇正文'));
+    assert(text(host).includes('选择前不会调用 AI'));
+    await generate.click();
+    await flush();
+    assert.strictEqual(calls, 0);
+    const context = host.querySelector('input');
+    context.checked = true;
+    await context.dispatch('change');
+    assert(!text(host).includes('选择前不会调用 AI'));
+    const recoveredGenerate = byText(host, '生成写作导航');
+    assert.strictEqual(recoveredGenerate.disabled, false);
+    await recoveredGenerate.click();
+    await flush();
+    assert.strictEqual(calls, 1);
+  });
+
   await test('generation cancellation is attempt-bound and preserves the goal', async () => {
     const document = new Document();
     const host = document.createElement('div');

@@ -527,6 +527,14 @@
         }
         context.append(list);
         section.append(context);
+        if (!view.currentFilePath && view.contextPaths.length === 0) {
+          section.append(element(
+            document,
+            'p',
+            'writing-navigation__context-required',
+            '请先打开一篇正文，或在“补充上下文”中选择至少一篇；选择前不会调用 AI。'
+          ));
+        }
       }
 
       const row = element(document, 'div', 'writing-navigation__compose-actions');

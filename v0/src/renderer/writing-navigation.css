@@ -147,6 +147,13 @@
   font-size: 11px;
 }
 
+.writing-navigation__context-required {
+  margin: 8px 0 0;
+  color: var(--navigation-warning);
+  font-size: 11px;
+  line-height: 1.55;
+}
+
 .writing-navigation__context-options,
 .writing-navigation__chapters,
 .writing-navigation__suggestions {
