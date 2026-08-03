@@ -219,14 +219,16 @@ function createImageReviewHandler(options = {}) {
         currentNavigation !== record.binding.navigationEpoch) {
       fail('IMAGE_REVIEW_STALE', '图片审阅不属于当前窗口或项目状态');
     }
-    if (identity.decision !== 'inserted' &&
+    if (currentGeneration < record.binding.mutationGeneration) {
+      fail('IMAGE_REVIEW_STALE', '项目内容代际无效');
+    }
+    if (identity.decision === 'deleted' &&
         currentGeneration !== record.binding.mutationGeneration &&
         !committedRetry) {
-      fail('IMAGE_REVIEW_STALE', '项目内容已经变化，请重新生成图片');
-    }
-    if (identity.decision === 'inserted' &&
-        currentGeneration < record.binding.mutationGeneration) {
-      fail('IMAGE_REVIEW_STALE', '项目内容代际无效');
+      fail(
+        'IMAGE_REVIEW_DELETE_BLOCKED',
+        '正文已发生变化。为避免断图，本次不能移入废纸篓；请选择“保留素材”结束本次评审。本次不会删除图片。'
+      );
     }
     if (committedRetry) {
       if (identity.decision !== 'inserted' &&

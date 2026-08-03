@@ -565,7 +565,7 @@
     return `${'../'.repeat(from.length - common)}${to.slice(common).join('/')}`;
   }
 
-  async function insertGeneratedImage(image, altText) {
+  async function insertGeneratedImage(image) {
     if (!state.project || !state.currentPath) return { ok: false, message: '请先打开一个正文文件' };
     if (state.currentPath === 'edit.md') return { ok: false, message: '项目 Prompt 不插入配图' };
     const filePath = image?.filePath;
@@ -573,8 +573,7 @@
       return { ok: false, message: '配图路径不在项目生成资产目录' };
     }
     if (!await persistCurrent(true)) return { ok: false, message: '当前文件未能保存' };
-    const alt = String(altText || '生成配图').replace(/[\[\]\\\r\n]/g, ' ').trim().slice(0, 160) || '生成配图';
-    const markdown = `![${alt}](${encodeURI(relativeAssetPath(state.currentPath, filePath))})`;
+    const markdown = `![章节配图](${encodeURI(relativeAssetPath(state.currentPath, filePath))})`;
     const inserted = window.__editor?.insertMarkdown?.(markdown) || { ok: false, message: '编辑器未连接' };
     if (!inserted.ok) return inserted;
     const saved = await persistCurrent(true);

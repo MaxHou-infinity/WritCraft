@@ -55,7 +55,7 @@ test('评分后必须显式选择插入、保留或移入废纸篓', () => {
   assert.match(view, /settleImageReview/);
   assert.match(view, /getImageReviewAggregate/);
   assert.match(view, /本项目 \$\{total\} 次评审/);
-  assert.match(view, /insertGeneratedImage\?\.\(\s*owner\.image,\s*owner\.altText\s*\)/);
+  assert.match(view, /insertGeneratedImage\?\.\(\s*owner\.image\s*\)/);
   assert.match(view, /pendingOwner !== owner/);
   assert.match(view, /reviewBusy/);
   assert.doesNotMatch(view, /(?:writeFile|atomicWrite|applyChanges)\s*\(/);
@@ -66,6 +66,8 @@ test('工作区拒绝 edit.md 和非 assets/generated 图片路径', () => {
   assert.match(workspace, /state\.currentPath === 'edit\.md'/);
   assert.match(workspace, /\^assets\\\/generated\\\//);
   assert.match(workspace, /insertMarkdown\?\.\(markdown\)/);
+  assert.match(workspace, /!\[章节配图\]/);
+  assert.doesNotMatch(workspace, /String\(altText/);
 });
 
 test('插入 Markdown 前后都经过现有项目保存门', () => {

@@ -453,8 +453,7 @@
       if (!reviewPayload(owner, 'inserted', controls)) return;
       if (!owner.insertionProof) {
         const inserted = await window.__workspace?.insertGeneratedImage?.(
-          owner.image,
-          owner.altText
+          owner.image
         );
         if (!inserted?.ok) {
           controls.hint.textContent = inserted?.message ||

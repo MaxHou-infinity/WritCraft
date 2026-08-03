@@ -4086,7 +4086,8 @@ async function run() {
       await waitForValue(first.client, `document.querySelector('#image-result .image-state')?.textContent.includes('已插入正文')`, 'rated explicit image insertion');
       const afterRenderer = await first.client.evaluate(`window.__editor.getContent()`);
       const afterDisk = projectService.readFile(project.rootPath, createdPath);
-      assert(afterRenderer.includes('![WritCraft E2E 配图验收：旧港档案室](../assets/generated/image-'));
+      assert(afterRenderer.includes('![章节配图](../assets/generated/image-'));
+      assert(!afterRenderer.includes(electronAiFixture.IMAGE_PROMPT));
       assert.strictEqual(afterRenderer, afterDisk);
       const generatedDirectory = path.join(project.rootPath, 'assets', 'generated');
       const generatedFiles = fs.readdirSync(generatedDirectory).filter(name => name.endsWith('.png'));

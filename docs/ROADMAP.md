@@ -76,7 +76,7 @@
 5. 修复旅程中发现的 P0/P1 阻断项；P2 必须明确记录、分级并决定是否允许发版。
 6. 记录内容无关的私有指标：Inline 接受率、导航建议帮助度/动作、Research 匹配判断、图片评分/采纳、耗时和稳定错误码。
 
-当前执行注记（2026-08-03，0.0CP）：fresh 作者验收-11 的 `CONTEXT_REQUIRED` P1 已由 `f2775cf` 关闭；作者验收-12 随后保留两次 ChangeSet 前 `INVALID_MODEL_OUTPUT` 零写入红灯。exact candidate **`e8b9588`** 改为每建议一个同文件 canonical evidence、Main 私有 `rangeId` 恢复 authority、有界相邻只读上下文和有限 `editIntent`。专项、完整 `npm test`、批准 GUI `npm run verify`、真实 Electron 37/37 与最终独立复审 P0/P1/P2=0。2026-08-03 作者在当前源码 App 再次使用作者验收-12时，正确看到正文内红删绿增 Diff；接受于 `05:24:07.306Z` 写入单一章节，Safe Undo 于 `05:27:10.888Z` 将同一 History 置为 `undone`；撤销后 14/14 Markdown 再次匹配源且 recovery 为空。该边界关闭 MiniMax `oneOf`/`const` 真实 canary 和统一任务作者门禁，不再重复验收-13。所有者现已授权更新 npm 与 GitHub，但审计确认所有作者副本的 `image-reviews.json` 仍为 0 条，真实 GUI 图片评分/终态门禁未关闭。npm 首次 `whoami` 返回 E401 后已通过官方浏览器登录恢复为 `houxyue`；0.1.2 仍因图片门禁与精确候选复验未发布。
+当前执行注记（2026-08-03，0.0CQ）：统一写作任务的正文内 Diff、接受与 Safe Undo 已由作者签收，不再重验。随后真实 `image-01` 旅程证明生成与渲染可用，但暴露两项发布阻断 P1：自动插入把提示词写入 Markdown alt；正文 mutation 后 keep/delete 统一返回 `IMAGE_REVIEW_STALE`。修复已收敛为中性 alt、keep 允许同项目向前 generation、delete 在正文变化后继续 fail closed 并提供防断图说明。最终专项、完整 `npm test`、批准 GUI `npm run verify`、强制 Electron 37/37 与独立终审 P0/P1=0 已通过；只剩 corrected-source 的受影响图片 GUI 复验。在此之前不得发布、打 `v0.1.2` 标签或创建 Release。
 
 历史检查点（0.0BZ）：只读 Main/IPC 基础已独立签收，包括严格结构/导航工具协议、证据锚点、8 条/30 分钟隔离缓存、watcher barrier、真实 deadline abort 和零写入门禁；专项 53/53、Network 15/15，独立复审 P0/P1=0。其当时未覆盖的 Renderer、动作、骨架与 Electron 已由上方 0.0CC 当前注记覆盖，不得从本段派发旧“下一阶段”。
 

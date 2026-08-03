@@ -1,6 +1,6 @@
 # WritCraft V0 · Image Review v1
 
-> Status: **2026-07-26 review settlement signed; 2026-07-27 in-app trash-management extension signed at P0=0/P1=0/P2=1; real Coding Plan API capability verified on 2026-07-28; author quality/cost evidence remains open**. One gated synthetic `sk-cp-` call returned a valid 1280×720 JPEG in 19,333 ms with zero manuscript insertion. This proves access and decoding, not author-perceived quality, adoption, billing cost, or rate-limit behavior.
+> Status: **2026-08-03 author acceptance exposed two release-blocking P1 defects; the corrective candidate is under verification and affected GUI paths remain open**. Image generation and decoding succeeded, but automatic insertion leaked the prompt into Markdown alt text and normal manuscript mutation made keep/delete report stale. The historical settlement and trash-management evidence remains scoped evidence, not current release sign-off.
 > Provider parameter source: MiniMax official China `POST https://api.minimaxi.com/v1/image_generation` reference (`https://platform.minimaxi.com/docs/api-reference/image-generation-t2i`) and Token Plan FAQ (`https://platform.minimaxi.com/docs/token-plan/faq`), checked 2026-07-28.
 
 ## 1. Product journey
@@ -10,10 +10,10 @@
 3. The preview shows decoded dimensions and the requested ratio. Generation alone never changes Markdown.
 4. Before settlement, the author chooses a 1–5 quality rating and may enter a manually checked non-negative provider cost with a fixed currency.
 5. The author then chooses exactly one terminal action:
-   - **Insert into the current manuscript**: save the Markdown reference, retain the asset, and record `inserted`.
+   - **Insert into the current manuscript**: save a neutral `章节配图` alt plus the relative asset reference, retain the asset, and record `inserted`. The generation prompt must never enter Markdown.
    - **Keep as material**: retain the asset without changing Markdown and record `kept`.
    - **Move to recoverable trash**: remove only the exact generated inode from the asset library, place it in the project’s private recoverable trash, and record `deleted`.
-6. Regeneration must settle the previous preview first; it cannot silently accumulate orphan assets. Project switch, navigation, mutation-generation drift, expiry, replay, or foreign ownership fail closed.
+6. Regeneration must settle the previous preview first; it cannot silently accumulate orphan assets. Project switch, navigation drift, mutation-generation rollback, expiry, replay, or foreign ownership fail closed. A forward manuscript generation may still settle **keep**. **Delete** requires the exact issued manuscript generation until Main can prove the asset is unreferenced; this prevents a referenced image from becoming a broken link. Insert may cross only its own verified save and must present exact authoritative Markdown proof.
 
 ## 2. Authority and privacy
 
@@ -37,6 +37,7 @@
 - Insert save failure: token remains live and no terminal review is recorded.
 - Markdown committed but evidence recording fails: report committed warning, retain asset, and allow exact evidence retry without repeating insertion.
 - Trash move failure or identity mismatch: token remains live and the UI stays blocked on the same preview.
+- Delete after any manuscript change: no asset move and an explicit recovery message. The author can choose **Keep as material** to terminate this review safely; the current flow must not promise an unavailable retry/delete path. Later cleanup of retained assets is a separate P2 candidate, not part of this patch.
 - Delete committed but response is lost: exact retry returns `deleted` without touching any other file.
 
 ## 5. In-app trash management extension

@@ -134,11 +134,16 @@ function loadImageHarness({
   };
   const metricCalls = [];
   const settleCalls = [];
+  const insertArgs = [];
   let insertCalls = 0;
   let generateCalls = 0;
   const workspace = {
     state: { project: { instanceId: 'instance-1' } },
-    insertGeneratedImage: async (...args) => { insertCalls += 1; return insertGeneratedImage(...args); },
+    insertGeneratedImage: async (...args) => {
+      insertCalls += 1;
+      insertArgs.push(args);
+      return insertGeneratedImage(...args);
+    },
   };
   const window = {
     __workspace: workspace,
@@ -159,7 +164,7 @@ function loadImageHarness({
   vm.runInNewContext(clientSource, context, { filename: 'ai-metrics-client.js' });
   vm.runInNewContext(imageSource, context, { filename: 'image-generation-view.js' });
   return {
-    nodes, window, workspace, metricCalls, settleCalls,
+    nodes, window, workspace, metricCalls, settleCalls, insertArgs,
     getInsertCalls: () => insertCalls,
     getGenerateCalls: () => generateCalls,
   };
@@ -325,6 +330,7 @@ console.log('════════ WritCraft V0 · AI metrics renderer verify
     imageClass(inserted.nodes['image-result'], 'image-rating').value = '5';
     await imageButton(inserted.nodes['image-result'], '插入当前正文').dispatch('click');
     assert.equal(inserted.getInsertCalls(), 1);
+    assert.equal(inserted.insertArgs[0].length, 1, 'prompt must not become Markdown alt text');
     assert.equal(inserted.settleCalls[0][1].decision, 'inserted');
     assert.equal(inserted.settleCalls[0][2].targetPath, 'chapters/01.md');
     assert.equal(inserted.settleCalls[0][2].revision, 'a'.repeat(64));

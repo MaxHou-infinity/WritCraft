@@ -145,11 +145,45 @@ test('issue signs only Main binding plus digest/path and returns no private asse
   assert(!JSON.stringify(item.state.issueInput).includes('SECRET'));
 });
 
-test('kept and deleted require the exact original mutation generation', () => {
-  for (const decision of ['kept', 'deleted']) {
+test('kept tolerates forward manuscript generations while preserving project authority', () => {
+  const item = fixture();
+  issued(item);
+  item.state.generation += 1;
+  const result = item.handler.settle(
+    item.event(),
+    'project-a',
+    review(item.token, 'kept')
+  );
+  assert.strictEqual(result.decision, 'kept');
+  assert.strictEqual(item.state.settleCalls.length, 1);
+});
+
+test('deleted blocks forward manuscript generations so a referenced asset cannot become a broken image', () => {
+  const item = fixture();
+  issued(item);
+  item.state.generation += 1;
+  expectCode('IMAGE_REVIEW_DELETE_BLOCKED', () =>
+    item.handler.settle(item.event(), 'project-a', review(item.token, 'deleted')));
+  assert.strictEqual(item.state.settleCalls.length, 0);
+});
+
+test('deleted still settles at the exact issued manuscript generation', () => {
+  const item = fixture();
+  issued(item);
+  const result = item.handler.settle(
+    item.event(),
+    'project-a',
+    review(item.token, 'deleted')
+  );
+  assert.strictEqual(result.decision, 'deleted');
+  assert.strictEqual(item.state.settleCalls.length, 1);
+});
+
+test('all decisions reject an impossible mutation-generation rollback', () => {
+  for (const decision of ['kept', 'deleted', 'inserted']) {
     const item = fixture();
     issued(item);
-    item.state.generation += 1;
+    item.state.generation -= 1;
     expectCode('IMAGE_REVIEW_STALE', () =>
       item.handler.settle(item.event(), 'project-a', review(item.token, decision)));
     assert.strictEqual(item.state.settleCalls.length, 0);
@@ -321,6 +355,68 @@ test('exact inserted response-loss retry is recovered without a second commit', 
       handler.settle(event, 'project-real', request, proof).responseRecovered,
       true
     );
+  } finally {
+    fs.rmSync(root, { recursive: true, force: true });
+  }
+});
+
+test('forward-generation keep reaches the real asset identity and digest checks', () => {
+  const root = fs.realpathSync(fs.mkdtempSync(path.join(os.tmpdir(), 'writcraft-image-handler-keep-')));
+  const generated = path.join(root, 'assets', 'generated');
+  fs.mkdirSync(generated, { recursive: true });
+  const bytes = Buffer.from('handler-forward-keep-fixture');
+  const digest = crypto.createHash('sha256').update(bytes).digest('hex');
+  const assetPath = `assets/generated/image-${digest}.png`;
+  const absoluteAssetPath = path.join(root, ...assetPath.split('/'));
+  fs.writeFileSync(absoluteAssetPath, bytes);
+  const state = {
+    project: { instanceId: 'project-real-keep', rootPath: root },
+    generation: 1,
+    navigation: 1,
+  };
+  try {
+    let tokenIndex = 0;
+    const service = imageReviewServiceModule.createImageReviewService({
+      randomToken: () => `irv_${String(++tokenIndex).padStart(48, 'e')}`,
+      now: () => new Date('2026-07-26T10:00:00.000Z'),
+    });
+    const handler = handlerModule.createImageReviewHandler({
+      assertTrustedSender() {},
+      getCurrentProject: () => state.project,
+      getMutationGeneration: () => state.generation,
+      getNavigationEpoch: () => state.navigation,
+      projectService: { readFileWithRevision() { throw new Error('not used'); } },
+      reviewService: service,
+    });
+    const event = { sender: { id: 10 } };
+    const issuedReview = handler.issue(
+      event,
+      state.project,
+      'f'.repeat(32),
+      { filePath: assetPath }
+    );
+    state.generation += 1;
+    const kept = handler.settle(event, state.project.instanceId, {
+      token: issuedReview.token,
+      decision: 'kept',
+      qualityRating: 4,
+    });
+    assert.strictEqual(kept.decision, 'kept');
+    assert.deepStrictEqual(fs.readFileSync(absoluteAssetPath), bytes);
+
+    const second = handler.issue(
+      event,
+      state.project,
+      '1'.repeat(32),
+      { filePath: assetPath }
+    );
+    fs.writeFileSync(absoluteAssetPath, Buffer.from('replacement'));
+    state.generation += 1;
+    expectCode('IMAGE_REVIEW_ASSET_CHANGED', () => handler.settle(
+      event,
+      state.project.instanceId,
+      { token: second.token, decision: 'kept', qualityRating: 4 }
+    ));
   } finally {
     fs.rmSync(root, { recursive: true, force: true });
   }

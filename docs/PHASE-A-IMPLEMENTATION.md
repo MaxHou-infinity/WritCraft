@@ -8,7 +8,7 @@
 
 > **历史工程交接（2026-07-29，0.0AC npm Developer Preview 本地签字收口）**：0.0AC 新增 macOS CLI、窄 npm 包、Node `>=22.12.0`、npm 10/11 fail-closed、Electron `43.2.0`、Main 观测 `did-finish-load` 后的 CLI readiness IPC 和零网络 `--check`；同时让 `sk-cp-` 图片能力进入 provider 现场门禁。该 readiness 只证明页面加载完成，不单独证明全部 workspace/bootstrap 逻辑成功。该批历史证据为 Persistent **3/3**、npm Preview **10/10**、installed **2/2**、真实 Electron **35/35**；当前候选只看下条。
 > **下一阶段合同**：`docs/AUTHOR-ACCEPTANCE-V1-CONTRACT.md` 已冻结，明确付费网络门禁、允许记录的隐私安全证据、真实长文旅程与发布前签字顺序。
-> **当前实现停点**：`writ-craft@0.1.1` 已公开到 npm `preview`，`latest` 仍为 `0.1.0`；`RM-1.2 / 0.1.2` 的统一写作任务真实作者纵切已于 0.0CO 完成。exact candidate `e8b9588` 实现每建议一个同文件 canonical-evidence `rangeId`、Main-owned 局部动作和有界相邻上下文，通过全量自动化、真实 Electron 37/37、P0/P1/P2=0 复审及真实作者 Diff→接受→Safe Undo 精确哈希闭环。0.1.2 尚未发布；所有者已经授权更新 npm/GitHub且 npm 身份已恢复，但真实 GUI 图片评分/终态与精确候选发布复验仍须按 `docs/ROADMAP.md` 与 `v0/DEVELOPMENT-STATUS.md` 关闭。
+> **当前实现停点**：`writ-craft@0.1.1` 已公开到 npm `preview`，`latest` 仍为 `0.1.0`；统一写作任务真实作者纵切已完成。2026-08-03 图片作者旅程把 0.1.2 从待发布候选退回修复态：真实生成/渲染通过，自动插入提示词污染与终态 stale 为发布阻断 P1。当前只关闭中性 alt、安全 keep/delete 结算及受影响复验；不得重开已签收模块，也不得在图片红灯关闭前创建 0.1.2 Tag/Release 或发布 npm。
 > **路线图入口**：Phase A 已是工程地基，不再负责后续版本排期。当前唯一目标是 `docs/ROADMAP.md` 的 `RM-1.2 / writ-craft@0.1.2` 真实作者可用性闭环。
 
 ## 1. 阶段目标
