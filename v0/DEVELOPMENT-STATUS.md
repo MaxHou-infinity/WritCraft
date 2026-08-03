@@ -5,7 +5,7 @@
 > 发布判断：**0.1.1 Developer Preview 已完成版本、自动化、双架构安装、独立复审、npm 发布、公网安装和 GitHub prerelease。registry 标签保持 `preview: 0.1.1`、`latest: 0.1.0`，因此本次没有把 Preview 冒充稳定版，也没有执行 unpublish、占位发布或上传未签名 App/ZIP。**
 > 当前目标版本：**`docs/ROADMAP.md` 的 `RM-1.2 / writ-craft@0.1.2` 真实作者可用性闭环。统一写作任务流已经签收，不再是开发纵切。当前唯一顺序是：真实 GUI `image-01` 评分/终态 → exact candidate 发布复验 → npm `preview` 与 GitHub prerelease 公网验证。不得继续派发旧公开 Research→Changes、多余统一任务测试、驾驶舱或后续版本功能。**
 > 当前源码证据：**exact candidate `e8b9588 fix(navigation): bind one local edit anchor` 已冻结。旧 Plan 公共入口已移除，右栏固定为 Chat / 导航 / Context / Changes。0.0CN 的默认 Navigation 只生成同文件、可直接落成 1–3 个局部 Diff 的 `changes` 建议；Main 把 canonical evidence 冻结为 request-local `rangeId`，模型不再复述 path/revision/offset/原文。`changes` 与 `needs_sources` 使用互斥工具分支，Main 继续执行 exact-key、范围成员、重叠、Unicode/字节、revision、owner、deadline、迟到结果与私有单次 ChangeSet authority 校验。专项、完整 `npm test`、批准 GUI `npm run verify`、强制真实 Electron 37/37 与最终独立复审 P0/P1/P2=0 均已通过。**
-> 当前作者验收进度：**此前签字模块仍保持关闭。exact candidate `e8b9588` 已由作者在当前源码 App 完成“一张局部建议→正文内 Diff→接受写入→Safe Undo”。本次 exact History 于 `2026-08-03T05:24:07.306Z` 应用同一章节，于 `2026-08-03T05:27:10.888Z` 进入 `undone`，撤销后 14/14 Markdown 再次逐文件匹配源，recovery 目录为空。统一任务真实作者门禁已关闭，不要求在未使用的验收-13重复付费旅程。所有者已授权更新 npm 与 GitHub，但审计确认所有验收副本的 `image-reviews.json` 均为 0 条，真实 GUI 图片评分/终态仍未签收；npm `whoami` 同时返回 E401。0.1.2 因此仍未发布。**
+> 当前作者验收进度：**此前签字模块仍保持关闭。exact candidate `e8b9588` 已由作者在当前源码 App 完成“一张局部建议→正文内 Diff→接受写入→Safe Undo”。本次 exact History 于 `2026-08-03T05:24:07.306Z` 应用同一章节，于 `2026-08-03T05:27:10.888Z` 进入 `undone`，撤销后 14/14 Markdown 再次逐文件匹配源，recovery 目录为空。统一任务真实作者门禁已关闭，不要求在未使用的验收-13重复付费旅程。所有者已授权更新 npm 与 GitHub；npm 首次 E401 后已通过官方浏览器登录恢复为 `houxyue`。但审计确认所有验收副本的 `image-reviews.json` 均为 0 条，真实 GUI 图片评分/终态仍未签收，0.1.2 因此仍未发布。**
 > 0.0AA 历史保留红灯：**首轮真实 Electron 暴露 Inspector 在上下文失效时被清空、旧 5-chip 断言和项目 Chat 等待诊断；完整 test 又暴露 Plan 测试把 generation 函数正文写死。独立复审发现新请求预检窗口可提交不可见旧轮、同项目重开 UI/Main 串话、失败重开提前清会话及两项测试/错误文案缺口，均转为生产边界和回归后关闭。真实 Electron 曾连续两次在旧 Graph 恢复阶段超时；加入只读失败快照后该阶段连续四次通过，未改 Graph 产品逻辑，按重复同源证据关闭 timing P2。另一次 Chat preflight 红灯证明测试在恢复 `edit.md` 后未等待权威 watcher barrier；改为生产 `flushExternalChanges()` 收敛，而未放宽 Chat guard。该里程碑所有红运行保留，最终源码连续两次 34/34；后续 0.0AB 当时推进到 35/35，当前总链只看本文顶部当前里程碑。**
 > Graph 历史签字基线：**性能修复前的既有源码曾完整 `npm test`、Electron-enabled `npm run verify`、强制真实 Electron 26/26 exit 0；Graph Filter 15/15、Workbench 14/14、dynamic 5/5、Large 5/5、Watcher 15/15、Network 11/11、Intelligence 17/17，第二轮复审 P0=0/P1=0/P2=2。该数字只保留为历史过程；0.0AB 后来推进到 35/35，当前总链只看顶部当前里程碑。**
 > Graph 动态边界：**300 文件/1279 节点 cold-to-interactive、cache/incremental、筛选/内存/布局、AX/键鼠、三类纠错、stale/Issue→Changes、failure live、重启与项目隔离均进入真实 Electron；正文/History/ledger 的零写入门禁通过。**  
@@ -21,7 +21,7 @@
 > Diagnostic Export 契约：`../docs/DIAGNOSTIC-EXPORT-V1-CONTRACT.md`（2026-07-26 已实现并完成自动化产品链签收）
 > Image Review 契约：`../docs/IMAGE-REVIEW-V1-CONTRACT.md`（2026-07-27 Trash 扩展已签字，待真实付费/作者验收）
 > Markdown Trash 契约：`../docs/MARKDOWN-TRASH-V1-CONTRACT.md`（2026-07-28 0.0AB 已实现并独立签收）
-> npm Developer Preview 契约：`../docs/NPM-DEVELOPER-PREVIEW-V1-CONTRACT.md`（0.1.1 已公开到 `preview`，公网安装 2/2；`latest` 仍为 0.1.0；0.1.2 已获授权但仍被图片作者门禁、候选复验与 npm E401 阻止）
+> npm Developer Preview 契约：`../docs/NPM-DEVELOPER-PREVIEW-V1-CONTRACT.md`（0.1.1 已公开到 `preview`，公网安装 2/2；`latest` 仍为 0.1.0；0.1.2 已获授权且 npm 身份已恢复，仍被图片作者门禁与候选复验阻止）
 > 用户安装与首次使用：`../docs/GETTING-STARTED.md`
 
 ## 0.0CN–0.0CO · 统一写作任务流 Main-owned rangeId 修复（已完成并验收）
@@ -73,6 +73,7 @@
 - ✅ 生产复制事务创建 fresh **作者验收-13**：源仍 eligible，20 files / 608,433 bytes，digest `9d0898863636da74615481a669c3e40362a60176249870e6d1793380c85b4380`，返回 `copyCreated=true / sourceUnchanged=true`。manifest cutoff `2026-08-02T06:33:47.698Z`；继承 History=3 / metrics=23，切点后均为 0。
 - ✅ 作者在最新源码 App 中看到正确正文内 Diff，接受后生成 exact History；Safe Undo 将该 History 置为 `undone` 并精确恢复原稿。作者验收-12 同时保留此前两次零写入红灯和本次有界绿灯，验收-13 保持未使用，不再重复测试。
 - ✅ 2026-08-03 发布审计：registry 仍为 `preview: 0.1.1`、`latest: 0.1.0`，0.1.2 不存在；GitHub 仓库为公开且尚无 `v0.1.2` Release。生产依赖 audit 为 0 vulnerabilities，npm Preview **10/10**、隔离 installed **2/2**、packaged release **7/7**。当前 dry-run tarball 为 **135 files / 667,444 bytes packed / 3,119,465 bytes unpacked / shasum `6fcffabcdf2253df1407887a55ac9a82d0c96e25`**。这些是工作树候选准备证据；最终文档提交后仍须重跑精确候选门禁。
+- ✅ npm 身份恢复：首次 `npm whoami` 为 E401；经官方浏览器登录后只读复核为 `houxyue`，registry 仍无 0.1.2。没有因此跳过图片作者门禁、发布包或创建 GitHub Release。
 
 ### 2026-08-01 recent-project 握手 P1（已关闭，exact candidate `2bb9052`）
 
@@ -83,9 +84,9 @@
 - **验证红灯保留**：产品 P1 关闭后的首次完整 `npm test` 因两项旧源码字符串断言仍要求无参数 recovery 调用而红；修正为 owner-aware 精确顺序并补 deferred 覆盖后，完整 `npm test` exit 0。不得用最终绿灯抹去该测试漂移红灯。
 - **最终门禁**：`npm run verify:navigation`、完整 `npm test`、批准 GUI `npm run verify` exit 0；强制真实 Electron **37/37**，包含统一任务 Diff/接受/Safe Undo、退出重启与 recent-project 恢复。第四轮独立只读复审 **P0=0/P1=0/P2=0，签字 YES**。
 
-**当前纵切结论**：统一写作任务流已完成真实作者签收，不再派发作者验收-13或额外 provider canary。所有者已于 2026-08-03 授权后续 npm/GitHub 发布；下一动作只由图片作者验收、精确候选复验、npm 重新认证及公网发布证明决定，授权不得替代这些门禁。
+**当前纵切结论**：统一写作任务流已完成真实作者签收，不再派发作者验收-13或额外 provider canary。所有者已于 2026-08-03 授权后续 npm/GitHub 发布，npm 身份也已恢复；下一动作只由图片作者验收、精确候选复验及公网发布证明决定，授权不得替代这些门禁。
 
-**旧暂停点仍失效**：不得从 `1b51595` 或作者验收-10续跑。此前已签字模块仍不重测，不得回到旧 Research→Changes 人工转交；图片作者门禁、候选复验和 npm 认证关闭前不得发布 0.1.2。
+**旧暂停点仍失效**：不得从 `1b51595` 或作者验收-10续跑。此前已签字模块仍不重测，不得回到旧 Research→Changes 人工转交；图片作者门禁与精确候选复验关闭前不得发布 0.1.2。
 
 ## 0. 续作口令
 
@@ -1105,7 +1106,8 @@ Onboarding v2 已取代上述“容错解析完整 `editContent` + 部分创建�
 - [x] Inline 接受率、Navigation 帮助度与统一任务动作/可理解性已有真实作者样本；旧 Research 匹配判断不再补测。
 - [x] 只修复验收中发现的 P0/P1 与决定阻断发版的 P2；统一任务 exact candidate `e8b9588` 已完成全量、真实 Electron 与独立复审，不插入 `0.2.0+` 功能。
 - [ ] 完成真实 GUI `image-01` 质量评分与明确终态；不得把合成图片门禁或空 `image-reviews.json` 当作作者验收。
-- [ ] 恢复 npm 登录，针对最终候选重跑 audit、preview tarball、installed、完整回归/真实 Electron和独立复审；通过后仅发布 `preview`，保持 `latest=0.1.0`。
+- [x] npm 登录已通过官方浏览器恢复并复核为 `houxyue`；registry 仍无 0.1.2。
+- [ ] 针对最终候选重跑 audit、preview tarball、installed、完整回归/真实 Electron和独立复审；通过后仅发布 `preview`，保持 `latest=0.1.0`。
 - [ ] 发布后同步 registry shasum、公网安装、Git tag/GitHub prerelease、文档、Git 与 Nowledge；所有者发布授权已于 2026-08-03 给出，无需再次索取，但不豁免前述门禁。
 
 ### P1：能力审计后的本地产品缺口
