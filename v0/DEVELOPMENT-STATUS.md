@@ -1,10 +1,10 @@
 # 笔触 · WritCraft 当前开发状态
 
-> 最后更新：2026-08-03（0.2.0 候选验收完成；尚未发布）
+> 最后更新：2026-08-03（0.2.0 发布执行中；本地产物与自动门禁已通过）
 > 当前公开版本：`writ-craft@0.1.2`，npm `preview`
-> 当前代码版本：`v0/package.json` 为 `0.1.2`
+> 当前代码版本：`v0/package.json` 为 `0.2.0`
 > 下一候选版本：`0.2.0` 日常写作工作区
-> 当前阶段：**0.2.0 候选验收完成；发布门禁保持关闭**
+> 当前阶段：**0.2.0 发布门禁已获授权，正在执行 npm/GitHub/Tag/Release/App ZIP 发布**
 
 本文件只记录当前事实、开放风险和下一动作。0.1.x 的完整里程碑、红灯、测试数字和验收过程已归档到 [`docs/archive/development/DEVELOPMENT-STATUS-THROUGH-0.1.2.md`](../docs/archive/development/DEVELOPMENT-STATUS-THROUGH-0.1.2.md)，不得从归档旧 TODO 直接派发工作。
 
@@ -54,6 +54,13 @@
 - 最新源码 `npm test` 与非沙箱完整 `npm run verify` 通过；待审 focused Electron 3/3 通过。Daily Workspace focused 复跑再次在“外部文件 watcher 大纲刷新等待”处红灯；该非固定 harness 时序问题已保留为 P2，未用重跑绿灯覆盖。确定性 watcher/owner 专项、真实作者 UI 旅程和此前 focused 证据均通过，未形成稳定产品回归。
 - 最终独立复审：P0=0、P1=0、P2=2，可进入候选。P2-1 为缺少“`refreshOutline` await 期间切项目”的 mutation-sensitive 专项，生产实现已有 refresh 后 owner 复核；P2-2 为通用 store 配置超过 10 项时 public projection 可能隐藏最旧映射，生产 Main 上限与 projection 同为 10，当前不可触发。两项均允许候选，未来触及对应代码或提高上限时必须先补合同和反例。
 - 所有者于 2026-08-03 完成唯一一次最短主观旅程并明确回复“验收通过”。至此工程门禁、真实作者客观旅程和作者主观体验均已关闭，0.2.0 候选验收完成。未经另行授权，仍不发布、不打 Tag/Release、不推送或分发 App/ZIP。
+
+### 0.2.0 发布执行记录（2026-08-03）
+
+- 所有者已明确授权：执行 npm `preview`、GitHub 推送、`v0.2.0` Tag/Release，并上传 App/ZIP 产物。
+- 发布前自动门禁：`npm test`、非沙箱 `npm run verify`、`npm run release:verify`、`npm audit --omit=dev` 均通过；npm tarball dry-run 为 `writ-craft-0.2.0.tgz`，140 个文件，683,229 bytes。
+- 本地 macOS 产物：`v0/release/WritCraft-darwin-arm64.zip`；当前为 ad-hoc 本地签名、未公证，不宣称 Apple Developer ID 分发能力。
+- 本节在 npm/GitHub 动作完成后补录 registry shasum、dist-tag、发布提交、Tag、Release URL、ZIP SHA-256 和最终时间；在补录前不得把候选写成已公开。
 
 ### 0.2.0 阶段 E 当前事实（2026-08-03）
 

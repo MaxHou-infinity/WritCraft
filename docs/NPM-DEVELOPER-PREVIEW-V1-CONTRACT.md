@@ -1,6 +1,6 @@
 # WritCraft V0 · npm Developer Preview v1
 
-> Status: `writ-craft@0.1.2` was published to the explicit npm `preview` tag on 2026-08-03 after real-author acceptance. Registry shasum `553bec35246b118ae5a47b2d4dd327c16c171029` matches the release tarball. Annotated tag `v0.1.2` resolves to release commit `395b863`, and its GitHub Release is a prerelease with no App/ZIP attachment. Public-registry installation plus real `npm exec` version/check passed. Registry tags remain intentionally split: `preview: 0.1.2`, `latest: 0.1.0`.
+> Status: `writ-craft@0.2.0` is the next authorized npm `preview` publication after real-author acceptance. The prior `0.1.2` publication remains historical: registry shasum `553bec35246b118ae5a47b2d4dd327c16c171029`, tag `v0.1.2`, release commit `395b863`. The 0.2.0 shasum, tag, GitHub Release, and App/ZIP checks are recorded only after the publication steps complete. Registry tags remain intentionally split: `preview: 0.1.2` until the new publish succeeds, `latest: 0.1.0`.
 
 ## Distribution boundary
 
