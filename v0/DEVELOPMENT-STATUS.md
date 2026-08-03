@@ -1,15 +1,16 @@
 # 笔触 · WritCraft · V0 开发状态与续作入口
 
-> 最后更新：2026-08-03（Asia/Shanghai，0.0CQ · 图片作者验收红灯与候选修复）
-> 当前状态：**`writ-craft@0.1.1` 已从 exact candidate `c65981e` 发布到 npm `preview`；registry 时间 `2026-07-29T14:30:16.176Z`，shasum `d370c500666e25cfb373852deafa21b232d2bc18` 与本地候选一致。公网隔离安装/启动/退出为 2/2。annotated tag `v0.1.1` 指向同一提交，GitHub prerelease 已公开：`https://github.com/MaxHou-infinity/WritCraft/releases/tag/v0.1.1`。**
-> 发布判断：**0.1.1 Developer Preview 已完成版本、自动化、双架构安装、独立复审、npm 发布、公网安装和 GitHub prerelease。registry 标签保持 `preview: 0.1.1`、`latest: 0.1.0`，因此本次没有把 Preview 冒充稳定版，也没有执行 unpublish、占位发布或上传未签名 App/ZIP。**
-> 当前目标版本：**`docs/ROADMAP.md` 的 `RM-1.2 / writ-craft@0.1.2`。真实 GUI 图片旅程已由“未测试”转为明确红灯：生成/解码/渲染通过，但自动插入提示词污染与终态 stale 必须关闭。当前唯一顺序是：图片 P1 修复与受影响复验 → exact candidate 发布复验 → npm `preview` 与 GitHub prerelease。不得创建 `v0.1.2` Tag/Release 或发布 npm，直到红灯关闭。**
-> 当前源码证据：**`e8b9588` 只继续作为已签收统一任务基线，不再是发布候选。工作树修复把自动插入固定为 `![章节配图](相对路径)`，不再把 prompt 带入正文；keep 在同窗口/项目/root/navigation 且 generation 只向前时允许结算；delete 在任何正文变化后明确阻止，避免移动已被 Markdown 引用的资产。最终 Image Handler **13/13**、Renderer **8/8**、Metrics **20/20**、完整 `npm test`、批准 GUI `npm run verify` 与强制真实 Electron **37/37** 均通过；E2E 动态证明磁盘正文含中性 alt 且不含 fixture prompt。独立终审 **P0=0/P1=0/P2=2**，可以提交候选并进入仅受影响作者复验，仍不可直接发布。**
-> 当前作者验收进度：**此前签字模块仍保持关闭。作者已证明真实图片生成和正文渲染正常；同时保留两项 P1 红灯：自动插入曾把生成提示词写进 Markdown alt，且终端记录出现 `IMAGE_REVIEW_STALE` 三次，导致评分/终态未结算。手工拖入后再删除应被安全阻止，因为该资产可能已被正文引用；修复后的 UI 必须给出明确防断图说明。只复验受影响图片路径，不重复统一任务或其他已签字旅程。**
+> 最后更新：2026-08-03（Asia/Shanghai，0.0CR · 0.1.2 公网发布收口）
+> 当前状态：**`writ-craft@0.1.2` 已发布到 npm `preview`；registry 时间 `2026-08-03T06:24:15.008Z`，shasum `553bec35246b118ae5a47b2d4dd327c16c171029` 与本地发布 tarball 一致。annotated tag `v0.1.2` 解引用到 `395b863`，GitHub prerelease 已公开：`https://github.com/MaxHou-infinity/WritCraft/releases/tag/v0.1.2`。**
+> 发布判断：**0.1.2 已完成作者验收、自动化、独立复审、npm 发布、GitHub prerelease 与公网隔离安装检查。registry 保持 `preview: 0.1.2`、`latest: 0.1.0`；没有执行 unpublish、移动稳定标签或分发未签名 App/ZIP。**
+> 下一目标版本：**`docs/ROADMAP.md` 的 `writ-craft@0.2.0` 日常写作工作区，当前仅为路线图下一目标，尚未启动、尚未形成开发授权或候选提交。0.1.2 已冻结，后续缺陷必须使用新版本。**
+> 0.1.2 最终证据：**图片修复把自动插入固定为 `![章节配图](相对路径)`；keep 允许同项目向前 generation，delete 在正文变化后明确阻止。Image Handler **13/13**、Renderer **8/8**、Metrics **20/20**、完整 `npm test`、批准 GUI `npm run verify`、强制真实 Electron **37/37** 与作者人工复验均通过；独立终审 **P0=0/P1=0/P2=2**。**
+> 作者验收终态：**此前签字模块保持关闭；图片真实生成/渲染、prompt-free 插入和安全终态路径已由作者明确确认“验收通过”。历史 prompt 污染与三次 `IMAGE_REVIEW_STALE` 红灯继续保留，不能改写为从未发生。**
 > 本批红/绿账本：**首轮沙盒 `npm run verify` 在 DOM Sanitizer 启动 Electron 时 `code=null`，同命令获准 GUI 复跑 exit 0，分类为环境红灯。强制 Electron 首轮运行到图片阶段后因旧 prompt-alt 断言而红，修正测试合同；第二轮在未改动的 Navigation late-open 阶段超时，保留为时序 P2；第三轮 37/37 通过。绿灯不覆盖这三条历史红运行。**
 > 本批保留 P2：**固定“章节配图”可阻止 prompt 污染，但可访问性描述较弱，后续应提供独立 alt/caption；正文变化后 delete 必须安全阻止并以“保留素材”结束评审，当前流程尚无清理该已保留素材的入口。Nowledge 的“Image Trash 不再扩展”决定继续有效，本批只修已公开路径的发布阻断缺陷，不重开 Trash 功能项目。**
 > 当前 exact candidate：**生产源码候选 `2c6004e fix(image): keep prompts out of manuscripts` 与文档绑定提交 `1e8f8c2` 已推送 GitHub `main`。所有者于 2026-08-03 明确回复“验收通过”，关闭仅受影响的图片作者复验：prompt-free 插入与安全终态路径获得人工签字。此前红灯和两个 P2 继续保留，不被本次绿灯覆盖。当前可按既有授权执行 npm `preview` 与 GitHub prerelease；不得移动 `latest` 或分发 App/ZIP。**
-> 0.1.2 npm 发布事实：**所有者完成官方浏览器认证后，`writ-craft@0.1.2` 于 `2026-08-03T06:24:15.008Z` 发布成功；registry shasum `553bec35246b118ae5a47b2d4dd327c16c171029` 与本地发布 tarball 一致，integrity 为 `sha512-z5pQPrqMK3uf8qb81WOUHauEwkdD8uRsPJR6lrCDhazReAFR64YuGFLMxzZt0jb3up9GsJRCroOs30zZmQC6Fw==`。dist-tag 为 `preview: 0.1.2`、`latest: 0.1.0`，没有把 Preview 冒充稳定版。GitHub Tag/Release 待本次最终文档提交后创建；仍不分发 App/ZIP。**
+> 0.1.2 npm 发布事实：**所有者完成官方浏览器认证后，`writ-craft@0.1.2` 于 `2026-08-03T06:24:15.008Z` 发布成功；registry shasum `553bec35246b118ae5a47b2d4dd327c16c171029` 与本地发布 tarball 一致，integrity 为 `sha512-z5pQPrqMK3uf8qb81WOUHauEwkdD8uRsPJR6lrCDhazReAFR64YuGFLMxzZt0jb3up9GsJRCroOs30zZmQC6Fw==`。dist-tag 为 `preview: 0.1.2`、`latest: 0.1.0`，没有把 Preview 冒充稳定版；仍不分发 App/ZIP。**
+> 0.1.2 GitHub/公网验证：**annotated tag `v0.1.2` 对象 `448b454` 解引用到发布提交 `395b863`；GitHub prerelease 已公开：`https://github.com/MaxHou-infinity/WritCraft/releases/tag/v0.1.2`，无 App/ZIP 附件。公网隔离安装成功，真实 `npm exec` 返回版本 0.1.2，`--check` 为 ok=true（darwin、Node 26.3.1、npm 11、Electron 43.2.0、runtimeReady=false）。首次误用不存在的 `writ-craft` bin 和随后直接执行 `writcraft --check` 被 npm 启动合同拒绝，均保留为验证命令红灯；正确 npm exec 绿灯不覆盖它们。**
 > 0.0AA 历史保留红灯：**首轮真实 Electron 暴露 Inspector 在上下文失效时被清空、旧 5-chip 断言和项目 Chat 等待诊断；完整 test 又暴露 Plan 测试把 generation 函数正文写死。独立复审发现新请求预检窗口可提交不可见旧轮、同项目重开 UI/Main 串话、失败重开提前清会话及两项测试/错误文案缺口，均转为生产边界和回归后关闭。真实 Electron 曾连续两次在旧 Graph 恢复阶段超时；加入只读失败快照后该阶段连续四次通过，未改 Graph 产品逻辑，按重复同源证据关闭 timing P2。另一次 Chat preflight 红灯证明测试在恢复 `edit.md` 后未等待权威 watcher barrier；改为生产 `flushExternalChanges()` 收敛，而未放宽 Chat guard。该里程碑所有红运行保留，最终源码连续两次 34/34；后续 0.0AB 当时推进到 35/35，当前总链只看本文顶部当前里程碑。**
 > Graph 历史签字基线：**性能修复前的既有源码曾完整 `npm test`、Electron-enabled `npm run verify`、强制真实 Electron 26/26 exit 0；Graph Filter 15/15、Workbench 14/14、dynamic 5/5、Large 5/5、Watcher 15/15、Network 11/11、Intelligence 17/17，第二轮复审 P0=0/P1=0/P2=2。该数字只保留为历史过程；0.0AB 后来推进到 35/35，当前总链只看顶部当前里程碑。**
 > Graph 动态边界：**300 文件/1279 节点 cold-to-interactive、cache/incremental、筛选/内存/布局、AX/键鼠、三类纠错、stale/Issue→Changes、failure live、重启与项目隔离均进入真实 Electron；正文/History/ledger 的零写入门禁通过。**  
@@ -25,7 +26,7 @@
 > Diagnostic Export 契约：`../docs/DIAGNOSTIC-EXPORT-V1-CONTRACT.md`（2026-07-26 已实现并完成自动化产品链签收）
 > Image Review 契约：`../docs/IMAGE-REVIEW-V1-CONTRACT.md`（2026-07-27 Trash 扩展已签字，待真实付费/作者验收）
 > Markdown Trash 契约：`../docs/MARKDOWN-TRASH-V1-CONTRACT.md`（2026-07-28 0.0AB 已实现并独立签收）
-> npm Developer Preview 契约：`../docs/NPM-DEVELOPER-PREVIEW-V1-CONTRACT.md`（0.1.1 已公开到 `preview`，公网安装 2/2；`latest` 仍为 0.1.0；0.1.2 已获授权且 npm 身份已恢复，仍被图片作者门禁与候选复验阻止）
+> npm Developer Preview 契约：`../docs/NPM-DEVELOPER-PREVIEW-V1-CONTRACT.md`（0.1.2 已公开到 `preview` 并完成公网隔离安装检查；`latest` 仍为 0.1.0）
 > 用户安装与首次使用：`../docs/GETTING-STARTED.md`
 
 ## 0.0CN–0.0CO · 统一写作任务流 Main-owned rangeId 修复（已完成并验收）
@@ -1094,15 +1095,15 @@ Onboarding v2 已取代上述“容错解析完整 `editContent` + 部分创建�
 | 来源、PDF、脚注 | ✅ | 本地证据地基和可审查建议已接入 |
 | AI metrics | 🟡 | 真实 GUI 已验证项目内记录、聚合与落盘；项目切换隔离有专项动态证据，仍待真实作者样本 |
 | Research / A–D 溯源 | ✅ | Main-owned Research→Changes v1 与 committed-warning 技术边界已签字；作为独立高级能力保留，不再是 0.1.2 默认作者旅程或当前人工验收待办 |
-| image-01 插图 | 🟡 | Coding Plan 真实合成调用、解码尺寸/比例和零正文插入已通过；安全审阅/废纸篓链保持签字，仍待真实作者质量、采纳、费用/限流样本 |
+| image-01 插图 | ✅ | Coding Plan 真实生成/渲染、prompt-free 插入、安全终态与作者受影响路径已签字；费用/限流统计仍是小样本指标，不是 0.1.2 发布门禁 |
 | 6→7 章 Electron E2E | ✅ | exact candidate `e8b9588` 强制真实 Electron 37/37；合格真实作者项目已完成受影响的统一任务最短链 |
 | 10 名作者内测与 Continue 指标 | ⬜ | 尚无真实样本，不得做 Go/No-Go 结论 |
-| npm Developer Preview | ✅ | `preview: 0.1.1`、`latest: 0.1.0`；公网 shasum 匹配、隔离安装 2/2，exact GitHub `v0.1.1` prerelease 已公开 |
+| npm Developer Preview | ✅ | `preview: 0.1.2`、`latest: 0.1.0`；公网 shasum 匹配、npm exec 检查通过，GitHub `v0.1.2` prerelease 已公开 |
 | 独立 macOS App 发布 | ⬜ | 当前不是首发路线；若未来启用，仍需 Developer ID、hardened runtime、公证和 Gatekeeper |
 
 ## 4. 后续 TODO（严格顺序）
 
-### RM-1.2 / 0.1.2：当前唯一目标
+### RM-1.2 / 0.1.2：已完成并发布冻结
 
 - [x] 由作者显式指定满足合同的真实项目，完成只读预检与隔离副本；0.0AQ 的正式事务证明源不变，fresh 副本已合格创建并在当前 App 打开。
 - [x] 项目卡、Inline、Chapter、结构规划、Navigation 原文定位/帮助度及旧 Changes 技术闭环均已完成，不再重复；统一写作任务流的一次点击、同任务依据、正文内 Diff、终态、接受/拒绝与 Safe Undo 已由 exact candidate `e8b9588` 签收。
