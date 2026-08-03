@@ -1,18 +1,18 @@
 # 笔触 · WritCraft · V0 开发状态与续作入口
 
-> 最后更新：2026-08-03（Asia/Shanghai，0.0CO · exact candidate `e8b9588` 的统一任务真实作者旅程已签收）
+> 最后更新：2026-08-03（Asia/Shanghai，0.0CP · 发布审计与文档事实校准）
 > 当前状态：**`writ-craft@0.1.1` 已从 exact candidate `c65981e` 发布到 npm `preview`；registry 时间 `2026-07-29T14:30:16.176Z`，shasum `d370c500666e25cfb373852deafa21b232d2bc18` 与本地候选一致。公网隔离安装/启动/退出为 2/2。annotated tag `v0.1.1` 指向同一提交，GitHub prerelease 已公开：`https://github.com/MaxHou-infinity/WritCraft/releases/tag/v0.1.1`。**
 > 发布判断：**0.1.1 Developer Preview 已完成版本、自动化、双架构安装、独立复审、npm 发布、公网安装和 GitHub prerelease。registry 标签保持 `preview: 0.1.1`、`latest: 0.1.0`，因此本次没有把 Preview 冒充稳定版，也没有执行 unpublish、占位发布或上传未签名 App/ZIP。**
-> 当前目标版本：**`docs/ROADMAP.md` 的 `RM-1.2 / writ-craft@0.1.2` 真实作者可用性闭环。当前唯一开发纵切是 `UNIFIED-WRITING-TASK-V1-CONTRACT.md`：把 Navigation 建议、必要依据核对、正文内 Diff、决定和 Safe Undo 合并为同一任务。不得继续派发旧公开 Research→Changes 多步旅程，也不得插入驾驶舱或其他后续版本功能。**
+> 当前目标版本：**`docs/ROADMAP.md` 的 `RM-1.2 / writ-craft@0.1.2` 真实作者可用性闭环。统一写作任务流已经签收，不再是开发纵切。当前唯一顺序是：真实 GUI `image-01` 评分/终态 → exact candidate 发布复验 → npm `preview` 与 GitHub prerelease 公网验证。不得继续派发旧公开 Research→Changes、多余统一任务测试、驾驶舱或后续版本功能。**
 > 当前源码证据：**exact candidate `e8b9588 fix(navigation): bind one local edit anchor` 已冻结。旧 Plan 公共入口已移除，右栏固定为 Chat / 导航 / Context / Changes。0.0CN 的默认 Navigation 只生成同文件、可直接落成 1–3 个局部 Diff 的 `changes` 建议；Main 把 canonical evidence 冻结为 request-local `rangeId`，模型不再复述 path/revision/offset/原文。`changes` 与 `needs_sources` 使用互斥工具分支，Main 继续执行 exact-key、范围成员、重叠、Unicode/字节、revision、owner、deadline、迟到结果与私有单次 ChangeSet authority 校验。专项、完整 `npm test`、批准 GUI `npm run verify`、强制真实 Electron 37/37 与最终独立复审 P0/P1/P2=0 均已通过。**
-> 当前作者验收进度：**此前签字模块仍保持关闭。exact candidate `e8b9588` 已由作者在当前源码 App 完成“一张局部建议→正文内 Diff→接受写入→Safe Undo”。运行虽发生在作者验收-12，但该副本在新运行前已有 14/14 Markdown 与源一致、切点后 History=0 的零写入基线；本次 exact History 于 `2026-08-03T05:24:07.306Z` 应用同一章节，于 `2026-08-03T05:27:10.888Z` 进入 `undone`，撤销后 14/14 Markdown 再次逐文件匹配源，recovery 目录为空。因此该运行可按精确前后边界签收，不要求作者在未使用的验收-13重复付费旅程。统一任务真实作者门禁已关闭；0.1.2 仍未发布，发布需要所有者另行授权。**
+> 当前作者验收进度：**此前签字模块仍保持关闭。exact candidate `e8b9588` 已由作者在当前源码 App 完成“一张局部建议→正文内 Diff→接受写入→Safe Undo”。本次 exact History 于 `2026-08-03T05:24:07.306Z` 应用同一章节，于 `2026-08-03T05:27:10.888Z` 进入 `undone`，撤销后 14/14 Markdown 再次逐文件匹配源，recovery 目录为空。统一任务真实作者门禁已关闭，不要求在未使用的验收-13重复付费旅程。所有者已授权更新 npm 与 GitHub，但审计确认所有验收副本的 `image-reviews.json` 均为 0 条，真实 GUI 图片评分/终态仍未签收；npm `whoami` 同时返回 E401。0.1.2 因此仍未发布。**
 > 0.0AA 历史保留红灯：**首轮真实 Electron 暴露 Inspector 在上下文失效时被清空、旧 5-chip 断言和项目 Chat 等待诊断；完整 test 又暴露 Plan 测试把 generation 函数正文写死。独立复审发现新请求预检窗口可提交不可见旧轮、同项目重开 UI/Main 串话、失败重开提前清会话及两项测试/错误文案缺口，均转为生产边界和回归后关闭。真实 Electron 曾连续两次在旧 Graph 恢复阶段超时；加入只读失败快照后该阶段连续四次通过，未改 Graph 产品逻辑，按重复同源证据关闭 timing P2。另一次 Chat preflight 红灯证明测试在恢复 `edit.md` 后未等待权威 watcher barrier；改为生产 `flushExternalChanges()` 收敛，而未放宽 Chat guard。该里程碑所有红运行保留，最终源码连续两次 34/34；后续 0.0AB 当时推进到 35/35，当前总链只看本文顶部当前里程碑。**
 > Graph 历史签字基线：**性能修复前的既有源码曾完整 `npm test`、Electron-enabled `npm run verify`、强制真实 Electron 26/26 exit 0；Graph Filter 15/15、Workbench 14/14、dynamic 5/5、Large 5/5、Watcher 15/15、Network 11/11、Intelligence 17/17，第二轮复审 P0=0/P1=0/P2=2。该数字只保留为历史过程；0.0AB 后来推进到 35/35，当前总链只看顶部当前里程碑。**
 > Graph 动态边界：**300 文件/1279 节点 cold-to-interactive、cache/incremental、筛选/内存/布局、AX/键鼠、三类纠错、stale/Issue→Changes、failure live、重启与项目隔离均进入真实 Electron；正文/History/ledger 的零写入门禁通过。**  
 > Graph 保留 P2：**200% 仍采用 CDP DeviceMetrics 等价模拟，未调用 Electron `setZoomFactor(2)`；pan/zoom 以 Long Task observer 为性能证据，空数组也会通过，但 transform 的真实变化已有断言。这两项不阻塞签字，后续不得误记为已关闭。**  
 > 产品权威规格：`../docs/WRITCRAFT-PRD-V3.md`  
 > 产品开发路线图：`../docs/ROADMAP.md`（`RM-1.2`；当前目标产品版本 `0.1.2`）
-> 统一写作任务合同：`../docs/UNIFIED-WRITING-TASK-V1-CONTRACT.md`（0.0CN 技术候选已实现；当前唯一作者验收纵切）
+> 统一写作任务合同：`../docs/UNIFIED-WRITING-TASK-V1-CONTRACT.md`（0.0CO 技术与真实作者旅程均已签收；不得重复）
 > 写作导航合同：`../docs/WRITING-NAVIGATION-V1-CONTRACT.md`（已冻结；替代公开 `writcraft.plan/v2`）
 > Phase A 工程契约：`../docs/PHASE-A-IMPLEMENTATION.md`
 > 真实作者验收契约：`../docs/AUTHOR-ACCEPTANCE-V1-CONTRACT.md`（已冻结；0.0U 不改变真实作者门禁）
@@ -21,10 +21,10 @@
 > Diagnostic Export 契约：`../docs/DIAGNOSTIC-EXPORT-V1-CONTRACT.md`（2026-07-26 已实现并完成自动化产品链签收）
 > Image Review 契约：`../docs/IMAGE-REVIEW-V1-CONTRACT.md`（2026-07-27 Trash 扩展已签字，待真实付费/作者验收）
 > Markdown Trash 契约：`../docs/MARKDOWN-TRASH-V1-CONTRACT.md`（2026-07-28 0.0AB 已实现并独立签收）
-> npm Developer Preview 契约：`../docs/NPM-DEVELOPER-PREVIEW-V1-CONTRACT.md`（0.1.1 已公开到 `preview`，公网安装 2/2；`latest` 仍为 0.1.0）
+> npm Developer Preview 契约：`../docs/NPM-DEVELOPER-PREVIEW-V1-CONTRACT.md`（0.1.1 已公开到 `preview`，公网安装 2/2；`latest` 仍为 0.1.0；0.1.2 已获授权但仍被图片作者门禁、候选复验与 npm E401 阻止）
 > 用户安装与首次使用：`../docs/GETTING-STARTED.md`
 
-## 0.0CN · 统一写作任务流 Main-owned rangeId 修复（当前；技术验证完成，验收未完成）
+## 0.0CN–0.0CO · 统一写作任务流 Main-owned rangeId 修复（已完成并验收）
 
 ### 真实红灯证据
 
@@ -72,6 +72,7 @@
 - ✅ exact candidate 已提交为 **`e8b9588 fix(navigation): bind one local edit anchor`**，未推送、未发布。
 - ✅ 生产复制事务创建 fresh **作者验收-13**：源仍 eligible，20 files / 608,433 bytes，digest `9d0898863636da74615481a669c3e40362a60176249870e6d1793380c85b4380`，返回 `copyCreated=true / sourceUnchanged=true`。manifest cutoff `2026-08-02T06:33:47.698Z`；继承 History=3 / metrics=23，切点后均为 0。
 - ✅ 作者在最新源码 App 中看到正确正文内 Diff，接受后生成 exact History；Safe Undo 将该 History 置为 `undone` 并精确恢复原稿。作者验收-12 同时保留此前两次零写入红灯和本次有界绿灯，验收-13 保持未使用，不再重复测试。
+- ✅ 2026-08-03 发布审计：registry 仍为 `preview: 0.1.1`、`latest: 0.1.0`，0.1.2 不存在；GitHub 仓库为公开且尚无 `v0.1.2` Release。生产依赖 audit 为 0 vulnerabilities，npm Preview **10/10**、隔离 installed **2/2**、packaged release **7/7**。当前 dry-run tarball 为 **135 files / 667,444 bytes packed / 3,119,465 bytes unpacked / shasum `6fcffabcdf2253df1407887a55ac9a82d0c96e25`**。这些是工作树候选准备证据；最终文档提交后仍须重跑精确候选门禁。
 
 ### 2026-08-01 recent-project 握手 P1（已关闭，exact candidate `2bb9052`）
 
@@ -82,22 +83,22 @@
 - **验证红灯保留**：产品 P1 关闭后的首次完整 `npm test` 因两项旧源码字符串断言仍要求无参数 recovery 调用而红；修正为 owner-aware 精确顺序并补 deferred 覆盖后，完整 `npm test` exit 0。不得用最终绿灯抹去该测试漂移红灯。
 - **最终门禁**：`npm run verify:navigation`、完整 `npm test`、批准 GUI `npm run verify` exit 0；强制真实 Electron **37/37**，包含统一任务 Diff/接受/Safe Undo、退出重启与 recent-project 恢复。第四轮独立只读复审 **P0=0/P1=0/P2=0，签字 YES**。
 
-**当前纵切结论**：统一写作任务流已完成真实作者签收，不再派发作者验收-13或额外 provider canary。下一动作只由当前路线图的剩余发布门禁决定；未经所有者单独授权不得发布 0.1.2。
+**当前纵切结论**：统一写作任务流已完成真实作者签收，不再派发作者验收-13或额外 provider canary。所有者已于 2026-08-03 授权后续 npm/GitHub 发布；下一动作只由图片作者验收、精确候选复验、npm 重新认证及公网发布证明决定，授权不得替代这些门禁。
 
-**旧暂停点仍失效**：不得从 `1b51595` 或作者验收-10续跑。此前已签字模块仍不重测，不得回到旧 Research→Changes 人工转交，也不得发布 0.1.2。
+**旧暂停点仍失效**：不得从 `1b51595` 或作者验收-10续跑。此前已签字模块仍不重测，不得回到旧 Research→Changes 人工转交；图片作者门禁、候选复验和 npm 认证关闭前不得发布 0.1.2。
 
 ## 0. 续作口令
 
-Chat 的三级 scope/context、Main-owned 多轮连续性、Onboarding v2、Research→Changes 技术底座与 Inline Rewrite v2 已经完成技术签字。项目卡、Inline、Chapter、空项目结构和 Navigation 建议价值已真实完成。旧 Plan 在九次真实失败后停止；当前只实现 `UNIFIED-WRITING-TASK-V1-CONTRACT.md`，不再执行旧 canary、Research 人工判断链或已签字旅程，不分发现有 `release/` 产物。
+Chat 的三级 scope/context、Main-owned 多轮连续性、Onboarding v2、Research→Changes 技术底座与 Inline Rewrite v2 已经完成技术签字。项目卡、Inline、Chapter、空项目结构、Navigation 建议价值和统一写作任务均已真实完成。旧 Plan 在九次真实失败后停止；当前只关闭 `image-01` 作者评分/终态与发布门禁，不再执行旧 canary、Research 人工判断链或已签字旅程，不分发现有 `release/` 产物。
 
 1. 先读 `../docs/ROADMAP.md` 的当前目标，再读本文、`package.json`、对应合同、当前源码文件与 `git log -1 --stat`；本地 Git 历史从 2026-07-26 V0 基线开始，不得据此臆测更早的开发过程。
 2. **Diagnostic Export v1、Research Accuracy v1、committed-warning、Graph 三项韧性缺口、Changes/History durable recovery、Image Review v1 与 Image Trash 本地链均已完整签收，不再重开这些协议。**
-3. 0.0AB 已完成普通 Markdown 项目回收区；0.0AC 的 npm Preview/Coding Plan 图片改造已在提交 `71571b8` 与权威 Nowledge 记忆中收口，0.1.1 的 npm/GitHub 发布链也已关闭。恢复顺序必须是：核对 Git HEAD 与顶部证据 → 只推进 `RM-1.2 / 0.1.2 / 0.0CM`。不得重开已关闭的发布、回收区、Chat、Prompt 或 watcher 安全链。
+3. 0.0AB 已完成普通 Markdown 项目回收区；0.0AC 的 npm Preview/Coding Plan 图片改造已在提交 `71571b8` 与权威 Nowledge 记忆中收口，0.1.1 的 npm/GitHub 发布链也已关闭。恢复顺序必须是：核对 Git HEAD 与顶部证据 → 只推进真实图片作者终态、精确候选复验、npm/GitHub 0.1.2 发布证明。不得重开统一任务、回收区、Chat、Prompt 或 watcher 安全链。
 4. 不重写已经签字的 Onboarding v2 service、capability store、batch、Main/preload 与 Renderer 契约；Main 动态 admission、single-flight 和 Renderer 生命周期 authority 清理均已关闭。
 5. 每批合入后重跑定向测试；阶段完成时再运行完整 `npm test`、`npm run verify` 与 `WRITCRAFT_E2E_FORCE=1 npm run e2e:electron`，保存当次证据。
 6. 真实 API 只使用用户显式配置的 Key；记录延迟、限流、超时、故障和费用，不记录 Key、Prompt、模型原文或正文。Key 前缀只表示凭据/计费类型，不能代替官方能力与现场门禁。首发按 npm Developer Preview 合同执行；独立 App 发布才需要 Developer ID、公证与 Gatekeeper。
 
-### 0.0CL 2026-08-01 · Research 自由文本 JSON 迁移为具名结构化工具（待作者复验）
+### 0.0CL 2026-08-01 · Research 自由文本 JSON 迁移为具名结构化工具（历史；默认旅程已被统一任务取代，无需复验）
 
 - **真实红灯**：作者从 Navigation 正确进入 Research、勾选 1 个来源并运行后，界面显示“AI 研究结果不是严格 JSON”。导航问题、发现和 canonical 原文依据已正确到达；失败发生在真实 provider 返回后的初始 Research 解析，项目文件零写入。
 - **根因**：`research-service` 仍要求模型在普通 text block 中自行输出 JSON。真实 MiniMax 可以附加解释或 Markdown 围栏；继续加重提示词只能降低概率，不能形成协议保证，也会重复消耗作者时间与额度。
@@ -143,7 +144,7 @@ Chat 的三级 scope/context、Main-owned 多轮连续性、Onboarding v2、Rese
 - **作者操作与可见终态**：作者在第九隔离副本输入真实简化目标并完成生成。可见界面返回 **3 条**建议，每条均展示 Main 恢复的原文依据；作者通过依据链接打开对应章节，导航页、建议卡和章节编辑器同时保留。自动化没有代替作者输入、生成或点击。
 - **内容无关运行证据**：manifest 后记录两条 `plan/generated`（metrics v1 的历史 action 名），耗时 **18,314 ms / 13,562 ms**，均为 before/after 0；没有 `failed`。这证明 `d28c440` 的 request-local evidenceRef 协议在真实 MiniMax 调用中越过了第八副本连续失败的 `INVALID_MODEL_EVIDENCE` 边界。两次成功均保留，但后续不再要求重复生成。
 - **零写入与隔离**：post-manifest History **0**、recovery **0**；验收副本除 `.writcraft` 私有状态外，与授权源逐文件一致。授权源仍 eligible：20 files / 608,433 bytes、12 chapters、4,748 可见中文字符、1 source，digest **`9d089886…`**。打开章节是本地定位，不产生正文或 History 写入。
-- **作者价值判断与当时下一步（已被 0.0CM 取代）**：作者已明确判断当前 3 条建议“有帮助”。Navigation 的生成、canonical evidence、定位和帮助度关闭且不再重复。当时计划分别验收 Changes/Research；后续真实反馈否定该公开多步旅程，现只按 0.0CM 统一任务合同续作。
+- **作者价值判断与当时下一步（已被 0.0CO 关闭）**：作者已明确判断当前 3 条建议“有帮助”。Navigation 的生成、canonical evidence、定位和帮助度关闭且不再重复。当时计划分别验收 Changes/Research；后续真实反馈否定该公开多步旅程，统一任务现已签收，不再续作或复验。
 
 ### 0.0CF 2026-07-31 · 已有稿件导航 evidenceRef 协议修复
 
@@ -1082,14 +1083,14 @@ Onboarding v2 已取代上述“容错解析完整 `editContent` + 部分创建�
 | 普通 Markdown 回收区恢复 UI | ✅ | Explorer 列表/刷新/单项恢复、窄 IPC、opaque token、watcher barrier、native journal recovery、冲突与替换 fail-closed 均已签字；真实 Electron 35/35 |
 | Chapter 生成/整体重写 | ✅ | strict plan/block、整文件审阅、撤销、完整异步所有权、no-op/provenance/result/capability 运行态门禁均已接入；最终复审 P0/P1/P2=0 |
 | Changes 分块审阅与历史 Plan→Changes 安全链 | ✅ | Changes 默认 pending、逐块/整文件决策、residual、审计/撤销和目标 revision 锁定仍有效；Plan→Changes 只算历史安全证据，不是现行入口 |
-| 结构规划 / 写作导航 | 🟡 | 结构规划与 Navigation 生成/定位/帮助度已签字；旧 Changes 技术链可复用。统一写作任务流合同已冻结，但同任务正文内 Diff、60 秒终态和真实作者最短链仍未实现/验收 |
+| 结构规划 / 写作导航 | ✅ | 结构规划与 Navigation 生成/定位/帮助度已签字；统一写作任务流的一次点击、正文内 Diff、接受与 Safe Undo 已由 exact candidate `e8b9588` 完成作者验收 |
 | Graph v2 核心与扩展验收 | ✅ | 300 文件/1279 节点、纠错/stale/failure live、AX/键鼠、布局/性能、重启/A→B 均有行为证据；韧性批关闭语义权威、不可变快照与异步所有权，复审 P0/P1/P2=0；0.0AB 当时总链为 35/35，当前见顶部当前里程碑 |
 | Diagnostic Preview / Export | ✅ | 设置页精确预览、递归脱敏 allowlist、token-only IPC、原生保存和不可覆盖 0600 写入均已接入；Service 13/13、Handler 10/10、Renderer 7/7、真实 Electron 可见旅程通过 |
 | 来源、PDF、脚注 | ✅ | 本地证据地基和可审查建议已接入 |
 | AI metrics | 🟡 | 真实 GUI 已验证项目内记录、聚合与落盘；项目切换隔离有专项动态证据，仍待真实作者样本 |
 | Research / A–D 溯源 | ✅ | Main-owned Research→Changes v1 与 committed-warning 技术边界已签字；作为独立高级能力保留，不再是 0.1.2 默认作者旅程或当前人工验收待办 |
 | image-01 插图 | 🟡 | Coding Plan 真实合成调用、解码尺寸/比例和零正文插入已通过；安全审阅/废纸篓链保持签字，仍待真实作者质量、采纳、费用/限流样本 |
-| 6→7 章 Electron E2E | 🟡 | 0.1.1 发布候选连续两轮真实 Electron 37/37；本地稳定性通过，仍待合格真实作者项目 |
+| 6→7 章 Electron E2E | ✅ | exact candidate `e8b9588` 强制真实 Electron 37/37；合格真实作者项目已完成受影响的统一任务最短链 |
 | 10 名作者内测与 Continue 指标 | ⬜ | 尚无真实样本，不得做 Go/No-Go 结论 |
 | npm Developer Preview | ✅ | `preview: 0.1.1`、`latest: 0.1.0`；公网 shasum 匹配、隔离安装 2/2，exact GitHub `v0.1.1` prerelease 已公开 |
 | 独立 macOS App 发布 | ⬜ | 当前不是首发路线；若未来启用，仍需 Developer ID、hardened runtime、公证和 Gatekeeper |
@@ -1099,11 +1100,13 @@ Onboarding v2 已取代上述“容错解析完整 `editContent` + 部分创建�
 ### RM-1.2 / 0.1.2：当前唯一目标
 
 - [x] 由作者显式指定满足合同的真实项目，完成只读预检与隔离副本；0.0AQ 的正式事务证明源不变，fresh 副本已合格创建并在当前 App 打开。
-- [ ] 项目卡、Inline、Chapter、结构规划、Navigation 原文定位/帮助度及旧 Changes 技术闭环均已完成，不再重复。当前只实现并验收统一写作任务流：单一主动作、同任务依据恢复、正文内 Diff、15 秒取消、60 秒终态、接受/拒绝/冲突/Safe Undo。
+- [x] 项目卡、Inline、Chapter、结构规划、Navigation 原文定位/帮助度及旧 Changes 技术闭环均已完成，不再重复；统一写作任务流的一次点击、同任务依据、正文内 Diff、终态、接受/拒绝与 Safe Undo 已由 exact candidate `e8b9588` 签收。
 - [x] 复现并诊断作者项目 `Graph INVALID_CACHE`；0.0AN / `a72a179` 已提供不删除作者数据、不手工清缓存的可理解诊断、自动重建与失败恢复终态，最终独立复审 P0/P1/P2=0。
-- [ ] Inline 接受率与导航帮助度已有真实作者证据；统一任务完成后只收集本链的动作、耗时、取消/终态和作者可理解性样本。旧 Research 匹配判断不再补测。
-- [ ] 只修复验收中发现的 P0/P1 与决定阻断发版的 P2；`⌘K` 必填作者指令 P1 已实现、完成自动化与独立复审，并作为 exact candidate `9b21a9d` 提交推送；不得插入 `0.2.0+` 功能。
-- [ ] 完成完整回归、连续真实 Electron、独立复审、文档/Git/Nowledge 同步，并在另获授权后发布 0.1.2 Preview。
+- [x] Inline 接受率、Navigation 帮助度与统一任务动作/可理解性已有真实作者样本；旧 Research 匹配判断不再补测。
+- [x] 只修复验收中发现的 P0/P1 与决定阻断发版的 P2；统一任务 exact candidate `e8b9588` 已完成全量、真实 Electron 与独立复审，不插入 `0.2.0+` 功能。
+- [ ] 完成真实 GUI `image-01` 质量评分与明确终态；不得把合成图片门禁或空 `image-reviews.json` 当作作者验收。
+- [ ] 恢复 npm 登录，针对最终候选重跑 audit、preview tarball、installed、完整回归/真实 Electron和独立复审；通过后仅发布 `preview`，保持 `latest=0.1.0`。
+- [ ] 发布后同步 registry shasum、公网安装、Git tag/GitHub prerelease、文档、Git 与 Nowledge；所有者发布授权已于 2026-08-03 给出，无需再次索取，但不豁免前述门禁。
 
 ### P1：能力审计后的本地产品缺口
 
@@ -1235,7 +1238,7 @@ Graph Extended Acceptance v1 已签字。首轮复审曾以 P1=3 回退 watcher�
 - [x] 真实作者 Inline 拒绝：第五副本 operation `8f093bb9…` 记录 `generated → rejected`，没有新增 History，目标 mtime 和磁盘内容保持在前一笔已接受真相；界面明确显示“原文已恢复”。
 - [x] 真实作者 Inline 接受：第五副本 operation `cd20e785…` 产生唯一 post-manifest application/applied History `change_6516ccbc…`，目标 before/after revision 与磁盘 SHA-256 精确一致。
 - [x] 真实作者 Inline Safe Undo：第五副本最新正文 History 已变为 `undone`，正文 SHA-256 恢复到 beforeHash `1bdb3a5c…`，14 个 Markdown 的组合摘要精确回到基线 `7ead5eaa…`，原始验收源保持不变。
-- [ ] 项目卡、Inline、第七副本 Chapter、新空项目结构规划与第九副本 Navigation 原文定位/帮助度判断已关闭；旧 Plan 不再复测。最新 Main 只为重建不可迁移的 action authority 重跑一次 Navigation，随后只验收 Changes/Research，再继续 image-01、Graph/恢复。
+- [x] 项目卡、Inline、第七副本 Chapter、新空项目结构规划、第九副本 Navigation 与第十二副本统一任务已关闭；旧 Plan、旧 Research→Changes 默认旅程及未受影响模块不再复测。剩余作者门禁只看本节 `image-01` 评分/终态。
 
 ### P2：Main 网络与安全审计
 

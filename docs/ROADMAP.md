@@ -2,7 +2,7 @@
 
 > 路线图版本：`RM-1.2`
 > 生效日期：2026-08-01
-> 当前产品版本：`writ-craft@0.1.1` Developer Preview
+> 当前公开产品版本：`writ-craft@0.1.1` Developer Preview
 > 当前目标版本：`writ-craft@0.1.2`
 > 当前目标：真实作者可用性闭环
 > 状态：**当前开发顺序与版本边界的唯一权威**
@@ -76,7 +76,7 @@
 5. 修复旅程中发现的 P0/P1 阻断项；P2 必须明确记录、分级并决定是否允许发版。
 6. 记录内容无关的私有指标：Inline 接受率、导航建议帮助度/动作、Research 匹配判断、图片评分/采纳、耗时和稳定错误码。
 
-当前执行注记（2026-08-03，0.0CO）：fresh 作者验收-11 的 `CONTEXT_REQUIRED` P1 已由 `f2775cf` 关闭；作者验收-12 随后保留两次 ChangeSet 前 `INVALID_MODEL_OUTPUT` 零写入红灯。exact candidate **`e8b9588`** 改为每建议一个同文件 canonical evidence、Main 私有 `rangeId` 恢复 authority、有界相邻只读上下文和有限 `editIntent`。专项、完整 `npm test`、批准 GUI `npm run verify`、真实 Electron 37/37 与最终独立复审 P0/P1/P2=0。2026-08-03 作者在当前源码 App 再次使用作者验收-12时，正确看到正文内红删绿增 Diff；该操作运行前已有 14/14 Markdown 与源一致、History=0 的精确基线。接受于 `05:24:07.306Z` 写入单一章节，Safe Undo 于 `05:27:10.888Z` 将同一 History 置为 `undone`；撤销后 14/14 Markdown 再次匹配源且 recovery 为空。该精确前后边界同时关闭 MiniMax `oneOf`/`const` 真实 canary 和统一任务作者门禁，不再要求在未使用的作者验收-13重复付费测试。0.1.2 尚未发布；任何发布仍需所有者另行授权。
+当前执行注记（2026-08-03，0.0CP）：fresh 作者验收-11 的 `CONTEXT_REQUIRED` P1 已由 `f2775cf` 关闭；作者验收-12 随后保留两次 ChangeSet 前 `INVALID_MODEL_OUTPUT` 零写入红灯。exact candidate **`e8b9588`** 改为每建议一个同文件 canonical evidence、Main 私有 `rangeId` 恢复 authority、有界相邻只读上下文和有限 `editIntent`。专项、完整 `npm test`、批准 GUI `npm run verify`、真实 Electron 37/37 与最终独立复审 P0/P1/P2=0。2026-08-03 作者在当前源码 App 再次使用作者验收-12时，正确看到正文内红删绿增 Diff；接受于 `05:24:07.306Z` 写入单一章节，Safe Undo 于 `05:27:10.888Z` 将同一 History 置为 `undone`；撤销后 14/14 Markdown 再次匹配源且 recovery 为空。该边界关闭 MiniMax `oneOf`/`const` 真实 canary 和统一任务作者门禁，不再重复验收-13。所有者现已授权更新 npm 与 GitHub，但审计确认所有作者副本的 `image-reviews.json` 仍为 0 条，真实 GUI 图片评分/终态门禁未关闭；npm `whoami` 同时返回 E401。0.1.2 因此仍未发布，且不得以授权取代门禁或身份验证。
 
 历史检查点（0.0BZ）：只读 Main/IPC 基础已独立签收，包括严格结构/导航工具协议、证据锚点、8 条/30 分钟隔离缓存、watcher barrier、真实 deadline abort 和零写入门禁；专项 53/53、Network 15/15，独立复审 P0/P1=0。其当时未覆盖的 Renderer、动作、骨架与 Electron 已由上方 0.0CC 当前注记覆盖，不得从本段派发旧“下一阶段”。
 

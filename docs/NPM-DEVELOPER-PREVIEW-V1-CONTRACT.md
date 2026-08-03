@@ -1,6 +1,6 @@
 # WritCraft V0 · npm Developer Preview v1
 
-> Status: `writ-craft@0.1.1` was published to the explicit npm `preview` tag on 2026-07-29 from candidate commit `c65981e`; registry shasum `d370c500666e25cfb373852deafa21b232d2bc18` exactly matches the signed candidate. Public-registry install/start/exit cleanup passed 2/2. Git tag `v0.1.1` points to the same candidate and its GitHub Release is a prerelease, not latest. Registry tags are intentionally split: `preview: 0.1.1`, `latest: 0.1.0`.
+> Status: `writ-craft@0.1.1` was published to the explicit npm `preview` tag on 2026-07-29 from candidate commit `c65981e`; registry shasum `d370c500666e25cfb373852deafa21b232d2bc18` exactly matches the signed candidate. Public-registry install/start/exit cleanup passed 2/2. Git tag `v0.1.1` points to the same candidate and its GitHub Release is a prerelease, not latest. Registry tags are intentionally split: `preview: 0.1.1`, `latest: 0.1.0`. On 2026-08-03 the owner authorized a future 0.1.2 publication, but preflight found npm authentication expired and the roadmap's real-GUI image review still unrecorded; 0.1.2 remains unpublished until both and the exact-candidate verification are closed.
 
 ## Distribution boundary
 
