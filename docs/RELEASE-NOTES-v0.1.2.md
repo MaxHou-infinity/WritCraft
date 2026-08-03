@@ -1,6 +1,6 @@
 # WritCraft v0.1.2 Developer Preview
 
-> 候选发布说明。0.1.2 尚未发布；公开安装仍会获得 0.1.1，直到 npm 与 GitHub prerelease 完成并验证。
+> `writ-craft@0.1.2` 已于 2026-08-03 发布到 npm `preview`。`latest` 仍保持 0.1.0；本页对应 GitHub prerelease，不分发未签名 App/ZIP。
 
 ## 这一版解决什么
 
@@ -13,6 +13,7 @@
 - 15 秒可取消、60 秒硬终态和明确处理阶段；
 - Main-owned `rangeId`、revision、owner 与 ChangeSet 权限边界；
 - 项目恢复、输入焦点、滚动、审阅按钮与错误文案等真实作者反馈修复。
+- 图片自动插入不再把生成提示词写入正文；图片保留/删除在正文变化时给出安全、可执行的终态。
 
 ## 不变的安全承诺
 
@@ -24,7 +25,7 @@
 
 ## 安装
 
-发布并完成公网验证后：
+通过 npm `preview` 安装：
 
 ```bash
 npx writ-craft@preview
