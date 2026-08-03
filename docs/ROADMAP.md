@@ -76,7 +76,7 @@
 5. 修复旅程中发现的 P0/P1 阻断项；P2 必须明确记录、分级并决定是否允许发版。
 6. 记录内容无关的私有指标：Inline 接受率、导航建议帮助度/动作、Research 匹配判断、图片评分/采纳、耗时和稳定错误码。
 
-当前执行注记（2026-08-03，0.0CQ）：统一写作任务的正文内 Diff、接受与 Safe Undo 已由作者签收，不再重验。随后真实 `image-01` 旅程证明生成与渲染可用，但暴露两项发布阻断 P1：自动插入把提示词写入 Markdown alt；正文 mutation 后 keep/delete 统一返回 `IMAGE_REVIEW_STALE`。修复已收敛为中性 alt、keep 允许同项目向前 generation、delete 在正文变化后继续 fail closed 并提供防断图说明。最终专项、完整 `npm test`、批准 GUI `npm run verify`、强制 Electron 37/37 与独立终审 P0/P1=0 已通过；只剩 corrected-source 的受影响图片 GUI 复验。在此之前不得发布、打 `v0.1.2` 标签或创建 Release。
+当前执行注记（2026-08-03，0.0CQ）：统一写作任务与图片受影响路径均已由作者签收。图片修复采用中性 alt、keep 允许同项目向前 generation、delete 在正文变化后继续 fail closed；专项、完整 `npm test`、批准 GUI `npm run verify`、强制 Electron 37/37 与独立终审 P0/P1=0 已通过。所有者明确回复“验收通过”，因此 0.1.2 作者门禁关闭；可以按既有授权发布 npm `preview` 与 GitHub prerelease，但不得移动 `latest` 或分发 App/ZIP。历史红灯与两个 P2 继续保留。
 
 历史检查点（0.0BZ）：只读 Main/IPC 基础已独立签收，包括严格结构/导航工具协议、证据锚点、8 条/30 分钟隔离缓存、watcher barrier、真实 deadline abort 和零写入门禁；专项 53/53、Network 15/15，独立复审 P0/P1=0。其当时未覆盖的 Renderer、动作、骨架与 Electron 已由上方 0.0CC 当前注记覆盖，不得从本段派发旧“下一阶段”。
 
