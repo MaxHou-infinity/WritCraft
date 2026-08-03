@@ -39,6 +39,14 @@ test('every hunk starts pending and no implicit apply decision exists', () => {
   assert(Object.isFrozen(state) && Object.isFrozen(state.decisions));
 });
 
+test('a Main-hydrated public review identity is accepted without private capability authority', () => {
+  const publicReview = { ...review(), changeSetId: `review_${'b'.repeat(32)}` };
+  const state = State.create(publicReview);
+  assert(state);
+  assert.strictEqual(state.review.changeSetId, publicReview.changeSetId);
+  assert(!JSON.stringify(state).includes(`pc_${'a'.repeat(32)}`));
+});
+
 test('individual accept and reject produce an ID-only exact decision', () => {
   let state = State.create(review());
   state = State.update(state, H1, 'accepted');

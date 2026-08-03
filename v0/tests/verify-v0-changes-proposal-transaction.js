@@ -40,39 +40,39 @@ async function run() {
     assert.strictEqual(state.begin('issue', 'project-1').mode, 'issue');
   });
 
-  await test('normal→Plan invalidates the normal result and discards its capability with the origin project', async () => {
+  await test('normal→Issue invalidates the normal result and discards its capability with the origin project', async () => {
     const state = Transaction.create();
     const normal = state.begin('normal', 'project-origin');
-    const plan = state.begin('plan', 'project-origin');
+    const issue = state.begin('issue', 'project-origin');
     const discarded = [];
     assert.strictEqual(await state.settle(normal, { ok: true, changeSetId: 'pc_normal' }, {
       mode: 'normal', projectInstanceId: 'project-origin',
       discard: async (projectInstanceId, id) => discarded.push([projectInstanceId, id]),
     }), false);
     assert.deepStrictEqual(discarded, [['project-origin', 'pc_normal']]);
-    assert.strictEqual(state.isCurrent(plan, 'project-origin', 'plan'), true);
+    assert.strictEqual(state.isCurrent(issue, 'project-origin', 'issue'), true);
   });
 
-  await test('chapter→Plan invalidates the chapter result and preserves the newer Plan lock', async () => {
+  await test('chapter→Research invalidates the chapter result and preserves the newer Research lock', async () => {
     const state = Transaction.create();
     const chapter = state.begin('chapter', 'project-1');
-    const plan = state.begin('plan', 'project-1');
+    const research = state.begin('research', 'project-1');
     assert.strictEqual(state.finish(chapter, 'project-1'), false, '旧 finally 不得结束新事务');
-    assert.strictEqual(state.isCurrent(plan, 'project-1', 'plan'), true);
+    assert.strictEqual(state.isCurrent(research, 'project-1', 'research'), true);
     const discarded = [];
     await state.settle(chapter, { ok: true, changeSetId: 'pc_chapter' }, {
       mode: 'chapter', projectInstanceId: 'project-1',
       discard: async (origin, id) => discarded.push([origin, id]),
     });
     assert.deepStrictEqual(discarded, [['project-1', 'pc_chapter']]);
-    assert.strictEqual(state.isCurrent(plan, 'project-1', 'plan'), true);
+    assert.strictEqual(state.isCurrent(research, 'project-1', 'research'), true);
   });
 
   await test('a project switch still discards late capability with the token origin, never the new project', async () => {
     const state = Transaction.create();
     const token = state.begin('normal', 'project-a');
     state.invalidate();
-    state.begin('plan', 'project-b');
+    state.begin('issue', 'project-b');
     const discarded = [];
     assert.strictEqual(await state.settle(token, { ok: true, changeSetId: 'pc_a' }, {
       mode: 'normal', projectInstanceId: 'project-b',
@@ -83,9 +83,9 @@ async function run() {
 
   await test('only the current token may settle and unlock its own busy epoch', async () => {
     const state = Transaction.create();
-    const token = state.begin('plan', 'project-1');
-    assert.strictEqual(await state.settle(token, { ok: true, changeSetId: 'pc_plan' }, {
-      mode: 'plan', projectInstanceId: 'project-1', discard: async () => assert.fail('current result discarded'),
+    const token = state.begin('research', 'project-1');
+    assert.strictEqual(await state.settle(token, { ok: true, changeSetId: 'pc_research' }, {
+      mode: 'research', projectInstanceId: 'project-1', discard: async () => assert.fail('current result discarded'),
     }), true);
     assert.strictEqual(state.finish(token, 'project-1'), true);
     assert.strictEqual(state.getActive(), null);
@@ -471,16 +471,16 @@ async function run() {
     assert.deepStrictEqual(calls, [['project-1', 'pc_old'], ['project-1', 'pc_new']]);
   });
 
-  await test('explicit Plan detach invalidates handoff and disposes its late capability', async () => {
+  await test('explicit Research detach invalidates handoff and disposes its late capability', async () => {
     const state = Transaction.create();
-    const plan = state.begin('plan', 'project-1');
+    const research = state.begin('research', 'project-1');
     state.invalidate();
     const discarded = [];
-    assert.strictEqual(await state.settle(plan, { ok: true, changeSetId: 'pc_late_plan' }, {
-      mode: 'plan', projectInstanceId: 'project-1',
+    assert.strictEqual(await state.settle(research, { ok: true, changeSetId: 'pc_late_research' }, {
+      mode: 'research', projectInstanceId: 'project-1',
       discard: async (origin, id) => discarded.push([origin, id]),
     }), false);
-    assert.deepStrictEqual(discarded, [['project-1', 'pc_late_plan']]);
+    assert.deepStrictEqual(discarded, [['project-1', 'pc_late_research']]);
   });
 
   await test('Graph Issue handoff shares the proposal epoch and supersedes a late normal result', async () => {
@@ -496,10 +496,10 @@ async function run() {
     assert.strictEqual(state.isCurrent(issue, 'project-1', 'issue'), true);
   });
 
-  await test('Changes view gates all modes and exits completed Plan state after the first accepted write', async () => {
+  await test('Changes view gates all current modes and preserves Chapter ownership helpers', async () => {
     const view = fs.readFileSync(path.join(__dirname, '../src/renderer/changes-view.js'), 'utf8');
     const html = fs.readFileSync(path.join(__dirname, '../src/renderer/index.html'), 'utf8');
-    for (const mode of ['normal', 'plan', 'issue']) {
+    for (const mode of ['normal', 'issue', 'research']) {
       assert(view.includes(`proposalTransactions?.begin('${mode}'`), `${mode} does not share proposal gate`);
     }
     assert(view.includes('WritCraftChangesProposalTransaction?.beginChapter?.('));
@@ -510,13 +510,13 @@ async function run() {
     assert(view.includes("if (pending) return setStatus('当前还有待审阅 Changes；请先应用或丢弃，再生成当前章节。', true)"));
     assert(view.includes('discard: (originProjectInstanceId, changeSetId) => bridge.discardChanges?.(originProjectInstanceId, changeSetId)'));
     assert(view.includes('if (proposalTransactions.finish(transaction, window.__workspace?.state?.project?.instanceId || null)) setBusy(false)'));
-    assert(view.includes('const completedPlan = appliedCount > 0 && completePlanModeAfterWrite()'));
-    assert(view.includes('原 Plan 已完成'));
+    assert(!view.includes('activePlanRequest'));
+    assert(!view.includes('openPlanTask'));
     assert(view.includes("recordChangeMetric('discarded', previous?.metric)"));
     assert(view.indexOf("recordChangeMetric('discarded', previous?.metric)") < view.indexOf('renderChangeSet(result, metric, candidateReviewState)', view.indexOf('async function replaceGeneratedReview')));
     assert((view.match(/if \(!result\?\.ok\)/g) || []).length >= 3, 'failed generation must return before replacement');
-    assert(view.includes('if (planModeLeaveButton) planModeLeaveButton.disabled = reviewCommitInFlight'));
-    assert(view.includes('if (reviewCommitInFlight || !activePlanRequest) return'));
+    assert(view.includes('if (issueModeLeaveButton) issueModeLeaveButton.disabled = reviewCommitInFlight'));
+    assert(view.includes('if (researchModeLeaveButton) researchModeLeaveButton.disabled = reviewCommitInFlight || busy'));
     assert(html.indexOf('changes-proposal-transaction.js') < html.indexOf('changes-view.js'));
   });
 

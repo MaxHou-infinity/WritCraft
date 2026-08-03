@@ -1,3 +1,5 @@
+// Pure cross-process locator logic. Keep this module free of Electron, DOM,
+// filesystem and network authority so Main and Renderer use identical rules.
 (function (root, factory) {
   const api = factory();
   if (typeof module === 'object' && module.exports) module.exports = api;

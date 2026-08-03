@@ -13,7 +13,7 @@ const changeHistoryService = require('../src/main/change-history-service');
 const chapterProposalService = require('../src/main/chapter-proposal-service');
 const consistencyEngine = require('../src/main/consistency-engine');
 const graphIndexService = require('../src/main/graph-index-service');
-const blockAnchor = require('../src/renderer/block-anchor');
+const blockAnchor = require('../src/shared/block-anchor');
 const fixture = require('./fixtures/writcraft-longform-project');
 
 let passed = 0;
@@ -255,15 +255,19 @@ async function run() {
       const workspace = {
         tabs: ['edit.md', ...project.chapterPaths],
         activePath: 'chapters/05-hearing.md',
-        files: {
-          'edit.md': { cursorOffset: 21, scrollTop: 44 },
-          'chapters/01-arrival.md': { cursorOffset: 188, scrollTop: 310.5 },
-          'chapters/02-data-dispute.md': { cursorOffset: 75, scrollTop: 140 },
-          'chapters/03-archive-room.md': { cursorOffset: 250, scrollTop: 420 },
-          'chapters/04-advertising.md': { cursorOffset: 61, scrollTop: 89 },
-          'chapters/05-hearing.md': { cursorOffset: 333, scrollTop: 720 },
-          'chapters/06-after-tide.md': { cursorOffset: 18, scrollTop: 0 },
-        },
+        files: Object.fromEntries([
+          ['edit.md', 21, 44],
+          ['chapters/01-arrival.md', 188, 310.5],
+          ['chapters/02-data-dispute.md', 75, 140],
+          ['chapters/03-archive-room.md', 250, 420],
+          ['chapters/04-advertising.md', 61, 89],
+          ['chapters/05-hearing.md', 333, 720],
+          ['chapters/06-after-tide.md', 18, 0],
+        ].map(([path, caretOffset, scrollTop]) => [path, {
+          caretOffset, selectionAnchorOffset: caretOffset, selectionFocusOffset: caretOffset,
+          scrollTop, activeOutlineId: null, collapsedOutlineIds: [],
+        }])),
+        returnStack: [],
       };
       assert.deepStrictEqual(projectService.saveWorkspace(project.rootPath, workspace), workspace);
       const servicePath = require.resolve('../src/main/project-service');

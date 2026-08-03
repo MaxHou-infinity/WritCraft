@@ -6,7 +6,7 @@
 // short-lived record for later Main-owned actions.
 
 const crypto = require('crypto');
-const blockAnchor = require('../renderer/block-anchor');
+const blockAnchor = require('../shared/block-anchor');
 const { SECTIONS: PROJECT_INTENT_SECTIONS } = require('./project-onboarding-v2-service');
 
 const REQUEST_SCHEMA = 'writcraft.writing-navigation-request/v1';

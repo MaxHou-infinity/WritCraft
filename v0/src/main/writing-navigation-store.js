@@ -14,7 +14,7 @@ const ACTION_ID_RE = /^wna_[a-f0-9]{32}$/;
 const ATTEMPT_ID_RE = /^wno_[a-f0-9]{32}$/;
 const LEASE_ID_RE = /^wnl_[a-f0-9]{32}$/;
 const PROJECT_INSTANCE_ID_RE = /^instance_[a-f0-9]{24}$/;
-const ACTIONS = new Set(['open', 'research', 'changes']);
+const ACTIONS = new Set(['changes']);
 const MAX_JSON_NODES = 4096;
 
 class WritingNavigationStoreError extends Error {
@@ -236,37 +236,29 @@ function createWritingNavigationStore(options = {}) {
     const reservedIds = new Set(occupiedIds);
     if (entry.record.mode === 'navigation') {
       for (const suggestion of entry.record.result.suggestions) {
-        const suggestionActions = {};
-        for (const actionName of ['research', 'changes']) {
-          const actionId = randomId('wna_', randomBytes, reservedIds);
-          reservedIds.add(actionId);
-          actionIds.push(actionId);
-          suggestionActions[actionName] = actionId;
-          preparedActions.set(actionId, {
-            resultKey: key,
-            ownerId: entry.ownerId,
-            projectInstanceId: entry.projectInstanceId,
-            suggestionId: suggestion.suggestionId,
-            action: actionName,
-            terminated: false,
-            leaseId: null,
-            attemptId: null,
-          });
-        }
-        actionBySuggestion.set(suggestion.suggestionId, suggestionActions);
+        const actionId = randomId('wna_', randomBytes, reservedIds);
+        reservedIds.add(actionId);
+        actionIds.push(actionId);
+        preparedActions.set(actionId, {
+          resultKey: key,
+          ownerId: entry.ownerId,
+          projectInstanceId: entry.projectInstanceId,
+          suggestionId: suggestion.suggestionId,
+          action: 'changes',
+          terminated: false,
+          leaseId: null,
+          attemptId: null,
+        });
+        actionBySuggestion.set(suggestion.suggestionId, actionId);
       }
     }
     const result = deepCloneFreeze({
       ...entry.record.result,
       ...(entry.record.mode === 'navigation' ? {
         suggestions: entry.record.result.suggestions.map(suggestion => {
-          const minted = actionBySuggestion.get(suggestion.suggestionId);
           return {
             ...suggestion,
-            // Compatibility-only alias: fixed to Changes so the model's legacy
-            // action hint never controls a public capability.
-            actionId: minted.changes,
-            actionIds: minted,
+            actionId: actionBySuggestion.get(suggestion.suggestionId),
           };
         }),
       } : {}),
@@ -348,18 +340,13 @@ function createWritingNavigationStore(options = {}) {
       fail('STALE_NAVIGATION', '写作导航已因项目状态变化失效');
     }
     if (action.leaseId) {
-      if (['open', 'research'].includes(action.action)) {
-        fail('ACTION_BUSY', action.action === 'research'
-          ? '正在打开这条建议的来源面板，请稍候'
-          : '正在打开这条写作导航建议，请稍候');
-      }
       terminateAction(raw.actionId);
       fail('ACTION_REPLAYED', '写作导航动作已在处理中');
     }
     const suggestion = entry.record.result.suggestions.find(
       item => item.suggestionId === action.suggestionId
     );
-    if (!suggestion || !['research', 'changes'].includes(action.action)) {
+    if (!suggestion || action.action !== 'changes') {
       action.terminated = true;
       fail('INVALID_NAVIGATION_RECORD', '写作导航动作与权威建议不一致');
     }
@@ -376,7 +363,7 @@ function createWritingNavigationStore(options = {}) {
     });
     const authority = deepCloneFreeze({
       leaseId,
-      repeatable: ['open', 'research'].includes(action.action),
+      repeatable: false,
       navigationId: entry.record.navigationId,
       suggestion: { ...suggestion, action: action.action },
       record: entry.record,
@@ -450,7 +437,7 @@ function createWritingNavigationStore(options = {}) {
       fail('INVALID_ACTION_SETTLEMENT', '只有 Changes 动作可以保留待审重试能力');
     }
     const retryable = ['retryable_failure', 'cancelled'].includes(raw.outcome);
-    if (!reviewBlocked && !retryable && !['open', 'research'].includes(action.action)) {
+    if (!reviewBlocked && !retryable) {
       action.terminated = true;
     }
     if (raw.outcome === 'stale') action.terminated = true;

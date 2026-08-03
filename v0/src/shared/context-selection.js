@@ -1,4 +1,4 @@
-// WritCraft context selection/parser (UMD, pure and DOM-free).
+// WritCraft cross-process context parser (UMD, pure and authority-free).
 (function (root, factory) {
   const api = factory();
   if (typeof module === 'object' && module.exports) module.exports = api;

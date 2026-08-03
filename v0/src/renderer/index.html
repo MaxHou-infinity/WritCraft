@@ -38,6 +38,11 @@
     .app-shell { display: grid; grid-template-columns: 54px 248px minmax(520px, 1fr); grid-template-rows: minmax(0, 1fr); height: 100vh; }
     .app-shell[data-workspace-view="graph"] { grid-template-columns: 54px minmax(520px, 1fr); }
     .app-shell[data-workspace-view="graph"] .project-sidebar { display: none; }
+    .app-shell[data-workspace-view="home"] { grid-template-columns: 54px minmax(520px, 1fr); }
+    .app-shell[data-workspace-view="home"] .project-sidebar,
+    .app-shell[data-workspace-view="home"] .editor-column,
+    .app-shell[data-workspace-view="home"] #assistant-dock { display: none !important; }
+    .app-shell[data-workspace-view="home"] .project-home-view { display: block; }
 
     /* 书脊式活动栏：整个工作区唯一的深色常驻结构 */
     .activity-bar {
@@ -138,6 +143,22 @@
     .explorer-label { display: flex; align-items: center; justify-content: space-between; padding: 13px 13px 6px; color: var(--ink-soft); font-size: 10px; letter-spacing: .08em; }
     #new-file-button { border: 0; background: transparent; color: var(--ink-soft); cursor: pointer; font-size: 16px; line-height: 1; }
     #project-tree { flex: 1; overflow: auto; padding: 3px 7px 14px; }
+    .current-outline { border-top: 1px solid var(--line); background: rgba(255,255,255,.16); }
+    .current-outline > summary { display: flex; align-items: center; justify-content: space-between; padding: 8px 12px; list-style: none; cursor: pointer; color: var(--ink-soft); font-size: 10px; letter-spacing: .04em; }
+    .current-outline > summary::-webkit-details-marker { display: none; }
+    .current-outline > summary::before { content: '›'; margin-right: 6px; transition: transform .12s ease; }
+    .current-outline[open] > summary::before { transform: rotate(90deg); }
+    #current-outline-status { margin-left: auto; font-size: 9px; letter-spacing: 0; }
+    #current-outline-status.is-error { color: #9f433a; }
+    #current-outline-list { position: relative; max-height: 220px; overflow: auto; padding: 1px 7px 9px 14px; }
+    #current-outline-list::before { content: ''; position: absolute; top: 2px; bottom: 10px; left: 11px; width: 1px; background: #d8cec0; }
+    .outline-item { position: relative; display: block; width: 100%; border: 0; border-radius: 4px; padding: 5px 7px 5px calc(8px + var(--outline-depth) * 10px); background: transparent; color: var(--ink-soft); text-align: left; font: 11px/1.35 inherit; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; cursor: pointer; }
+    .outline-item[hidden] { display: none; }
+    .outline-item::before { content: ''; position: absolute; left: calc(2px + var(--outline-depth) * 10px); top: 10px; width: 4px; height: 4px; border-radius: 50%; background: #a89b8b; }
+    .outline-item:hover, .outline-item:focus-visible { outline: none; color: var(--theme-deep); background: #e9e2d8; }
+    .outline-item[aria-current="location"] { color: var(--theme-deep); background: #e4dbcf; font-weight: 600; }
+    .outline-empty { padding: 8px 7px; color: var(--ink-soft); font-size: 10px; }
+    .narrow-outline-toggle { display: none; }
     .tree-empty { padding: 24px 11px; color: var(--ink-soft); font-size: 12px; line-height: 1.7; }
     .tree-row { display: flex; align-items: center; min-width: 0; }
     .tree-item {
@@ -206,6 +227,26 @@
     .index-dot { width: 7px; height: 7px; border-radius: 50%; background: #9aaa8e; }
     .sidebar-view { min-height: 0; flex: 1; display: flex; flex-direction: column; }
     .sidebar-view[hidden] { display: none; }
+    .quick-open-dialog { width: min(680px, calc(100vw - 32px)); max-height: min(620px, calc(100vh - 48px)); margin: 10vh auto 0; padding: 0; border: 1px solid #cfc5b7; border-radius: 12px; background: #fbf8f2; color: var(--ink); box-shadow: 0 28px 72px rgba(48,39,29,.28); }
+    .quick-open-dialog::backdrop { background: rgba(38,33,28,.30); backdrop-filter: blur(2px); }
+    .quick-open-head { display: grid; grid-template-columns: 32px minmax(0,1fr) 34px; align-items: center; gap: 5px; padding: 9px 10px; border-bottom: 1px solid var(--line); }
+    .quick-open-mark { color: var(--theme-deep); font: 18px/1 "Songti SC", serif; text-align: center; }
+    #quick-open-input { width: 100%; border: 0; padding: 8px 4px; background: transparent; color: var(--ink); outline: none; font: 17px/1.3 "Songti SC", "STSong", serif; }
+    #quick-open-close { width: 30px; height: 30px; border: 0; border-radius: 5px; background: transparent; color: var(--ink-soft); cursor: pointer; }
+    #quick-open-close:hover, #quick-open-close:focus-visible { outline: none; background: #ebe4da; color: var(--theme-deep); }
+    #quick-open-status { min-height: 28px; padding: 7px 16px 5px; color: var(--ink-soft); font-size: 10px; }
+    #quick-open-results { max-height: min(480px, calc(100vh - 190px)); overflow: auto; padding: 3px 8px 10px; }
+    .quick-open-item { display: grid; grid-template-columns: 76px minmax(0,1fr); align-items: center; width: 100%; gap: 8px; border: 0; border-radius: 7px; padding: 9px 10px; background: transparent; color: var(--ink); text-align: left; cursor: pointer; }
+    .quick-open-group { padding: 9px 10px 4px; color: var(--ink-soft); font-size: 9px; letter-spacing: .09em; text-transform: uppercase; }
+    .quick-open-item[aria-selected="true"], .quick-open-item:hover { background: #e9e2d7; }
+    .quick-open-item:focus { outline: none; }
+    .quick-open-kind { color: var(--theme-deep); font-size: 9px; letter-spacing: .06em; }
+    .quick-open-copy { min-width: 0; display: grid; gap: 3px; }
+    .quick-open-copy strong, .quick-open-copy small { overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+    .quick-open-copy strong { font: 500 13px/1.3 "Songti SC", "STSong", serif; }
+    .quick-open-copy small { color: var(--ink-soft); font-size: 9px; }
+    .quick-open-empty { padding: 30px 12px 36px; color: var(--ink-soft); text-align: center; font-size: 11px; }
+    @media (prefers-reduced-motion: reduce) { .current-outline > summary::before { transition: none; } }
     .search-box { padding: 9px 11px 10px; border-bottom: 1px solid var(--line); }
     #project-search-input { width: 100%; border: 1px solid #d2c9bc; border-radius: 5px; padding: 8px 9px; background: #fff; outline: none; font-size: 11px; }
     #project-search-input:focus { border-color: var(--theme); box-shadow: 0 0 0 2px rgba(201,144,87,.12); }
@@ -296,6 +337,9 @@
     .document-bar { position: relative; display: flex; align-items: center; justify-content: space-between; padding: 0 22px; border-bottom: 1px solid #ebe6dd; min-width: 0; }
     .document-identity { min-width: 0; }
     #document-title { font: 500 14px/1.2 "Songti SC", "STSong", serif; }
+    #workspace-return { border: 1px solid #d8cdbf; border-radius: 999px; padding: 6px 10px; background: #faf7f1; color: var(--theme-deep); font: 600 10px/1 -apple-system, sans-serif; cursor: pointer; }
+    #workspace-return:hover { border-color: var(--theme); background: #f3ece2; }
+    #workspace-return:focus-visible { outline: 2px solid var(--theme); outline-offset: 2px; }
     #document-path { margin-top: 2px; color: var(--ink-soft); font-size: 9px; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
     .document-tools { display: flex; gap: 7px; align-items: center; }
     .context-chip { border: 1px solid #dcc9b4; background: #f6ecdf; color: #80542e; border-radius: 999px; padding: 3px 8px; font-size: 9px; }
@@ -475,11 +519,11 @@
     #changes-instruction { width: 100%; min-height: 76px; resize: vertical; border: 1px solid #d8d0c4; border-radius: 6px; background: #fff; padding: 9px; font: 11px/1.55 -apple-system, sans-serif; outline: none; }
     #changes-instruction:focus { border-color: var(--theme); }
     #changes-instruction[readonly] { resize: none; background: #f3f0e9; color: #5f5a52; cursor: default; }
-    .changes-plan-mode { display: flex; align-items: center; justify-content: space-between; gap: 10px; padding: 9px 10px; border: 1px solid #b9a9d6; border-radius: 6px; background: #f3eefb; color: #4f3b77; }
-    .changes-plan-mode[hidden] { display: none; }
-    .changes-plan-mode__copy { display: grid; gap: 3px; min-width: 0; }
-    .changes-plan-mode__copy span { overflow-wrap: anywhere; font: 10px/1.4 ui-monospace, SFMono-Regular, Menlo, monospace; }
-    .changes-plan-mode button { flex: 0 0 auto; border: 1px solid #8b73b6; border-radius: 5px; background: #fff; color: #4f3b77; padding: 5px 8px; cursor: pointer; }
+    .changes-mode-banner { display: flex; align-items: center; justify-content: space-between; gap: 10px; padding: 9px 10px; border: 1px solid #b9a9d6; border-radius: 6px; background: #f3eefb; color: #4f3b77; }
+    .changes-mode-banner[hidden] { display: none; }
+    .changes-mode-banner__copy { display: grid; gap: 3px; min-width: 0; }
+    .changes-mode-banner__copy span { overflow-wrap: anywhere; font: 10px/1.4 ui-monospace, SFMono-Regular, Menlo, monospace; }
+    .changes-mode-banner button { flex: 0 0 auto; border: 1px solid #8b73b6; border-radius: 5px; background: #fff; color: #4f3b77; padding: 5px 8px; cursor: pointer; }
     .changes-research-mode { border-color: #73a6a0; background: #edf8f6; color: #285f59; align-items: flex-start; }
     .changes-research-mode button { border-color: #73a6a0; color: #285f59; }
     .changes-research-card { display: grid; gap: 7px; margin-top: 8px; padding: 9px; border: 1px solid #b8d8d3; border-radius: 6px; background: #fff; }
@@ -783,6 +827,36 @@
     #migration-warnings { margin: 10px 0 0; color: #9b5d35; font-size: 10px; line-height: 1.55; }
 
     .graph-view { display: none; grid-column: 1 / -1; min-width: 0; min-height: 0; overflow: clip; background: #151719; color: #e8e8e5; grid-template-rows: auto minmax(0,1fr); }
+    .project-home-view { display: none; grid-column: 1 / -1; min-width: 0; min-height: 0; overflow: auto; background: #f7f3ed; color: #2d2924; }
+    .project-home-inner { width: min(1120px, calc(100% - 64px)); margin: 0 auto; padding: 48px 0 72px; }
+    .project-home-hero { display: flex; align-items: flex-end; justify-content: space-between; gap: 32px; padding-bottom: 28px; border-bottom: 1px solid #d9cdbf; }
+    .project-home-kicker { margin: 0 0 8px; color: #9a6435; font: 700 12px/1.2 ui-sans-serif, system-ui; letter-spacing: .16em; text-transform: uppercase; }
+    .project-home-hero h1 { margin: 0; font: 600 clamp(34px, 4vw, 58px)/1.05 Georgia, "Songti SC", serif; }
+    .project-home-hero p { max-width: 620px; margin: 14px 0 0; color: #756e65; font-size: 16px; line-height: 1.7; }
+    .project-home-actions { display: flex; gap: 10px; flex: 0 0 auto; }
+    .project-home-actions button, .project-home-card button { border: 1px solid #cdbfaf; border-radius: 10px; background: #fffdf9; color: #3b342d; padding: 9px 14px; font: 650 13px/1.2 ui-sans-serif, system-ui; cursor: pointer; }
+    .project-home-actions .is-primary, .project-home-card button.is-primary { border-color: #547b71; background: #547b71; color: #fff; }
+    .project-home-status { min-height: 24px; margin: 18px 0 0; color: #756e65; font-size: 13px; }
+    .project-home-status.is-error { color: #a33f35; }
+    .project-home-summary { display: grid; grid-template-columns: repeat(3, minmax(0,1fr)); gap: 12px; margin: 26px 0; }
+    .project-home-stat { padding: 18px 20px; border: 1px solid #ddd2c5; border-radius: 14px; background: rgba(255,255,255,.58); }
+    .project-home-stat strong { display: block; font: 600 30px/1 Georgia, serif; }
+    .project-home-stat span { display: block; margin-top: 8px; color: #7d746a; font-size: 12px; }
+    .project-home-grid { display: grid; grid-template-columns: repeat(2, minmax(0,1fr)); gap: 18px; }
+    .project-home-card { min-width: 0; padding: 22px; border: 1px solid #ddd2c5; border-radius: 16px; background: #fffdf9; box-shadow: 0 8px 24px rgba(65,50,37,.055); }
+    .project-home-card h2 { margin: 0 0 4px; font: 600 22px/1.25 Georgia, "Songti SC", serif; }
+    .project-home-card > p { margin: 0 0 16px; color: #81776d; font-size: 13px; }
+    .project-home-list { display: grid; gap: 8px; }
+    .project-home-item { display: grid; grid-template-columns: minmax(0,1fr) auto; gap: 12px; align-items: center; padding: 12px 0; border-top: 1px solid #eee6dc; }
+    .project-home-item:first-child { border-top: 0; }
+    .project-home-item strong { display: block; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; font-size: 14px; }
+    .project-home-item small { display: block; margin-top: 5px; color: #8b8278; }
+    .project-home-empty { padding: 16px 0; color: #8b8278; font-size: 14px; }
+    @media (max-width: 780px) {
+      .project-home-inner { width: min(100% - 32px, 680px); padding-top: 28px; }
+      .project-home-hero { align-items: flex-start; flex-direction: column; }
+      .project-home-summary, .project-home-grid { grid-template-columns: 1fr; }
+    }
     .work-area.graph-active { grid-template-columns: minmax(0,1fr); min-height: 0; height: 100%; overflow: clip; }
     .work-area.graph-active .editor-column, .work-area.graph-active #assistant-dock { display: none !important; }
     .work-area.graph-active .graph-view { display: grid; height: 100%; max-height: 100%; }
@@ -912,6 +986,25 @@
       .activity-bar { padding-inline: 2px; }
       .activity-button { width: 36px; }
       .project-sidebar { display: none; }
+      .narrow-outline-toggle {
+        position: fixed; z-index: 31; top: 50px; left: 50px; display: inline-flex;
+        align-items: center; gap: 5px; border: 1px solid #d8cdbf; border-radius: 999px;
+        padding: 6px 10px; background: rgba(250,247,241,.96); color: var(--theme-deep);
+        box-shadow: 0 4px 16px rgba(52,43,35,.1); font: 600 11px/1 -apple-system, sans-serif;
+      }
+      .narrow-outline-toggle[aria-expanded="true"] { background: var(--theme-deep); color: #fff; }
+      .project-sidebar.is-narrow-outline-open {
+        position: fixed; z-index: 30; inset: 42px auto 0 42px; display: block; width: min(280px, calc(100vw - 58px));
+        border-right: 1px solid #d5cabd; background: var(--paper); box-shadow: 12px 0 28px rgba(46,38,31,.16);
+      }
+      .project-sidebar.is-narrow-outline-open .project-heading,
+      .project-sidebar.is-narrow-outline-open .explorer-label,
+      .project-sidebar.is-narrow-outline-open #project-tree,
+      .project-sidebar.is-narrow-outline-open .markdown-trash,
+      .project-sidebar.is-narrow-outline-open .sidebar-foot { display: none; }
+      .project-sidebar.is-narrow-outline-open #sidebar-explorer-view { display: block !important; padding-top: 42px; }
+      .project-sidebar.is-narrow-outline-open #current-outline { display: block; border-top: 0; }
+      .project-sidebar.is-narrow-outline-open #current-outline-list { max-height: calc(100vh - 106px); }
     }
     @media (prefers-reduced-motion: reduce) { *, *::before, *::after { scroll-behavior: auto !important; transition: none !important; } }
   </style>
@@ -920,6 +1013,9 @@
   <div class="app-shell" data-workspace-view="explorer">
     <nav class="activity-bar" aria-label="工作区视图">
       <div class="brand-seal" title="笔触">笔</div>
+      <button class="activity-button" type="button" data-view="home" data-workspace-view="home" data-label="项目首页" title="项目首页" aria-label="项目首页">
+        <svg viewBox="0 0 24 24" aria-hidden="true"><path d="m4 11 8-7 8 7v9h-6v-6h-4v6H4z"/></svg>
+      </button>
       <button class="activity-button is-active" type="button" data-view="explorer" data-workspace-view="explorer" data-label="项目文件" title="项目文件" aria-label="项目文件" aria-current="page">
         <svg viewBox="0 0 24 24" aria-hidden="true"><path d="M4 5.5h6l2 2h8v11H4z"/><path d="M4 9.5h16"/></svg>
       </button>
@@ -948,6 +1044,8 @@
       </button>
     </nav>
 
+    <button id="narrow-outline-toggle" class="narrow-outline-toggle" type="button" aria-controls="current-outline" aria-expanded="false">大纲</button>
+
     <aside class="project-sidebar">
       <div class="project-heading">
         <div class="project-heading-copy">
@@ -965,6 +1063,10 @@
       <section class="sidebar-view" id="sidebar-explorer-view">
         <div class="explorer-label"><span>项目文件</span><button id="new-file-button" title="新建 Markdown 文件" disabled>＋</button></div>
         <div id="project-tree"><div class="tree-empty">创建或打开一个项目后，<br>这里会显示 edit.md 与全部写作文件。</div></div>
+        <details id="current-outline" class="current-outline" open>
+          <summary>当前文稿<span id="current-outline-status" role="status" aria-live="polite">打开 Markdown 后显示章节标题</span></summary>
+          <div id="current-outline-list" role="tree" aria-label="当前文稿大纲"><div class="outline-empty">当前文稿没有标题</div></div>
+        </details>
         <details id="markdown-trash" class="markdown-trash">
           <summary id="markdown-trash-toggle" aria-controls="markdown-trash-panel" aria-expanded="false">项目回收区 · 0</summary>
           <section id="markdown-trash-panel" class="markdown-trash-panel" aria-label="项目回收区" aria-busy="false">
@@ -993,7 +1095,28 @@
       </section>
     </aside>
 
+    <dialog id="quick-open-dialog" class="quick-open-dialog" aria-label="快速打开项目位置">
+      <div class="quick-open-head">
+        <span class="quick-open-mark" id="quick-open-title" aria-hidden="true">⌘</span>
+        <input id="quick-open-input" type="search" maxlength="256" autocomplete="off" placeholder="打开文件、标题、人物或一致性问题…" role="combobox" aria-controls="quick-open-results" aria-expanded="true" aria-autocomplete="list">
+        <button id="quick-open-close" type="button" aria-label="关闭快速打开">Esc</button>
+      </div>
+      <div id="quick-open-status" role="status" aria-live="polite">输入名称，或使用方向键选择。</div>
+      <div id="quick-open-results" role="listbox" aria-label="项目位置"></div>
+    </dialog>
+
     <main class="work-area" id="work-area">
+      <section class="project-home-view" id="project-home-view" aria-label="项目首页" aria-busy="false">
+        <div class="project-home-inner">
+          <header class="project-home-hero">
+            <div><p class="project-home-kicker">Daily writing workspace</p><h1 id="project-home-title">今天从哪里继续？</h1><p>这里仅汇总本地、可验证的项目事实。它不会替你判断章节是否完成，也不会调用 AI。</p></div>
+            <div class="project-home-actions"><button id="project-home-back" type="button">回到写作</button><button id="project-home-refresh" class="is-primary" type="button">刷新首页</button></div>
+          </header>
+          <div id="project-home-status" class="project-home-status" role="status" aria-live="polite">打开项目后显示今日工作入口。</div>
+          <div id="project-home-summary" class="project-home-summary"></div>
+          <div id="project-home-grid" class="project-home-grid"></div>
+        </div>
+      </section>
       <section class="editor-column">
         <div class="tab-bar" id="tab-bar"><div class="empty-tab">没有打开的文件</div></div>
         <div class="document-bar">
@@ -1002,6 +1125,7 @@
             <div id="document-path">项目 → 文件 → 段落</div>
           </div>
           <div class="document-tools">
+            <button id="workspace-return" type="button" hidden>返回上一位置</button>
             <button class="context-chip" id="edit-context-chip" type="button" aria-expanded="false" hidden>edit.md 已载入</button>
             <button id="toggle-ai" title="切换 AI 面板">✦ AI</button>
           </div>
@@ -1223,9 +1347,9 @@
   <script src="html-sanitizer.js"></script>
   <script src="legacy-draft.js"></script>
   <script src="ai-request-guard.js"></script>
-  <script src="context-selection.js"></script>
+  <script src="../shared/context-selection.js"></script>
   <script src="chat-context-state.js"></script>
-  <script src="block-anchor.js"></script>
+  <script src="../shared/block-anchor.js"></script>
   <script src="citation-formatter.js"></script>
   <script src="ai-metrics-client.js"></script>
   <script src="ai-metrics-view.js"></script>
@@ -1242,6 +1366,9 @@
   <script src="project-onboarding-view.js"></script>
   <script src="external-sync-state-service.js"></script>
   <script src="workspace.js"></script>
+  <script src="daily-workspace-state.js"></script>
+  <script src="daily-workspace-view.js"></script>
+  <script src="project-home-view.js"></script>
   <script src="search-view.js"></script>
   <script src="sources-view.js"></script>
   <script src="graph-filter-state.js"></script>

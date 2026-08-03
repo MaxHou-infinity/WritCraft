@@ -7,7 +7,7 @@ const os = require('os');
 const path = require('path');
 const projectService = require('../src/main/project-service');
 const service = require('../src/main/inline-rewrite-context-service');
-const anchor = require('../src/renderer/block-anchor');
+const anchor = require('../src/shared/block-anchor');
 
 let passed = 0;
 function test(name, fn) {

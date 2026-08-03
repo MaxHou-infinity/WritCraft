@@ -700,6 +700,72 @@ const NAVIGATION = {
     assert.strictEqual(await acceptedAt(low + 1), false);
   });
 
+  await test('maximum legal navigation goal, evidence catalog and Unicode output close together', async () => {
+    const body = Array.from({ length: service.MAX_EVIDENCE_CANDIDATES }, (_, index) =>
+      `证据${String(index + 1).padStart(4, '0')}具有唯一内容。`
+    ).join('\n\n');
+    const maximumGoal = `${'界'.repeat(1048)}${'x'.repeat(952)}`;
+    assert.strictEqual(Array.from(maximumGoal).length, 2000);
+    assert.strictEqual(Buffer.byteLength(maximumGoal, 'utf8'), 4096);
+    async function run(padding) {
+      let providerCalls = 0;
+      let providerBytes = 0;
+      let result = null;
+      let error = null;
+      try {
+        result = await service.proposeWritingNavigation({
+          projectService: fakeProject({
+            'edit.md': `# Prompt\n${'x'.repeat(padding)}`,
+            'chapters/01.md': body,
+          }),
+          rootPath: '/tmp/project',
+          request: {
+            schema: service.REQUEST_SCHEMA,
+            mode: 'navigation',
+            goal: maximumGoal,
+            currentFilePath: 'chapters/01.md',
+            contextPaths: [],
+          },
+          randomBytes: size => Buffer.alloc(size, 7),
+          callLLM: async (messages, _model, _tokens, options) => {
+            providerCalls += 1;
+            const refs = options.tools[0].input_schema.properties.suggestions.items.properties
+              .evidenceRefs.items.enum;
+            assert.strictEqual(refs.length, service.MAX_EVIDENCE_CANDIDATES);
+            providerBytes = Buffer.byteLength(service.providerRequestBody(messages, options.tools), 'utf8');
+            return toolResult({
+              mode: 'navigation',
+              suggestions: [{
+                finding: '😀'.repeat(160),
+                evidenceRefs: [refs[refs.length - 1]],
+                whyNow: '😀'.repeat(160),
+                editIntent: 'clarify',
+                expectedResult: '😀'.repeat(160),
+                action: 'changes',
+              }],
+            });
+          },
+        });
+      } catch (caught) {
+        error = caught;
+      }
+      return { providerCalls, providerBytes, result, error };
+    }
+
+    const baseline = await run(0);
+    assert.strictEqual(baseline.result?.ok, true);
+    const padding = service.MAX_REQUEST_BYTES - baseline.providerBytes;
+    assert(padding > 0);
+    const exact = await run(padding);
+    assert.strictEqual(exact.result?.ok, true);
+    assert.strictEqual(exact.providerCalls, 1);
+    assert.strictEqual(exact.providerBytes, service.MAX_REQUEST_BYTES);
+    assert.strictEqual(exact.result.result.suggestions[0].evidence.length, 1);
+    const overflow = await run(padding + 1);
+    assert.strictEqual(overflow.error?.code, 'NAVIGATION_PROMPT_TOO_LARGE');
+    assert.strictEqual(overflow.providerCalls, 0);
+  });
+
   await test('maximum Unicode fields pass while C0 and isolated surrogates fail raw validation', async () => {
     const project = fakeProject({ 'edit.md': '# Prompt\n' });
     const maximum = JSON.parse(JSON.stringify(STRUCTURE));

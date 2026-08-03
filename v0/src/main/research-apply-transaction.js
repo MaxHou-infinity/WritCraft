@@ -15,9 +15,6 @@ function refreshedResidualMetadata(pending, applied = [], residualChangeSet = nu
     }));
   }
   return {
-    planDependencies: pending.planDependencies
-      ? pending.planDependencies.map(item => ({ ...item, revision: revisions.get(item.path) || item.revision }))
-      : null,
     projectDependencies: pending.projectDependencies
       ? pending.projectDependencies.map(item => ({ ...item, revision: revisions.get(item.path) || item.revision }))
       : null,

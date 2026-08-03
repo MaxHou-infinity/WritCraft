@@ -7,7 +7,10 @@
 
   const REVIEW_SCHEMA = 'writcraft.changes-review/v1';
   const DECISION_SCHEMA = 'writcraft.changes-decision/v1';
-  const REVIEW_ID_RE = /^(?:cs_[a-f0-9]{24}|pc_[a-f0-9]{32})$/;
+  // Main may hydrate a current-session public review without exposing the
+  // private pc_* capability. Keep this allowlist identical to Main's review
+  // contract; review_* is an identity for decisions, never store authority.
+  const REVIEW_ID_RE = /^(?:cs_[a-f0-9]{24}|pc_[a-f0-9]{32}|review_[a-f0-9]{32})$/;
   const HUNK_ID_RE = /^hk_[a-f0-9]{24}$/;
   const MAX_FILES = 64;
   const MAX_HUNKS = 1024;

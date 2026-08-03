@@ -2,7 +2,7 @@
 const assert = require('assert');
 const path = require('path');
 
-const context = require(path.join(__dirname, '..', 'src/renderer/context-selection.js'));
+const context = require(path.join(__dirname, '..', 'src/shared/context-selection.js'));
 let pass = 0;
 
 function check(label, fn) {
@@ -266,7 +266,7 @@ check('所有新引用语法可混合分词且仍受总 mention 上限约束', (
 });
 
 check('模块是 UMD 纯函数，不依赖 DOM、IPC 或 Node 文件系统', () => {
-  const source = require('fs').readFileSync(path.join(__dirname, '..', 'src/renderer/context-selection.js'), 'utf8');
+  const source = require('fs').readFileSync(path.join(__dirname, '..', 'src/shared/context-selection.js'), 'utf8');
   for (const forbidden of ['document.', 'window.', 'ipcRenderer', "require('fs')", 'localStorage']) {
     assert.ok(!source.includes(forbidden), `不应依赖 ${forbidden}`);
   }

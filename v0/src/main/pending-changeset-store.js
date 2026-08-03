@@ -1,6 +1,7 @@
 'use strict';
 
 const crypto = require('crypto');
+const nodePath = require('path');
 
 const DEFAULT_MAX_ENTRIES = 10;
 const CAPABILITY_RE = /^pc_[a-f0-9]{32}$/;
@@ -20,6 +21,10 @@ const SHA256_RE = /^sha256:[a-f0-9]{64}$/;
 const MAX_ISSUE_DEPENDENCIES_BYTES = 64 * 1024;
 const MAX_RESEARCH_DEPENDENCIES_BYTES = 32 * 1024;
 const MAX_PROJECT_DEPENDENCIES = 17;
+const MAX_PUBLIC_REVIEW_LOCATIONS = 10;
+const PUBLIC_REVIEW_LOCATION_RE = /^review_[a-f0-9]{32}$/;
+const MAX_PUBLIC_LABEL_BYTES = 1024;
+const MAX_PUBLIC_PATH_BYTES = 4096;
 
 class PendingChangeSetStoreError extends Error {
   constructor(code, message) {
@@ -31,17 +36,6 @@ class PendingChangeSetStoreError extends Error {
 
 function fail(code, message) {
   throw new PendingChangeSetStoreError(code, message);
-}
-
-function normalizeDependencies(value) {
-  if (value == null) return null;
-  if (!Array.isArray(value)) fail('INVALID_DEPENDENCIES', 'Plan dependencies 必须是数组');
-  return Object.freeze(value.map(item => {
-    if (!item || typeof item.path !== 'string' || typeof item.revision !== 'string') {
-      fail('INVALID_DEPENDENCIES', 'Plan dependency 无效');
-    }
-    return Object.freeze({ path: item.path, revision: item.revision });
-  }));
 }
 
 function normalizeProjectDependencies(value) {
@@ -268,7 +262,38 @@ function createPendingChangeSetStore(options = {}) {
   const idFactory = typeof options.idFactory === 'function' ? options.idFactory : () => crypto.randomUUID();
   const clock = typeof options.clock === 'function' ? options.clock : Date.now;
   const onRemove = typeof options.onRemove === 'function' ? options.onRemove : null;
+  const locationPrefixFactory = typeof options.locationPrefixFactory === 'function'
+    ? options.locationPrefixFactory
+    : () => crypto.randomBytes(12).toString('hex');
+  const publicLocationPrefix = String(locationPrefixFactory() || '').toLocaleLowerCase('en-US');
+  if (!/^[a-f0-9]{24}$/.test(publicLocationPrefix)) {
+    fail('INVALID_LOCATION_PREFIX', '待审阅位置会话前缀无效');
+  }
   const records = new Map();
+  const publicLocations = new Map();
+  const publicLocationByCapability = new Map();
+  let publicReviewProjectInstanceId = null;
+  let publicReviewRootPath = null;
+  let publicLocationSequence = 0;
+  let pendingGeneration = 0;
+  let publicReviewGeneration = 0;
+
+  function removePublicLocationForCapability(capability) {
+    const locationId = publicLocationByCapability.get(capability);
+    if (!locationId) return false;
+    publicLocationByCapability.delete(capability);
+    if (!publicLocations.delete(locationId)) return false;
+    publicReviewGeneration += 1;
+    return true;
+  }
+
+  function clearPublicLocations() {
+    if (!publicLocations.size) return false;
+    publicLocations.clear();
+    publicLocationByCapability.clear();
+    publicReviewGeneration += 1;
+    return true;
+  }
 
   function notifyRemove(capability, record, reason) {
     if (!onRemove || !record) return;
@@ -278,6 +303,8 @@ function createPendingChangeSetStore(options = {}) {
   function remove(capability, reason) {
     const record = records.get(capability);
     if (!record || !records.delete(capability)) return false;
+    pendingGeneration += 1;
+    removePublicLocationForCapability(capability);
     notifyRemove(capability, record, reason);
     return true;
   }
@@ -320,7 +347,6 @@ function createPendingChangeSetStore(options = {}) {
     records.set(capability, Object.freeze({
       changeSet,
       rootPath,
-      planDependencies: normalizeDependencies(metadata.planDependencies),
       projectDependencies: normalizeProjectDependencies(metadata.projectDependencies),
       issueDependencies,
       researchDependencies,
@@ -330,6 +356,7 @@ function createPendingChangeSetStore(options = {}) {
       fileSelectionPolicies: normalizeFileSelectionPolicies(metadata.fileSelectionPolicies),
       provenance: cloneMetadata(metadata.provenance),
     }));
+    pendingGeneration += 1;
     while (records.size > maxEntries) remove(records.keys().next().value, 'evicted');
     return capability;
   }
@@ -338,10 +365,145 @@ function createPendingChangeSetStore(options = {}) {
     return putWithCapability(allocateCapability(), changeSet, rootPath, metadata);
   }
 
+  function canonicalRootPath(value) {
+    if (typeof value !== 'string' || !value || value.includes('\0') || !nodePath.isAbsolute(value) ||
+        nodePath.resolve(value) !== value) return null;
+    return value;
+  }
+
+  function bindPublicReviewProject(projectInstanceId, rootPath) {
+    const root = rootPath === null ? null : canonicalRootPath(rootPath);
+    if ((projectInstanceId === null) !== (rootPath === null) ||
+        (projectInstanceId !== null && (!PROJECT_INSTANCE_ID_RE.test(String(projectInstanceId || '')) || !root))) {
+      fail('PROJECT_CHANGED', '待审阅位置不属于当前项目');
+    }
+    if (publicReviewProjectInstanceId === projectInstanceId && publicReviewRootPath === root) {
+      return publicReviewGeneration;
+    }
+    const previousRoot = publicReviewRootPath;
+    if (previousRoot !== null) {
+      for (const [capability, record] of [...records.entries()]) {
+        if (record.rootPath === previousRoot) remove(capability, 'project-switch');
+      }
+    }
+    clearPublicLocations();
+    publicReviewProjectInstanceId = projectInstanceId;
+    publicReviewRootPath = root;
+    publicReviewGeneration += 1;
+    return publicReviewGeneration;
+  }
+
+  function allocatePublicLocationId() {
+    if (publicLocationSequence >= 0xffffffff) {
+      fail('LOCATION_LIMIT', '待审阅位置会话序号已耗尽');
+    }
+    publicLocationSequence += 1;
+    return `review_${publicLocationPrefix}${publicLocationSequence.toString(16).padStart(8, '0')}`;
+  }
+
+  function publicReviewLabel(value, paths, hunkCount) {
+    const fallback = paths.length === 1
+      ? `${paths[0]} · ${hunkCount} 项待审修改`
+      : `${paths.length} 个文件 · ${hunkCount} 项待审修改`;
+    const label = value === undefined ? fallback : value;
+    if (typeof label !== 'string' || !label || Buffer.byteLength(label, 'utf8') > MAX_PUBLIC_LABEL_BYTES ||
+        /[\u0000-\u0008\u000b\u000c\u000e-\u001f\u007f]/.test(label)) {
+      fail('INVALID_PUBLIC_REVIEW', '待审阅公开标题无效');
+    }
+    return label;
+  }
+
+  function publishPublicReviewLocation(capability, projectInstanceId, options = {}) {
+    pruneExpired();
+    if (projectInstanceId !== publicReviewProjectInstanceId ||
+        !PROJECT_INSTANCE_ID_RE.test(String(projectInstanceId || ''))) {
+      fail('PROJECT_CHANGED', '待审阅位置不属于当前项目');
+    }
+    if (!isPlainObject(options) || Object.keys(options).some(key => key !== 'label')) {
+      fail('INVALID_PUBLIC_REVIEW', '待审阅公开信息无效');
+    }
+    if (!CAPABILITY_RE.test(String(capability || '')) || !records.has(capability)) {
+      fail('REVIEW_NOT_AVAILABLE', '待审阅修改已不可用');
+    }
+    const existingId = publicLocationByCapability.get(capability);
+    if (existingId) return publicLocations.get(existingId).publicReview;
+    const record = records.get(capability);
+    if (!publicReviewRootPath || record.rootPath !== publicReviewRootPath) {
+      fail('REVIEW_NOT_AVAILABLE', '待审阅修改已不可用');
+    }
+    const review = require('./changeset-review-service').createReview(record.changeSet, {
+      reviewId: capability,
+      selectionPolicy: record.selectionPolicy,
+      fileSelectionPolicies: record.fileSelectionPolicies,
+    });
+    const targetPaths = review.files.map(file => file.path);
+    if (!targetPaths.length || targetPaths.length !== review.totalFiles ||
+        targetPaths.some(path => !markdownPath(path) || Buffer.byteLength(path, 'utf8') > MAX_PUBLIC_PATH_BYTES)) {
+      fail('INVALID_PUBLIC_REVIEW', '待审阅目标文件无效');
+    }
+    const locationId = allocatePublicLocationId();
+    const publicReview = Object.freeze({
+      locationId,
+      label: publicReviewLabel(options.label, targetPaths, review.totalHunks),
+      targetPaths: Object.freeze([...targetPaths]),
+      fileCount: review.totalFiles,
+      hunkCount: review.totalHunks,
+      expiresAt: record.expiresAt,
+    });
+    publicLocations.set(locationId, Object.freeze({
+      projectInstanceId,
+      capability,
+      publicReview,
+    }));
+    publicLocationByCapability.set(capability, locationId);
+    publicReviewGeneration += 1;
+    while (publicLocations.size > MAX_PUBLIC_REVIEW_LOCATIONS) {
+      const oldest = publicLocations.keys().next().value;
+      const evicted = publicLocations.get(oldest);
+      // The projection is only a bounded quick-open index. Evicting it must
+      // never revoke the underlying review capability or delete its ChangeSet.
+      publicLocations.delete(oldest);
+      if (publicLocationByCapability.get(evicted.capability) === oldest) {
+        publicLocationByCapability.delete(evicted.capability);
+      }
+      publicReviewGeneration += 1;
+    }
+    return publicReview;
+  }
+
+  function listPublicReviewLocations(projectInstanceId) {
+    pruneExpired();
+    if (projectInstanceId !== publicReviewProjectInstanceId ||
+        !PROJECT_INSTANCE_ID_RE.test(String(projectInstanceId || ''))) {
+      fail('PROJECT_CHANGED', '待审阅位置不属于当前项目');
+    }
+    return Object.freeze([...publicLocations.values()]
+      .filter(item => item.projectInstanceId === projectInstanceId &&
+        records.get(item.capability)?.rootPath === publicReviewRootPath)
+      .map(item => item.publicReview));
+  }
+
+  function resolvePublicReviewLocationForMain(projectInstanceId, locationId) {
+    pruneExpired();
+    const item = PUBLIC_REVIEW_LOCATION_RE.test(String(locationId || ''))
+      ? publicLocations.get(locationId)
+      : null;
+    if (projectInstanceId !== publicReviewProjectInstanceId || !item ||
+        item.projectInstanceId !== projectInstanceId ||
+        records.get(item.capability)?.rootPath !== publicReviewRootPath) {
+      fail('REVIEW_NOT_AVAILABLE', '待审阅修改已不可用');
+    }
+    return Object.freeze({ capability: item.capability, record: records.get(item.capability) });
+  }
+
   return Object.freeze({
     allocateCapability,
     putWithCapability,
     put,
+    bindPublicReviewProject,
+    publishPublicReviewLocation,
+    listPublicReviewLocations,
+    resolvePublicReviewLocationForMain,
     get(capability) { pruneExpired(); return CAPABILITY_RE.test(String(capability || '')) ? records.get(capability) : undefined; },
     delete(capability, reason = 'deleted') { return CAPABILITY_RE.test(String(capability || '')) && remove(capability, reason); },
     clear(reason = 'cleared') { for (const capability of [...records.keys()]) remove(capability, reason); },
@@ -360,6 +522,8 @@ function createPendingChangeSetStore(options = {}) {
     },
     has(capability) { pruneExpired(); return CAPABILITY_RE.test(String(capability || '')) && records.has(capability); },
     get size() { pruneExpired(); return records.size; },
+    get pendingGeneration() { return pendingGeneration; },
+    get publicReviewGeneration() { return publicReviewGeneration; },
   });
 }
 
@@ -369,6 +533,8 @@ module.exports = {
   MAX_ISSUE_DEPENDENCIES_BYTES,
   MAX_RESEARCH_DEPENDENCIES_BYTES,
   MAX_PROJECT_DEPENDENCIES,
+  MAX_PUBLIC_REVIEW_LOCATIONS,
+  PUBLIC_REVIEW_LOCATION_RE,
   PendingChangeSetStoreError,
   capabilityFromUuid,
   normalizeProjectDependencies,

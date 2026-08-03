@@ -41,7 +41,7 @@ V1 只适用于除 `edit.md` 外尚无公开 Markdown 正文的新项目。已�
 适用于至少有一个公开 Markdown 正文的项目。AI 返回 1–3 张“下一步建议”，每张精确包含：
 
 - 发现了什么问题或机会；
-- 一至三个证据锚点：现有相对路径、唯一章节标题和不超过 160 字的原文片段；
+- 一个证据锚点：现有相对路径、章节标题和不超过 160 字的原文片段；
 - 为什么现在值得处理；
 - 建议采取什么动作；
 - 完成后预期改善什么。
@@ -69,16 +69,16 @@ Main 必须把模型锚点解析为 canonical block locator，并绑定当时 re
 ### 3.2 写作导航输出
 
 - Main 先用每次请求新生成的 CSPRNG nonce，把本次已读 snapshot 中可安全定位的非代码正文区块编成有界、不可跨请求复用的临时 `evidenceRef`；模型不可创建或改写引用；
-- 模型工具 input 顶层精确为 `{"mode":"navigation","suggestions":[...]}`；每个 suggestion 精确为 `finding`、`evidenceRefs`、`whyNow`、`recommendedAction`、`expectedResult`、`action`；
-- `evidenceRefs` 只能从本次动态 schema 的 enum 选择 1–3 个不重复 ID。模型不再抄写 `relativePath`、`sectionHeading` 或 `quote`；
+- 模型工具 input 顶层精确为 `{"mode":"navigation","suggestions":[...]}`；每个 suggestion 精确为 `finding`、`evidenceRefs`、`whyNow`、`editIntent`、`expectedResult`、`action`；
+- `evidenceRefs` 只能从本次动态 schema 的 enum 选择 1 个 ID。模型不再抄写 `relativePath`、`sectionHeading` 或 `quote`；
 - Main 验证引用 membership 后生成公开 suggestion；其中 `evidence` 精确为 `relativePath`、`sectionHeading`、`quote`、`revision` 与 Main-owned `locator`，全部来自同一本次权威 snapshot；
 - 建议 1–3 张；
 - `finding`、`whyNow`、`expectedResult` 各 1–160 字；
-- `recommendedAction` 1–80 字，`action` 只能为 `open`、`research`、`changes`；
-- 每张公开结果含 1–3 个 evidence；`relativePath` 服从现有公开路径合同，`sectionHeading` 1–120 字，`quote` 1–160 字；
+- `editIntent` 必须从 Main 冻结的局部编辑意图枚举选择；Main 将其映射为 1–80 字的公开 `recommendedAction`。现行公开 suggestion 的 `action` 只能为 `changes`。`open`、`research` 是已退役默认双动作的历史值，不得由模型生成或 Renderer 暴露；独立 Research 页面仍按自身合同保留；
+- 每张公开结果精确含 1 个 evidence；`relativePath` 服从现有公开路径合同，`sectionHeading` 1–120 字，`quote` 1–160 字；
 - 无模型自定 ID、路径、引文、revision、任务状态或额外字段；navigation/action opaque ID 仍只由 Main 在验证后生成。
 
-两种模式都必须使用一个专用 named tool；Main 只接受一个匹配的 bounded plain-JSON input。provider request（含 prompt、context、tool schema）不超过 1 MiB，tool input 序列化后不超过 64 KiB，`max_tokens` 为 8192，deadline 为 90 秒。上下文最多 8 个正文文件、聚合 240 KiB；当前正文计入这 8 个总额，Context manifest 的 X/Y 使用同一总数定义。Main 在实现测试中用全上限 Unicode fixture 证明 schema、字符计数和序列化字节闭合。
+两种模式都必须使用一个专用 named tool；Main 只接受一个匹配的 bounded plain-JSON input。provider request（含 prompt、context、tool schema）不超过 1 MiB，tool input 序列化后不超过 64 KiB，`max_tokens` 为 8192，Main provider deadline 为 50 秒；Renderer 为包含保存与 IPC 的完整旅程保留 60 秒硬终点。上下文最多 8 个正文文件、聚合 240 KiB；当前正文计入这 8 个总额，Context manifest 的 X/Y 使用同一总数定义。Main 在实现测试中用全上限 Unicode fixture 证明 schema、字符计数和序列化字节闭合。
 
 每次用户点击最多一次付费 provider 调用。格式、字段、证据或容量失败均直接给出内容无关、可执行的失败说明，不自动重试；只有作者再次明确点击才产生新调用。取消和 deadline 终止当次 owner，迟到响应无 authority。
 
@@ -93,10 +93,10 @@ Main 必须把模型锚点解析为 canonical block locator，并绑定当时 re
 - Main 必须严格验证模式、数量、字符/字节上限、本次 evidenceRef membership、重复引用和允许动作；再从 frozen catalog 恢复路径、标题、quote、locator 与 revision。不猜测、不修补、不把字符串强制转换成数组。
 - 模型不得获得写 capability。缓存最多保存 8 次结果、每次最多 3 张建议、TTL 30 分钟；按项目 instance 与 owner 隔离，超限淘汰最旧结果并使其 capability 失效。
 - 原文依据链接直接使用 Main 已恢复的 locator 打开章节，不占用 Research/Changes capability。
-- Main 为每张建议分别签发 `research` 和 `changes` 单次 opaque action capability；模型输出中的历史 `action` 字段不得决定按钮是否出现。执行前重验全部证据、Context manifest、当前项目和 generation；成功交接或任何 stale/replay 都使对应 capability 终止。
+- 0.0CL 曾为每张建议分别签发 `research` 与 `changes` capability；该双动作是历史默认旅程，不是当前公开合同。0.1.2 统一任务流只签发一次 `changes` action capability，使用 `submit_unified_writing_task` 进入正文内 Diff；原文依据使用 Main-owned locator 本地打开，不需要 action capability。从 Sources 主动启动的独立 Research 由其自身合同管理，不从导航建议恢复旧双动作。执行前仍须重验全部证据、Context manifest、当前项目和 generation；成功交接或任何 stale/replay 都使当前 capability 终止。
 - Renderer 刷新或同一 App 进程内重新打开项目时，Main 可在 30 分钟 TTL 内暂存旧 record，但必须立即撤销旧 action/lease。恢复时 Renderer 只传 project instance ID；Main 重新经过 watcher barrier，核对 `edit.md`、所有已读正文 revision 及每个 quote/heading/locator，再绑定新 instance/generation/Renderer epoch 并签发全新动作。该恢复不调用 provider；任一依赖变化则 fail-closed。App 完全退出后不持久化正文、quote 或 capability，因此不承诺跨进程恢复。
-- `changes` 必须且只能使用 `submit_localized_edits`：Main 从冻结目标快照建立最多 96 个 request-local、revision-bound 范围，Prompt/Schema 同源绑定 `rangeId`；模型只返回 `rangeId/newText/summary`，不得返回路径、revision、原文或偏移。每次最多 8 项，单项 `newText` 最多 640、合计最多 1024、summary 最多 40 Unicode code points，完整工具参数不超过 7 KiB，专用 `max_tokens=8192`。Main 重建范围目录并重验路径、revision、内容、偏移、重复、重叠、依赖和 ChangeSet。
-- 首轮只有列入 allowlist 的结构或容量失败可内部纠正一次，纠正请求不得回显被拒内容；第二次仍失败必须终止且不得第三次调用。第二次付费调用前后都必须重新验证 action lease、项目 authority 与全部依赖。失败在缓存审阅前结束，仍 current 的 action 按既有状态语义保留。
+- `changes` 必须且只能使用 `submit_unified_writing_task`：Main 从当前建议的唯一 canonical evidence 建立 request-local、revision-bound `rangeId`；模型只返回局部 edits 或严格 `needs_sources`，不得返回路径、revision、原文或偏移。现行统一任务最多 3 项局部修改，完整工具参数不超过 20 KiB，专用 `max_tokens=8192`。Main 重建范围目录并重验路径、revision、内容、偏移、重复、重叠、依赖和 ChangeSet。既有 `submit_localized_edits` 的 96 范围、8 项、640/1024 字符边界属于独立 Inline/底层局部编辑合同，不是 Navigation 的公开生成协议。
+- 每次明确点击最多一次付费调用；结构、容量或格式失败不进行隐藏付费纠正。再次尝试必须由作者明确触发，并在调用前后重新验证 action lease、项目 authority 与全部依赖。失败在缓存审阅前结束，仍 current 的 action 按既有状态语义保留。
 - 每次执行另绑定一个 opaque attempt ID。普通失败、超时或作者取消只结束该 attempt，并保留仍 current 的 action 供显式重试；旧 attempt 的迟到取消或 finally 不得影响新 attempt。
 - 已有待审 Changes 时，`changes` 返回 `REVIEW_IN_PROGRESS` 并保留当前审阅，绝不替换或丢弃；作者处理完后须从仍有效的建议重新发起，过期则重新生成导航。
 - 项目 A 的迟到生成、handoff 或 finally 不得改变项目 B 的缓存、busy、Context manifest 或待审 Changes。
@@ -120,7 +120,7 @@ Main 必须把模型锚点解析为 canonical block locator，并绑定当时 re
 - 已有项目返回 1–3 张完整建议，每张都有可打开的原文依据和唯一主要动作“处理这个建议”；
 - schema/input/request/context 的最大合法 fixture 与超一边界均有测试；一次点击至多一次 provider call；
 - unknown/duplicate/cross-request evidenceRef、locator/revision 漂移、Context 不完整披露、项目切换、缓存过期、重复消费和 A→B 迟到均 fail-closed；
-- 已有 pending Changes 时不替换审阅，Research/Changes 各自 capability 互不串用；
+- 已有 pending Changes 时不替换审阅；每条建议只有一个 Changes capability，独立 Research 不从该建议取得 capability；
 - 同一 App 内刷新/重开恢复不产生第二次 provider 调用，旧 action ID 失效、新 ID 可用，依赖漂移、A→B 切换和迟到恢复均 fail-closed；
 - 所有生成失败证明 Markdown、History、Changes 和 mutation generation 零变化；
 - 任何正文修改都只能在 Changes 中接受后落盘；

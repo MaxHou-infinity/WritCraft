@@ -22,8 +22,8 @@ function check(label, fn) {
 
 console.log('\nWorkspace navigation ownership verification');
 
-check('four project workspaces have one semantic activity route each', () => {
-  for (const view of ['explorer', 'search', 'sources', 'graph']) {
+check('five project workspaces have one semantic activity route each', () => {
+  for (const view of ['home', 'explorer', 'search', 'sources', 'graph']) {
     assert.strictEqual((html.match(new RegExp(`<button[^>]+data-workspace-view="${view}"`, 'g')) || []).length, 1);
   }
   assert.strictEqual((html.match(/aria-current="page"/g) || []).length, 1);
@@ -31,7 +31,7 @@ check('four project workspaces have one semantic activity route each', () => {
 });
 
 check('workspace owns every primary route transition and exact selected state', () => {
-  assert(workspace.includes("const WORKSPACE_VIEWS = new Set(['explorer', 'search', 'sources', 'graph'])"));
+  assert(workspace.includes("const WORKSPACE_VIEWS = new Set(['home', 'explorer', 'search', 'sources', 'graph'])"));
   assert(workspace.includes("document.querySelectorAll('.activity-button[data-workspace-view]').forEach"));
   assert.strictEqual((workspace.match(/querySelectorAll\('\.activity-button\[data-workspace-view\]'\)/g) || []).length, 2);
   assert(workspace.includes("button.classList.toggle('is-active', selected)"));
@@ -52,7 +52,7 @@ check('secondary renderers expose lifecycle hooks instead of competing click own
 
 check('graph is a complete workspace rather than a source-sidebar hybrid', () => {
   assert(html.includes('.app-shell[data-workspace-view="graph"] .project-sidebar { display: none; }'));
-  assert(workspace.includes("const sidebarVisible = name !== 'graph'"));
+  assert(workspace.includes("const sidebarVisible = !['graph', 'home'].includes(name)"));
   assert(workspace.includes("if (name === 'graph') window.__graphView?.activate?.()"));
   assert(workspace.includes("else window.__graphView?.deactivate?.()"));
 });

@@ -1,11 +1,10 @@
 'use strict';
 
-const blockAnchor = require('../renderer/block-anchor');
+const blockAnchor = require('../shared/block-anchor');
 const projectChangesProposalService = require('./project-changes-proposal-service');
 const unifiedWritingTaskService = require('./unified-writing-task-service');
 const { markdownPaths } = require('./writing-navigation-service');
 
-const OPEN_HANDOFF_SCHEMA = 'writcraft.writing-navigation-open/v1';
 const RESEARCH_HANDOFF_SCHEMA = 'writcraft.writing-navigation-research/v1';
 const CHANGES_PROVENANCE_SCHEMA = 'writcraft.writing-navigation-changes/v1';
 const REVISION_RE = /^[a-f0-9]{64}$/;
@@ -200,43 +199,6 @@ function publicEvidence(evidence) {
   });
 }
 
-function openHandoff(authority) {
-  if (authority?.suggestion?.action !== 'open' || !authority.suggestion.evidence?.length) {
-    fail('ACTION_MISMATCH', '这条建议不是打开章节动作');
-  }
-  const evidence = authority.suggestion.evidence[0];
-  return Object.freeze({
-    ok: true,
-    kind: 'open',
-    handoff: Object.freeze({
-      schema: OPEN_HANDOFF_SCHEMA,
-      navigationId: authority.navigationId,
-      suggestionId: authority.suggestion.suggestionId,
-      path: evidence.relativePath,
-      locator: evidence.locator,
-    }),
-  });
-}
-
-function researchHandoff(authority) {
-  if (authority?.suggestion?.action !== 'research') {
-    fail('ACTION_MISMATCH', '这条建议不是补充来源动作');
-  }
-  const suggestion = authority.suggestion;
-  return Object.freeze({
-    ok: true,
-    kind: 'research',
-    handoff: Object.freeze({
-      schema: RESEARCH_HANDOFF_SCHEMA,
-      navigationId: authority.navigationId,
-      suggestionId: suggestion.suggestionId,
-      question: suggestion.recommendedAction,
-      finding: suggestion.finding,
-      evidence: Object.freeze(suggestion.evidence.map(publicEvidence)),
-    }),
-  });
-}
-
 function prepareChangesHandoff({
   projectService,
   rootPath,
@@ -350,14 +312,11 @@ function finalizeChangesHandoff({ preparedHandoff, parsed, changeSetService }) {
 }
 
 module.exports = Object.freeze({
-  OPEN_HANDOFF_SCHEMA,
   RESEARCH_HANDOFF_SCHEMA,
   CHANGES_PROVENANCE_SCHEMA,
   WritingNavigationHandoffError,
   revalidateRecord,
   revalidateAuthority,
-  openHandoff,
-  researchHandoff,
   prepareChangesHandoff,
   needsSourcesHandoff,
   finalizeChangesHandoff,

@@ -95,4 +95,4 @@ V0 聚焦一类主用户：正在撰写方法论书籍、专业报告或结构�
 
 ---
 
-历史调研、竞品材料、早期多用户画像、TipTap 试验、模型时延/价格假设和原四周排期保留在 `raw/`、`PDCA-V0-调研复盘.md` 与 `deliverables/笔触 · WritCraft — 一个月 V0 路线图.md` 中，仅供追溯，不是当前产品或工程合同。
+历史调研、竞品材料、早期多用户画像、TipTap 试验、模型时延/价格假设和原四周排期保留在 `raw/`、`docs/archive/retrospectives/PDCA-V0-调研复盘.md` 与 `deliverables/笔触 · WritCraft — 一个月 V0 路线图.md` 中，仅供追溯，不是当前产品或工程合同。

@@ -151,9 +151,10 @@ check('跨文件 Changes 必须先预览再按修改块决定应用', () => {
   assert.ok(changesView.includes('await window.__workspace.persistCurrent(true)'));
 });
 check('工作区恢复标签、光标和滚动位置', () => {
-  assert.ok(workspace.includes('bridge.loadWorkspace()'));
-  assert.ok(workspace.includes('bridge.saveWorkspace(workspaceSnapshot())'));
-  assert.ok(workspace.includes('cursorOffset'));
+  assert.ok(workspace.includes('bridge.loadWorkspace(projectInstanceId)'));
+  assert.ok(workspace.includes('bridge?.saveWorkspaceBeforeClose?.('));
+  assert.ok(workspace.includes('bridge.saveWorkspace('));
+  assert.ok(workspace.includes('selectionAnchorOffset'));
   assert.ok(workspace.includes('scrollTop'));
   assert.ok(workspace.includes('bridge.openRecent()'));
 });

@@ -25,15 +25,13 @@ test('identical content hashes receive independent unguessable proposal capabili
   ];
   const store = createPendingChangeSetStore({ idFactory: () => ids.shift() });
   const same = Object.freeze({ id: 'cs_same_content' });
-  const plan = store.put(same, '/project', {
-    planDependencies: [{ path: 'edit.md', revision: 'a'.repeat(64) }],
-  });
+  const first = store.put(same, '/project');
   const generic = store.put(same, '/project');
-  assert.match(plan, CAPABILITY_RE);
+  assert.match(first, CAPABILITY_RE);
   assert.match(generic, CAPABILITY_RE);
-  assert.notStrictEqual(plan, generic);
-  assert.strictEqual(store.get(plan).planDependencies[0].path, 'edit.md');
-  assert.strictEqual(store.get(generic).planDependencies, null);
+  assert.notStrictEqual(first, generic);
+  assert.strictEqual(store.get(first).changeSet, same);
+  assert.strictEqual(store.get(generic).changeSet, same);
 });
 
 test('discarding a stale same-content proposal cannot remove the current proposal', () => {
@@ -87,7 +85,7 @@ test('bounded FIFO eviction never aliases a newly issued capability', () => {
 test('preallocated residual capabilities preserve immutable review metadata', () => {
   const store = createPendingChangeSetStore({ idFactory: () => '88888888-8888-4888-8888-888888888888' });
   const capability = store.allocateCapability();
-  const provenance = { planId: 'plan-1', targets: [{ path: 'one.md', revision: 'a'.repeat(64) }] };
+  const provenance = { requestId: 'request-1', targets: [{ path: 'one.md', revision: 'a'.repeat(64) }] };
   store.putWithCapability(capability, { id: 'cs_residual' }, '/project', {
     selectionPolicy: 'hunk',
     fileSelectionPolicies: { 'edit.md': 'file' },
@@ -309,6 +307,53 @@ test('clearExcept preserves the in-flight authority while invalidating every sib
   assert.strictEqual(store.has(preserved), true);
   assert.strictEqual(store.has(sibling), false);
   assert.deepStrictEqual(removals, [{ capability: sibling, reason: 'cleared' }]);
+});
+
+test('pending generation advances only for real put, remove, expiry, eviction and clear mutations', () => {
+  let now = 1000;
+  const ids = [
+    '10101010-1010-4010-8010-101010101010',
+    '20202020-2020-4020-8020-202020202020',
+    '30303030-3030-4030-8030-303030303030',
+  ];
+  const store = createPendingChangeSetStore({
+    maxEntries: 1,
+    clock: () => now,
+    idFactory: () => ids.shift(),
+  });
+  assert.strictEqual(store.pendingGeneration, 0);
+  const first = store.put({ id: 'cs_generation_1' }, '/project');
+  assert.strictEqual(store.pendingGeneration, 1);
+  assert.strictEqual(store.get(first).changeSet.id, 'cs_generation_1');
+  assert.strictEqual(store.pendingGeneration, 1);
+  const second = store.put({ id: 'cs_generation_2' }, '/project');
+  assert.strictEqual(store.pendingGeneration, 3, 'second put and FIFO eviction are distinct mutations');
+  assert.strictEqual(store.delete(first), false);
+  assert.strictEqual(store.pendingGeneration, 3);
+  assert.strictEqual(store.delete(second), true);
+  assert.strictEqual(store.pendingGeneration, 4);
+
+  const expiring = store.allocateCapability();
+  store.putWithCapability(expiring, { id: 'cs_generation_expiring' }, '/project', {
+    researchDependencies: researchDependencies(expiring),
+  });
+  assert.strictEqual(store.pendingGeneration, 5);
+  now = 2000;
+  assert.strictEqual(store.size, 0);
+  assert.strictEqual(store.pendingGeneration, 6);
+
+  const clearIds = [
+    '40404040-4040-4040-8040-404040404040',
+    '50505050-5050-4050-8050-505050505050',
+  ];
+  const clearStore = createPendingChangeSetStore({ maxEntries: 2, idFactory: () => clearIds.shift() });
+  clearStore.put({ id: 'cs_clear_1' }, '/project');
+  clearStore.put({ id: 'cs_clear_2' }, '/project');
+  assert.strictEqual(clearStore.pendingGeneration, 2);
+  clearStore.clear();
+  assert.strictEqual(clearStore.pendingGeneration, 4);
+  clearStore.clear();
+  assert.strictEqual(clearStore.pendingGeneration, 4, 'empty clear is not a store mutation');
 });
 
 console.log(`\nPending ChangeSet capability store ${passed}/${passed} passed.`);

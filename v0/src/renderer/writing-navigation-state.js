@@ -15,7 +15,7 @@
   const CAPABILITY_ID_RE = /^wsc_[a-f0-9]{32}$/;
   const ALTERNATIVE_ID_RE = /^alternative_[1-3]$/;
   const SAFE_TEXT = /^(?:[^\u0000-\u001f\uD800-\uDFFF]|[\uD800-\uDBFF][\uDC00-\uDFFF])*$/u;
-  const ACTIONS = new Set(['open', 'research', 'changes']);
+  const ACTIONS = new Set(['changes']);
 
   function deepFreeze(value) {
     if (!value || typeof value !== 'object' || Object.isFrozen(value)) return value;
@@ -138,16 +138,12 @@
           copy.suggestions.length > 3) return null;
       for (const suggestion of copy.suggestions) {
         if (!ACTION_ID_RE.test(suggestion?.actionId || '') ||
-            !ACTION_ID_RE.test(suggestion?.actionIds?.research || '') ||
-            !ACTION_ID_RE.test(suggestion?.actionIds?.changes || '') ||
-            suggestion.actionIds.research === suggestion.actionIds.changes ||
             !ACTIONS.has(suggestion.action) ||
             !safeText(suggestion.finding, 160) ||
             !safeText(suggestion.whyNow, 160) ||
             !safeText(suggestion.recommendedAction, 80) ||
             !safeText(suggestion.expectedResult, 160) ||
-            !Array.isArray(suggestion.evidence) || !suggestion.evidence.length ||
-            suggestion.evidence.length > 3) return null;
+            !Array.isArray(suggestion.evidence) || suggestion.evidence.length !== 1) return null;
       }
     }
     return deepFreeze(copy);

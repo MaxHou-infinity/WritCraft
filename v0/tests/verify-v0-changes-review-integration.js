@@ -94,8 +94,8 @@ test('Renderer begins pending, sends exact decisions, supports bulk/reset and co
   assert(view.includes('pending.reviewState = nextState'));
   assert(view.includes('reviewCommitInFlight'));
   assert(view.includes('discardButton.disabled = controlsBusy'));
-  assert(view.includes('if (planModeLeaveButton) planModeLeaveButton.disabled = reviewCommitInFlight'));
-  assert(view.includes('if (reviewCommitInFlight || !activePlanRequest) return'));
+  assert(view.includes('if (issueModeLeaveButton) issueModeLeaveButton.disabled = reviewCommitInFlight'));
+  assert(view.includes('if (researchModeLeaveButton) researchModeLeaveButton.disabled = reviewCommitInFlight || busy'));
   assert(view.includes('if (recoveryBlocked || historyUndoInFlight || !bridge?.undoChange'));
   assert(view.includes("historyList.querySelectorAll('.history-undo')"));
   assert(view.includes("preview.querySelectorAll('.change-decision, [data-onboarding-path]')"));

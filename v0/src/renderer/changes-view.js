@@ -38,12 +38,9 @@
   let targetSelectionTouched = false;
   let normalScopePlan = null;
   let metricsRequestSequence = 0;
-  let activePlanRequest = null;
   let activeIssueRequest = null;
   let activeResearchRequest = null;
   let researchOpenSequence = 0;
-  let planModeBanner = null;
-  let planModeLeaveButton = null;
   let issueModeBanner = null;
   let issueModeLeaveButton = null;
   let researchModeBanner = null;
@@ -56,61 +53,21 @@
   let generationProgressOwner = null;
   let controlsBusyOwner = null;
   let historyUndoOwner = null;
+  let pendingHydrationSequence = 0;
+  let pendingDiscardSequence = 0;
   const expandedReviewHunks = new Set();
   let onboardingMetricSettlement = null;
   let unsettledOnboardingMetric = null;
   let unsettledOnboardingConfirmationRelease = null;
   const proposalTransactions = window.WritCraftChangesProposalTransaction?.create?.();
 
-  function ensurePlanModeBanner() {
-    if (planModeBanner) return planModeBanner;
-    planModeBanner = document.createElement('section');
-    planModeBanner.className = 'changes-plan-mode';
-    planModeBanner.hidden = true;
-    const copy = document.createElement('div');
-    copy.className = 'changes-plan-mode__copy';
-    const title = document.createElement('strong');
-    title.textContent = 'Plan 任务专用模式';
-    const detail = document.createElement('span');
-    detail.dataset.planProvenance = 'true';
-    copy.append(title, detail);
-    const leave = document.createElement('button');
-    leave.type = 'button';
-    leave.textContent = '脱离 Plan';
-    planModeLeaveButton = leave;
-    leave.addEventListener('click', () => { void leavePlanMode(); });
-    planModeBanner.append(copy, leave);
-    instruction.parentElement.insertBefore(planModeBanner, instruction);
-    return planModeBanner;
-  }
-
-  function renderPlanMode(provenance = null) {
-    const banner = ensurePlanModeBanner();
-    banner.hidden = !activePlanRequest;
-    instruction.readOnly = Boolean(activePlanRequest || activeIssueRequest);
-    if (activeResearchRequest) instruction.readOnly = true;
-    instruction.hidden = Boolean(activeResearchRequest);
-    contextPicker.hidden = Boolean(activePlanRequest || activeIssueRequest);
-    if (activeResearchRequest) contextPicker.hidden = true;
-    targetPicker.hidden = Boolean(activePlanRequest || activeIssueRequest);
-    chapterButton.hidden = Boolean(activePlanRequest || activeIssueRequest);
-    if (activeResearchRequest) chapterButton.hidden = true;
-    if (!activePlanRequest) return;
-    instruction.value = `Plan ${activePlanRequest.planId} / Task ${activePlanRequest.taskId}`;
-    const targets = provenance?.targets || pending?.provenance?.targets || [];
-    const detail = banner.querySelector('[data-plan-provenance]');
-    if (detail) detail.textContent = targets.length
-      ? `${activePlanRequest.planId} · ${activePlanRequest.taskId} · ${targets.map(target => `${target.path} @ ${target.revision}`).join('、')}`
-      : `${activePlanRequest.planId} · ${activePlanRequest.taskId} · 等待 Main 核验目标`;
-  }
-
   function ensureIssueModeBanner() {
     if (issueModeBanner) return issueModeBanner;
     issueModeBanner = document.createElement('section');
-    issueModeBanner.className = 'changes-plan-mode changes-issue-mode';
+    issueModeBanner.className = 'changes-mode-banner changes-issue-mode';
     issueModeBanner.hidden = true;
     const copy = document.createElement('div');
-    copy.className = 'changes-plan-mode__copy';
+    copy.className = 'changes-mode-banner__copy';
     const title = document.createElement('strong');
     title.textContent = '星图问题专用审阅';
     const detail = document.createElement('span');
@@ -129,13 +86,13 @@
   function renderIssueMode(provenance = null) {
     const banner = ensureIssueModeBanner();
     banner.hidden = !activeIssueRequest;
-    instruction.readOnly = Boolean(activePlanRequest || activeIssueRequest);
+    instruction.readOnly = Boolean(activeIssueRequest);
     if (activeResearchRequest) instruction.readOnly = true;
     instruction.hidden = Boolean(activeResearchRequest);
-    contextPicker.hidden = Boolean(activePlanRequest || activeIssueRequest);
+    contextPicker.hidden = Boolean(activeIssueRequest);
     if (activeResearchRequest) contextPicker.hidden = true;
-    targetPicker.hidden = Boolean(activePlanRequest || activeIssueRequest);
-    chapterButton.hidden = Boolean(activePlanRequest || activeIssueRequest);
+    targetPicker.hidden = Boolean(activeIssueRequest);
+    chapterButton.hidden = Boolean(activeIssueRequest);
     if (activeResearchRequest) chapterButton.hidden = true;
     if (!activeIssueRequest) return;
     instruction.value = `Graph Issue ${activeIssueRequest.issueId}`;
@@ -180,10 +137,10 @@
   function ensureResearchModeBanner() {
     if (researchModeBanner) return researchModeBanner;
     researchModeBanner = document.createElement('section');
-    researchModeBanner.className = 'changes-plan-mode changes-research-mode';
+    researchModeBanner.className = 'changes-mode-banner changes-research-mode';
     researchModeBanner.hidden = true;
     const copy = document.createElement('div');
-    copy.className = 'changes-plan-mode__copy';
+    copy.className = 'changes-mode-banner__copy';
     const title = document.createElement('strong');
     title.textContent = 'Research 证据卡专用模式';
     const locks = document.createElement('span');
@@ -207,12 +164,12 @@
     const banner = ensureResearchModeBanner();
     banner.hidden = !activeResearchRequest;
     instruction.hidden = Boolean(activeResearchRequest);
-    instruction.readOnly = Boolean(activePlanRequest || activeIssueRequest);
+    instruction.readOnly = Boolean(activeIssueRequest);
     if (activeResearchRequest) instruction.readOnly = true;
-    contextPicker.hidden = Boolean(activePlanRequest || activeIssueRequest);
+    contextPicker.hidden = Boolean(activeIssueRequest);
     if (activeResearchRequest) contextPicker.hidden = true;
-    targetPicker.hidden = Boolean(activePlanRequest || activeIssueRequest);
-    chapterButton.hidden = Boolean(activePlanRequest || activeIssueRequest);
+    targetPicker.hidden = Boolean(activeIssueRequest);
+    chapterButton.hidden = Boolean(activeIssueRequest);
     if (activeResearchRequest) chapterButton.hidden = true;
     if (!activeResearchRequest) return;
     const host = banner.querySelector('[data-research-card]');
@@ -230,37 +187,6 @@
       text.textContent = String(value || '');
       host.append(key, text);
     }
-  }
-
-  async function leavePlanMode() {
-    if (reviewCommitInFlight || !activePlanRequest) return;
-    const discardId = pending?.id || null;
-    proposalTransactions?.invalidate();
-    pending = null;
-    activePlanRequest = null;
-    instruction.value = '';
-    renderPlanMode();
-    setBusy(false);
-    preview.replaceChildren(Object.assign(document.createElement('div'), {
-      className: 'tree-empty', textContent: '已脱离 Plan；现在可自由输入跨文件修订目标。',
-    }));
-    applyButton.hidden = true;
-    discardButton.hidden = true;
-    resetCommitControls();
-    setStatus('已进入普通 Changes 自由模式');
-    instruction.focus();
-    if (discardId && bridge?.discardChanges) {
-      await bridge.discardChanges(window.__workspace?.state?.project?.instanceId || null, discardId);
-    }
-  }
-
-  function completePlanModeAfterWrite() {
-    if (!activePlanRequest) return false;
-    proposalTransactions?.invalidate();
-    activePlanRequest = null;
-    instruction.value = '';
-    renderPlanMode();
-    return true;
   }
 
   async function releaseResearchOwnership(snapshot, options = {}) {
@@ -298,7 +224,6 @@
     activeResearchRequest = null;
     instruction.value = '';
     renderResearchMode();
-    renderPlanMode();
     renderIssueMode();
     applyButton.hidden = true;
     discardButton.hidden = true;
@@ -353,20 +278,16 @@
 
     stopGenerationProgress();
     pending = null;
-    if (mode === 'plan') activePlanRequest = null;
     if (mode === 'issue') activeIssueRequest = null;
     if (mode === 'normal') normalScopePlan = null;
     instruction.value = '';
-    renderPlanMode();
     renderIssueMode();
     preview.replaceChildren(Object.assign(document.createElement('div'), {
       className: 'tree-empty',
       textContent: mode === 'issue'
         ? 'AI 没有生成可安全应用的局部修复；项目文件未变化，已退出星图专用审阅。'
-        : mode === 'plan'
-          ? 'AI 没有生成可安全应用的局部修改；项目文件未变化，已退出 Plan 专用审阅。'
-          : mode === 'chapter'
-            ? 'AI 分阶段生成的完整章节与当前文件一致；项目文件未变化。'
+        : mode === 'chapter'
+          ? 'AI 分阶段生成的完整章节与当前文件一致；项目文件未变化。'
           : 'AI 没有生成可安全应用的局部修改；项目文件未变化，本地范围计划已清空。',
     }));
     applyButton.hidden = true;
@@ -375,10 +296,8 @@
     recordChangeMetric('generated', metric);
     const message = mode === 'issue'
       ? '星图问题本次未产生修改；请调整正文或重新分析后再试。'
-      : mode === 'plan'
-        ? 'Plan 任务本次未产生修改；任务未写入正文，可从 Plan 调整后重新执行。'
-        : mode === 'chapter'
-          ? '本次生成的完整章节与当前正文一致；未创建审阅能力，磁盘没有变化。'
+      : mode === 'chapter'
+        ? '本次生成的完整章节与当前正文一致；未创建审阅能力，磁盘没有变化。'
         : '本次范围未产生实际修改；项目文件未变化，可调整指令后重新确认范围。';
     setStatus(message);
     return { ok: true, noChanges: true, message };
@@ -574,7 +493,6 @@
     chapterButton.disabled = controlsBusy;
     applyButton.disabled = controlsBusy;
     discardButton.disabled = controlsBusy;
-    if (planModeLeaveButton) planModeLeaveButton.disabled = reviewCommitInFlight;
     if (issueModeLeaveButton) issueModeLeaveButton.disabled = reviewCommitInFlight;
     if (researchModeLeaveButton) researchModeLeaveButton.disabled = reviewCommitInFlight || busy;
     preview.querySelectorAll('.change-decision, [data-onboarding-path]').forEach(control => { control.disabled = controlsBusy; });
@@ -583,7 +501,6 @@
     });
     proposeButton.textContent = busy && label !== 'chapter' ? '处理中…'
       : activeResearchRequest ? activeResearchRequest.phase === 'review' ? 'Research 提案待审阅' : '依据核对卡生成 Diff'
-        : activePlanRequest ? '重新生成此 Plan 任务'
         : activeIssueRequest ? '重新生成此星图问题'
           : normalScopePlan ? '确认范围并生成 Diff' : '跨文件修改';
     chapterButton.textContent = busy && label === 'chapter' ? '生成中…' : '生成当前章节';
@@ -744,7 +661,7 @@
       const checkbox = document.createElement('input');
       checkbox.type = 'checkbox';
       checkbox.checked = selectedTargetPaths.includes(filePath);
-      checkbox.disabled = Boolean(activePlanRequest || activeIssueRequest ||
+      checkbox.disabled = Boolean(activeIssueRequest ||
         (activeResearchRequest && activeResearchRequest.phase !== 'ready')) || (atLimit && !checkbox.checked);
       checkbox.dataset.path = filePath;
       const pathText = document.createElement('span');
@@ -804,7 +721,7 @@
       const checkbox = document.createElement('input');
       checkbox.type = 'checkbox';
       checkbox.checked = selectedContextPaths.includes(filePath);
-      checkbox.disabled = Boolean(activePlanRequest || activeIssueRequest) || selectedTargetPaths.includes(filePath) ||
+      checkbox.disabled = Boolean(activeIssueRequest) || selectedTargetPaths.includes(filePath) ||
         (atLimit && !checkbox.checked);
       checkbox.dataset.path = filePath;
       const pathText = document.createElement('span');
@@ -853,7 +770,7 @@
     }
     refreshTargetPicker();
     refreshContextPicker();
-    if (!activePlanRequest && !activeIssueRequest && !activeResearchRequest) instruction.focus();
+    if (!activeIssueRequest && !activeResearchRequest) instruction.focus();
     loadHistory();
     loadMetrics();
   }
@@ -1141,6 +1058,8 @@
       proposalDigest: result.proposalDigest || null,
       fileSuggestions: result.fileSuggestions || [],
       provenance: result.provenance || null,
+      publicReviewLocationId: result.publicReview?.locationId || null,
+      hydratedPublicReview: result.hydratedPublicReview === true,
       requireCompleteDecision: result.requireCompleteDecision === true,
       metric,
     };
@@ -1150,7 +1069,6 @@
       inlineReviewMode = null;
       return false;
     }
-    if (activePlanRequest) renderPlanMode(result.provenance);
     if (activeIssueRequest) renderIssueMode(result.provenance);
     return true;
   }
@@ -1486,7 +1404,6 @@
   async function propose() {
     if (recoveryBlocked) return setStatus('项目写入状态正在恢复，暂不能生成新的修改', true);
     if (activeResearchRequest) return proposeResearchCard();
-    if (activePlanRequest) return proposePlanTask();
     if (activeIssueRequest) return proposeGraphIssueTask();
     const value = instruction.value.trim();
     if (!value) return setStatus('请先描述跨文件修订目标', true);
@@ -1684,85 +1601,6 @@
     }
   }
 
-  async function proposePlanTask() {
-    if (!activePlanRequest) return { ok: false, message: '当前没有已绑定的 Plan 任务' };
-    if (!bridge?.handoffPlanTask) {
-      const message = 'Plan→Changes 服务尚未连接';
-      setStatus(message, true);
-      return { ok: false, message };
-    }
-    const request = activePlanRequest;
-    const projectInstanceId = window.__workspace?.state?.project?.instanceId || null;
-    const transaction = proposalTransactions?.begin('plan', projectInstanceId);
-    if (!transaction) {
-      const message = 'Plan 任务交接事务无效';
-      setStatus(message, true);
-      return { ok: false, message };
-    }
-    const metric = {
-      operationId: window.WritCraftAiMetrics?.createOperationId?.(),
-      originProjectInstanceId: projectInstanceId,
-      action: 'plan_task', startedAt: Date.now(), scope: 'multi_file', beforeChars: 0, afterChars: 0,
-    };
-    setBusy(true);
-    setStatus('正在由 Main 核验 Plan、目标路径与 revision…');
-    try {
-      const saved = await window.__workspace.persistCurrent(true);
-      if (!proposalTransactions.isCurrent(transaction, window.__workspace?.state?.project?.instanceId || null, 'plan')) {
-        return { ok: true, canceled: true, message: '旧 Plan 任务已取消' };
-      }
-      if (!saved) {
-        const message = '当前文件未能安全保存，Plan 交接已停止';
-        setStatus(message, true);
-        return { ok: false, message };
-      }
-      // The payload is intentionally identifier-only. Instruction, target
-      // paths and revisions are recovered from Main's canonical plan record.
-      const result = await bridge.handoffPlanTask(metric.originProjectInstanceId, request);
-      const current = await proposalTransactions.settle(transaction, result, {
-        mode: 'plan',
-        projectInstanceId: window.__workspace?.state?.project?.instanceId || null,
-        discard: (originProjectInstanceId, changeSetId) => bridge.discardChanges?.(originProjectInstanceId, changeSetId),
-      });
-      if (!current) return { ok: true, canceled: true, message: '旧 Plan 任务结果已丢弃' };
-      if (!result?.ok) {
-        recordChangeMetric('failed', metric);
-        const message = result?.message || result?.error || 'Plan 任务交接失败';
-        setStatus(message, true);
-        return { ok: false, message };
-      }
-      if (result.noChanges === true) {
-        const provenance = result.provenance;
-        if (provenance?.schema !== 'writcraft.plan-task-handoff/v1' ||
-            provenance?.planId !== request.planId || provenance?.taskId !== request.taskId) {
-          recordChangeMetric('failed', metric);
-          const message = 'Plan 无变更响应与当前任务绑定不一致，已阻止处理';
-          setStatus(message, true);
-          return { ok: false, message };
-        }
-        return finishNoChanges('plan', result, metric);
-      }
-      if (!(await replaceGeneratedReview(result, metric))) {
-        recordChangeMetric('failed', metric);
-        return { ok: false, message: '旧审阅未能安全释放，新提案已取消' };
-      }
-      recordChangeMetric('generated', metric);
-      const paths = (result.provenance?.targets || []).map(target => target.path).join('、');
-      const message = `${result.fileCount || 0} 个文件待审阅 · Main 已绑定 ${paths || '计划目标'}`;
-      setStatus(message);
-      return { ok: true, message: 'Plan 任务已生成可审阅 Changes，正文尚未写入。' };
-    } catch (error) {
-      const current = proposalTransactions.isCurrent(transaction, window.__workspace?.state?.project?.instanceId || null, 'plan');
-      if (!current) return { ok: true, canceled: true, message: '旧 Plan 任务已取消' };
-      recordChangeMetric('failed', metric);
-      const message = `Plan 任务生成中断：${error.message}`;
-      setStatus(message, true);
-      return { ok: false, message };
-    } finally {
-      if (proposalTransactions.finish(transaction, window.__workspace?.state?.project?.instanceId || null)) setBusy(false);
-    }
-  }
-
   async function proposeChapter() {
     if (pending) return setStatus('当前还有待审阅 Changes；请先应用或丢弃，再生成当前章节。', true);
     const value = instruction.value.trim();
@@ -1896,10 +1734,8 @@
     if (inlineReviewMode) settleInlineReview({ status: 'recovery' });
     pending = null;
     confirmationMode = null;
-    activePlanRequest = null;
     activeIssueRequest = null;
     activeResearchRequest = null;
-    renderPlanMode();
     renderIssueMode();
     renderResearchMode();
     applyButton.hidden = true;
@@ -2037,7 +1873,13 @@
       let result = null;
       let mutationFailure = null;
       try {
-        result = await bridge.applyChanges(projectInstanceId, decision);
+        result = pending.hydratedPublicReview
+          ? await window.writCraft?.project?.dailyWorkspace?.applyPendingReview?.(
+            projectInstanceId,
+            pending.publicReviewLocationId,
+            decision
+          )
+          : await bridge.applyChanges(projectInstanceId, decision);
       } catch (error) {
         mutationFailure = error;
       }
@@ -2095,7 +1937,6 @@
       }
       committedResult = result;
       const appliedCount = result.applied?.length || 0;
-      const completedPlan = appliedCount > 0 && completePlanModeAfterWrite();
       if (result.residualUnavailable === true) {
         const snapshot = snapshotResearchOwnership();
         clearResearchRendererState(snapshot,
@@ -2116,8 +1957,8 @@
         pending.id = nextState.review.changeSetId;
         pending.reviewState = nextState;
         pending.provenance = result.provenance || pending.provenance;
+        pending.publicReviewLocationId = result.publicReview?.locationId || null;
         renderPendingReview();
-        if (activePlanRequest) renderPlanMode(pending.provenance);
         const researchResidual = pending.proposalKind === 'research_card' && activeResearchRequest
           ? activeResearchRequest : null;
         if (researchResidual) researchResidual.phase = 'refreshing';
@@ -2134,9 +1975,7 @@
           researchResidual.phase = 'review';
         }
         if (!authoritativeReloaded) await loadHistory();
-        setStatus(completedPlan
-          ? `Plan 任务已写入正文；原 Plan 已完成，请处理剩余 ${result.remainingHunkCount || nextState.review.totalHunks} 个修改块，后续任务请新建 Plan。`
-          : `本轮已接受 ${result.acceptedHunkCount || 0}、拒绝 ${result.rejectedHunkCount || 0}；剩余 ${result.remainingHunkCount || nextState.review.totalHunks} 个待决定`);
+        setStatus(`本轮已接受 ${result.acceptedHunkCount || 0}、拒绝 ${result.rejectedHunkCount || 0}；剩余 ${result.remainingHunkCount || nextState.review.totalHunks} 个待决定`);
         return;
       }
       const completedIssue = completeIssueModeAfterReview();
@@ -2157,7 +1996,6 @@
       if (completedResearch) {
         activeResearchRequest = null;
         renderResearchMode();
-        renderPlanMode();
         renderIssueMode();
       }
       if (isOnboardingProposal && result.onboardingConfirmation) {
@@ -2205,8 +2043,6 @@
         ? appliedCount
           ? '星图问题修复已安全写入；请重新分析星图确认问题是否消除。'
           : `已完整拒绝 ${result.rejectedHunkCount || 0} 个星图修复块，项目文件没有变化`
-        : completedPlan
-        ? 'Plan 任务已安全写入并完成；如需继续规划，请新建 Plan。'
         : !appliedCount
         ? `已记录拒绝 ${result.rejectedHunkCount || 0} 个修改块，项目文件没有变化`
         : isEditPromptProposal
@@ -2314,7 +2150,25 @@
       return;
     }
     if (pending?.id && bridge?.discardChanges) {
-      await bridge.discardChanges(window.__workspace?.state?.project?.instanceId || null, pending.id);
+      const activePending = pending;
+      const projectInstanceId = window.__workspace?.state?.project?.instanceId || null;
+      const discardOwner = ++pendingDiscardSequence;
+      const discardCurrent = () => discardOwner === pendingDiscardSequence && pending === activePending &&
+        window.__workspace?.state?.project?.instanceId === projectInstanceId;
+      if (pending.hydratedPublicReview) {
+        const discarded = await window.writCraft?.project?.dailyWorkspace?.discardPendingReview?.(
+          projectInstanceId,
+          pending.publicReviewLocationId
+        );
+        if (!discardCurrent()) return false;
+        if (!discarded?.ok) {
+          setStatus(discarded?.message || '这份待审修改无法丢弃，请刷新项目后重试。', true);
+          return false;
+        }
+      } else {
+        await bridge.discardChanges(projectInstanceId, pending.id);
+        if (!discardCurrent()) return false;
+      }
     }
     recordChangeMetric('discarded');
     completeIssueModeAfterReview();
@@ -2409,11 +2263,13 @@
   applyButton?.addEventListener('click', applySelected);
   discardButton?.addEventListener('click', discard);
   instruction?.addEventListener('input', () => {
-    if (activePlanRequest || activeIssueRequest) return;
+    if (activeIssueRequest) return;
     invalidateEditableProposal('指令已变化，旧生成请求已取消。');
     invalidateNormalScopePlan('指令已变化，需要重新确认可修改范围。');
   });
   document.addEventListener('writcraft:project-entered', () => {
+    pendingHydrationSequence += 1;
+    pendingDiscardSequence += 1;
     const stalePending = pending;
     const staleConfirmation = confirmationMode;
     const staleResearch = snapshotResearchOwnership();
@@ -2431,7 +2287,6 @@
     if (inlineReviewMode) settleInlineReview({ status: 'project_changed', appliedCount: 0 });
     pending = null;
     proposalTransactions?.invalidate();
-    activePlanRequest = null;
     activeIssueRequest = null;
     activeResearchRequest = null;
     normalScopePlan = null;
@@ -2442,7 +2297,6 @@
     selectedTargetPaths = [];
     targetSelectionTouched = false;
     instruction.value = '';
-    renderPlanMode();
     renderIssueMode();
     renderResearchMode();
     setBusy(false);
@@ -2456,6 +2310,45 @@
     if (staleResearch) void releaseResearchOwnership(staleResearch, { discardCard: false });
   });
   document.addEventListener('writcraft:ai-metrics-changed', loadMetrics);
+  document.addEventListener('writcraft:open-pending-review', event => {
+    const reviewLocationId = event.detail?.reviewLocationId || '';
+    if (!reviewLocationId) return;
+    const hydrationOwner = Object.freeze({
+      sequence: ++pendingHydrationSequence,
+      projectInstanceId: window.__workspace?.state?.project?.instanceId || null,
+      reviewLocationId,
+    });
+    const hydrationCurrent = () => hydrationOwner.sequence === pendingHydrationSequence &&
+      window.__workspace?.state?.project?.instanceId === hydrationOwner.projectInstanceId;
+    if (pending && pending.publicReviewLocationId === reviewLocationId) {
+      event.detail?.accept?.();
+      open();
+      renderPendingReview();
+      setStatus('已打开当前会话的待审修改；项目文件尚未写入。');
+      return;
+    }
+    event.detail?.accept?.();
+    open();
+    setStatus('正在恢复待审 Diff…');
+    const projectInstanceId = hydrationOwner.projectInstanceId;
+    void window.writCraft?.project?.dailyWorkspace?.hydratePendingReview?.(
+      projectInstanceId,
+      reviewLocationId
+    ).then(result => {
+      if (!hydrationCurrent()) return;
+      if (!result?.ok || result.publicReview?.locationId !== reviewLocationId) {
+        setStatus(result?.message || '这份待审修改已经过期或不属于当前项目。', true);
+        return;
+      }
+      if (!renderChangeSet({ ...result, hydratedPublicReview: true })) {
+        setStatus('待审 Diff 无法安全恢复，请重新生成。', true);
+        return;
+      }
+      setStatus('已恢复待审 Diff；项目文件尚未写入。');
+    }).catch(error => {
+      if (hydrationCurrent()) setStatus(`待审 Diff 恢复失败：${error.message}`, true);
+    });
+  });
   document.addEventListener('writcraft:tree-changed', () => {
     const beforeResearchTargets = window.WritCraftResearchHandoffTransaction?.targetFingerprint?.(selectedTargetPaths) || '';
     invalidateEditableProposal('项目文件树已变化，旧生成请求已取消。');
@@ -2505,7 +2398,7 @@
 
   function canStartOnboarding() {
     if (onboardingMetricSettlement || unsettledOnboardingMetric || unsettledOnboardingConfirmationRelease ||
-        pending || confirmationMode || activePlanRequest || activeIssueRequest || activeResearchRequest ||
+        pending || confirmationMode || activeIssueRequest || activeResearchRequest ||
         historyUndoInFlight) {
       return { ok: false, message: confirmationMode
         ? '请先确认或放弃当前初始文件创建'
@@ -2574,7 +2467,7 @@
   }
 
   function acceptProposal(result, options = {}) {
-    if (pending || confirmationMode || activePlanRequest || activeIssueRequest || activeResearchRequest) {
+    if (pending || confirmationMode || activeIssueRequest || activeResearchRequest) {
       if (!options.inlineReview) openPanel();
       const availability = canStartOnboarding();
       setStatus(availability.message, true);
@@ -2624,12 +2517,10 @@
 
   function openWithInstruction(value) {
     openPanel();
-    if (activePlanRequest || activeIssueRequest || activeResearchRequest) {
-      setStatus(activePlanRequest
-        ? '当前仍绑定 Plan 任务；请先点击“脱离 Plan”再使用自由指令。'
-        : activeIssueRequest
-          ? '当前仍绑定星图问题；请先退出专用审阅再使用自由指令。'
-          : '当前仍绑定 Research 证据卡；请先退出专用模式再使用自由指令。', true);
+    if (activeIssueRequest || activeResearchRequest) {
+      setStatus(activeIssueRequest
+        ? '当前仍绑定星图问题；请先退出专用审阅再使用自由指令。'
+        : '当前仍绑定 Research 证据卡；请先退出专用模式再使用自由指令。', true);
       return;
     }
     invalidateEditableProposal();
@@ -2645,7 +2536,7 @@
     if (!handoff || !projectInstanceId || !bridge?.resolveResearchCard) {
       return { ok: false, message: 'Research 证据卡请求无效或服务未连接' };
     }
-    if (pending || confirmationMode || activePlanRequest || activeIssueRequest) {
+    if (pending || confirmationMode || activeIssueRequest) {
       openPanel();
       setStatus('当前存在其他专用模式或待审阅 Changes；请先完成或丢弃。', true);
       return { ok: false, message: '请先处理当前 Changes 审阅' };
@@ -2662,7 +2553,7 @@
     catch (error) { return { ok: false, message: error.message }; }
     if (openSequence !== researchOpenSequence ||
         projectInstanceId !== window.__workspace?.state?.project?.instanceId ||
-        pending || confirmationMode || activePlanRequest || activeIssueRequest || activeResearchRequest) {
+        pending || confirmationMode || activeIssueRequest || activeResearchRequest) {
       return { ok: false, message: '项目已切换，证据卡未打开' };
     }
     const card = resolved?.card || resolved;
@@ -2685,7 +2576,6 @@
     selectedTargetPaths = [];
     targetSelectionTouched = false;
     renderResearchMode();
-    renderPlanMode();
     renderIssueMode();
     openPanel();
     setBusy(false);
@@ -2697,11 +2587,6 @@
     const request = window.WritCraftGraphIssueHandoffTransaction?.normalizeRequest?.(value);
     if (!request || !proposalTransactions || !bridge?.handoffGraphIssue) {
       return { ok: false, message: '图谱问题交接请求无效或服务未连接' };
-    }
-    if (activePlanRequest) {
-      openPanel();
-      setStatus('当前仍绑定 Plan 任务；请先点击“脱离 Plan”再处理图谱问题。', true);
-      return { ok: false, message: '请先脱离当前 Plan 任务' };
     }
     if (activeResearchRequest) {
       openPanel();
@@ -2799,37 +2684,6 @@
     }
   }
 
-  async function openPlanTask(value) {
-    const normalized = window.WritCraftPlanHandoffTransaction?.normalizeRequest?.(value);
-    if (!normalized || !proposalTransactions) {
-      return { ok: false, message: 'Plan 任务交接请求无效' };
-    }
-    if (pending) {
-      openPanel();
-      setStatus('当前还有待审阅 Changes；请先应用或丢弃，再交接 Plan 任务。', true);
-      return { ok: false, message: '请先处理当前待审阅 Changes' };
-    }
-    if (activeIssueRequest) {
-      openPanel();
-      setStatus('当前仍绑定星图问题；请先退出星图审阅再交接 Plan 任务。', true);
-      return { ok: false, message: '请先退出星图问题审阅' };
-    }
-    if (activeResearchRequest) {
-      openPanel();
-      setStatus('当前仍绑定 Research 证据卡；请先退出 Research 再交接 Plan 任务。', true);
-      return { ok: false, message: '请先退出 Research 专用模式' };
-    }
-    // Entering Plan is a mode transition, not just another button click. Any
-    // ordinary/chapter proposal still in flight becomes stale immediately.
-    proposalTransactions.invalidate();
-    invalidateNormalScopePlan();
-    activePlanRequest = normalized;
-    renderPlanMode();
-    openPanel();
-    setStatus('Plan 专用模式：指令和目标范围由 Main 权威记录锁定。');
-    return proposePlanTask();
-  }
-
   window.__changesView = {
     open: openPanel,
     close: closePanel,
@@ -2843,8 +2697,6 @@
     leaveResearchMode,
     cancelResearchForRerun,
     openGraphIssue,
-    openPlanTask,
-    leavePlanMode,
     leaveIssueMode,
     loadHistory,
     renderHistory,

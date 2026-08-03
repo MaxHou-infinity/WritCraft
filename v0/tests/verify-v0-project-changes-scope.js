@@ -114,7 +114,7 @@ test('页面明确分开可修改目标和只读附加上下文', () => {
 
 test('第一次点击只展示本地权威范围，第二次才调用 Main', () => {
   const start = view.indexOf('async function propose()');
-  const end = view.indexOf('async function proposePlanTask()', start);
+  const end = view.indexOf('function researchSessionCurrent(', start);
   const propose = view.slice(start, end);
   assert(propose.includes('renderNormalScopePlan(request)'));
   assert(propose.includes('return { ok: true, scopePlanned: true }'));

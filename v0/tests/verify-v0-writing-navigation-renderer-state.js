@@ -79,7 +79,6 @@ function navigationResult() {
     suggestions: [{
       suggestionId: 'suggestion_1',
       actionId: ACTION_ID,
-      actionIds: { research: ACTION_ID, changes: `wna_${'e'.repeat(32)}` },
       finding: '开篇缺少问题边界',
       evidence: [{
         relativePath: 'chapters/01.md',

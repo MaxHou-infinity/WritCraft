@@ -27,18 +27,25 @@ const electronAiFixture = require('./fixtures/electron-ai-provider');
 const APP_ROOT = path.resolve(__dirname, '..');
 const ENTRY_PATH = path.join(APP_ROOT, 'src', 'renderer', 'index.html');
 const START_TIMEOUT_MS = 15_000;
-const COMMAND_TIMEOUT_MS = 5_000;
+// Full real-Electron verification performs native helper compilation, file
+// watching and CDP evaluation in one process. Five seconds produced unrelated
+// timeouts at different stages under load; this is harness transport capacity,
+// not a product-operation deadline.
+const COMMAND_TIMEOUT_MS = 10_000;
 const EXIT_TIMEOUT_MS = 8_000;
 const MAX_PROCESS_LOG_CHARS = 16_000;
 const RELEASE_REQUIRED = process.env.WRITCRAFT_E2E_FORCE === '1' || process.env.CI === 'true';
 const ONBOARDING_FOCUS = process.env.WRITCRAFT_E2E_FOCUS_ONBOARDING === '1';
+const DAILY_WORKSPACE_FOCUS = process.env.WRITCRAFT_E2E_FOCUS_DAILY_WORKSPACE === '1';
+const PENDING_REVIEW_FOCUS = process.env.WRITCRAFT_E2E_FOCUS_PENDING_REVIEW === '1';
 const LARGE_GRAPH_FILE_COUNT = 300;
 const GRAPH_COLD_BUDGET_MS = 2500;
 const GRAPH_CACHE_BUDGET_MS = 700;
 const GRAPH_INCREMENTAL_BUDGET_MS = 800;
 const GRAPH_INTERACTION_BUDGET_MS = 100;
 const GRAPH_RENDERER_HEAP_BUDGET_BYTES = 150 * 1024 * 1024;
-const EXPECTED_STAGE_COUNT = ONBOARDING_FOCUS ? 2 : 37;
+const EXPECTED_STAGE_COUNT = ONBOARDING_FOCUS || DAILY_WORKSPACE_FOCUS ? 2 :
+  (PENDING_REVIEW_FOCUS ? 3 : 38);
 
 let passed = 0;
 const activeElectronInstances = new Set();
@@ -463,6 +470,8 @@ async function launchElectron(profileRoot, recentProjectRoot, options = {}) {
       WRITCRAFT_E2E_AI_FIXTURE: options.aiFixture === false ? '' : '1',
       WRITCRAFT_E2E_USER_DATA: '1',
       WRITCRAFT_E2E_WATCHER_FAILURE: options.watcherFailure === true ? '1' : '',
+      WRITCRAFT_E2E_WORKSPACE_SAVE_DELAY_MS: '500',
+      WRITCRAFT_E2E_RESEARCH_TTL_MS: PENDING_REVIEW_FOCUS ? '8000' : '',
       ELECTRON_ENABLE_LOGGING: '1',
     },
     stdio: ['ignore', 'pipe', 'pipe'],
@@ -604,17 +613,21 @@ async function run() {
     ...Array.from({ length: 12 }, (_, index) => `E2E_CHANGES_FILLER_A_${index + 1}`),
     electronAiFixture.CHANGES_BEFORE[1],
     ...Array.from({ length: 12 }, (_, index) => `E2E_CHANGES_FILLER_B_${index + 1}`),
-    electronAiFixture.PLAN_BEFORE,
-    electronAiFixture.PROPOSAL_RACE_BEFORE,
   ].join('\n\n');
   const changesReviewFixture = [
     electronAiFixture.CHANGES_BEFORE[0],
     ...Array.from({ length: 12 }, (_, index) => `E2E_CHANGES_FILLER_A_${index + 1}`),
     electronAiFixture.CHANGES_BEFORE[1],
     ...Array.from({ length: 12 }, (_, index) => `E2E_CHANGES_FILLER_B_${index + 1}`),
-    electronAiFixture.PLAN_BEFORE,
-    electronAiFixture.PROPOSAL_RACE_BEFORE,
   ].join('\n\n');
+  if (PENDING_REVIEW_FOCUS) {
+    fs.mkdirSync(path.dirname(path.join(project.rootPath, createdPath)), { recursive: true });
+    fs.writeFileSync(
+      path.join(project.rootPath, createdPath),
+      `${createdContent}\n`,
+      'utf8'
+    );
+  }
   let first = null;
   let second = null;
   let productionProfile = null;
@@ -641,10 +654,636 @@ async function run() {
       assert.strictEqual(runtime.readyState, 'complete');
       assert.strictEqual(runtime.contextIsolation, true);
       assert.strictEqual(runtime.bridgeReady, true);
-      assert.strictEqual(coldProject.chapterCount, 6);
+      assert.strictEqual(coldProject.chapterCount, PENDING_REVIEW_FOCUS ? 7 : 6);
       assert(coldProject.treeFileCount >= 9);
       assert.strictEqual(coldProject.currentPath, 'edit.md');
     });
+
+    await stage('serves the Daily Workspace snapshot and opaque locations through the real preload IPC bridge', async () => {
+      const proof = await first.client.evaluate(`(async () => {
+        const projectInstanceId = window.__workspace.state.project.instanceId;
+        const snapshotEnvelope = await window.writCraft.project.dailyWorkspace.snapshot(projectInstanceId);
+        const locationsEnvelope = await window.writCraft.project.dailyWorkspace.listLocations(projectInstanceId, {
+          query: '', kinds: ['file', 'heading'], limit: 10, requestId: 'electron-daily-workspace-1',
+        });
+        const outlineEnvelope = await window.writCraft.project.dailyWorkspace.listOutline(projectInstanceId, {
+          path: window.__workspace.getCurrentPath(), requestId: 'electron-daily-outline-1',
+        });
+        const firstFile = locationsEnvelope.result?.items?.find(item => item.kind === 'file');
+        const resolvedEnvelope = firstFile
+          ? await window.writCraft.project.dailyWorkspace.resolveLocation(projectInstanceId, firstFile.locationId)
+          : null;
+        const changedEnvelope = await window.writCraft.project.dailyWorkspace.snapshot('instance_000000000000000000000000');
+        return {
+          projectInstanceId,
+          snapshotEnvelope,
+          locationsEnvelope,
+          outlineEnvelope,
+          resolvedEnvelope,
+          changedEnvelope,
+          firstLocationId: firstFile?.locationId || null,
+          bridgeKeys: Object.keys(window.writCraft.project.dailyWorkspace).sort(),
+        };
+      })()`);
+
+      assert.deepStrictEqual(proof.bridgeKeys, [
+        'applyPendingReview', 'discardPendingReview', 'hydratePendingReview',
+        'listLocations', 'listOutline', 'resolveLocation', 'resolveStableLocation', 'snapshot',
+      ]);
+      assert.strictEqual(
+        proof.snapshotEnvelope.ok,
+        true,
+        `Daily Workspace snapshot IPC failed: ${JSON.stringify(proof.snapshotEnvelope)}`
+      );
+      assert.strictEqual(proof.snapshotEnvelope.snapshot.schema, 'writcraft.project-home/v1');
+      assert.strictEqual(
+        Object.prototype.hasOwnProperty.call(proof.snapshotEnvelope.snapshot.authority, 'projectInstanceId'),
+        false,
+        'the public Home snapshot must not expose its private project binding'
+      );
+      assert(proof.snapshotEnvelope.snapshot.summary.markdownFileCount >= 9);
+      assert.strictEqual(proof.locationsEnvelope.ok, true);
+      assert.strictEqual(proof.locationsEnvelope.result.schema, 'writcraft.workspace-locations/v1');
+      assert(proof.locationsEnvelope.result.items.some(item => item.kind === 'file'));
+      assert.strictEqual(proof.resolvedEnvelope.ok, true);
+      assert.strictEqual(proof.resolvedEnvelope.result.schema, 'writcraft.workspace-location-resolved/v1');
+      assert.strictEqual(proof.resolvedEnvelope.result.target.action, 'open_file');
+      assert.strictEqual(proof.outlineEnvelope.ok, true);
+      assert.strictEqual(proof.outlineEnvelope.result.schema, 'writcraft.document-outline/v1');
+      assert(proof.outlineEnvelope.result.items.every(item => Number.isSafeInteger(item.level) && item.outlineId));
+      assert.strictEqual(proof.changedEnvelope.ok, false);
+      assert.strictEqual(proof.changedEnvelope.error, 'PROJECT_CHANGED');
+
+      if (process.env.WRITCRAFT_E2E_ZOOM_FACTOR === '2') {
+        await waitForValue(first.client, `(() => {
+          const home = document.querySelector('button[data-workspace-view="home"]');
+          const editor = document.getElementById('editor');
+          return home && editor && home.getBoundingClientRect().width > 0 &&
+            editor.getBoundingClientRect().height > 0 ? true : null;
+        })()`, 'Daily Workspace controls at real zoom factor 2');
+        assert(first.logRef.value.includes('[e2e:zoom] actual=2'),
+          `Main did not attest webContents zoom factor 2: ${first.logRef.value}`);
+      }
+
+      const publicPayload = JSON.stringify({
+        snapshot: proof.snapshotEnvelope,
+        locations: proof.locationsEnvelope,
+        outline: proof.outlineEnvelope,
+        resolved: proof.resolvedEnvelope,
+        changed: proof.changedEnvelope,
+      });
+      assert(!publicPayload.includes(project.rootPath));
+      assert(!/capability|rootPath|root_path/i.test(publicPayload));
+
+      const homeReady = await first.client.evaluate(`(() => {
+        window.__e2eHomeOrigin = {
+          path: window.__workspace.getCurrentPath(),
+          caretOffset: window.__workspace.getCursorOffset(),
+        };
+        document.querySelector('button[data-workspace-view="home"]').click();
+        return true;
+      })()`);
+      assert.strictEqual(homeReady, true);
+      const homeProof = await waitForValue(first.client, `(() => {
+        const view = document.getElementById('project-home-view');
+        if (view.getAttribute('aria-busy') !== 'false') return null;
+        const stats = [...document.querySelectorAll('.project-home-stat strong')].map(node => node.textContent);
+        const cards = [...document.querySelectorAll('.project-home-card h2')].map(node => node.textContent);
+        return getComputedStyle(view).display !== 'none' && stats.length === 3
+          ? { stats, cards, active: document.querySelector('button[data-workspace-view="home"]').getAttribute('aria-current') }
+          : null;
+      })()`, 'Daily Workspace project home');
+      assert.strictEqual(homeProof.active, 'page');
+      assert(homeProof.cards.includes('继续写作'));
+      assert(homeProof.cards.includes('待审修改'));
+      assert(homeProof.cards.includes('需要核对'));
+      await first.client.evaluate(`document.getElementById('project-home-back').click()`);
+      const returnedHomeOrigin = await waitForValue(first.client, `(() => {
+        if (document.querySelector('.app-shell').dataset.workspaceView !== 'explorer') return null;
+        const current = {
+          path: window.__workspace.getCurrentPath(),
+          caretOffset: window.__workspace.getCursorOffset(),
+        };
+        return current.path === window.__e2eHomeOrigin.path &&
+          current.caretOffset === window.__e2eHomeOrigin.caretOffset ? current : null;
+      })()`, 'Daily Workspace return to exact editor origin');
+      assert.strictEqual(returnedHomeOrigin.path, proof.outlineEnvelope.result.path);
+
+      await first.client.evaluate(`document.querySelector('button[data-workspace-view="home"]').click()`);
+      await waitForValue(first.client, `document.getElementById('project-home-view').getAttribute('aria-busy') === 'false'`, 'Daily Workspace Home refresh before card navigation');
+      await first.client.evaluate(`document.querySelector('[data-home-card="continue"] button').click()`);
+      const continued = await waitForValue(first.client, `(() => {
+        if (document.querySelector('.app-shell').dataset.workspaceView !== 'explorer') return null;
+        return { path: window.__workspace.getCurrentPath(), caretOffset: window.__workspace.getCursorOffset() };
+      })()`, 'Daily Workspace Continue Writing card navigation');
+      assert.strictEqual(typeof continued.path, 'string');
+      assert(Number.isSafeInteger(continued.caretOffset));
+
+      const continuedReturn = await waitForValue(first.client, `(() => {
+        const button = document.getElementById('workspace-return');
+        return !button.hidden && button.textContent.includes('项目首页') ? button.textContent : null;
+      })()`, 'Daily Workspace persistent return action after Continue Writing');
+      assert(continuedReturn.includes('项目首页'));
+      await first.client.evaluate(`document.getElementById('workspace-return').click()`);
+      await waitForValue(first.client, `document.querySelector('.app-shell').dataset.workspaceView === 'home' && document.getElementById('project-home-view').getAttribute('aria-busy') === 'false'`, 'Daily Workspace returns from Continue Writing to Home');
+
+      const recentAvailable = await first.client.evaluate(`Boolean(document.querySelector('[data-home-card="recent"] button'))`);
+      assert.strictEqual(recentAvailable, true);
+      await first.client.evaluate(`document.querySelector('[data-home-card="recent"] button').click()`);
+      const recentOpened = await waitForValue(first.client, `(() => {
+        if (document.querySelector('.app-shell').dataset.workspaceView !== 'explorer') return null;
+        return window.__workspace.getCurrentPath() || null;
+      })()`, 'Daily Workspace Recent card navigation');
+      assert.strictEqual(typeof recentOpened, 'string');
+      await waitForValue(first.client, `!document.getElementById('workspace-return').hidden`, 'Daily Workspace persistent return action after Recent');
+      await first.client.evaluate(`document.getElementById('workspace-return').click()`);
+      await waitForValue(first.client, `document.querySelector('.app-shell').dataset.workspaceView === 'home'`, 'Daily Workspace returns from Recent to Home');
+      await first.client.evaluate(`document.getElementById('project-home-back').click()`);
+      await waitForValue(first.client, `document.querySelector('.app-shell').dataset.workspaceView === 'explorer'`, 'Daily Workspace leaves Home after card return');
+      await first.client.evaluate(`window.__workspace.openFile(
+        ${JSON.stringify(proof.outlineEnvelope.result.path)}, { pin: true }
+      )`);
+      await waitForValue(first.client, `window.__workspace.getCurrentPath() === ${JSON.stringify(proof.outlineEnvelope.result.path)}`, 'Daily Workspace restores outline fixture after card navigation');
+
+      const quickOpenStarted = await first.client.evaluate(`(() => {
+        const input = document.getElementById('quick-open-input');
+        window.__dailyWorkspaceView.openQuickOpen();
+        window.__e2eQuickOpenInput = input;
+        input.value = 'chapter';
+        input.dispatchEvent(new InputEvent('input', { bubbles: true, inputType: 'insertText', data: 'chapter' }));
+        return {
+          open: document.getElementById('quick-open-dialog').open,
+          focused: document.activeElement === input,
+          outlineCount: document.querySelectorAll('.outline-item').length,
+        };
+      })()`);
+      assert.strictEqual(quickOpenStarted.open, true);
+      assert.strictEqual(quickOpenStarted.focused, true);
+      assert(quickOpenStarted.outlineCount >= 1);
+      const quickOpenReady = await waitForValue(first.client, `(() => {
+        const input = document.getElementById('quick-open-input');
+        const rows = [...document.querySelectorAll('.quick-open-item')];
+        if (!rows.length) return null;
+        input.dispatchEvent(new KeyboardEvent('keydown', { bubbles: true, key: 'ArrowDown' }));
+        return {
+          sameInput: input === window.__e2eQuickOpenInput,
+          focused: document.activeElement === input,
+          rows: rows.length,
+          selected: document.querySelectorAll('.quick-open-item[aria-selected="true"]').length,
+        };
+      })()`, 'Daily Workspace quick open keyboard list');
+      assert.strictEqual(quickOpenReady.sameInput, true);
+      assert.strictEqual(quickOpenReady.focused, true);
+      assert(quickOpenReady.rows >= 1);
+      assert.strictEqual(quickOpenReady.selected, 1);
+      const compositionStarted = await first.client.evaluate(`(() => {
+        const input = document.getElementById('quick-open-input');
+        const status = document.getElementById('quick-open-status');
+        input.dispatchEvent(new CompositionEvent('compositionstart', { bubbles: true, data: '' }));
+        input.value = '不存在的组合输入';
+        input.dispatchEvent(new InputEvent('input', { bubbles: true, inputType: 'insertCompositionText', data: '不存在的组合输入', isComposing: true }));
+        window.__e2eCompositionStatus = status.textContent;
+        window.__e2eCompositionInput = input;
+        return status.textContent;
+      })()`);
+      await delay(250);
+      const compositionHeld = await first.client.evaluate(`(() => ({
+        sameInput: document.getElementById('quick-open-input') === window.__e2eCompositionInput,
+        focused: document.activeElement === window.__e2eCompositionInput,
+        status: document.getElementById('quick-open-status').textContent,
+        initialStatus: window.__e2eCompositionStatus,
+      }))()`);
+      assert.strictEqual(compositionHeld.sameInput, true);
+      assert.strictEqual(compositionHeld.focused, true);
+      assert.strictEqual(compositionHeld.status, compositionStarted);
+      await first.client.evaluate(`document.getElementById('quick-open-input').dispatchEvent(
+        new CompositionEvent('compositionend', { bubbles: true, data: '不存在的组合输入' })
+      )`);
+      await waitForValue(first.client, `document.getElementById('quick-open-status').textContent.includes('0 个位置')`, 'Daily Workspace IME composition query');
+      await first.client.evaluate(`window.__dailyWorkspaceView.closeQuickOpen()`);
+      const outlineTarget = proof.outlineEnvelope.result.items[1] || proof.outlineEnvelope.result.items[0];
+      assert(outlineTarget, 'real document must expose an outline target');
+      await first.client.evaluate(`document.querySelector(
+        '.outline-item[data-outline-id="${outlineTarget.outlineId}"]'
+      ).click()`);
+      const outlineLocated = await waitForValue(first.client, `(() => {
+        const current = document.querySelector('.outline-item[aria-current="location"]');
+        const offset = window.__workspace.getCursorOffset();
+        return current?.dataset.outlineId === ${JSON.stringify(outlineTarget.outlineId)} &&
+          offset === ${outlineTarget.startOffset} ? { offset, current: current.dataset.outlineId } : null;
+      })()`, 'Daily Workspace source-offset outline activation');
+      assert.strictEqual(outlineLocated.offset, outlineTarget.startOffset);
+
+      const v2BeforeReload = await first.client.evaluate(`(async () => {
+        window.__workspace.revealRange(4, 8);
+        document.getElementById('editor').dispatchEvent(new MouseEvent('mouseup', { bubbles: true }));
+        document.querySelector('.editor-scroll').scrollTop = 24;
+        document.querySelector('.editor-scroll').dispatchEvent(new Event('scroll', { bubbles: true }));
+        await new Promise(resolve => setTimeout(resolve, 450));
+        const projectInstanceId = window.__workspace.state.project.instanceId;
+        const saved = await window.writCraft.project.loadWorkspace(projectInstanceId);
+        return {
+          path: window.__workspace.getCurrentPath(),
+          saved,
+          returnState: window.__workspace.captureEditorReturnState(),
+        };
+      })()`);
+      assert.strictEqual(v2BeforeReload.saved.ok, true);
+      assert.strictEqual(v2BeforeReload.returnState.selectionAnchorOffset, 4);
+      assert.strictEqual(v2BeforeReload.returnState.selectionFocusOffset, 12);
+      assert.strictEqual(v2BeforeReload.saved.workspace.returnStack.length, 1);
+      assert.strictEqual(v2BeforeReload.saved.workspace.returnStack[0].view, 'editor');
+      assert(!JSON.stringify(v2BeforeReload.saved.workspace.returnStack).includes('pending_review'));
+      const workspaceRace = await first.client.evaluate(`(async () => {
+        const projectInstanceId = window.__workspace.state.project.instanceId;
+        const loaded = await window.writCraft.project.loadWorkspace(projectInstanceId);
+        const activePath = loaded.workspace.activePath;
+        const older = structuredClone(loaded.workspace);
+        const closeFlush = structuredClone(loaded.workspace);
+        older.files[activePath].scrollTop = 999999999;
+        closeFlush.files[activePath].scrollTop = 999999998;
+        const olderPending = window.writCraft.project.saveWorkspace(projectInstanceId, older);
+        const closeResult = window.writCraft.project.saveWorkspaceBeforeClose(projectInstanceId, closeFlush);
+        const olderResult = await olderPending;
+        const finalResult = await window.writCraft.project.loadWorkspace(projectInstanceId);
+        return { closeResult, olderResult, finalScrollTop: finalResult.workspace.files[activePath].scrollTop };
+      })()`);
+      assert.strictEqual(workspaceRace.closeResult.ok, true);
+      assert.strictEqual(workspaceRace.olderResult.ok, false);
+      assert.strictEqual(workspaceRace.olderResult.error, 'STALE_WORKSPACE_SAVE');
+      assert.strictEqual(workspaceRace.finalScrollTop, 999999998);
+      const workspaceDisk = JSON.parse(fs.readFileSync(path.join(project.rootPath, '.writcraft', 'workspace.json'), 'utf8'));
+      assert.strictEqual(workspaceDisk.schema, 'writcraft.workspace/v2');
+      assert.strictEqual(workspaceDisk.schemaVersion, 2);
+
+      await first.client.command('Page.reload', { ignoreCache: true });
+      await waitForRenderer(first.client);
+      await waitForProject(first.client, 6);
+      const v2Restored = await waitForValue(first.client, `(() => {
+        if (window.__workspace.getCurrentPath() !== ${JSON.stringify(v2BeforeReload.path)}) return null;
+        const state = window.__workspace.captureEditorReturnState();
+        return state?.selectionAnchorOffset === 4 && state?.selectionFocusOffset === 12 ? state : null;
+      })()`, 'Daily Workspace v2 selection restore after real reload');
+      assert.strictEqual(v2Restored.path, v2BeforeReload.path);
+      await waitForValue(first.client, `!document.getElementById('workspace-return').hidden`, 'Daily Workspace v2 returnStack restored after real reload');
+      await first.client.evaluate(`document.getElementById('workspace-return').click()`);
+      const v2Returned = await waitForValue(first.client, `(() => {
+        const button = document.getElementById('workspace-return');
+        const state = window.__workspace.captureEditorReturnState();
+        return button.hidden && state ? state : null;
+      })()`, 'Daily Workspace v2 persisted return action');
+      assert.strictEqual(v2Returned.path, 'edit.md');
+
+      if (DAILY_WORKSPACE_FOCUS) {
+        const currentPath = await first.client.evaluate(`window.__workspace.getCurrentPath()`);
+        const beforeExternal = projectService.readFileWithRevision(project.rootPath, currentPath);
+        projectService.atomicWriteFile(
+          project.rootPath,
+          currentPath,
+          `${beforeExternal.content}\n\n## E2E 外部刷新标题\n外部修改后的正文。\n`,
+          beforeExternal.revision
+        );
+        const externalOutline = await waitForValue(first.client, `(() => {
+          const row = [...document.querySelectorAll('.outline-item')]
+            .find(item => item.textContent.includes('E2E 外部刷新标题'));
+          return row && document.getElementById('editor').textContent.includes('外部修改后的正文')
+            ? { label: row.textContent, status: document.getElementById('current-outline-status').textContent }
+            : null;
+        })()`, 'Daily Workspace external edit outline refresh');
+        assert(externalOutline.status.includes('个标题'));
+
+        await first.client.command('Emulation.setDeviceMetricsOverride', {
+          width: 720,
+          height: 900,
+          deviceScaleFactor: 1,
+          mobile: false,
+        });
+        const narrowOutline = await waitForValue(first.client, `(() => {
+          const toggle = document.getElementById('narrow-outline-toggle');
+          if (getComputedStyle(toggle).display === 'none') return null;
+          toggle.click();
+          const row = document.querySelector('.outline-item');
+          return row && getComputedStyle(document.querySelector('.project-sidebar')).display !== 'none'
+            ? { expanded: toggle.getAttribute('aria-expanded'), label: row.textContent, focused: document.activeElement === row }
+            : null;
+        })()`, 'Daily Workspace narrow outline drawer');
+        assert.strictEqual(narrowOutline.expanded, 'true');
+        assert.strictEqual(narrowOutline.focused, true);
+        await first.client.evaluate(`document.activeElement.dispatchEvent(
+          new KeyboardEvent('keydown', { bubbles: true, key: 'Enter' })
+        )`);
+        await waitForValue(first.client, `document.getElementById('narrow-outline-toggle').getAttribute('aria-expanded') === 'false'`, 'Daily Workspace narrow keyboard activation');
+        await first.client.evaluate(`document.getElementById('narrow-outline-toggle').click()`);
+        await first.client.evaluate(`document.dispatchEvent(new KeyboardEvent('keydown', { bubbles: true, key: 'Escape' }))`);
+        const narrowClosed = await first.client.evaluate(`(() => {
+          const toggle = document.getElementById('narrow-outline-toggle');
+          return { expanded: toggle.getAttribute('aria-expanded'), focused: document.activeElement === toggle };
+        })()`);
+        assert.strictEqual(narrowClosed.expanded, 'false');
+        assert.strictEqual(narrowClosed.focused, true);
+        await first.client.command('Emulation.clearDeviceMetricsOverride');
+
+        if (process.env.WRITCRAFT_E2E_ZOOM_FACTOR === '2') {
+          await first.client.evaluate(`document.querySelector('button[data-workspace-view="home"]').click()`);
+          await waitForValue(first.client, `document.getElementById('project-home-view').getAttribute('aria-busy') === 'false'`, 'zoom-2 Home ready');
+          await first.client.evaluate(`document.querySelector('[data-home-card="continue"] button').click()`);
+          await waitForValue(first.client, `document.querySelector('.app-shell').dataset.workspaceView === 'explorer' && !document.getElementById('workspace-return').hidden`, 'zoom-2 Home card navigation');
+          await first.client.evaluate(`document.getElementById('workspace-return').click()`);
+          await waitForValue(first.client, `document.querySelector('.app-shell').dataset.workspaceView === 'home'`, 'zoom-2 return to Home');
+          const zoomKeyboard = await first.client.evaluate(`(() => {
+            window.__dailyWorkspaceView.openQuickOpen();
+            const input = document.getElementById('quick-open-input');
+            input.focus();
+            const focused = document.activeElement === input;
+            window.__dailyWorkspaceView.closeQuickOpen();
+            return { focused, mainLogAttested: true };
+          })()`);
+          assert.strictEqual(zoomKeyboard.focused, true);
+          assert(first.logRef.value.includes('[e2e:zoom] actual=2'));
+          await first.client.evaluate(`document.getElementById('project-home-back').click()`);
+          await waitForValue(first.client, `document.querySelector('.app-shell').dataset.workspaceView === 'explorer'`, 'zoom-2 leave Home');
+        }
+
+        const alternate = projectService.createProjectAt(scratch, 'Daily Workspace B');
+        fs.writeFileSync(
+          path.join(alternate.rootPath, 'oversized.md'),
+          `# Oversized\n${'x'.repeat((16 * 1024 * 1024) + 1)}`,
+          'utf8'
+        );
+        const originalWorkspacePath = path.join(project.rootPath, '.writcraft', 'workspace.json');
+        const originalWorkspaceBeforeSwitch = fs.readFileSync(originalWorkspacePath, 'utf8');
+        projectService.saveRecentProject(first.userData, alternate.rootPath);
+        const inFlightSwitch = await first.client.evaluate(`(async () => {
+          const projectInstanceId = window.__workspace.state.project.instanceId;
+          const loaded = await window.writCraft.project.loadWorkspace(projectInstanceId);
+          const activePath = loaded.workspace.activePath;
+          const older = structuredClone(loaded.workspace);
+          older.files[activePath].scrollTop = 999999999;
+          const olderPending = window.writCraft.project.saveWorkspace(projectInstanceId, older);
+          const opened = await window.writCraft.project.openRecent();
+          const olderResult = await olderPending;
+          return { opened, olderResult };
+        })()`);
+        assert.strictEqual(inFlightSwitch.opened.ok, true);
+        assert.strictEqual(inFlightSwitch.olderResult.ok, false);
+        assert.strictEqual(inFlightSwitch.olderResult.error, 'PROJECT_CHANGED');
+        assert.strictEqual(fs.readFileSync(originalWorkspacePath, 'utf8'), originalWorkspaceBeforeSwitch);
+        await first.client.command('Page.reload', { ignoreCache: true });
+        await waitForRenderer(first.client);
+        const alternateState = await waitForProject(first.client, 0);
+        const alternateWorkspacePath = path.join(alternate.rootPath, '.writcraft', 'workspace.json');
+        const alternateWorkspaceBefore = fs.readFileSync(alternateWorkspacePath, 'utf8');
+        const switched = await first.client.evaluate(`(async () => ({
+          oldLocation: await window.writCraft.project.dailyWorkspace.resolveLocation(
+            ${JSON.stringify(proof.projectInstanceId)},
+            ${JSON.stringify(proof.firstLocationId)}
+          ),
+          staleWorkspaceLoad: await window.writCraft.project.loadWorkspace(
+            ${JSON.stringify(proof.projectInstanceId)}
+          ),
+          oversized: await window.writCraft.project.dailyWorkspace.snapshot(
+            window.__workspace.state.project.instanceId
+          ),
+          staleWorkspaceSave: await window.writCraft.project.saveWorkspace(
+            ${JSON.stringify(proof.projectInstanceId)},
+            { tabs: [], activePath: null, files: {}, returnStack: [] }
+          ),
+        }))()`);
+        assert.strictEqual(alternateState.name, 'Daily Workspace B');
+        assert.strictEqual(switched.oldLocation.ok, false);
+        assert.strictEqual(switched.oldLocation.error, 'PROJECT_CHANGED');
+        assert.strictEqual(switched.staleWorkspaceLoad.ok, false);
+        assert.strictEqual(switched.staleWorkspaceLoad.error, 'PROJECT_CHANGED');
+        assert.strictEqual(switched.oversized.ok, false);
+        assert.strictEqual(switched.oversized.error, 'PROJECT_WATCHER_UNAVAILABLE');
+        assert.strictEqual(switched.staleWorkspaceSave.ok, false);
+        assert.strictEqual(switched.staleWorkspaceSave.error, 'PROJECT_CHANGED');
+        assert.strictEqual(fs.readFileSync(alternateWorkspacePath, 'utf8'), alternateWorkspaceBefore);
+        assert(!JSON.stringify(switched).includes(alternate.rootPath));
+      }
+    });
+
+    if (DAILY_WORKSPACE_FOCUS) {
+      await delay(0);
+      assertNoUnexpectedElectronExit();
+      assert.strictEqual(passed, EXPECTED_STAGE_COUNT);
+      console.log(`\n✅ Real Electron focused Daily Workspace E2E ${passed}/${EXPECTED_STAGE_COUNT} stages passed.`);
+      return;
+    }
+
+    if (PENDING_REVIEW_FOCUS) {
+      await stage('hydrates, partially decides, rehydrates and completes a public pending review', async () => {
+        await first.client.evaluate(`window.__workspace.openFile(${JSON.stringify(createdPath)}, { pin: true })`);
+        await waitForValue(first.client, `window.__workspace.getCurrentPath() === ${JSON.stringify(createdPath)}`, 'pending fixture file open');
+        const beforeFirst = projectService.readFile(project.rootPath, createdPath);
+        const beforeSecond = projectService.readFile(project.rootPath, changesSecondPath);
+        await waitForValue(first.client, `Boolean(window.__changesView?.open)`, 'focused Changes view readiness');
+        await first.client.evaluate(`window.__changesView.open()`);
+        await waitForValue(first.client, `document.querySelector('#project-changes-target-list input[data-path=${JSON.stringify(changesSecondPath)}]')`, 'focused second Changes target');
+        await first.client.evaluate(`(() => {
+          const secondTarget = document.querySelector('#project-changes-target-list input[data-path=${JSON.stringify(changesSecondPath)}]');
+          if (!secondTarget) throw new Error('E2E_SECOND_CHANGE_TARGET_MISSING');
+          if (!secondTarget.checked) secondTarget.click();
+          const input = document.getElementById('changes-instruction');
+          input.value = ${JSON.stringify(electronAiFixture.CHANGES_REVIEW_GOAL)};
+          input.dispatchEvent(new Event('input', { bubbles: true }));
+          document.getElementById('changes-propose').click();
+        })()`);
+        await waitForValue(first.client, `document.getElementById('changes-status').textContent.includes('再次点击')`, 'focused Changes scope confirmation');
+        await first.client.evaluate(`document.getElementById('changes-propose').click()`);
+        try {
+          await waitForValue(first.client, `document.querySelectorAll('.change-hunk-card').length === 3`, 'focused pending proposal');
+        } catch (error) {
+          const state = await first.client.evaluate(`(() => ({
+            status: document.getElementById('changes-status')?.textContent || '',
+            cards: document.querySelectorAll('.change-hunk-card').length,
+            targets: [...document.querySelectorAll('#project-changes-target-list input:checked')].map(input => input.dataset.path),
+            scopePlan: Boolean(document.querySelector('.project-changes-scope-plan')),
+          }))()`);
+          throw new Error(`${error.message}; state=${JSON.stringify(state)}`);
+        }
+        assert.strictEqual(projectService.readFile(project.rootPath, createdPath), beforeFirst);
+        assert.strictEqual(projectService.readFile(project.rootPath, changesSecondPath), beforeSecond);
+
+        await first.client.command('Page.reload', { ignoreCache: true });
+        await waitForRenderer(first.client);
+        await waitForProject(first.client, 6);
+        await first.client.evaluate(`document.querySelector('button[data-workspace-view="home"]').click()`);
+        await waitForValue(first.client, `document.getElementById('project-home-view').getAttribute('aria-busy') === 'false'`, 'focused pending Home');
+        await waitForValue(first.client, `document.querySelector('[data-home-card="pending"] button')`, 'focused pending Home card');
+        const discardedReviewLocationId = await first.client.evaluate(`(async () => {
+          const snapshot = await window.writCraft.project.dailyWorkspace.snapshot(
+            window.__workspace.state.project.instanceId
+          );
+          return snapshot.snapshot.pendingReviews[0].locationId;
+        })()`);
+        await first.client.evaluate(`document.querySelector('[data-home-card="pending"] button').click()`);
+        await waitForValue(first.client, `document.getElementById('changes-status').textContent.includes('已恢复待审 Diff') && document.querySelectorAll('.change-hunk-card').length === 3`, 'focused public review hydration');
+
+        await first.client.evaluate(`document.getElementById('changes-discard').click()`);
+        await waitForValue(first.client, `document.getElementById('changes-status').textContent.includes('尚无待审阅修改')`, 'focused public review discard');
+        assert.strictEqual(projectService.readFile(project.rootPath, createdPath), beforeFirst);
+        assert.strictEqual(projectService.readFile(project.rootPath, changesSecondPath), beforeSecond);
+        const discardedResult = await first.client.evaluate(`window.writCraft.project.dailyWorkspace.hydratePendingReview(
+          window.__workspace.state.project.instanceId,
+          ${JSON.stringify(discardedReviewLocationId)}
+        )`);
+        assert.strictEqual(discardedResult.ok, false);
+        assert.strictEqual(discardedResult.error, 'REVIEW_NOT_AVAILABLE');
+
+        await first.client.evaluate(`window.__changesView.open()`);
+        await waitForValue(first.client, `document.querySelector('#project-changes-target-list input[data-path=${JSON.stringify(changesSecondPath)}]')`, 'focused Changes target after discard');
+        await first.client.evaluate(`(() => {
+          const secondTarget = document.querySelector('#project-changes-target-list input[data-path=${JSON.stringify(changesSecondPath)}]');
+          if (!secondTarget) throw new Error('E2E_SECOND_CHANGE_TARGET_MISSING_AFTER_DISCARD');
+          if (!secondTarget.checked) secondTarget.click();
+          const input = document.getElementById('changes-instruction');
+          input.value = ${JSON.stringify(electronAiFixture.CHANGES_REVIEW_GOAL)};
+          input.dispatchEvent(new Event('input', { bubbles: true }));
+          document.getElementById('changes-propose').click();
+        })()`);
+        await waitForValue(first.client, `document.getElementById('changes-status').textContent.includes('再次点击')`, 'focused Changes scope confirmation after discard');
+        await first.client.evaluate(`document.getElementById('changes-propose').click()`);
+        await waitForValue(first.client, `document.querySelectorAll('.change-hunk-card').length === 3`, 'focused pending reproposal after discard');
+        await first.client.command('Page.reload', { ignoreCache: true });
+        await waitForRenderer(first.client);
+        await waitForProject(first.client, 6);
+        await first.client.evaluate(`document.querySelector('button[data-workspace-view="home"]').click()`);
+        await waitForValue(first.client, `document.getElementById('project-home-view').getAttribute('aria-busy') === 'false'`, 'focused re-proposed pending Home');
+        await waitForValue(first.client, `document.querySelector('[data-home-card="pending"] button')`, 'focused re-proposed pending Home card');
+        const initialReviewLocationId = await first.client.evaluate(`(async () => {
+          const snapshot = await window.writCraft.project.dailyWorkspace.snapshot(
+            window.__workspace.state.project.instanceId
+          );
+          return snapshot.snapshot.pendingReviews[0].locationId;
+        })()`);
+        assert.match(initialReviewLocationId, /^review_[a-f0-9]{32}$/);
+        assert.notStrictEqual(initialReviewLocationId, discardedReviewLocationId);
+        await first.client.evaluate(`document.querySelector('[data-home-card="pending"] button').click()`);
+        await waitForValue(first.client, `document.getElementById('changes-status').textContent.includes('已恢复待审 Diff') && document.querySelectorAll('.change-hunk-card').length === 3`, 'focused re-proposed public review hydration');
+
+        await first.client.evaluate(`(() => {
+          let cards = [...document.querySelectorAll('.change-hunk-card')];
+          cards[0].querySelector('.change-decision--accepted').click();
+          cards = [...document.querySelectorAll('.change-hunk-card')];
+          cards[1].querySelector('.change-decision--rejected').click();
+          document.getElementById('changes-apply').click();
+        })()`);
+        await waitForValue(first.client, `document.getElementById('changes-status').textContent.includes('本轮已接受 1、拒绝 1') && document.querySelectorAll('.change-hunk-card').length === 1`, 'focused residual review');
+        const retiredInitial = await first.client.evaluate(`window.writCraft.project.dailyWorkspace.hydratePendingReview(
+          window.__workspace.state.project.instanceId,
+          ${JSON.stringify(initialReviewLocationId)}
+        )`);
+        assert.strictEqual(retiredInitial.ok, false);
+        assert.strictEqual(retiredInitial.error, 'REVIEW_NOT_AVAILABLE');
+
+        await first.client.command('Page.reload', { ignoreCache: true });
+        await waitForRenderer(first.client);
+        await waitForProject(first.client, 6);
+        await first.client.evaluate(`document.querySelector('button[data-workspace-view="home"]').click()`);
+        await waitForValue(first.client, `document.getElementById('project-home-view').getAttribute('aria-busy') === 'false'`, 'focused residual Home');
+        const residualCard = await waitForValue(first.client, `(() => {
+          const card = document.querySelector('[data-home-card="pending"]');
+          return card?.querySelector('button') ? card.textContent : null;
+        })()`, 'focused residual Home card');
+        assert(residualCard.includes('1 项修改'));
+        const residualReviewLocationId = await first.client.evaluate(`(async () => {
+          const snapshot = await window.writCraft.project.dailyWorkspace.snapshot(
+            window.__workspace.state.project.instanceId
+          );
+          return snapshot.snapshot.pendingReviews[0].locationId;
+        })()`);
+        assert.match(residualReviewLocationId, /^review_[a-f0-9]{32}$/);
+        assert.notStrictEqual(residualReviewLocationId, initialReviewLocationId);
+        await first.client.evaluate(`document.querySelector('[data-home-card="pending"] button').click()`);
+        await waitForValue(first.client, `document.getElementById('changes-status').textContent.includes('已恢复待审 Diff') && document.querySelectorAll('.change-hunk-card').length === 1`, 'focused residual hydration');
+        await first.client.evaluate(`(() => {
+          document.querySelector('.change-hunk-card .change-decision--accepted').click();
+          document.getElementById('changes-apply').click();
+        })()`);
+        await waitForValue(first.client, `document.getElementById('changes-status').textContent.includes('已安全应用 1 个文件')`, 'focused residual apply');
+        const retiredResidual = await first.client.evaluate(`window.writCraft.project.dailyWorkspace.hydratePendingReview(
+          window.__workspace.state.project.instanceId,
+          ${JSON.stringify(residualReviewLocationId)}
+        )`);
+        assert.strictEqual(retiredResidual.ok, false);
+        assert.strictEqual(retiredResidual.error, 'REVIEW_NOT_AVAILABLE');
+        const finalFirst = projectService.readFile(project.rootPath, createdPath);
+        assert(finalFirst.includes(electronAiFixture.CHANGES_AFTER[0]));
+        assert(finalFirst.includes(electronAiFixture.CHANGES_BEFORE[1]));
+        assert(!finalFirst.includes(electronAiFixture.CHANGES_AFTER[1]));
+        assert(projectService.readFile(project.rootPath, changesSecondPath).includes(electronAiFixture.CHANGES_AFTER[2]));
+
+        const researchTargetBefore = projectService.readFile(
+          project.rootPath,
+          electronAiFixture.RESEARCH_TARGET_PATH
+        );
+        await first.client.evaluate(`document.querySelector('[data-view="sources"]').click()`);
+        await waitForValue(first.client, `document.querySelectorAll('#source-index-list .source-card').length >= 2`, 'focused expiry Source Index');
+        await first.client.evaluate(`(() => {
+          const card = [...document.querySelectorAll('#source-index-list .source-card')]
+            .find(node => node.textContent.includes('公开听证纪要'));
+          const checkbox = card?.querySelector('input[type="checkbox"]');
+          if (!checkbox) throw new Error('E2E_EXPIRY_SOURCE_MISSING');
+          checkbox.checked = true;
+          checkbox.dispatchEvent(new Event('change', { bubbles: true }));
+          const question = document.getElementById('source-research-question');
+          question.value = '这份纪要能支持哪条关于试运行状态的主张？';
+          question.dispatchEvent(new Event('input', { bubbles: true }));
+          document.getElementById('source-research-run').click();
+        })()`);
+        await waitForValue(first.client, `document.querySelector('.research-card .research-claim')?.textContent.includes('附条件试运行')`, 'focused expiry Research card');
+        await first.client.evaluate(`document.querySelector('.research-card .research-source').click()`);
+        await waitForValue(first.client, `[...document.querySelectorAll('.research-card .research-judgment-option')].every(button => !button.disabled)`, 'focused expiry Research source');
+        await first.client.evaluate(`(() => {
+          const card = document.querySelector('.research-card');
+          [...card.querySelectorAll('.research-judgment-option')]
+            .find(button => button.textContent === '主张匹配').click();
+        })()`);
+        await waitForValue(first.client, `document.querySelector('.research-card .research-to-changes:not(:disabled)')`, 'focused expiry Research judgment');
+        await first.client.evaluate(`document.querySelector('.research-card .research-to-changes').click()`);
+        await waitForValue(first.client, `window.__assistantDock.getMode() === 'changes' && !document.querySelector('.changes-research-mode')?.hidden`, 'focused expiry Research Changes');
+        await first.client.evaluate(`(() => {
+          const target = document.querySelector('#project-changes-target-list input[data-path=${JSON.stringify(electronAiFixture.RESEARCH_TARGET_PATH)}]');
+          if (!target) throw new Error('E2E_EXPIRY_TARGET_MISSING');
+          if (!target.checked) target.click();
+          document.getElementById('changes-propose').click();
+        })()`);
+        await waitForValue(first.client, `document.querySelector('#changes-preview .change-hunk-card') && document.getElementById('changes-status').textContent.includes('当前仅为预览')`, 'focused expiry pending preview');
+        const expiringReview = await first.client.evaluate(`(async () => {
+          const snapshot = await window.writCraft.project.dailyWorkspace.snapshot(
+            window.__workspace.state.project.instanceId
+          );
+          return snapshot.snapshot.pendingReviews[0];
+        })()`);
+        assert.match(expiringReview.locationId, /^review_[a-f0-9]{32}$/);
+        assert(Number.isSafeInteger(expiringReview.expiresAt));
+        assert(expiringReview.expiresAt > Date.now());
+        await delay(Math.max(0, expiringReview.expiresAt - Date.now() + 200));
+        const expiredResult = await first.client.evaluate(`window.writCraft.project.dailyWorkspace.hydratePendingReview(
+          window.__workspace.state.project.instanceId,
+          ${JSON.stringify(expiringReview.locationId)}
+        )`);
+        assert.strictEqual(expiredResult.ok, false);
+        assert.strictEqual(expiredResult.error, 'REVIEW_NOT_AVAILABLE');
+        await first.client.evaluate(`document.querySelector('button[data-workspace-view="home"]').click()`);
+        await waitForValue(first.client, `document.getElementById('project-home-view').getAttribute('aria-busy') === 'false'`, 'focused expired Home');
+        const expiredHome = await first.client.evaluate(`(() => {
+          const card = document.querySelector('[data-home-card="pending"]');
+          return { text: card.textContent, hasAction: Boolean(card.querySelector('button')) };
+        })()`);
+        assert.strictEqual(expiredHome.hasAction, false);
+        assert(expiredHome.text.includes('当前没有待审 Diff'));
+        assert.strictEqual(
+          projectService.readFile(project.rootPath, electronAiFixture.RESEARCH_TARGET_PATH),
+          researchTargetBefore
+        );
+      });
+      assertNoUnexpectedElectronExit();
+      assert.strictEqual(passed, EXPECTED_STAGE_COUNT);
+      console.log(`\n✅ Real Electron focused pending review E2E ${passed}/${EXPECTED_STAGE_COUNT} stages passed.`);
+      return;
+    }
 
     await stage('keeps long manuscript content inside a visible, keyboard-owned editor scrollbar', async () => {
       const scrollProof = await first.client.evaluate(`(() => {
@@ -1689,6 +2328,38 @@ async function run() {
       assert.strictEqual(projectService.readFile(project.rootPath, createdPath), beforeDisk);
       assert.strictEqual(projectService.readFile(project.rootPath, changesSecondPath), secondBeforeDisk);
 
+      // A Renderer reload destroys private Changes UI state while Main keeps
+      // the current-session capability. Re-enter only through Project Home's
+      // public location and prove the real IPC hydration rebuilds the Diff.
+      await first.client.command('Page.reload', { ignoreCache: true });
+      await waitForRenderer(first.client);
+      await waitForProject(first.client, 6);
+      await first.client.evaluate(`document.querySelector('button[data-workspace-view="home"]').click()`);
+      await waitForValue(first.client, `document.getElementById('project-home-view').getAttribute('aria-busy') === 'false'`, 'Project Home pending review refresh');
+      const pendingHome = await waitForValue(first.client, `(() => {
+        const card = document.querySelector('[data-home-card="pending"]');
+        const button = card?.querySelector('button');
+        return button ? { text: card.textContent, label: button.textContent } : null;
+      })()`, 'Project Home public pending review card');
+      assert(pendingHome.text.includes('3 项修改'));
+      await first.client.evaluate(`document.querySelector('[data-home-card="pending"] button').click()`);
+      try {
+        await waitForValue(first.client, `(() => {
+          const status = document.getElementById('changes-status').textContent;
+          return status.includes('已恢复待审 Diff') && document.querySelectorAll('.change-hunk-card').length === 3;
+        })()`, 'Project Home hydration of three pending hunks');
+      } catch (error) {
+        const state = await first.client.evaluate(`(() => ({
+          status: document.getElementById('changes-status')?.textContent || '',
+          cards: document.querySelectorAll('.change-hunk-card').length,
+          assistantMode: document.querySelector('[data-assistant-mode].is-active')?.dataset.assistantMode || '',
+          workspaceView: document.querySelector('.app-shell')?.dataset.workspaceView || '',
+        }))()`);
+        throw new Error(`${error.message}; state=${JSON.stringify(state)}`);
+      }
+      assert.strictEqual(projectService.readFile(project.rootPath, createdPath), beforeDisk);
+      assert.strictEqual(projectService.readFile(project.rootPath, changesSecondPath), secondBeforeDisk);
+
       const decisions = await first.client.evaluate(`(() => {
         let cards = [...document.querySelectorAll('.change-hunk-card')];
         cards[0].querySelector('.change-decision--accepted').click();
@@ -1729,6 +2400,24 @@ async function run() {
       }))()`);
       assert(residual.state.includes('is-pending'));
       assert.strictEqual(residual.disabled, true);
+
+      // The residual receives a new public location. Reload again so this is
+      // hydration rather than reuse of the live private Renderer review.
+      await first.client.command('Page.reload', { ignoreCache: true });
+      await waitForRenderer(first.client);
+      await waitForProject(first.client, 6);
+      await first.client.evaluate(`document.querySelector('button[data-workspace-view="home"]').click()`);
+      await waitForValue(first.client, `document.getElementById('project-home-view').getAttribute('aria-busy') === 'false'`, 'Project Home residual refresh');
+      const residualHome = await waitForValue(first.client, `(() => {
+        const card = document.querySelector('[data-home-card="pending"]');
+        return card?.querySelector('button') ? card.textContent : null;
+      })()`, 'Project Home residual public review card');
+      assert(residualHome.includes('1 项修改'));
+      await first.client.evaluate(`document.querySelector('[data-home-card="pending"] button').click()`);
+      await waitForValue(first.client, `(() =>
+        document.getElementById('changes-status').textContent.includes('已恢复待审 Diff') &&
+        document.querySelectorAll('.change-hunk-card').length === 1
+      )()`, 'Project Home hydration of residual hunk');
 
       await first.client.evaluate(`(() => {
         document.querySelector('.change-hunk-card .change-decision--accepted').click();
@@ -2092,169 +2781,6 @@ async function run() {
       })()`);
     });
 
-    // Historical Plan-only journeys remain below as isolated source evidence.
-    // They are unreachable because the public Plan authority and tab were retired.
-    if (false) {
-    await stage('retries a non-array last-allowed-milestone Plan targetPaths once inside the same read-only operation', async () => {
-      const markdownBefore = snapshotMarkdownFiles(project.rootPath);
-      const historyPath = path.join(project.rootPath, changeHistoryService.HISTORY_RELATIVE_PATH);
-      const historyBefore = fs.existsSync(historyPath) ? fs.readFileSync(historyPath, 'utf8') : null;
-
-      await first.client.evaluate(`(() => {
-        document.querySelector('[data-assistant-mode="plan"]').click();
-        const goal = document.getElementById('plan-goal');
-        goal.value = ${JSON.stringify(electronAiFixture.PLAN_STRICT_RETRY_GOAL)};
-        goal.dispatchEvent(new Event('input', { bubbles: true }));
-        document.getElementById('plan-generate').click();
-      })()`);
-      const recovered = await waitForValue(first.client, `(() => {
-        const task = document.querySelector('.plan-mode__task[data-task-id="strict_retry_t1"]');
-        if (!task) return null;
-        return {
-          state: window.__planModeView.getState().status,
-          goal: document.getElementById('plan-goal').value,
-          taskCount: document.querySelectorAll('.plan-mode__task').length,
-          title: task.textContent,
-          hasError: Boolean(document.querySelector('.plan-mode__status--error')),
-        };
-      })()`, 'the automatically recovered structured Plan task card');
-      assert.strictEqual(recovered.state, 'ready');
-      assert.strictEqual(recovered.goal, electronAiFixture.PLAN_STRICT_RETRY_GOAL);
-      assert.strictEqual(recovered.taskCount, 1);
-      assert(recovered.title.includes('验证 strict 恢复'));
-      assert.strictEqual(recovered.hasError, false);
-      assert.deepStrictEqual(snapshotMarkdownFiles(project.rootPath), markdownBefore,
-        'automatic Plan format recovery remains read-only');
-      assert.strictEqual(fs.existsSync(historyPath) ? fs.readFileSync(historyPath, 'utf8') : null, historyBefore,
-        'automatic Plan format recovery must not create History');
-      await first.client.evaluate(`window.__assistantDock.close()`);
-    });
-
-    await stage('hands a revision-locked Plan task to Changes and writes only after explicit hunk acceptance', async () => {
-      const beforeDisk = projectService.readFile(project.rootPath, createdPath);
-      assert(beforeDisk.includes(electronAiFixture.PLAN_BEFORE));
-      await first.client.evaluate(`(() => {
-        document.querySelector('[data-assistant-mode="changes"]').click();
-        const instruction = document.getElementById('changes-instruction');
-        instruction.value = ${JSON.stringify(electronAiFixture.PROPOSAL_RACE_GOAL)};
-        instruction.dispatchEvent(new Event('input', { bubbles: true }));
-        document.getElementById('changes-propose').click();
-        document.getElementById('changes-propose').click();
-        document.querySelector('[data-assistant-mode="plan"]').click();
-        const goal = document.getElementById('plan-goal');
-        goal.value = ${JSON.stringify(electronAiFixture.PLAN_GOAL)};
-        goal.dispatchEvent(new Event('input', { bubbles: true }));
-        document.getElementById('plan-generate').click();
-      })()`);
-      await waitForValue(first.client, `document.querySelector('.plan-mode__task[data-task-id="t1"]')`, 'the Main-bound Plan task card');
-      await first.client.evaluate(`(() => {
-        const card = document.querySelector('.plan-mode__task[data-task-id="t1"]');
-        card.querySelector('.plan-mode__task-toggle').click();
-        card.querySelector('.plan-mode__handoff').click();
-      })()`);
-      const planReview = await waitForValue(first.client, `(() => {
-        const banner = document.querySelector('.changes-plan-mode');
-        const card = document.querySelector('.change-hunk-card');
-        const input = document.getElementById('changes-instruction');
-        if (!banner || banner.hidden || !card || !input.readOnly) return null;
-        return { banner: banner.textContent, input: input.value, state: card.className };
-      })()`, 'the Plan-bound Changes review');
-      assert(planReview.banner.includes('t1'));
-      assert(planReview.banner.includes(createdPath));
-      assert(planReview.input.includes('Task t1'));
-      assert(planReview.state.includes('is-pending'));
-      assert.strictEqual(projectService.readFile(project.rootPath, createdPath), beforeDisk);
-      await delay(900);
-      const raceState = await first.client.evaluate(`(() => ({
-        banner: document.querySelector('.changes-plan-mode')?.textContent || '',
-        preview: document.querySelector('.change-hunk-card')?.textContent || '',
-        readonly: document.getElementById('changes-instruction').readOnly,
-      }))()`);
-      assert(raceState.banner.includes('t1'));
-      assert(raceState.preview.includes(electronAiFixture.PLAN_AFTER));
-      assert(!raceState.preview.includes(electronAiFixture.PROPOSAL_RACE_AFTER));
-      assert.strictEqual(raceState.readonly, true);
-      assert(projectService.readFile(project.rootPath, createdPath).includes(electronAiFixture.PROPOSAL_RACE_BEFORE));
-
-      const planWriteTiming = {
-        reviewReadyAt: Date.now(),
-        acceptDispatchedAt: null,
-        acceptedAt: null,
-        applyDispatchedAt: null,
-        appliedAt: null,
-      };
-      let planWritePhase = 'accept';
-      try {
-        planWriteTiming.acceptDispatchedAt = Date.now();
-        await first.client.evaluate(`document.querySelector('.change-hunk-card .change-decision--accepted, .change-file-actions .change-decision--accepted').click()`);
-        const accepted = await waitForValue(first.client, `(() => {
-          const apply = document.getElementById('changes-apply');
-          const cards = [...document.querySelectorAll('.change-hunk-card')];
-          const counts = {
-            total: cards.length,
-            accepted: cards.filter(card => card.classList.contains('is-accepted')).length,
-            rejected: cards.filter(card => card.classList.contains('is-rejected')).length,
-            pending: cards.filter(card => card.classList.contains('is-pending')).length,
-          };
-          const acceptedSummary = cards.length === 1 &&
-            cards[0].querySelector('.change-hunk-result')?.textContent.includes('已选择接受');
-          return acceptedSummary && counts.accepted === 1 && counts.pending === 0 &&
-            !apply.hidden && !apply.disabled ? counts : null;
-        })()`, 'the accepted and enabled Plan review');
-        assert.deepStrictEqual(accepted, { total: 1, accepted: 1, rejected: 0, pending: 0 });
-        planWriteTiming.acceptedAt = Date.now();
-        planWritePhase = 'apply';
-        planWriteTiming.applyDispatchedAt = Date.now();
-        await first.client.evaluate(`document.getElementById('changes-apply').click()`);
-        await waitForValue(first.client, `document.getElementById('changes-status').textContent.includes('Plan 任务已安全写入并完成')`, 'the explicitly accepted Plan task write');
-        planWriteTiming.appliedAt = Date.now();
-        console.log(`    Plan write timing: accept=${planWriteTiming.acceptedAt - planWriteTiming.acceptDispatchedAt}ms, apply=${planWriteTiming.appliedAt - planWriteTiming.applyDispatchedAt}ms, total=${planWriteTiming.appliedAt - planWriteTiming.reviewReadyAt}ms`);
-      } catch (error) {
-        const diagnostic = await first.client.evaluate(`(() => ({
-          status: document.getElementById('changes-status')?.textContent || '',
-          applyHidden: Boolean(document.getElementById('changes-apply')?.hidden),
-          applyDisabled: Boolean(document.getElementById('changes-apply')?.disabled),
-          planBannerVisible: Boolean(document.querySelector('.changes-plan-mode') && !document.querySelector('.changes-plan-mode').hidden),
-          planBannerTextLength: document.querySelector('.changes-plan-mode')?.textContent.length || 0,
-          instructionReadOnly: Boolean(document.getElementById('changes-instruction')?.readOnly),
-          counts: [...document.querySelectorAll('.change-hunk-card')].reduce((result, card) => ({
-            ...result,
-            total: result.total + 1,
-            accepted: result.accepted + Number(card.classList.contains('is-accepted')),
-            rejected: result.rejected + Number(card.classList.contains('is-rejected')),
-            pending: result.pending + Number(card.classList.contains('is-pending')),
-          }), { total: 0, accepted: 0, rejected: 0, pending: 0 }),
-          acceptedSummary: [...document.querySelectorAll('.change-hunk-card')]
-            .map(card => card.querySelector('.change-hunk-result')?.textContent || ''),
-        }))()`);
-        const disk = projectService.readFile(project.rootPath, createdPath);
-        diagnostic.disk = {
-          bytes: Buffer.byteLength(disk, 'utf8'),
-          sha256: crypto.createHash('sha256').update(disk).digest('hex'),
-        };
-        diagnostic.phase = planWritePhase;
-        diagnostic.timing = {
-          reviewReadyAt: planWriteTiming.reviewReadyAt,
-          acceptDispatchedAt: planWriteTiming.acceptDispatchedAt,
-          acceptedAt: planWriteTiming.acceptedAt,
-          applyDispatchedAt: planWriteTiming.applyDispatchedAt,
-          elapsedMs: Date.now() - planWriteTiming.reviewReadyAt,
-        };
-        throw new Error(`${error.message}; diagnostic=${JSON.stringify(diagnostic)}`);
-      }
-      const afterDisk = projectService.readFile(project.rootPath, createdPath);
-      assert(afterDisk.includes(electronAiFixture.PLAN_AFTER));
-      assert(!afterDisk.includes(electronAiFixture.PLAN_BEFORE));
-      await waitForValue(first.client, `(() => {
-        const banner = document.querySelector('.changes-plan-mode');
-        const status = document.getElementById('changes-status').textContent;
-        return banner?.hidden && !document.getElementById('changes-instruction').readOnly &&
-          status.includes('Plan 任务已安全写入并完成');
-      })()`, 'the completed Plan task leaving its stale record automatically');
-      await first.client.evaluate(`window.__assistantDock.close()`);
-    });
-    }
-
     await stage('filters the real Graph and exposes distinct evidence for every required diagnostic', async () => {
       const heapBefore = await first.client.command('Runtime.getHeapUsage');
       await first.client.evaluate(`(() => {
@@ -2310,8 +2836,12 @@ async function run() {
         `cold Graph UI exposed only ${coldUi.fileOptions} project-file filter options`);
       assert.deepStrictEqual(coldUi.unicodePaths, [true, true],
         'real Electron must preserve both compatibility-distinct author paths');
-      assert(coldUi.summary.includes('已重建索引'),
-        `first Graph UI open did not prove a cold rebuild: ${coldUi.summary}`);
+      // Daily Workspace now prebuilds the same Main-owned graph snapshot for
+      // Home status. The first public Graph open may therefore be either the
+      // cold rebuild owner or a cache consumer; both must expose identical
+      // bounded data and remain inside the interaction budget.
+      assert(coldUi.summary.includes('已重建索引') || coldUi.summary.includes('索引未变化'),
+        `first Graph UI open did not expose an authoritative index result: ${coldUi.summary}`);
       assert.strictEqual(coldUi.role, 'status');
       assert(['polite', 'assertive'].includes(coldUi.live));
       assert(coldUi.detail.length > 0, 'cold Graph UI issue action must expose an interactive detail');

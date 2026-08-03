@@ -4,7 +4,7 @@
 // sends only a locator proof; every byte given to the model is reconstructed
 // from the authoritative project snapshot here.
 
-const blockAnchor = require('../renderer/block-anchor');
+const blockAnchor = require('../shared/block-anchor');
 
 const REQUEST_SCHEMA = 'writcraft.inline-rewrite/v2';
 const MAX_REQUEST_BYTES = 8 * 1024;

@@ -92,18 +92,18 @@ check('suggestion actions use one compact editorial toolbar treatment', () => {
   assert(contrastRatio(primary[1], '#ffffff') >= 4.5, 'compact primary action text contrast is too low');
 });
 
-check('active verification chains exclude legacy Plan while historical Main evidence stays isolated', () => {
+check('active verification chains and package scripts exclude legacy Plan', () => {
   const scripts = packageJson.scripts || {};
   assert.strictEqual(scripts['verify:plan'], undefined);
-  const historical = scripts['verify:plan:historical'];
-  assert.strictEqual(typeof historical, 'string');
-  assert(historical.includes('verify-v0-project-plan.js'));
-  assert(!historical.includes('verify-v0-plan-handoff.js'));
-  assert(!historical.includes('verify-v0-plan-handoff-transaction.js'));
-  assert(!historical.includes('verify-v0-plan-mode-ui.js'));
-  assert(!historical.includes('verify-v0-assistant-integration.js'));
+  assert.strictEqual(scripts['verify:plan:historical'], undefined);
 
-  for (const name of ['pretest', 'preverify', 'test', 'verify', 'posttest', 'postverify']) {
+  const roots = ['pretest', 'preverify', 'test', 'verify', 'posttest', 'postverify'];
+  const visited = new Set();
+  const queue = [...roots];
+  while (queue.length) {
+    const name = queue.shift();
+    if (visited.has(name)) continue;
+    visited.add(name);
     const command = scripts[name] || '';
     for (const token of [
       'verify:plan',
@@ -111,11 +111,29 @@ check('active verification chains exclude legacy Plan while historical Main evid
       'verify-v0-plan-handoff.js',
       'verify-v0-plan-handoff-transaction.js',
       'verify-v0-plan-mode-ui.js',
-      'verify-v0-assistant-integration.js',
     ]) {
       assert(!command.includes(token), `${name} still invokes legacy Plan evidence: ${token}`);
     }
+    for (const match of command.matchAll(/npm run ([A-Za-z0-9:_-]+)/g)) {
+      if (scripts[match[1]] && !visited.has(match[1])) queue.push(match[1]);
+    }
   }
+});
+
+check('retired Plan implementation and executable tests are physically absent', () => {
+  for (const relative of [
+    'src/main/project-plan-service.js',
+    'src/main/project-plan-handler.js',
+    'src/main/project-plan-handoff-service.js',
+    'src/renderer/plan-mode-state.js',
+    'src/renderer/plan-mode-view.js',
+    'src/renderer/plan-mode.css',
+    'src/renderer/plan-handoff-transaction.js',
+    'tests/verify-v0-project-plan.js',
+    'tests/verify-v0-plan-mode-ui.js',
+    'tests/verify-v0-plan-handoff.js',
+    'tests/verify-v0-plan-handoff-transaction.js',
+  ]) assert.strictEqual(fs.existsSync(path.join(root, ...relative.split('/'))), false, relative);
 });
 
 console.log(`\n${passed}/${passed} writing-navigation public surface checks passed.`);

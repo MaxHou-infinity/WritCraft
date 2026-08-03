@@ -1,11 +1,11 @@
 'use strict';
 
 const crypto = require('crypto');
-const contextSelection = require('../renderer/context-selection');
+const contextSelection = require('../shared/context-selection');
 const sourceIndexService = require('./source-index-service');
 const graphIndexService = require('./graph-index-service');
 const contextPolicyService = require('./context-policy-service');
-const blockAnchor = require('../renderer/block-anchor');
+const blockAnchor = require('../shared/block-anchor');
 
 const MAX_CONTEXT_CHARS = 10000;
 const MAX_CONTEXT_BYTES = 32 * 1024;

@@ -344,7 +344,7 @@
     }
 
     async function runAction(suggestion, taskInput = {}) {
-      const actionId = suggestion?.actionIds?.changes;
+      const actionId = suggestion?.actionId;
       if (state.phase !== 'navigation-ready' || !actionId ||
           typeof options.onRunAction !== 'function') return false;
       const attemptId = createAttemptId();
@@ -358,10 +358,6 @@
           dispatch({ type: 'action-progress', actionId, attemptId, phase });
         }, taskInput);
         if (state.projectInstanceId !== projectId || state.projectEpoch !== epoch) return false;
-        if (result?.ok === true && result.kind === 'open' && result.handoff?.locator) {
-          await options.onOpenEvidence?.(result.handoff.locator, result.handoff.path);
-          if (state.projectInstanceId !== projectId || state.projectEpoch !== epoch) return false;
-        }
         dispatch({
           type: 'action-result',
           actionId,
@@ -386,7 +382,7 @@
     }
 
     async function cancelAction(suggestion) {
-      const actionId = suggestion?.actionIds?.changes;
+      const actionId = suggestion?.actionId;
       const active = state.actions[actionId];
       if (!active || active.status !== 'running' ||
           typeof options.onCancelAction !== 'function') return false;
@@ -437,17 +433,17 @@
         if (discarded !== true) {
           dispatch({
             type: 'action-review-adjust-failed',
-            actionId: suggestion.actionIds.changes,
+            actionId: suggestion.actionId,
             error: { error: 'REVIEW_DISCARD_FAILED' },
           });
           return false;
         }
-        dispatch({ type: 'action-retry-ready', actionId: suggestion.actionIds.changes });
+        dispatch({ type: 'action-retry-ready', actionId: suggestion.actionId });
         return runAction(suggestion, { adjustment });
       } catch (error) {
         dispatch({
           type: 'action-review-adjust-failed',
-          actionId: suggestion.actionIds.changes,
+          actionId: suggestion.actionId,
           error: { error: error?.code || 'REVIEW_DISCARD_FAILED' },
         });
         return false;
@@ -457,7 +453,7 @@
     async function adjustNoChanges(suggestion, value) {
       const adjustment = String(value || '').trim();
       if (!adjustment || adjustment.length > 500) return false;
-      const actionId = suggestion.actionIds.changes;
+      const actionId = suggestion.actionId;
       dispatch({ type: 'action-retry-ready', actionId });
       return runAction(suggestion, { adjustment });
     }
@@ -465,7 +461,7 @@
     async function resumeWithSources(suggestionId, sourceIds) {
       const suggestion = state.result?.suggestions?.find(item => item.suggestionId === suggestionId);
       if (!suggestion || !Array.isArray(sourceIds) || !sourceIds.length) return false;
-      const actionId = suggestion.actionIds.changes;
+      const actionId = suggestion.actionId;
       dispatch({ type: 'action-retry-ready', actionId });
       return runAction(suggestion, { sourceIds });
     }
@@ -782,7 +778,7 @@
           evidence.append(open);
         }
         card.append(evidence);
-        const actionId = suggestion.actionIds.changes;
+        const actionId = suggestion.actionId;
         const action = view.actions[actionId];
         const task = element(document, 'section', 'writing-navigation__task');
         task.setAttribute('aria-live', 'polite');

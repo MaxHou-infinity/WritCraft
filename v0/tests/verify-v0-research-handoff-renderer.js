@@ -80,7 +80,7 @@ test('handoff persists then captures and rechecks the complete editor binding', 
   assert.match(changes, /captureBinding\(window\.__workspace\?\.state, request\.targetPaths\)/);
   assert.match(changes, /researchSessionCurrent\(session\)/);
   assert.match(changes, /const openSequence = \+\+researchOpenSequence/);
-  assert.match(changes, /openSequence !== researchOpenSequence[\s\S]{0,220}pending \|\| confirmationMode \|\| activePlanRequest \|\| activeIssueRequest \|\| activeResearchRequest/);
+  assert.match(changes, /openSequence !== researchOpenSequence[\s\S]{0,220}pending \|\| confirmationMode \|\| activeIssueRequest \|\| activeResearchRequest/);
   assert.match(changes, /async function cancelResearchForRerun\(\) \{\s*\/\/[\s\S]{0,180}researchOpenSequence \+= 1;\s*if \(!activeResearchRequest\)/);
   assert.match(changes, /bindingMatches/);
 });
@@ -114,8 +114,8 @@ test('project, tree, file, editor input and unload lifecycles release Research o
     'writcraft:file-lifecycle-changed', "getElementById('editor')", "addEventListener('unload'"]) assert(changes.includes(marker));
 });
 
-test('normal, Plan, Graph and Onboarding reject Research exclusivity', () => {
-  assert.match(changes, /pending \|\| confirmationMode \|\| activePlanRequest \|\| activeIssueRequest \|\| activeResearchRequest/);
+test('normal Changes, Graph and Onboarding reject Research exclusivity', () => {
+  assert.match(changes, /pending \|\| confirmationMode \|\| activeIssueRequest \|\| activeResearchRequest/);
   assert.match(changes, /当前仍绑定 Research 证据卡/);
   assert.match(changes, /if \(activeResearchRequest\) return proposeResearchCard\(\)/);
 });

@@ -1,6 +1,6 @@
 #!/usr/bin/env node
 const assert = require('assert');
-const anchor = require('../src/renderer/block-anchor');
+const anchor = require('../src/shared/block-anchor');
 let pass = 0;
 function check(label, fn) { try { fn(); pass += 1; console.log(`  ✓ ${label}`); } catch (error) { console.error(`  ✗ ${label}: ${error.message}`); process.exitCode = 1; } }
 console.log('════════ WritCraft V0 · Block anchor verify ════════');

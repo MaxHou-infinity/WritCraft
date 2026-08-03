@@ -63,13 +63,6 @@ const CHANGES_AFTER = Object.freeze([
 ]);
 const CHAPTER_GOAL = 'E2E 分阶段生成并整体重写当前章节';
 const CHAPTER_GENERATED_MARKER = 'E2E_CHAPTER_PLANNED_BLOCK_GENERATED';
-const PLAN_GOAL = 'E2E 通过计划任务更新锁定章节';
-const PLAN_STRICT_RETRY_GOAL = 'E2E Plan strict 失败后可重试';
-const PLAN_BEFORE = 'E2E_PLAN_TARGET_BEFORE';
-const PLAN_AFTER = 'E2E_PLAN_TARGET_AFTER';
-const PROPOSAL_RACE_GOAL = 'E2E 延迟普通提案不得覆盖 Plan';
-const PROPOSAL_RACE_BEFORE = 'E2E_PROPOSAL_RACE_BEFORE';
-const PROPOSAL_RACE_AFTER = 'E2E_PROPOSAL_RACE_AFTER';
 const GRAPH_ISSUE_BEFORE_ONE = '正式签约早于社区调查。';
 const GRAPH_ISSUE_AFTER_ONE = '正式签约晚于社区调查。';
 const GRAPH_ISSUE_BEFORE_TWO = '之后每次引用效率数字，都必须同时说明时间范围和统计口径。';
@@ -321,13 +314,6 @@ function normalFile(prompt, marker) {
   return { path: match[1], content: match[2] };
 }
 
-function planTargetFile(prompt, marker) {
-  const files = [...prompt.matchAll(/<project-file roles=[^>]+ path="([^"]+)" revision="[a-f0-9]{64}">\n([\s\S]*?)\n<\/project-file>/g)];
-  const match = files.find(item => item[2].includes(marker));
-  if (!match) throw new Error('E2E_FIXTURE_MISSING_PLAN_TARGET');
-  return { path: match[1], content: match[2] };
-}
-
 function issueTargetFile(prompt, marker) {
   const files = [...prompt.matchAll(/<project-file role="target" path="([^"]+)" revision="[a-f0-9]{64}">\n([\s\S]*?)\n<\/project-file>/g)];
   const match = files.find(item => item[2].includes(marker));
@@ -383,90 +369,6 @@ function chapterBlockAnswer(prompt) {
     blockId: 'whole',
     content: `${match[1].trimEnd()}\n\n${CHAPTER_GENERATED_MARKER}`,
   };
-}
-
-function proposalRaceAnswer(prompt) {
-  const file = normalFile(prompt, PROPOSAL_RACE_BEFORE);
-  if (!file.content.includes(PROPOSAL_RACE_BEFORE)) throw new Error('E2E_FIXTURE_INVALID_RACE_TARGET');
-  return { edits: [{
-    path: file.path,
-    oldText: PROPOSAL_RACE_BEFORE,
-    newText: PROPOSAL_RACE_AFTER,
-    summary: '这个延迟提案必须在进入 Plan 后被丢弃',
-  }] };
-}
-
-function planAnswer(prompt) {
-  if (!prompt.includes(`用户目标：${PLAN_GOAL}`)) throw new Error('E2E_FIXTURE_INVALID_PLAN_GOAL');
-  const pathMatch = prompt.match(/项目中可引用的 Markdown 路径：(\[[^\n]+\])/);
-  const paths = pathMatch ? JSON.parse(pathMatch[1]) : [];
-  const targetPath = paths.find(filePath => filePath === CHAT_CURRENT_PATH);
-  if (!targetPath) throw new Error('E2E_FIXTURE_MISSING_PLAN_PATH');
-  return {
-    title: 'E2E 锁定章节计划',
-    summary: '验证项目计划只通过审阅后的 Changes 写入。',
-    assumptions: [],
-    openQuestions: [],
-    milestones: [{
-      id: 'm1',
-      title: '锁定章节',
-      objective: '更新指定章节中的计划标记。',
-      acceptanceCriteria: ['目标标记经人工接受后落盘'],
-      tasks: [{
-        id: 't1',
-        title: '更新计划标记',
-        description: '只修改锁定章节的计划验收标记。',
-        scope: 'file',
-        targetPaths: [targetPath],
-        dependsOn: [],
-        acceptanceCriteria: ['保留章节其他正文'],
-      }],
-    }],
-  };
-}
-
-function planStrictRetryAnswer(prompt) {
-  if (!prompt.includes(`用户目标：${PLAN_STRICT_RETRY_GOAL}`)) {
-    throw new Error('E2E_FIXTURE_INVALID_PLAN_STRICT_RETRY_GOAL');
-  }
-  const pathMatch = prompt.match(/项目中可引用的 Markdown 路径：(\[[^\n]+\])/);
-  const paths = pathMatch ? JSON.parse(pathMatch[1]) : [];
-  const targetPath = paths.find(filePath => filePath === CHAT_CURRENT_PATH);
-  if (!targetPath) throw new Error('E2E_FIXTURE_MISSING_PLAN_STRICT_RETRY_PATH');
-  return {
-    title: 'E2E strict 重试计划',
-    summary: '验证严格 JSON 失败后可以使用同一目标重试。',
-    assumptions: [],
-    openQuestions: [],
-    milestones: [{
-      id: 'strict_retry_m1',
-      title: '恢复计划生成',
-      objective: '证明无效输出不会污染后续请求。',
-      acceptanceCriteria: ['同一目标重试后显示任务卡'],
-      tasks: [{
-        id: 'strict_retry_t1',
-        title: '验证 strict 恢复',
-        description: '只绑定现有章节，不执行任何写入。',
-        scope: 'file',
-        targetPaths: [targetPath],
-        dependsOn: [],
-        acceptanceCriteria: ['任务卡可见且磁盘保持不变'],
-      }],
-    }],
-  };
-}
-
-function assertPlanToolRequest(request) {
-  const tool = request.tools?.[0];
-  const targetPathsSchema = tool?.input_schema?.properties?.milestones?.items
-    ?.properties?.tasks?.items?.properties?.targetPaths;
-  if (request.max_tokens !== 8_192 || request.thinking !== undefined ||
-      request.tools?.length !== 1 || tool?.name !== 'submit_project_plan' ||
-      request.tool_choice?.type !== 'tool' || request.tool_choice?.name !== 'submit_project_plan' ||
-      tool?.input_schema?.type !== 'object' || tool?.input_schema?.additionalProperties !== false ||
-      targetPathsSchema?.type !== 'array' || targetPathsSchema?.maxItems !== 2) {
-    throw new Error('E2E_FIXTURE_INVALID_PLAN_TOOL_PROTOCOL');
-  }
 }
 
 function assertResearchToolRequest(request) {
@@ -566,19 +468,6 @@ function unifiedWritingTaskAnswer(prompt, request) {
   };
 }
 
-function planChangesAnswer(prompt) {
-  if (!prompt.includes(`"planGoal":"${PLAN_GOAL}"`)) throw new Error('E2E_FIXTURE_INVALID_PLAN_HANDOFF');
-  const file = planTargetFile(prompt, PLAN_BEFORE);
-  if (!prompt.includes('oldText') || !prompt.includes('不得返回完整 after 文件') ||
-      !file.content.includes(PLAN_BEFORE)) throw new Error('E2E_FIXTURE_INVALID_PLAN_TARGET');
-  return { edits: [{
-    path: file.path,
-    oldText: PLAN_BEFORE,
-    newText: PLAN_AFTER,
-    summary: '执行 Main 锁定的计划任务',
-  }] };
-}
-
 function graphIssueChangesAnswer(prompt) {
   console.log('[e2e-fixture] GRAPH_ISSUE_PROVIDER_CALL');
   if (!prompt.includes('Graph Issue→Changes 修订执行器') ||
@@ -608,7 +497,6 @@ function graphIssueChangesAnswer(prompt) {
 
 function createElectronAiProvider() {
   let onboardingCalls = 0;
-  let planStrictRetryCalls = 0;
   let chapterBlockCalls = 0;
   return Object.freeze({
     apiKey: API_KEY,
@@ -621,7 +509,6 @@ function createElectronAiProvider() {
       }
       const prompt = request.messages[0].content;
       if ((prompt.includes('WritCraft 的普通 Project Changes 跨文件修订执行器') ||
-          prompt.includes('WritCraft 的 Plan→Changes 修订执行器') ||
           prompt.includes('WritCraft 的 Graph Issue→Changes 修订执行器')) && request.max_tokens !== 8192) {
         throw new Error('E2E_FIXTURE_INVALID_LOCALIZED_MAX_TOKENS');
       }
@@ -632,7 +519,6 @@ function createElectronAiProvider() {
         throw new Error('E2E_FIXTURE_INVALID_CHAPTER_BLOCK_MAX_TOKENS');
       }
       let output;
-      let planToolInput = null;
       let researchToolInput = null;
       let writingNavigationToolInput = null;
       let unifiedWritingTaskToolInput = null;
@@ -650,49 +536,10 @@ function createElectronAiProvider() {
         if (request.max_tokens !== 4096) throw new Error('E2E_FIXTURE_INVALID_REWRITE_MAX_TOKENS');
         await new Promise(resolve => setTimeout(resolve, 60));
         output = rewriteAnswer(prompt);
-      } else if (prompt.includes('WritCraft 的项目级 Plan Mode 助手')) {
-        assertPlanToolRequest(request);
-        if (prompt.includes(`用户目标：${PLAN_STRICT_RETRY_GOAL}`)) {
-          planStrictRetryCalls += 1;
-          if (planStrictRetryCalls === 1 && prompt.includes('唯一一次结构重试')) {
-            throw new Error('E2E_FIXTURE_EARLY_PLAN_FORMAT_RETRY');
-          }
-          if (planStrictRetryCalls === 2 && !prompt.includes('唯一一次结构重试')) {
-            throw new Error('E2E_FIXTURE_MISSING_PLAN_FORMAT_RETRY');
-          }
-          const strictAnswer = planStrictRetryAnswer(prompt);
-          if (planStrictRetryCalls === 1) {
-            strictAnswer.milestones = Array.from({ length: 2 }, (_, index) => ({
-              id: `strict_retry_m${index + 1}`,
-              title: `复核里程碑 ${index + 1}`,
-              objective: '验证长计划中每一个重复任务字段都受结构约束。',
-              acceptanceCriteria: ['结构错误必须被严格拒绝'],
-              tasks: [{
-                id: `strict_retry_t${index + 1}`,
-                title: `复核任务 ${index + 1}`,
-                description: index === 1
-                  ? '末里程碑目标路径故意为字符串'
-                  : '验证前置任务保持数组结构',
-                scope: 'file',
-                targetPaths: index === 1 ? CHAT_CURRENT_PATH : [CHAT_CURRENT_PATH],
-                dependsOn: [],
-                acceptanceCriteria: ['结构正确且磁盘保持不变'],
-              }],
-            }));
-          }
-          planToolInput = strictAnswer;
-        } else {
-          planToolInput = planAnswer(prompt);
-        }
-      } else if (prompt.includes('WritCraft 的 Plan→Changes 修订执行器')) {
-        output = JSON.stringify(planChangesAnswer(prompt));
       } else if (prompt.includes('WritCraft 的 Graph Issue→Changes 修订执行器')) {
         output = JSON.stringify(graphIssueChangesAnswer(prompt));
       } else if (prompt.includes('WritCraft 的 Research→Changes 局部修订执行器')) {
         output = JSON.stringify(researchChangesAnswer(prompt));
-      } else if (prompt.includes(`用户指令：${PROPOSAL_RACE_GOAL}`)) {
-        await new Promise(resolve => setTimeout(resolve, 700));
-        output = JSON.stringify(proposalRaceAnswer(prompt));
       } else if (prompt.includes(`用户指令：${CHANGES_REVIEW_GOAL}`)) {
         output = JSON.stringify(changesReviewAnswer(prompt));
       } else if (prompt.includes('WritCraft 的完整章节生成规划器')) {
@@ -753,23 +600,6 @@ function createElectronAiProvider() {
         unifiedWritingTaskToolInput = unifiedWritingTaskAnswer(prompt, request);
       } else {
         throw new Error('E2E_FIXTURE_UNHANDLED_TEXT');
-      }
-      if (planToolInput) {
-        return jsonResponse({
-          model: 'MiniMax-M3',
-          content: [
-            { type: 'thinking', thinking: 'E2E tool protocol reasoning' },
-            { type: 'text', text: 'E2E 计划已提交。' },
-            {
-              type: 'tool_use',
-              id: `call_plan_${planStrictRetryCalls || 1}`,
-              name: 'submit_project_plan',
-              input: planToolInput,
-            },
-          ],
-          stop_reason: 'tool_use',
-          usage: { input_tokens: 128, output_tokens: 64 },
-        });
       }
       if (researchToolInput) {
         return jsonResponse({
@@ -884,13 +714,6 @@ module.exports = {
   CHANGES_AFTER,
   CHAPTER_GOAL,
   CHAPTER_GENERATED_MARKER,
-  PLAN_GOAL,
-  PLAN_STRICT_RETRY_GOAL,
-  PLAN_BEFORE,
-  PLAN_AFTER,
-  PROPOSAL_RACE_GOAL,
-  PROPOSAL_RACE_BEFORE,
-  PROPOSAL_RACE_AFTER,
   GRAPH_ISSUE_BEFORE_ONE,
   GRAPH_ISSUE_AFTER_ONE,
   GRAPH_ISSUE_BEFORE_TWO,

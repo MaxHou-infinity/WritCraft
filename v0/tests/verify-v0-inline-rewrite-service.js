@@ -8,7 +8,7 @@ const os = require('os');
 const path = require('path');
 const projectService = require('../src/main/project-service');
 const changeSetService = require('../src/main/changeset-service');
-const blockAnchor = require('../src/renderer/block-anchor');
+const blockAnchor = require('../src/shared/block-anchor');
 const contextService = require('../src/main/inline-rewrite-context-service');
 const service = require('../src/main/inline-rewrite-service');
 

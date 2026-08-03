@@ -12,7 +12,9 @@ const REVIEW_SCHEMA = 'writcraft.changes-review/v1';
 const DECISION_SCHEMA = 'writcraft.changes-decision/v1';
 const MAX_DECISION_BYTES = 64 * 1024;
 const HUNK_ID_RE = /^hk_[a-f0-9]{24}$/;
-const REVIEW_ID_RE = /^(?:cs_[a-f0-9]{24}|pc_[a-f0-9]{32})$/;
+// review_* is the public, project-bound identity used by Daily Workspace. It
+// deliberately validates as a review identity but never grants store access.
+const REVIEW_ID_RE = /^(?:cs_[a-f0-9]{24}|pc_[a-f0-9]{32}|review_[a-f0-9]{32})$/;
 
 class ChangeSetReviewError extends Error {
   constructor(code, message) {

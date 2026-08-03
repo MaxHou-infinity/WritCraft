@@ -103,7 +103,7 @@ test('快速切换只提交最新读取，并恢复每文件光标与滚动', ()
   assert.ok(firstGuard >= 0 && recovery > firstGuard && secondGuard > recovery);
   assert.ok(workspace.includes('captureCurrentView()'));
   assert.ok(workspace.includes('const view = state.views[path] || {}'));
-  assert.ok(workspace.includes('restoreCursor(view.cursorOffset || 0)'));
+  assert.ok(workspace.includes('restoreSelection(anchorOffset, focusOffset)'));
   assert.ok(workspace.includes('editorScroll.scrollTop = Math.max(0, Number(view.scrollTop) || 0)'));
 });
 

@@ -6,7 +6,7 @@
 // and fresh project snapshots here.
 
 const crypto = require('crypto');
-const blockAnchor = require('../renderer/block-anchor');
+const blockAnchor = require('../shared/block-anchor');
 const graphCorrectionService = require('./graph-correction-service');
 const localizedEditService = require('./localized-edit-service');
 

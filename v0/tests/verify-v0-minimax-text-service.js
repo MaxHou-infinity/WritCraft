@@ -25,14 +25,14 @@ function response(payload, options = {}) {
 const CP_KEY = `sk-cp-${'A1_-'.repeat(20)}`;
 const API_KEY = `sk-api-${'B2_-'.repeat(20)}`;
 const TEST_TOOL = {
-  name: 'submit_project_plan',
-  description: 'Submit one structured project plan.',
+  name: 'submit_test_payload',
+  description: 'Submit one structured test payload.',
   input_schema: {
     type: 'object',
     additionalProperties: false,
-    required: ['milestones'],
+    required: ['items'],
     properties: {
-      milestones: {
+      items: {
         type: 'array',
         items: { type: 'object' },
       },
@@ -115,7 +115,7 @@ async function run() {
 
   await test('sends one forced tool schema and exposes only one bounded matching tool input', async () => {
     let captured;
-    const input = { milestones: [{ id: 'm1' }] };
+    const input = { items: [{ id: 'item-1' }] };
     const result = await service.callMessages({
       apiKey: API_KEY,
       messages: [{ role: 'user', content: '生成项目计划' }],

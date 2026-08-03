@@ -12,6 +12,7 @@
   const documentTitle = document.getElementById('document-title');
   const documentPath = document.getElementById('document-path');
   const editContextChip = document.getElementById('edit-context-chip');
+  const workspaceReturn = document.getElementById('workspace-return');
   const editDiagnosticPanel = document.getElementById('edit-diagnostic-panel');
   const editDiagnosticList = document.getElementById('edit-diagnostic-list');
   const editDiagnosticRepair = document.getElementById('edit-diagnostic-repair');
@@ -62,12 +63,13 @@
   const onboardingHost = document.getElementById('project-onboarding-host');
   const startOnboardingButton = document.getElementById('start-project-onboarding');
   const projectMenu = document.getElementById('project-menu');
-  const WORKSPACE_VIEWS = new Set(['explorer', 'search', 'sources', 'graph']);
+  const WORKSPACE_VIEWS = new Set(['home', 'explorer', 'search', 'sources', 'graph']);
   let activeWorkspaceView = 'explorer';
   let migrationResolver = null;
   let legacyDraftSnoozed = false;
   let treeOpenTimer = null;
   let markdownTrashSequence = 0;
+  let externalChangeSequence = 0;
   let markdownTrashBusy = false;
   let markdownTrashOwner = null;
 
@@ -90,7 +92,10 @@
     saveTimer: null,
     savePromise: null,
     workspaceTimer: null,
+    workspaceSavePromise: null,
+    returnOperationGeneration: 0,
     views: {},
+    returnStack: [],
     conflictRecovery: false,
     conflictRevision: null,
     externalDeleted: false,
@@ -111,6 +116,13 @@
 
   function beginProjectEntry() {
     state.projectEntryGeneration += 1;
+    // A watcher callback can already be inside an awaited tree/file read when
+    // the author starts switching projects. Invalidate that callback before
+    // any project-entry await, not only after the new descriptor is installed.
+    externalChangeSequence += 1;
+    state.returnOperationGeneration += 1;
+    clearTimeout(state.workspaceTimer);
+    state.workspaceTimer = null;
     return state.projectEntryGeneration;
   }
 
@@ -150,7 +162,9 @@
   }
 
   function isOwnedProjectEntryCurrent(owner) {
-    return !owner || isProjectEntryCurrent(owner.entryGeneration, owner.projectInstanceId);
+    if (!owner) return true;
+    if (typeof owner.isCurrent === 'function') return owner.isCurrent();
+    return isProjectEntryCurrent(owner.entryGeneration, owner.projectInstanceId);
   }
 
   const INLINE_RECONCILIATION_REQUEST = Object.freeze({
@@ -372,6 +386,70 @@
     return range.toString().length;
   }
 
+  function nodeOffset(node, offset) {
+    if (!node || !editor.contains(node)) return 0;
+    const range = document.createRange();
+    range.selectNodeContents(editor);
+    range.setEnd(node, offset);
+    return range.toString().length;
+  }
+
+  function getSelectionOffsets() {
+    const selection = window.getSelection();
+    if (!selection || !selection.rangeCount || !editor.contains(selection.anchorNode) ||
+        !editor.contains(selection.focusNode)) {
+      const caretOffset = getCursorOffset();
+      return { caretOffset, selectionAnchorOffset: caretOffset, selectionFocusOffset: caretOffset };
+    }
+    return {
+      caretOffset: nodeOffset(selection.focusNode, selection.focusOffset),
+      selectionAnchorOffset: nodeOffset(selection.anchorNode, selection.anchorOffset),
+      selectionFocusOffset: nodeOffset(selection.focusNode, selection.focusOffset),
+    };
+  }
+
+  function textPoint(offset) {
+    let remaining = Math.max(0, Number(offset) || 0);
+    const walker = document.createTreeWalker(editor, NodeFilter.SHOW_TEXT);
+    let node;
+    let last = null;
+    while ((node = walker.nextNode())) {
+      last = node;
+      if (remaining <= node.data.length) return { node, offset: remaining };
+      remaining -= node.data.length;
+    }
+    return last ? { node: last, offset: last.data.length } : null;
+  }
+
+  function restoreSelection(anchorOffset, focusOffset) {
+    const anchor = textPoint(anchorOffset);
+    const focus = textPoint(focusOffset);
+    if (!anchor || !focus) return false;
+    const selection = window.getSelection();
+    selection.removeAllRanges();
+    if (typeof selection.setBaseAndExtent === 'function') {
+      selection.setBaseAndExtent(anchor.node, anchor.offset, focus.node, focus.offset);
+    } else {
+      const range = document.createRange();
+      range.setStart(anchor.node, anchor.offset);
+      range.setEnd(focus.node, focus.offset);
+      selection.addRange(range);
+    }
+    editor.focus();
+    return true;
+  }
+
+  function getFirstVisibleOffset() {
+    if (!editorScroll || typeof document.caretRangeFromPoint !== 'function') return null;
+    const bounds = editorScroll.getBoundingClientRect();
+    const range = document.caretRangeFromPoint(bounds.left + 12, bounds.top + 12);
+    if (!range || !editor.contains(range.startContainer)) return null;
+    const prefix = document.createRange();
+    prefix.selectNodeContents(editor);
+    prefix.setEnd(range.startContainer, range.startOffset);
+    return prefix.toString().length;
+  }
+
   function restoreCursor(offset) {
     const target = Math.max(0, Number(offset) || 0);
     const walker = document.createTreeWalker(editor, NodeFilter.SHOW_TEXT);
@@ -424,9 +502,13 @@
 
   function captureCurrentView() {
     if (!state.currentPath) return;
+    const selection = getSelectionOffsets();
     state.views[state.currentPath] = {
-      cursorOffset: getCursorOffset(),
+      ...(state.views[state.currentPath] || {}),
+      ...selection,
       scrollTop: editorScroll ? Math.max(0, editorScroll.scrollTop) : 0,
+      activeOutlineId: state.views[state.currentPath]?.activeOutlineId || null,
+      collapsedOutlineIds: [...(state.views[state.currentPath]?.collapsedOutlineIds || [])],
     };
   }
 
@@ -435,14 +517,133 @@
     return {
       tabs: [...state.tabs],
       activePath: state.currentPath,
-      files: { ...state.views },
+      files: Object.fromEntries(state.tabs.map(path => [path, state.views[path] || {
+        caretOffset: 0,
+        selectionAnchorOffset: 0,
+        selectionFocusOffset: 0,
+        scrollTop: 0,
+        activeOutlineId: null,
+        collapsedOutlineIds: [],
+      }])),
+      returnStack: state.returnStack.map(entry => structuredClone(entry)),
     };
+  }
+
+  function updateWorkspaceReturnControl() {
+    if (!workspaceReturn) return;
+    workspaceReturn.hidden = state.returnStack.length === 0;
+    workspaceReturn.textContent = state.returnStack.at(-1)?.view === 'project_home'
+      ? '返回项目首页'
+      : '返回上一位置';
+  }
+
+  function captureEditorReturnState() {
+    if (!state.currentPath || !/^[a-f0-9]{64}$/.test(state.revision || '')) return null;
+    const selection = getSelectionOffsets();
+    return {
+      path: state.currentPath,
+      ...selection,
+      scrollTop: editorScroll ? Math.max(0, editorScroll.scrollTop) : 0,
+      revision: state.revision,
+    };
+  }
+
+  function pushReturnLocation(entry) {
+    if (!entry || !state.project) return false;
+    const previous = state.returnStack.at(-1);
+    if (!previous || JSON.stringify(previous) !== JSON.stringify(entry)) state.returnStack.push(structuredClone(entry));
+    if (state.returnStack.length > 32) state.returnStack.splice(0, state.returnStack.length - 32);
+    updateWorkspaceReturnControl();
+    scheduleWorkspaceSave();
+    return true;
+  }
+
+  async function returnToPreviousLocation() {
+    if (!state.project || !state.returnStack.length) return false;
+    const projectInstanceId = state.project.instanceId;
+    const operationGeneration = ++state.returnOperationGeneration;
+    const isCurrent = entry => state.project?.instanceId === projectInstanceId &&
+      state.returnOperationGeneration === operationGeneration && state.returnStack.at(-1) === entry;
+    while (state.returnStack.length) {
+      const entry = state.returnStack.at(-1);
+      try {
+        if (!isCurrent(entry)) return false;
+        if (entry.view === 'project_home') {
+          setWorkspaceView('home');
+        } else if (entry.editorReturnState) {
+          setWorkspaceView('explorer');
+          const returned = entry.editorReturnState;
+          const opened = await openFile(returned.path, { pin: true });
+          if (!isCurrent(entry)) return false;
+          if (opened === false) throw new Error('原写作位置已经不可用');
+          const exactRevision = state.revision === returned.revision;
+          if (exactRevision) {
+            restoreSelection(returned.selectionAnchorOffset, returned.selectionFocusOffset);
+            if (editorScroll) editorScroll.scrollTop = returned.scrollTop;
+          } else {
+            restoreSelection(returned.caretOffset, returned.caretOffset);
+            if (editorScroll) editorScroll.scrollTop = Math.max(0, returned.scrollTop);
+            setSaveState('正文已变化，已返回当前版本的安全位置', 'saved');
+          }
+        } else if (entry.stableLocator) {
+          const response = await bridge?.dailyWorkspace?.resolveStableLocation?.(
+            projectInstanceId,
+            entry.stableLocator
+          );
+          if (!isCurrent(entry)) return false;
+          const target = response?.result?.target;
+          if (!response?.ok || target?.action !== 'open_file') throw new Error('返回位置已经失效');
+          setWorkspaceView('explorer');
+          const opened = await openFile(target.filePath, { pin: true });
+          if (!isCurrent(entry)) return false;
+          if (opened === false || state.revision !== target.revision) throw new Error('返回位置正在变化');
+          revealRange(target.offset, Math.max(0, target.endOffset - target.offset));
+        } else {
+          const view = ({ editor: 'explorer', graph: 'graph', sources: 'sources', changes: 'explorer' })[entry.view];
+          if (!view || !setWorkspaceView(view)) throw new Error('返回视图已经失效');
+          if (entry.view === 'changes') window.__assistantDock?.open?.('changes');
+        }
+        if (!isCurrent(entry)) return false;
+        state.returnStack.pop();
+        updateWorkspaceReturnControl();
+        scheduleWorkspaceSave();
+        return true;
+      } catch (_) {
+        // A stale entry cannot block older safe history. Drop it and continue,
+        // matching the v2 contract instead of reconstructing authority locally.
+        if (!isCurrent(entry)) return false;
+        state.returnStack.pop();
+      }
+    }
+    updateWorkspaceReturnControl();
+    scheduleWorkspaceSave();
+    setSaveState('之前的位置已经失效', 'error');
+    return false;
+  }
+
+  function updateOutlineViewState(next) {
+    if (!state.currentPath || !next || typeof next !== 'object') return;
+    const current = state.views[state.currentPath] || {
+      ...getSelectionOffsets(), scrollTop: editorScroll ? Math.max(0, editorScroll.scrollTop) : 0,
+    };
+    state.views[state.currentPath] = {
+      ...current,
+      activeOutlineId: typeof next.activeOutlineId === 'string' ? next.activeOutlineId : null,
+      collapsedOutlineIds: Array.isArray(next.collapsedOutlineIds) ? [...next.collapsedOutlineIds] : [],
+    };
+    scheduleWorkspaceSave();
   }
 
   async function saveWorkspaceNow() {
     clearTimeout(state.workspaceTimer);
     if (state.inlineMutationBlocked || !state.project || !bridge?.saveWorkspace) return;
-    try { await bridge.saveWorkspace(workspaceSnapshot()); } catch (_) {}
+    const projectInstanceId = state.project.instanceId;
+    const snapshot = workspaceSnapshot();
+    const pending = Promise.resolve(bridge.saveWorkspace(projectInstanceId, snapshot)).catch(() => {});
+    state.workspaceSavePromise = pending;
+    try { await pending; } finally {
+      if (state.workspaceSavePromise === pending) state.workspaceSavePromise = null;
+    }
   }
 
   function scheduleWorkspaceSave() {
@@ -1142,6 +1343,7 @@
     if (!bridge || !bridge.writeFile) return false;
     setSaveState('正在保存…', 'saving');
     const path = state.currentPath;
+    const projectInstanceId = state.project.instanceId;
     const revision = state.revision;
     const version = state.editVersion;
     const content = window.__editor && window.__editor.getContent
@@ -1178,6 +1380,16 @@
       clearRecovery(path);
       renderTabs();
       setSaveState('已保存', 'saved');
+      if (state.project?.instanceId === projectInstanceId) {
+        document.dispatchEvent(new CustomEvent('writcraft:current-file-authority-changed', {
+          detail: {
+            projectInstanceId,
+            path,
+            revision: state.revision,
+            status: 'saved',
+          },
+        }));
+      }
       return true;
     }
     state.dirty = true;
@@ -1260,7 +1472,16 @@
     // caller's revealRange() is overwritten by this next-frame cursor restore.
     await new Promise(resolve => requestAnimationFrame(() => {
       if (openGeneration === state.openGeneration && state.currentPath === path) {
-        restoreCursor(view.cursorOffset || 0);
+        const caretOffset = Number.isSafeInteger(view.caretOffset)
+          ? view.caretOffset
+          : Number.isSafeInteger(view.cursorOffset) ? view.cursorOffset : 0;
+        const anchorOffset = Number.isSafeInteger(view.selectionAnchorOffset)
+          ? view.selectionAnchorOffset
+          : caretOffset;
+        const focusOffset = Number.isSafeInteger(view.selectionFocusOffset)
+          ? view.selectionFocusOffset
+          : caretOffset;
+        restoreSelection(anchorOffset, focusOffset);
         if (editorScroll) editorScroll.scrollTop = Math.max(0, Number(view.scrollTop) || 0);
       }
       resolve();
@@ -1299,14 +1520,16 @@
     document.dispatchEvent(new CustomEvent('writcraft:current-file-changed', { detail: { path: state.currentPath } }));
   }
 
-  async function refreshTree() {
+  async function refreshTree(owner = null) {
     if (!bridge || !bridge.listTree) return;
     const result = normalizeResult(await bridge.listTree());
+    if (owner && !owner.isCurrent()) return false;
     if (result.ok) {
       state.tree = result.tree || [];
       renderTree();
       document.dispatchEvent(new CustomEvent('writcraft:tree-changed'));
     }
+    return true;
   }
 
   async function loadEditContext(owner = null) {
@@ -2000,6 +2223,8 @@
     state.currentPath = '';
     state.revision = null;
     state.views = {};
+    state.returnStack = [];
+    updateWorkspaceReturnControl();
     state.conflictRecovery = false;
     state.conflictRevision = null;
     state.externalDeleted = false;
@@ -2031,7 +2256,7 @@
     if (bridge?.loadWorkspace) {
       let saved = null;
       try {
-        saved = normalizeResult(await bridge.loadWorkspace());
+        saved = normalizeResult(await bridge.loadWorkspace(projectInstanceId));
       } catch (_) {}
       if (!isProjectEntryCurrent(entryGeneration, projectInstanceId)) return false;
       if (saved?.ok && saved.workspace) {
@@ -2039,6 +2264,10 @@
         state.views = saved.workspace.files && typeof saved.workspace.files === 'object'
           ? { ...saved.workspace.files }
           : {};
+        state.returnStack = Array.isArray(saved.workspace.returnStack)
+          ? saved.workspace.returnStack.map(entry => structuredClone(entry))
+          : [];
+        updateWorkspaceReturnControl();
         initialPath = saved.workspace.activePath || initialPath;
       }
     }
@@ -2209,7 +2438,7 @@
     resolve(action);
   }
 
-  async function handleProjectResult(result, entryGeneration) {
+  async function handleProjectResult(result, entryGeneration, entryKind = 'existing') {
     if (!isProjectEntryCurrent(entryGeneration)) return false;
     result = normalizeResult(result);
     if (result.migration?.kind === 'legacy-edit') {
@@ -2241,9 +2470,11 @@
         showError(resultMessage(next, '迁移失败，原文件保持不变'));
         return false;
       }
-      return handleProjectResult(next, entryGeneration);
+      return handleProjectResult(next, entryGeneration, entryKind);
     }
-    return enterProject(result, entryGeneration);
+    const entered = await enterProject(result, entryGeneration);
+    if (entered && entryKind === 'created') setWorkspaceView('home');
+    return entered;
   }
 
   function markdownTreePaths(nodes, output = new Set()) {
@@ -2468,10 +2699,12 @@
         return showError('请先对当前生成图片选择插入、保留或移入废纸篓，再切换项目');
       }
       if (!isProjectEntryCurrent(entryGeneration)) return;
+      await saveWorkspaceNow();
+      if (!isProjectEntryCurrent(entryGeneration)) return;
       setSaveState('正在创建项目…', 'saving');
       const result = await bridge.create(name);
       if (!isProjectEntryCurrent(entryGeneration)) return;
-      await handleProjectResult(result, entryGeneration);
+      await handleProjectResult(result, entryGeneration, 'created');
     } catch (error) {
       if (isProjectEntryCurrent(entryGeneration)) showError(error.message);
     } finally {
@@ -2495,6 +2728,8 @@
           !(await window.__imageGenerationView.discardPending())) {
         return showError('请先对当前生成图片选择插入、保留或移入废纸篓，再切换项目');
       }
+      if (!isProjectEntryCurrent(entryGeneration)) return;
+      await saveWorkspaceNow();
       if (!isProjectEntryCurrent(entryGeneration)) return;
       setSaveState('正在打开项目…', 'saving');
       const result = await bridge.open();
@@ -2546,7 +2781,7 @@
     activeWorkspaceView = name;
     if (appShell) appShell.dataset.workspaceView = name;
 
-    const sidebarVisible = name !== 'graph';
+    const sidebarVisible = !['graph', 'home'].includes(name);
     if (explorerView) explorerView.hidden = !sidebarVisible || name !== 'explorer';
     if (searchView) searchView.hidden = !sidebarVisible || name !== 'search';
     if (sourcesView) sourcesView.hidden = !sidebarVisible || name !== 'sources';
@@ -2643,11 +2878,12 @@
     return flushExternalChanges();
   }
 
-  async function refreshExternalEditContext(payload) {
+  async function refreshExternalEditContext(payload, owner) {
     if (state.currentPath === 'edit.md' || !changeTouchesPath(payload, 'edit.md')) return false;
     let result;
     try { result = normalizeResult(await bridge.readFile('edit.md')); }
     catch (error) { result = { ok: false, error: error.message }; }
+    if (!owner.isCurrent()) return false;
     if (!result.ok) {
       if (state.editContext) writeRecoveryEntry('edit.md', state.editContext, state.editContextRevision);
       state.editContext = '';
@@ -2656,7 +2892,8 @@
       state.promptFrontMatter = null;
       updateDocumentChrome(state.currentPath);
       setSaveState('⚠ edit.md 已从磁盘删除；AI 操作已暂停', 'error');
-      await maybeOfferOrphanRecovery();
+      await maybeOfferOrphanRecovery(owner);
+      if (!owner.isCurrent()) return false;
       return true;
     }
     if (result.revision === state.editContextRevision) return false;
@@ -2672,6 +2909,18 @@
   async function handleExternalChange(payload) {
     if (!state.project || payload?.projectInstanceId !== state.project.instanceId) return;
     if (state.inlineMutationBlocked) return;
+    const projectInstanceId = state.project.instanceId;
+    const currentPath = state.currentPath;
+    const sequence = ++externalChangeSequence;
+    const owner = Object.freeze({
+      projectInstanceId,
+      currentPath,
+      sequence,
+      isCurrent() {
+        return sequence === externalChangeSequence &&
+          state.project?.instanceId === projectInstanceId && state.currentPath === currentPath;
+      },
+    });
     const authoritativeExternal = payload.aiContextChanged !== false;
     const changes = payload.changes || [];
     const graphChangedPaths = authoritativeExternal
@@ -2680,15 +2929,16 @@
     const graphInvalidated = authoritativeExternal && changes.some(change => !change?.path);
     if (graphChangedPaths.length || graphInvalidated) {
       document.dispatchEvent(new CustomEvent('writcraft:graph-source-changed', {
-        detail: { projectInstanceId: state.project.instanceId, paths: graphChangedPaths, invalidateAll: graphInvalidated },
+        detail: { projectInstanceId, paths: graphChangedPaths, invalidateAll: graphInvalidated },
       }));
     }
     const projectInvalidated = changes.some(change => !change.path);
     const otherPathChanged = changes.some(change => change.path
-      && change.path !== state.currentPath && change.path !== 'edit.md');
-    await refreshTree();
-    const editContextChanged = await refreshExternalEditContext(payload);
-    if (!state.currentPath || !changeTouchesCurrent(payload)) {
+      && change.path !== currentPath && change.path !== 'edit.md');
+    if (await refreshTree(owner) === false || !owner.isCurrent()) return;
+    const editContextChanged = await refreshExternalEditContext(payload, owner);
+    if (!owner.isCurrent()) return;
+    if (!currentPath || !changeTouchesPath(payload, currentPath)) {
       if (authoritativeExternal && window.__aiRequestGuard?.shouldAdvanceContext({ editContextChanged, otherPathChanged, projectInvalidated })) {
         state.aiContextGeneration += 1;
         document.dispatchEvent(new CustomEvent('writcraft:chat-context-invalidated', {
@@ -2701,11 +2951,13 @@
     // settle, then compare revisions; matching revisions are a harmless echo.
     if (state.savePromise) {
       try { await state.savePromise; } catch (_) {}
+      if (!owner.isCurrent()) return;
     }
-    const path = state.currentPath;
+    const path = currentPath;
     let result;
     try { result = normalizeResult(await bridge.readFile(path)); }
     catch (error) { result = { ok: false, error: error.message }; }
+    if (!owner.isCurrent()) return;
 
     if (!result.ok) {
       if (authoritativeExternal) state.aiContextGeneration += 1;
@@ -2726,10 +2978,19 @@
       saveRecovery();
       showConflictActions(true);
       setSaveState('⚠ 文件已从磁盘删除；可用当前内容重新创建，或关闭标签', 'error');
+      document.dispatchEvent(new CustomEvent('writcraft:current-file-authority-changed', {
+        detail: {
+          projectInstanceId,
+          path,
+          revision: null,
+          status: 'missing',
+        },
+      }));
       document.dispatchEvent(new CustomEvent('writcraft:chat-context-invalidated', {
         detail: { reason: 'external-current-file-deleted', path },
       }));
-      await maybeOfferOrphanRecovery();
+      await maybeOfferOrphanRecovery(owner);
+      if (!owner.isCurrent()) return;
       return;
     }
     const currentRevisionChanged = result.revision !== state.revision;
@@ -2749,12 +3010,22 @@
       saveRecovery();
       showConflictActions(true);
       setSaveState('⚠ 外部文件已变化；请选择保留本地稿或使用磁盘版本', 'error');
+      document.dispatchEvent(new CustomEvent('writcraft:current-file-authority-changed', {
+        detail: {
+          projectInstanceId,
+          path,
+          revision: result.revision || null,
+          status: 'conflict',
+        },
+      }));
       return;
     }
     captureCurrentView();
     state.currentPath = '';
     await openFile(path);
-    if (state.currentPath === path) setSaveState('已重新载入外部修改', 'saved');
+    if (state.project?.instanceId === projectInstanceId && state.currentPath === path) {
+      setSaveState('已重新载入外部修改', 'saved');
+    }
   }
 
   async function closeExternallyDeletedTab() {
@@ -2879,6 +3150,7 @@
   editor.addEventListener('keyup', scheduleWorkspaceSave);
   editor.addEventListener('mouseup', scheduleWorkspaceSave);
   editorScroll?.addEventListener('scroll', scheduleWorkspaceSave, { passive: true });
+  workspaceReturn?.addEventListener('click', () => { void returnToPreviousLocation(); });
   conflictKeepLocal?.addEventListener('click', async () => {
     await keepLocalConflictDraft();
   });
@@ -2934,7 +3206,16 @@
   });
   window.addEventListener('beforeunload', () => {
     saveRecovery();
-    saveWorkspaceNow();
+    clearTimeout(state.workspaceTimer);
+    state.workspaceTimer = null;
+    // A close event cannot wait for Promise-based IPC. Use the narrow Main
+    // close-flush bridge so the latest caret/selection/scroll state is durable.
+    try {
+      if (state.project) bridge?.saveWorkspaceBeforeClose?.(
+        state.project.instanceId,
+        workspaceSnapshot()
+      );
+    } catch (_) {}
   });
 
   editContextChip?.addEventListener('click', () => {
@@ -2986,11 +3267,17 @@
     flushExternalChanges,
     settleOwnWriteEcho,
     getCurrentPath: () => state.currentPath,
+    getCursorOffset,
+    getFirstVisibleOffset,
     persistCurrent,
     refreshTree,
     reloadCurrent,
     openFile,
     revealRange,
+    captureEditorReturnState,
+    pushReturnLocation,
+    returnToPreviousLocation,
+    updateOutlineViewState,
     resolveContextSelections,
     revealContextChip,
     insertSourceCitation,

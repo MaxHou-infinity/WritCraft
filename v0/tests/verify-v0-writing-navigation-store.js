@@ -108,49 +108,33 @@ function deterministicBytes() {
 (async () => {
   console.log('\nWriting navigation store verification');
 
-  await test('installs an owner-bound result and issues research plus Changes capabilities', async () => {
+  await test('installs an owner-bound result and issues one Changes capability', async () => {
     const store = storeModule.createWritingNavigationStore({ randomBytes: deterministicBytes() });
     const result = store.install(binding({ record: await record() }));
-    assert.match(result.suggestions[0].actionIds.research, /^wna_[a-f0-9]{32}$/);
-    assert.match(result.suggestions[0].actionIds.changes, /^wna_[a-f0-9]{32}$/);
-    assert.notStrictEqual(
-      result.suggestions[0].actionIds.research,
-      result.suggestions[0].actionIds.changes
-    );
+    assert.match(result.suggestions[0].actionId, /^wna_[a-f0-9]{32}$/);
+    assert.strictEqual(result.suggestions[0].actionIds, undefined);
     assert.strictEqual(store.get(binding({ navigationId: result.navigationId })).navigationId, result.navigationId);
     assert.strictEqual(store.stats().results, 1);
-    assert.strictEqual(store.stats().actions, 2);
+    assert.strictEqual(store.stats().actions, 1);
   });
 
-  await test('research remains safely reusable while changes consumes after successful handoff', async () => {
-    for (const action of ['research', 'changes']) {
-      const store = storeModule.createWritingNavigationStore({ randomBytes: deterministicBytes() });
-      const result = store.install(binding({ record: await record(action === 'research' ? 2 : 3) }));
-      const lease = store.acquireAction(actionBinding({
-        actionId: result.suggestions[0].actionIds[action],
-      }));
-      assert.strictEqual(lease.suggestion.action, action);
-      const settled = store.settleAction(binding({ leaseId: lease.leaseId, outcome: 'success' }));
-      assert.strictEqual(settled.consumed, action === 'changes');
-      if (action === 'research') {
-        const reopened = store.acquireAction(actionBinding({
-          actionId: result.suggestions[0].actionIds.research,
-        }));
-        assert.strictEqual(reopened.repeatable, true);
-        store.settleAction(binding({ leaseId: reopened.leaseId, outcome: 'success' }));
-      } else {
-        assert.throws(
-          () => store.acquireAction(actionBinding({ actionId: result.suggestions[0].actionIds.changes })),
-          error => error.code === 'ACTION_NOT_FOUND'
-        );
-      }
-    }
+  await test('Changes consumes its single capability after successful handoff', async () => {
+    const store = storeModule.createWritingNavigationStore({ randomBytes: deterministicBytes() });
+    const result = store.install(binding({ record: await record(3) }));
+    const lease = store.acquireAction(actionBinding({ actionId: result.suggestions[0].actionId }));
+    assert.strictEqual(lease.suggestion.action, 'changes');
+    assert.strictEqual(lease.repeatable, false);
+    assert.strictEqual(store.settleAction(binding({ leaseId: lease.leaseId, outcome: 'success' })).consumed, true);
+    assert.throws(
+      () => store.acquireAction(actionBinding({ actionId: result.suggestions[0].actionId })),
+      error => error.code === 'ACTION_NOT_FOUND'
+    );
   });
 
   await test('a review-ready Changes action remains reusable only after the review is settled', async () => {
     const store = storeModule.createWritingNavigationStore({ randomBytes: deterministicBytes() });
     const result = store.install(binding({ record: await record(31, 'changes') }));
-    const actionId = result.suggestions[0].actionIds.changes;
+    const actionId = result.suggestions[0].actionId;
     const lease = store.acquireAction(actionBinding({ actionId }));
     const settled = store.settleAction(binding({ leaseId: lease.leaseId, outcome: 'review_ready' }));
     assert.strictEqual(settled.consumed, false);
@@ -160,49 +144,10 @@ function deterministicBytes() {
     assert.throws(() => store.acquireAction(actionBinding({ actionId })), error => error.code === 'ACTION_NOT_FOUND');
   });
 
-  await test('concurrent Research reports busy without aborting or consuming the active lease', async () => {
-    const store = storeModule.createWritingNavigationStore({ randomBytes: deterministicBytes() });
-    const result = store.install(binding({ record: await record(45, 'changes', '并发来源') }));
-    const actionId = result.suggestions[0].actionIds.research;
-    const first = store.acquireAction(actionBinding({ actionId }));
-    assert.strictEqual(first.signal.aborted, false);
-    assert.throws(
-      () => store.acquireAction(actionBinding({
-        actionId, attemptId: `wno_${'f'.repeat(32)}`,
-      })),
-      error => error.code === 'ACTION_BUSY'
-    );
-    assert.strictEqual(first.signal.aborted, false);
-    assert.strictEqual(store.assertLeaseCurrent(binding({ leaseId: first.leaseId })).action, 'research');
-    assert.strictEqual(store.settleAction(binding({
-      leaseId: first.leaseId, outcome: 'success',
-    })).consumed, false);
-    const reopened = store.acquireAction(actionBinding({
-      actionId, attemptId: `wno_${'e'.repeat(32)}`,
-    }));
-    assert.strictEqual(reopened.suggestion.action, 'research');
-  });
-
-  await test('an internal source-recovery capability does not change the model-approved local-edit action', async () => {
-    const store = storeModule.createWritingNavigationStore({ randomBytes: deterministicBytes() });
-    const result = store.install(binding({ record: await record(4) }));
-    const research = store.acquireAction(actionBinding({
-      actionId: result.suggestions[0].actionIds.research,
-    }));
-    assert.strictEqual(research.suggestion.action, 'research');
-    assert.strictEqual(research.record.result.suggestions[0].action, 'changes');
-    assert.strictEqual(research.repeatable, true);
-    store.settleAction(binding({ leaseId: research.leaseId, outcome: 'success' }));
-    const changes = store.acquireAction(actionBinding({
-      actionId: result.suggestions[0].actionIds.changes,
-    }));
-    assert.strictEqual(changes.suggestion.action, 'changes');
-  });
-
   await test('REVIEW_IN_PROGRESS style retryable settlement preserves the action', async () => {
     const store = storeModule.createWritingNavigationStore({ randomBytes: deterministicBytes() });
     const result = store.install(binding({ record: await record(5, 'changes') }));
-    const actionId = result.suggestions[0].actionIds.changes;
+    const actionId = result.suggestions[0].actionId;
     const first = store.acquireAction(actionBinding({ actionId }));
     assert.strictEqual(store.settleAction(binding({
       leaseId: first.leaseId,
@@ -268,7 +213,7 @@ function deterministicBytes() {
   await test('concurrent replay terminates the single-use action', async () => {
     const store = storeModule.createWritingNavigationStore({ randomBytes: deterministicBytes() });
     const result = store.install(binding({ record: await record(6, 'changes') }));
-    const actionId = result.suggestions[0].actionIds.changes;
+    const actionId = result.suggestions[0].actionId;
     const first = store.acquireAction(actionBinding({ actionId }));
     assert.strictEqual(store.assertLeaseCurrent(binding({ leaseId: first.leaseId })).action, 'changes');
     assert.throws(
@@ -348,7 +293,7 @@ function deterministicBytes() {
     for (let index = 11; index <= 18; index += 1) {
       evictionStore.install(binding({ record: await record(index) }));
     }
-    assert.deepStrictEqual(evictionStore.stats(), { results: 8, actions: 16, leases: 0 });
+    assert.deepStrictEqual(evictionStore.stats(), { results: 8, actions: 8, leases: 0 });
     assert.throws(
       () => evictionStore.acquireAction(actionBinding({ actionId: first.suggestions[0].actionId })),
       error => error.code === 'ACTION_NOT_FOUND'
@@ -415,9 +360,8 @@ function deterministicBytes() {
   await test('parking preserves the latest record, aborts old work and restores fresh capabilities', async () => {
     const store = storeModule.createWritingNavigationStore({ randomBytes: deterministicBytes() });
     const installed = store.install(binding({ record: await record(42, 'changes', '恢复测试') }));
-    const oldResearchId = installed.suggestions[0].actionIds.research;
-    const oldChangesId = installed.suggestions[0].actionIds.changes;
-    const running = store.acquireAction(actionBinding({ actionId: oldChangesId }));
+    const oldActionId = installed.suggestions[0].actionId;
+    const running = store.acquireAction(actionBinding({ actionId: oldActionId }));
 
     assert.strictEqual(store.parkProject({ ownerId: OWNER, projectInstanceId: PROJECT }), 1);
     assert.strictEqual(running.signal.aborted, true);
@@ -439,19 +383,18 @@ function deterministicBytes() {
       navigationId: installed.navigationId,
     });
     assert.strictEqual(restored.navigationId, installed.navigationId);
-    assert.notStrictEqual(restored.suggestions[0].actionIds.research, oldResearchId);
-    assert.notStrictEqual(restored.suggestions[0].actionIds.changes, oldChangesId);
+    assert.notStrictEqual(restored.suggestions[0].actionId, oldActionId);
     assert.strictEqual(store.peekRestorable(OWNER, ROOT), null);
-    assert.strictEqual(store.stats().actions, 2);
+    assert.strictEqual(store.stats().actions, 1);
     assert.throws(
-      () => store.acquireAction(actionBinding({ actionId: oldChangesId })),
+      () => store.acquireAction(actionBinding({ actionId: oldActionId })),
       error => error.code === 'ACTION_NOT_FOUND'
     );
     assert.strictEqual(store.acquireAction({
       ...restoredBinding,
-      actionId: restored.suggestions[0].actionIds.research,
+      actionId: restored.suggestions[0].actionId,
       attemptId: `wno_${'d'.repeat(32)}`,
-    }).suggestion.action, 'research');
+    }).suggestion.action, 'changes');
   });
 
   await test('failed capability remint leaves the parked record intact with no orphan actions', async () => {
@@ -459,18 +402,18 @@ function deterministicBytes() {
     const bytes = size => {
       call += 1;
       if (call === 1) return Buffer.alloc(size, 1);
-      if (call === 2) return Buffer.alloc(size, 2);
-      return Buffer.alloc(size, 3);
+      return Buffer.alloc(size, 2);
     };
     const store = storeModule.createWritingNavigationStore({ randomBytes: bytes });
     const installed = store.install(binding({ record: await record(44, 'changes', '原子恢复') }));
     store.parkProject({ ownerId: OWNER, projectInstanceId: PROJECT });
+    store.install(binding({ record: await record(45, 'changes', '占用能力') }));
     assert.throws(() => store.restoreLatest({
       ...binding({ projectInstanceId: 'instance_abcdef0123456789abcdef01' }),
       navigationId: installed.navigationId,
     }), error => error.code === 'CAPABILITY_COLLISION');
     assert.strictEqual(store.peekRestorable(OWNER, ROOT).navigationId, installed.navigationId);
-    assert.deepStrictEqual(store.stats(), { results: 1, actions: 0, leases: 0 });
+    assert.deepStrictEqual(store.stats(), { results: 2, actions: 1, leases: 0 });
   });
 
   await test('hard invalidation deletes parked records instead of making them restorable', async () => {

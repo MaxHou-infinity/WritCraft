@@ -34,25 +34,49 @@ const project = service.createProjectAt(scratch, '恢复测试');
 service.createMarkdownFile(project.rootPath, 'chapters/01.md');
 service.createMarkdownFile(project.rootPath, 'notes.md');
 
-check('新项目初始化 schema v1 工作区', () => {
+const position = (caretOffset = 0, scrollTop = 0) => ({
+  caretOffset,
+  selectionAnchorOffset: caretOffset,
+  selectionFocusOffset: caretOffset,
+  scrollTop,
+  activeOutlineId: null,
+  collapsedOutlineIds: [],
+});
+
+check('新项目初始化 schema v2 工作区', () => {
   const disk = JSON.parse(fs.readFileSync(path.join(project.rootPath, service.WORKSPACE_FILE), 'utf8'));
-  assert.equal(disk.schema, 'writcraft.workspace/v1');
-  assert.equal(disk.schemaVersion, 1);
+  assert.equal(disk.schema, 'writcraft.workspace/v2');
+  assert.equal(disk.schemaVersion, 2);
   assert.deepEqual(service.loadWorkspace(project.rootPath), {
     tabs: ['edit.md'],
     activePath: 'edit.md',
-    files: { 'edit.md': { cursorOffset: 0, scrollTop: 0 } },
+    files: { 'edit.md': position() },
+    returnStack: [],
   });
 });
 
-check('持久化标签、激活文件、光标和滚动位置', () => {
+check('持久化标签、激活文件、选区、滚动、大纲和返回路径', () => {
   const state = {
     tabs: ['edit.md', 'chapters/01.md'],
     activePath: 'chapters/01.md',
     files: {
-      'edit.md': { cursorOffset: 12, scrollTop: 24.5 },
-      'chapters/01.md': { cursorOffset: 8, scrollTop: 96 },
+      'edit.md': position(12, 24.5),
+      'chapters/01.md': {
+        ...position(8, 96),
+        selectionAnchorOffset: 3,
+        activeOutlineId: 'sec_0123456789abcdef',
+        collapsedOutlineIds: ['sec_fedcba9876543210'],
+      },
     },
+    returnStack: [{
+      view: 'project_home', stableLocator: null, scrollTop: 18, editorReturnState: null,
+    }, {
+      view: 'editor', stableLocator: { kind: 'file', path: 'edit.md' }, scrollTop: 0,
+      editorReturnState: {
+        path: 'edit.md', caretOffset: 12, selectionAnchorOffset: 4,
+        selectionFocusOffset: 12, scrollTop: 24.5, revision: 'a'.repeat(64),
+      },
+    }],
   };
   assert.deepEqual(service.saveWorkspace(project.rootPath, state), state);
   assert.deepEqual(service.loadWorkspace(project.rootPath), state);
@@ -65,7 +89,8 @@ check('工作区只接受已存在的公开 Markdown 路径', () => {
   const base = relPath => ({
     tabs: [relPath],
     activePath: relPath,
-    files: { [relPath]: { cursorOffset: 0, scrollTop: 0 } },
+    files: { [relPath]: position() },
+    returnStack: [],
   });
   throwsCode(() => service.saveWorkspace(project.rootPath, base('../outside.md')), 'PATH_TRAVERSAL');
   throwsCode(() => service.saveWorkspace(project.rootPath, base('/tmp/outside.md')), 'ABSOLUTE_PATH');
@@ -78,27 +103,72 @@ check('拒绝标签外激活文件和非法位置', () => {
   throwsCode(() => service.saveWorkspace(project.rootPath, {
     tabs: ['edit.md'],
     activePath: 'notes.md',
-    files: { 'edit.md': { cursorOffset: 0, scrollTop: 0 } },
+    files: { 'edit.md': position() },
+    returnStack: [],
   }), 'INVALID_WORKSPACE');
   throwsCode(() => service.saveWorkspace(project.rootPath, {
     tabs: ['edit.md'],
     activePath: 'edit.md',
-    files: { 'edit.md': { cursorOffset: -1, scrollTop: 0 } },
+    files: { 'edit.md': { ...position(), caretOffset: -1 } },
+    returnStack: [],
   }), 'INVALID_WORKSPACE');
 });
 
-check('损坏、旧 schema 或引用丢失文件时安全回退 edit.md', () => {
+check('合法 v1 原子迁移为 v2，损坏、未来 schema 或丢失文件不覆盖原记录', () => {
   const target = path.join(project.rootPath, service.WORKSPACE_FILE);
+  fs.writeFileSync(target, JSON.stringify({
+    schema: 'writcraft.workspace/v1', schemaVersion: 1,
+    tabs: ['edit.md', 'chapters/01.md'], activePath: 'chapters/01.md',
+    files: { 'edit.md': { cursorOffset: 2, scrollTop: 4 }, 'chapters/01.md': { cursorOffset: 7, scrollTop: 9 } },
+  }));
+  const migrated = service.loadWorkspace(project.rootPath);
+  assert.deepEqual(migrated.files['chapters/01.md'], position(7, 9));
+  assert.deepEqual(migrated.returnStack, []);
+  assert.equal(JSON.parse(fs.readFileSync(target, 'utf8')).schema, 'writcraft.workspace/v2');
+
   fs.writeFileSync(target, '{broken');
   assert.deepEqual(service.loadWorkspace(project.rootPath).tabs, ['edit.md']);
-  fs.writeFileSync(target, JSON.stringify({ schema: 'writcraft.workspace/v0', schemaVersion: 0 }));
+  assert.equal(fs.readFileSync(target, 'utf8'), '{broken');
+  const future = JSON.stringify({ schema: 'writcraft.workspace/v99', schemaVersion: 99 });
+  fs.writeFileSync(target, future);
   assert.deepEqual(service.loadWorkspace(project.rootPath).tabs, ['edit.md']);
+  assert.equal(fs.readFileSync(target, 'utf8'), future);
   fs.writeFileSync(target, JSON.stringify({
     schema: 'writcraft.workspace/v1', schemaVersion: 1,
     tabs: ['gone.md'], activePath: 'gone.md',
     files: { 'gone.md': { cursorOffset: 0, scrollTop: 0 } },
   }));
   assert.deepEqual(service.loadWorkspace(project.rootPath).tabs, ['edit.md']);
+  assert.equal(JSON.parse(fs.readFileSync(target, 'utf8')).schema, 'writcraft.workspace/v1');
+});
+
+check('只读采集可解释 v1，但不会抢占 Main 的迁移写权限', () => {
+  const target = path.join(project.rootPath, service.WORKSPACE_FILE);
+  const legacy = JSON.stringify({
+    schema: 'writcraft.workspace/v1', schemaVersion: 1,
+    tabs: ['edit.md'], activePath: 'edit.md',
+    files: { 'edit.md': { cursorOffset: 3, scrollTop: 5 } },
+  });
+  fs.writeFileSync(target, legacy);
+  const interpreted = service.loadWorkspace(project.rootPath, { migrate: false });
+  assert.equal(interpreted.files['edit.md'].caretOffset, 3);
+  assert.equal(interpreted.schema, undefined);
+  assert.equal(fs.readFileSync(target, 'utf8'), legacy);
+});
+
+check('v2 拒绝未知字段、pending 定位和越界返回状态', () => {
+  const base = {
+    tabs: ['edit.md'], activePath: 'edit.md', files: { 'edit.md': position() }, returnStack: [],
+  };
+  throwsCode(() => service.saveWorkspace(project.rootPath, { ...base, unknown: true }), 'INVALID_WORKSPACE');
+  throwsCode(() => service.saveWorkspace(project.rootPath, {
+    ...base,
+    returnStack: [{ view: 'changes', stableLocator: { kind: 'pending_review', reviewLocationId: 'x' }, scrollTop: 0, editorReturnState: null }],
+  }), 'INVALID_WORKSPACE');
+  throwsCode(() => service.saveWorkspace(project.rootPath, {
+    ...base,
+    files: { 'edit.md': { ...position(), collapsedOutlineIds: Array(129).fill('sec_0123456789abcdef') } },
+  }), 'INVALID_WORKSPACE');
 });
 
 check('工作区内部文件不允许通过符号链接越界', () => {
@@ -112,7 +182,7 @@ check('工作区内部文件不允许通过符号链接越界', () => {
   assert.deepEqual(service.loadWorkspace(unsafe).tabs, ['edit.md']);
   throwsCode(() => service.saveWorkspace(unsafe, {
     tabs: ['edit.md'], activePath: 'edit.md',
-    files: { 'edit.md': { cursorOffset: 0, scrollTop: 0 } },
+    files: { 'edit.md': position() }, returnStack: [],
   }), 'SYMLINK_NOT_ALLOWED');
   assert.deepEqual(fs.readdirSync(outside), []);
 });
@@ -147,6 +217,10 @@ check('openRecent 重新校验持久化路径且不暴露 rootPath', () => {
   for (const route of ['open-recent', 'load-workspace', 'save-workspace']) {
     assert.ok(mainSource.includes(`ipcMain.handle('writcraft:project:${route}'`), `缺少 ${route} IPC`);
   }
+  assert.ok(mainSource.includes("ipcMain.on('writcraft:project:save-workspace-before-close'"));
+  assert.ok(mainSource.includes("if (projectInstanceId !== project.instanceId)"));
+  assert.ok(mainSource.includes('event.returnValue = { ok: true, workspace: saved }'));
+  assert.ok(mainSource.includes('operationGeneration <= workspaceSaveGeneration'));
   const recentHandler = mainSource.slice(
     mainSource.indexOf("ipcMain.handle('writcraft:project:open-recent'"),
     mainSource.indexOf("ipcMain.handle('writcraft:project:list'")
@@ -182,8 +256,12 @@ check('openRecent 重新校验持久化路径且不暴露 rootPath', () => {
 
 check('preload 仅暴露最小恢复 API', () => {
   assert.ok(preloadSource.includes("openRecent: () => ipcRenderer.invoke('writcraft:project:open-recent')"));
-  assert.ok(preloadSource.includes("loadWorkspace: () => ipcRenderer.invoke('writcraft:project:load-workspace')"));
-  assert.ok(preloadSource.includes("saveWorkspace: (workspace) => ipcRenderer.invoke('writcraft:project:save-workspace', workspace)"));
+  assert.ok(preloadSource.includes('loadWorkspace: (projectInstanceId) =>'));
+  assert.ok(preloadSource.includes("ipcRenderer.invoke('writcraft:project:load-workspace', projectInstanceId)"));
+  assert.ok(preloadSource.includes("'writcraft:project:save-workspace',"));
+  assert.ok(preloadSource.includes('++workspaceSaveGeneration'));
+  assert.ok(preloadSource.includes("ipcRenderer.sendSync('writcraft:project:workspace-save-seed')"));
+  assert.ok(preloadSource.includes("'writcraft:project:save-workspace-before-close',"));
   assert.ok(!preloadSource.includes('rootPath:'));
 });
 

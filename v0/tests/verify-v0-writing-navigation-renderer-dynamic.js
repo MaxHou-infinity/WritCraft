@@ -121,7 +121,6 @@ function deferred() {
 const PROJECT = { instanceId: 'instance_0123456789abcdef01234567' };
 const NAVIGATION_ID = `nav_${'a'.repeat(32)}`;
 const CAPABILITY_ID = `wsc_${'b'.repeat(32)}`;
-const ACTION_ID = `wna_${'c'.repeat(32)}`;
 const CHANGES_ACTION_ID = `wna_${'d'.repeat(32)}`;
 let id = 0;
 const nextId = () => `wno_${String(++id).padStart(32, '0')}`;
@@ -155,7 +154,7 @@ function structure() {
   };
 }
 
-function navigation(action = 'open') {
+function navigation(action = 'changes') {
   return {
     ok: true,
     result: {
@@ -163,8 +162,7 @@ function navigation(action = 'open') {
       navigationId: NAVIGATION_ID,
       mode: 'navigation',
       suggestions: [{
-        suggestionId: 'suggestion_1', actionId: ACTION_ID,
-        actionIds: { research: ACTION_ID, changes: CHANGES_ACTION_ID },
+        actionId: CHANGES_ACTION_ID,
         finding: '开篇缺少边界',
         evidence: [{
           relativePath: 'chapters/01.md', revision: '2'.repeat(64),
@@ -445,11 +443,12 @@ async function flush() {
     const host = document.createElement('div');
     document.body.append(host);
     let actionCalls = 0;
+    let evidenceOpens = 0;
     let adjustmentSeen = null;
     const controller = View.mount(host, {
       stateApi: State,
       createAttemptId: nextId,
-      onGenerate: async () => navigation('open'),
+      onGenerate: async () => navigation('changes'),
       onRunAction: async (_projectId, actionId, attemptId, _onStage, taskInput) => {
         actionCalls += 1;
         adjustmentSeen = taskInput?.adjustment || null;
@@ -462,8 +461,10 @@ async function flush() {
           changeSetId: `pc_${'f'.repeat(32)}`,
         };
       },
-      onOpenEvidence: async value => {
+      onOpenEvidence: async (value, filePath) => {
+        evidenceOpens += 1;
         assert.strictEqual(value.filePath, 'chapters/01.md');
+        assert.strictEqual(filePath, 'chapters/01.md');
       },
       onAdjustReview: async () => true,
     });
@@ -481,6 +482,10 @@ async function flush() {
     assert(text(host).includes('基于本次已读取的 1/3 个正文文件'));
     assert(text(host).includes('以下建议仅在本次已读范围内优先'));
     assert(text(host).includes('开篇缺少边界'));
+    await host.querySelector('.writing-navigation__evidence-link').click();
+    await flush();
+    assert.strictEqual(evidenceOpens, 1);
+    assert.strictEqual(actionCalls, 0);
     assert.strictEqual(host.querySelectorAll('.writing-navigation__primary').filter(
       node => node.textContent === '处理这个建议'
     ).length, 1);
@@ -573,7 +578,7 @@ async function flush() {
     assert(text(host).includes('不会再次调用 AI'));
     assert.strictEqual(await controller.request(), false);
     assert.strictEqual(generations, 0);
-    pending.resolve(navigation('research'));
+    pending.resolve(navigation('changes'));
     assert.strictEqual(await restoring, true);
     assert.strictEqual(controller.getState().phase, 'navigation-ready');
     assert(text(host).includes('处理这个建议'));

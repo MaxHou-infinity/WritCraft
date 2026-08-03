@@ -44,10 +44,13 @@ function createHarness(recoveryResults = []) {
     changesHistoryRecoveryGeneration: 0,
     mutationBlockers: {},
     changesHistoryRecovery: null,
+    views: {},
+    returnStack: [],
   };
   const noop = () => {};
   const context = vm.createContext({
     state,
+    externalChangeSequence: 0,
     migrationResolver: null,
     finishMigrationDialog: noop,
     closeProjectOnboarding: noop,
@@ -66,6 +69,7 @@ function createHarness(recoveryResults = []) {
     setMarkdownTrashMutationBlocked: noop,
     setChangesHistoryMutationBlocked: noop,
     setSidebarView: noop,
+    updateWorkspaceReturnControl: noop,
     showConflictActions: noop,
     projectTitle: { textContent: '' },
     newFileButton: { disabled: false },
@@ -93,8 +97,10 @@ function createHarness(recoveryResults = []) {
     refreshMarkdownTrash: async () => {},
     console,
     Promise,
+    clearTimeout,
+    structuredClone: value => JSON.parse(JSON.stringify(value)),
   });
-  vm.runInContext(`${ownership}\n${enter}\nthis.api = { beginProjectEntry, enterProject };`, context);
+  vm.runInContext(`${ownership}\n${enter}\nthis.api = { beginProjectEntry, isOwnedProjectEntryCurrent, enterProject };`, context);
   return { state, events, api: context.api };
 }
 
@@ -119,6 +125,7 @@ function createOwnedHelperHarness() {
   const localValues = new Map([['legacy-key', 'legacy-value']]);
   const context = vm.createContext({
     state,
+    externalChangeSequence: 0,
     bridge: {
       async getContext() {
         contextCalls += 1;
@@ -173,6 +180,7 @@ function createOwnedHelperHarness() {
     clearRecovery: () => mutations.push('clear-recovery'),
     console,
     Promise,
+    clearTimeout,
   });
   vm.runInContext(
     `${ownership}\n${loadEditContextSource}\n${entryRecoveryHelpers}\n` +
@@ -191,6 +199,15 @@ async function test(name, fn) {
 
 (async () => {
   console.log('\nProject-entry workspace ownership verification');
+
+  await test('external watcher owners share the same exact current predicate', async () => {
+    const harness = createHarness();
+    let current = true;
+    const owner = { isCurrent: () => current };
+    assert.strictEqual(harness.api.isOwnedProjectEntryCurrent(owner), true);
+    current = false;
+    assert.strictEqual(harness.api.isOwnedProjectEntryCurrent(owner), false);
+  });
 
   await test('a stale project entry cannot mark a newer project ready', async () => {
     const oldRecovery = deferred();
@@ -222,6 +239,13 @@ async function test(name, fn) {
     );
     assert.strictEqual(harness.state.project.instanceId, 'project-b');
     assert.strictEqual(harness.state.projectReady, true);
+  });
+
+  await test('starting a project entry cancels the old workspace debounce owner', async () => {
+    const harness = createHarness();
+    harness.state.workspaceTimer = setTimeout(() => {}, 10_000);
+    harness.api.beginProjectEntry();
+    assert.strictEqual(harness.state.workspaceTimer, null);
   });
 
   await test('recovery failure remains not-ready and publishes a clearing event', async () => {

@@ -125,8 +125,8 @@ check('一致性问题状态可审阅并通过受限 IPC 持久化', () => {
   assert.ok(graphView.includes('bridge?.setIssueStatus?.(window.__workspace?.state?.project?.instanceId, issue.id, status)'));
 });
 check('六类显式引用与选段由 Main 权威解析并绑定到 AI 回复', () => {
-  assert.ok(html.includes('context-selection.js'));
-  assert.ok(html.includes('block-anchor.js'));
+  assert.ok(html.includes('../shared/context-selection.js'));
+  assert.ok(html.includes('../shared/block-anchor.js'));
   assert.ok(html.includes('id="chat-context-chips"'));
   assert.ok(main.includes("require('./context-resolver-service')"));
   assert.ok(main.includes("ipcMain.handle('writcraft:project:resolve-context'"));

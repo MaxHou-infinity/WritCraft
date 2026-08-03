@@ -80,6 +80,7 @@ test('uses a narrow publish allowlist that excludes tests, releases and secrets'
     'bin/writcraft.js',
     'src/main/**/*.js',
     'src/main/native/*',
+    'src/shared/**/*.js',
     'src/renderer/**/*',
     'README.md',
     'LICENSE',
@@ -96,6 +97,8 @@ test('ships the complete runtime and four executable universal helper artifacts'
   for (const relative of [
     'src/main/main.js',
     'src/main/preload.js',
+    'src/shared/block-anchor.js',
+    'src/shared/context-selection.js',
     'src/renderer/index.html',
     'src/main/native/author-copy-helper',
     'src/main/native/writing-structure-helper',
@@ -247,6 +250,8 @@ test('actual npm tarball has the shrinkwrap, notices, safe paths and executable 
     'src/main/native/writing-structure-helper',
     'src/main/native/project-hash-helper',
     'src/main/native/markdown-trash-helper',
+    'src/shared/block-anchor.js',
+    'src/shared/context-selection.js',
     'src/renderer/index.html',
   ]) assert(files.has(required), `tarball missing ${required}`);
   for (const file of files.values()) {
@@ -254,6 +259,15 @@ test('actual npm tarball has the shrinkwrap, notices, safe paths and executable 
     assert(!/(^|\/)\.env(?:\.|$)/.test(file.path), file.path);
     assert(!file.path.includes('DEVELOPMENT-STATUS'), file.path);
   }
+  for (const retiredPlanPath of [
+    'src/main/project-plan-service.js',
+    'src/main/project-plan-handler.js',
+    'src/main/project-plan-handoff-service.js',
+    'src/renderer/plan-mode-state.js',
+    'src/renderer/plan-mode-view.js',
+    'src/renderer/plan-mode.css',
+    'src/renderer/plan-handoff-transaction.js',
+  ]) assert(!files.has(retiredPlanPath), `tarball still contains ${retiredPlanPath}`);
   for (const executable of [
     'bin/writcraft.js',
     'src/main/native/author-copy-helper',

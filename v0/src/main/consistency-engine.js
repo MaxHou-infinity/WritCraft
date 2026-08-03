@@ -1,7 +1,7 @@
 'use strict';
 
 const crypto = require('crypto');
-const blockAnchor = require('../renderer/block-anchor');
+const blockAnchor = require('../shared/block-anchor');
 
 const SCHEMA = 'writcraft.graph/v2';
 const NODE_TYPES = Object.freeze([

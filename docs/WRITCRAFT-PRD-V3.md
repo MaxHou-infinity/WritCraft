@@ -192,7 +192,7 @@ Front Matter 中仅 `schema` 为系统必填字段；其他正文栏目允许为
 
 ### 5.4 AI 面板
 
-- **Chat**：围绕当前作用域问答，支持 `@file`、`@folder`、`@section`、`@entity` 和 `@source`。
+- **Chat**：围绕当前作用域问答。`@file`、`@folder`、`@section`、`@entity` 和 `@source` 自动补全属于路线图 `0.3.0`，不是 0.2.0 当前能力；
 - **导航**：空项目比较 2–3 个结构方案；已有稿件提供 1–3 个有证据的下一步建议。它可跳过，不是写作门槛，也不展示项目管理式任务图。
 - **Changes**：集中审查单文件或跨文件建议，逐文件查看 Diff、接受或拒绝。
 - **Context**：展示本次请求的上下文清单、估算规模、截断或检索原因。
@@ -402,7 +402,7 @@ Issue 类型首批支持：
 ### 10.2 Phase B：跨文件 AI
 
 1. Chat 能明确区分项目、文件和选区作用域。
-2. `@file` / `@section` 引用可跳转并出现在 Context Chips 中。
+2. `@file` / `@section` 引用可跳转并出现在 Context Chips 中；该项按 `docs/ROADMAP.md` 排入 `0.3.0`，不得从 Phase B 旧分组提前派发到 0.2.0。
 3. AI 对两个以上文件的修改以 ChangeSet 展示，逐文件接受和拒绝均正确。
 4. 修改目标在建议后发生变化时，接受操作被阻止并要求重新生成或人工合并。
 5. 所有已接受 AI 修改可撤销，并能在历史中追溯。
@@ -420,14 +420,14 @@ Issue 类型首批支持：
 
 ### 10.4 完整 V0 体验
 
-以一个包含 `edit.md`、不少于五个章节文件和来源材料的真实项目完成：项目定义 → 文件写作 → 段落 Diff → 跨文件修改 → 一致性检查 → 重启恢复。验收必须包含真实 Electron 行为测试；仅检查 DOM 元素或源码字符串不能证明完成。真实 GUI 项目卡落盘已经关闭；完整 V0 仍需真实作者图片质量/采纳与长文价值指标。npm 0.1.1 Developer Preview 的许可证、双架构、registry/GitHub 发布及公网安装均已关闭。独立 App 的签名/公证/Gatekeeper 属于未来可选路线。
+0.1.2 已用包含 `edit.md`、五个以上章节和来源材料的真实作者隔离副本完成项目定义、文件写作、段落 Diff、统一任务、图片受影响路径、一致性检查与重启恢复，并发布到 npm `preview` / GitHub prerelease。图片与长文的更多价值样本、Research 准确率和 10 名作者内测仍是 `1.0.0` Go/No-Go 证据，不是未关闭的 0.1.2 功能或发布门禁。独立 App 的签名/公证/Gatekeeper 属于未来可选路线。
 
 ## 11. 文档治理
 
 - 本文定义“做什么、为什么做、用户如何验收”。
 - `docs/ROADMAP.md` 是版本顺序、当前目标、范围/非目标与发版门禁的唯一权威。
-- `docs/PHASE-A-IMPLEMENTATION.md` 定义第一阶段“如何安全实现”；后续版本按路线图另立必要合同。
-- `docs/AUTHOR-ACCEPTANCE-V1-CONTRACT.md` 定义真实 API、真实作者、隐私指标和人工旅程的证据边界。
+- `docs/ARCHITECTURE.md` 定义当前稳定工程边界；完整 Phase A 实施过程已归档。
+- 真实 API、真实作者、隐私指标和人工旅程的 0.1.2 证据已归档到 `docs/archive/acceptance/AUTHOR-ACCEPTANCE-V1-CONTRACT.md`；后续版本按路线图另立必要验收合同。
 - `deliverables/` 已整体归档，只用于追溯早期调研、价值叙事和计划，不得派发当前任务；归档边界见 `deliverables/README.md`。
 - `v0/DEVELOPMENT-STATUS.md` 只记录已验证事实、当前风险与下一步，不得把计划写成已完成。
 - 文档读取优先级固定为：当次源码与可复现命令结果 → `v0/DEVELOPMENT-STATUS.md`（当前事实）→ 对应 `docs/*-CONTRACT.md`（验收边界）→ 本文（产品契约）→ `docs/ROADMAP.md`（版本顺序与范围）。它们职责不同，不用一个文件覆盖另一个；历史路线图、PDCA 和调研交付不得作为当前指令。

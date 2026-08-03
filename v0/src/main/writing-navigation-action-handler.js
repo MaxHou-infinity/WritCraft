@@ -221,20 +221,6 @@ function createWritingNavigationActionHandler(options = {}) {
       });
       assertLeaseCurrent();
 
-      if (lease.suggestion.action === 'open') {
-        const result = handoffService.openHandoff(lease);
-        assertLeaseCurrent();
-        settle('success');
-        return result;
-      }
-
-      if (lease.suggestion.action === 'research') {
-        const result = handoffService.researchHandoff(lease);
-        assertLeaseCurrent();
-        settle('success');
-        return result;
-      }
-
       if (lease.suggestion.action !== 'changes') {
         throw new handoffService.WritingNavigationHandoffError(
           'ACTION_MISMATCH',

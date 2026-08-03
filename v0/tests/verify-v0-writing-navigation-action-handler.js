@@ -217,7 +217,7 @@ async function setup(action, overrides = {}) {
       rawCancelHandler(event, projectInstanceId, actionId, attemptId),
     nextAttempt,
     store,
-    actionId: installed.suggestions[0].actionIds[action],
+    actionId: installed.suggestions[0].actionId,
     projectService,
     get modelCalls() { return modelCalls; },
     get cacheCalls() { return cacheCalls; },

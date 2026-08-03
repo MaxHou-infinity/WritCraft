@@ -56,7 +56,7 @@
 
 > **历史原排期，非续作 TODO**：此表是当时的目标，不逐项代表当前实现或签字；当前能力与未关闭验收只看 `v0/DEVELOPMENT-STATUS.md`。其中“2000 字真实测试”转入真实作者验收合同，不得把此表当作重新开发已签字模块的任务列表。
 
-> **排期修订**：以下原 Week 2 功能依赖 Phase A。先完成 `docs/PHASE-A-IMPLEMENTATION.md` 的项目文件、工作区和 revision 保存契约，再实现 `@chapter`、Composer 与跨文件 ChangeSet；不得在 localStorage 单文档架构上伪造“全项目”。
+> **历史排期修订**：以下原 Week 2 功能当时依赖 Phase A；该实施规格现归档于 `docs/archive/contracts/PHASE-A-IMPLEMENTATION.md`。项目文件、工作区和 revision 边界的当前摘要见 `docs/ARCHITECTURE.md`；本段不得用于重开 `@chapter`、Composer 或跨文件 ChangeSet 任务。
 
 > **V0 工程基线（2026-07-18，尚非退出签字）**：安全文件地基、Inline Diff、ChangeSet/撤销、来源/脚注、完整有界 Context、项目向导、增强图谱、章节 Composer、右侧四书签、300 文件压力测试和本地打包工具均已有实现。metrics、Research、image-01、Main 网络边界、Watcher 内外源隔离、真实 Chromium DOM sanitizer 13/13、long-form service E2E 与真实 Electron 9/9 已专项通过；仍缺真实 API、真实作者指标与发布复审。现有 App/ZIP 与源码不同步，历史数字不得用于当前签字。
 
@@ -85,7 +85,7 @@
 
 ## 四、 Week 3（Day 15-21）：⌘R 研究 + 脚注 + 图像 + 结论溯源
 
-> **历史原排期，非续作 TODO**：Research、来源与图像的本地/离线产品链已落地；真实 API、完整 `sk-api-` 图片质量与费用、真实作者证据按 `docs/AUTHOR-ACCEPTANCE-V1-CONTRACT.md` 验收。
+> **历史原排期，非续作 TODO**：Research、来源与图像的本地/离线产品链已落地；0.1.2 真实 API、图片质量与费用、真实作者证据已经验收，过程归档于 `docs/archive/acceptance/AUTHOR-ACCEPTANCE-V1-CONTRACT.md`。
 
 ### 目标
 5 类来源（A/B/C/D）做一次研究 → 自动生成 30 条脚注——这是 V0 "研究内联"差异化能力跑通。

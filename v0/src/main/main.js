@@ -76,6 +76,10 @@ const chatContextRequestService = require('./chat-context-request-service');
 const chatConversationService = require('./chat-conversation-service');
 const diagnosticExportService = require('./diagnostic-export-service');
 const diagnosticExportHandlerService = require('./diagnostic-export-handler');
+const projectHomeSnapshotService = require('./project-home-snapshot-service');
+const workspaceLocationService = require('./workspace-location-service');
+const dailyWorkspaceHandlerService = require('./daily-workspace-handler');
+const dailyWorkspaceDataRunner = require('./daily-workspace-data-runner');
 
 // Establish one identity-independent profile before Main reads userData. The
 // deterministic GUI E2E keeps its explicitly supplied disposable profile;
@@ -101,6 +105,9 @@ userDataService.configureUserData(app, {
 // packaged builds cannot activate it, even if an environment variable is set.
 const electronAiFixture = isElectronAiFixture
   ? require(path.join(__dirname, '..', '..', 'tests', 'fixtures', 'electron-ai-provider')).createElectronAiProvider()
+  : null;
+const electronResearchTtlMs = isElectronAiFixture && /^\d+$/.test(process.env.WRITCRAFT_E2E_RESEARCH_TTL_MS || '')
+  ? Number(process.env.WRITCRAFT_E2E_RESEARCH_TTL_MS)
   : null;
 
 // MiniMax API 端点（Anthropic 协议）
@@ -141,8 +148,19 @@ const markdownTrashHandler = markdownTrashHandlerModule.createMarkdownTrashHandl
 let projectMutationGeneration = 0;
 let rendererNavigationEpoch = 0;
 let internalMutationEpoch = 0;
+let dailyWorkspaceGraphGeneration = 0;
+let dailyWorkspaceSourceGeneration = 0;
+let dailyWorkspaceInventoryGeneration = 0;
+let dailyWorkspaceInventoryCache = null;
+let dailyWorkspaceGraphCache = null;
+let workspaceSaveGeneration = 0;
 let pendingChangeSets = null;
 const researchHandoffStore = researchHandoffService.createResearchHandoffStore({
+  // Real-Electron expiry tests may shorten the existing Main-owned TTL. The
+  // packaged App cannot activate the deterministic provider or this override.
+  ...(Number.isSafeInteger(electronResearchTtlMs) && electronResearchTtlMs > 0
+    ? { ttlMs: electronResearchTtlMs }
+    : {}),
   revokeCapability(capability) {
     pendingChangeSets?.delete(capability, 'research-owner-revoked');
   },
@@ -159,6 +177,95 @@ pendingChangeSets = pendingChangeSetStoreService.createPendingChangeSetStore({
         cardId: dependencies.cardId,
       });
     } catch (_) {}
+  },
+});
+const dailyWorkspaceHome = projectHomeSnapshotService.createProjectHomeSnapshotService();
+function matchesDailyWorkspaceQuery(query, ...values) {
+  return !query || values.some(value => String(value || '').normalize('NFKC')
+    .toLocaleLowerCase('zh-CN').includes(query));
+}
+const dailyWorkspaceLocations = workspaceLocationService.createWorkspaceLocationService({
+  currentStateProvider() {
+    const inventory = dailyWorkspaceInventoryCache;
+    if (!currentProject || !inventory) return null;
+    return {
+      projectInstanceId: currentProject.instanceId,
+      authority: {
+        projectMutationGeneration,
+        inventoryGeneration: dailyWorkspaceInventoryGeneration,
+        graphGeneration: dailyWorkspaceGraphGeneration,
+        sourceGeneration: dailyWorkspaceSourceGeneration,
+        pendingGeneration: pendingChangeSets.pendingGeneration,
+      },
+      inventory,
+    };
+  },
+  adapters: {
+    entity: {
+      list({ query }) {
+        if (!dailyWorkspaceGraphCache) return { status: 'partial', partialReasons: ['GRAPH_UNAVAILABLE'], items: [] };
+        const candidates = (dailyWorkspaceGraphCache.nodes || []).filter(node =>
+          matchesDailyWorkspaceQuery(query, node.label, node.type || '实体', '关系图谱'));
+        return {
+          status: candidates.length > 50 ? 'partial' : 'ready',
+          partialReasons: candidates.length > 50 ? ['GRAPH_RESULTS_LIMIT'] : [],
+          items: candidates.slice(0, 50).map(node => ({
+            locator: { kind: 'entity', nodeId: node.id }, label: node.label,
+            detail: node.type || '实体', breadcrumb: '关系图谱', badges: [],
+          })),
+        };
+      },
+      resolve({ locator, inventory }) {
+        const node = dailyWorkspaceGraphCache?.nodes?.find(item => item.id === locator.nodeId);
+        const evidence = node && (dailyWorkspaceGraphCache.evidence || []).find(item => node.evidenceIds?.includes(item.id));
+        const file = evidence && inventory.files.find(item => item.path === (evidence.path || evidence.filePath));
+        if (!file) return null;
+        return { action: 'open_file', filePath: file.path, revision: file.revision,
+          offset: evidence.start, endOffset: evidence.end };
+      },
+    },
+    issue: {
+      list({ query }) {
+        if (!dailyWorkspaceGraphCache) return { status: 'partial', partialReasons: ['GRAPH_UNAVAILABLE'], items: [] };
+        const candidates = (dailyWorkspaceGraphCache.issues || []).filter(issue =>
+          (issue.status || 'open') === 'open' &&
+          matchesDailyWorkspaceQuery(query, issue.title, issue.type || '一致性问题', '关系与时间'));
+        return {
+          status: candidates.length > 50 ? 'partial' : 'ready',
+          partialReasons: candidates.length > 50 ? ['GRAPH_RESULTS_LIMIT'] : [],
+          items: candidates.slice(0, 50).map(issue => ({
+            locator: { kind: 'issue', issueId: issue.id }, label: issue.title,
+            detail: issue.type || '一致性问题', breadcrumb: '关系与时间', badges: [issue.severity || 'warning'],
+          })),
+        };
+      },
+      resolve({ locator, inventory }) {
+        const issue = dailyWorkspaceGraphCache?.issues?.find(item => item.id === locator.issueId);
+        const evidence = issue && (dailyWorkspaceGraphCache.evidence || []).find(item => issue.evidenceIds?.includes(item.id));
+        const file = evidence && inventory.files.find(item => item.path === (evidence.path || evidence.filePath));
+        if (!file) return null;
+        return { action: 'open_file', filePath: file.path, revision: file.revision,
+          offset: evidence.start, endOffset: evidence.end };
+      },
+    },
+    pending_review: {
+      list({ projectInstanceId }) {
+        return {
+          status: 'ready', partialReasons: [],
+          items: pendingChangeSets.listPublicReviewLocations(projectInstanceId).map(item => ({
+            locationId: item.locationId,
+            label: item.label,
+            detail: item.fileCount === 1 ? '1 个正文文件' : `${item.fileCount} 个正文文件`,
+            breadcrumb: `待审修改 · ${item.fileCount} 个文件`,
+            badges: [`${item.hunkCount} 项修改`],
+          })),
+        };
+      },
+      resolve({ projectInstanceId, locationId }) {
+        pendingChangeSets.resolvePublicReviewLocationForMain(projectInstanceId, locationId);
+        return { action: 'open_review', reviewLocationId: locationId };
+      },
+    },
   },
 });
 const writingNavigationStore = writingNavigationStoreService.createWritingNavigationStore();
@@ -378,10 +485,19 @@ function projectFailure(error) {
     error instanceof changesHistoryReconciliationService.ChangesHistoryRecoveryError ||
     error instanceof referenceImportService.ReferenceImportError ||
     error instanceof diagnosticExportService.DiagnosticExportError;
+  const isSafeDailyWorkspaceError =
+    error instanceof projectHomeSnapshotService.ProjectHomeSnapshotError ||
+    error instanceof workspaceLocationService.WorkspaceLocationError ||
+    error instanceof dailyWorkspaceHandlerService.DailyWorkspaceHandlerError ||
+    error instanceof dailyWorkspaceDataRunner.DailyWorkspaceDataError;
   return {
     ok: false,
-    error: isSafeProjectError && error.code ? error.code : 'PROJECT_OPERATION_FAILED',
-    message: isSafeProjectError && error.message ? error.message : '文件系统操作失败，请检查权限或稍后重试',
+    error: (isSafeProjectError || isSafeDailyWorkspaceError) && error.code
+      ? error.code
+      : 'PROJECT_OPERATION_FAILED',
+    message: (isSafeProjectError || isSafeDailyWorkspaceError) && error.message
+      ? error.message
+      : '文件系统操作失败，请检查权限或稍后重试',
   };
 }
 
@@ -505,6 +621,110 @@ async function settleWritingNavigationAuthority(project) {
     projectChanged: '项目状态已变化，请重新生成写作导航',
   });
 }
+
+async function settleDailyWorkspaceAuthority(project) {
+  return settleProjectReadAuthority(project, {
+    watcherUnavailable: '项目文件监控无法完成一致性扫描；可继续编辑并稍后重试工作区刷新',
+    mutationInProgress: '项目文件正在提交，请稍后刷新工作区',
+    projectChanged: '项目状态已变化，请重新刷新工作区',
+  });
+}
+
+async function prepareDailyWorkspaceHomeData(project, binding) {
+  const graphGenerationAtStart = dailyWorkspaceGraphGeneration;
+  const sourceGenerationAtStart = dailyWorkspaceSourceGeneration;
+  const initialAuthority = {
+    projectInstanceId: binding.projectInstanceId,
+    projectMutationGeneration: binding.mutationGeneration,
+  };
+  const data = await dailyWorkspaceDataRunner.runDailyWorkspaceData({
+    rootPath: project.rootPath,
+    authority: initialAuthority,
+  });
+  if (!currentProject || currentProject.instanceId !== binding.projectInstanceId ||
+      currentProject.rootPath !== binding.rootPath || projectMutationGeneration !== binding.mutationGeneration ||
+      dailyWorkspaceGraphGeneration !== graphGenerationAtStart ||
+      dailyWorkspaceSourceGeneration !== sourceGenerationAtStart) {
+    throw new projectService.ProjectServiceError('PROJECT_CHANGED', '项目状态已变化，请重新刷新工作区');
+  }
+  dailyWorkspaceInventoryCache = data.inventory;
+  dailyWorkspaceGraphCache = data.graph;
+  dailyWorkspaceInventoryGeneration += 1;
+  const authority = Object.freeze({
+    projectMutationGeneration: binding.mutationGeneration,
+    inventoryGeneration: 0,
+    graphGeneration: graphGenerationAtStart,
+    sourceGeneration: sourceGenerationAtStart,
+    pendingGeneration: pendingChangeSets.pendingGeneration,
+  });
+  const evidenceById = new Map((data.graph?.evidence || []).map(evidence => [evidence.id, evidence]));
+  const openIssues = data.graph
+    ? (data.graph.issues || []).map(issue => ({
+      id: issue.id, type: issue.type, status: issue.status || 'open',
+      title: issue.title || issue.summary || issue.type, severity: issue.severity || 'warning',
+      filePath: evidenceById.get(issue.evidenceIds?.[0])?.path || null,
+    }))
+    : [];
+  const state = Object.freeze({
+    authority,
+    workspace: data.workspace,
+    fileTimes: data.fileTimes,
+    pendingReviews: pendingChangeSets.listPublicReviewLocations(project.instanceId),
+    openIssues,
+    source: data.source,
+  });
+  return {
+    inventory: data.inventory,
+    partialReasons: data.graphReasons || [],
+    captureHomeState() {
+    if (!currentProject || currentProject.instanceId !== binding.projectInstanceId ||
+        currentProject.rootPath !== binding.rootPath || projectMutationGeneration !== binding.mutationGeneration) {
+      throw new projectService.ProjectServiceError('PROJECT_CHANGED', '项目状态已变化，请重新刷新工作区');
+    }
+    if (dailyWorkspaceGraphGeneration !== authority.graphGeneration ||
+        dailyWorkspaceSourceGeneration !== authority.sourceGeneration ||
+        pendingChangeSets.pendingGeneration !== authority.pendingGeneration) {
+      throw new projectService.ProjectServiceError('PROJECT_CHANGED', '工作区派生状态已变化，请重新刷新');
+    }
+    return state;
+  },
+  };
+}
+
+async function ensureDailyWorkspaceLocationState(project, binding) {
+  if (dailyWorkspaceInventoryCache?.authority?.projectInstanceId === binding.projectInstanceId &&
+      dailyWorkspaceInventoryCache.authority.projectMutationGeneration === binding.mutationGeneration) return;
+  const graphGenerationAtStart = dailyWorkspaceGraphGeneration;
+  const sourceGenerationAtStart = dailyWorkspaceSourceGeneration;
+  const data = await dailyWorkspaceDataRunner.runDailyWorkspaceData({
+    rootPath: project.rootPath,
+    authority: { projectInstanceId: binding.projectInstanceId, projectMutationGeneration: binding.mutationGeneration },
+  });
+  if (!currentProject || currentProject.instanceId !== binding.projectInstanceId ||
+      currentProject.rootPath !== binding.rootPath || projectMutationGeneration !== binding.mutationGeneration ||
+      dailyWorkspaceGraphGeneration !== graphGenerationAtStart ||
+      dailyWorkspaceSourceGeneration !== sourceGenerationAtStart) {
+    throw new projectService.ProjectServiceError('PROJECT_CHANGED', '项目状态已变化，请重新定位');
+  }
+  dailyWorkspaceInventoryCache = data.inventory;
+  dailyWorkspaceGraphCache = data.graph;
+  dailyWorkspaceInventoryGeneration += 1;
+}
+
+const dailyWorkspaceHandler = dailyWorkspaceHandlerService.createDailyWorkspaceHandler({
+  assertTrustedSender,
+  getCurrentProject: () => currentProject,
+  getMutationGeneration: () => projectMutationGeneration,
+  settleReadAuthority: settleDailyWorkspaceAuthority,
+  homeSnapshotService: dailyWorkspaceHome,
+  prepareHomeData: prepareDailyWorkspaceHomeData,
+  ensureLocationState: ensureDailyWorkspaceLocationState,
+  captureProjectAuthority: () => ({
+    projectInstanceId: currentProject?.instanceId || null,
+    projectMutationGeneration,
+  }),
+  locationService: dailyWorkspaceLocations,
+});
 
 function requireMutableProject() {
   return assertInlineRewriteMutationAvailable(requireCurrentProject());
@@ -638,6 +858,10 @@ function advanceAiContextGeneration(options = {}) {
     });
   }
   projectMutationGeneration += 1;
+  dailyWorkspaceInventoryCache = null;
+  dailyWorkspaceGraphCache = null;
+  dailyWorkspaceGraphGeneration += 1;
+  dailyWorkspaceSourceGeneration += 1;
   lastContextResponse = null;
   invalidatePendingOnboardingReviews(options.preserveOnboardingChangeSetId || null);
 }
@@ -980,9 +1204,22 @@ function setCurrentProject(project) {
     if (currentProjectWatcher) currentProjectWatcher.close();
     currentProjectWatcher = null;
     projectWatcherHealth.reset();
+    dailyWorkspaceLocations.clearProject();
+    dailyWorkspaceInventoryCache = null;
+    dailyWorkspaceGraphCache = null;
   }
   currentProject = project;
-  if (changedProject) projectMutationGeneration += 1;
+  // Public pending-review locations are session capabilities bound to the
+  // exact active project. Rebinding destroys every old opaque mapping even
+  // when a Renderer kept a stale display item.
+  pendingChangeSets.bindPublicReviewProject(project.instanceId, project.rootPath);
+  if (changedProject) {
+    projectMutationGeneration += 1;
+    workspaceSaveGeneration = 0;
+    dailyWorkspaceGraphGeneration += 1;
+    dailyWorkspaceGraphCache = null;
+    dailyWorkspaceSourceGeneration += 1;
+  }
   if (changedProject) {
     try {
       startProjectWatcher(project);
@@ -1081,6 +1318,9 @@ function finalizeOrdinaryChanges({
       residualMetadata
     );
   }
+  const residualPublicReview = residualChangeSet
+    ? pendingChangeSets.publishPublicReviewLocation(residualCapability, project.instanceId)
+    : null;
 
   let onboardingTransition = {};
   if (onboardingReview) {
@@ -1134,6 +1374,7 @@ function finalizeOrdinaryChanges({
     ...(residualChangeSet && residualMetadata.provenance
       ? { provenance: residualMetadata.provenance }
       : {}),
+    ...(residualPublicReview ? { publicReview: residualPublicReview } : {}),
     ...onboardingTransition,
     ...treeResult,
   };
@@ -1355,6 +1596,13 @@ function createWindow() {
 
   mainWindow.loadFile(RENDERER_ENTRY);
   mainWindow.webContents.once('did-finish-load', () => {
+    if (!app.isPackaged && electronAiFixture && process.env.WRITCRAFT_E2E_ZOOM_FACTOR === '2') {
+      mainWindow.webContents.setZoomFactor(2);
+      const actual = mainWindow.webContents.getZoomFactor();
+      // Content-free proof for the real-Electron harness. This channel exists
+      // only in the explicit development fixture and is absent in packages.
+      console.log(`[e2e:zoom] actual=${actual}`);
+    }
     npmPreviewReady = true;
     sendNpmPreviewStatus('ready');
   });
@@ -1660,7 +1908,12 @@ function cacheReviewedChangeSet(changeSet, project, options = {}) {
     fileSelectionPolicies: metadata.fileSelectionPolicies,
   });
   pendingChangeSets.putWithCapability(capability, changeSet, project.rootPath, metadata);
-  return { capability, review };
+  const publicReview = pendingChangeSets.publishPublicReviewLocation(
+    capability,
+    project.instanceId,
+    options.publicLabel === undefined ? {} : { label: options.publicLabel }
+  );
+  return { capability, review, publicReview };
 }
 
 function invalidateOnboardingReview(changeSetId, record = pendingOnboardingReviews.get(changeSetId)) {
@@ -2112,6 +2365,114 @@ const writingNavigationHandlers = writingNavigationHandlerService.createWritingN
 ipcMain.handle('writcraft:project:propose-writing-navigation',
   writingNavigationHandlers.propose
 );
+
+ipcMain.handle('writcraft:project:get-daily-workspace',
+  async (event, projectInstanceId) => {
+    try { return { ok: true, snapshot: await dailyWorkspaceHandler.getHome(event, projectInstanceId) }; }
+    catch (error) { return projectFailure(error); }
+  });
+ipcMain.handle('writcraft:project:list-workspace-locations',
+  async (event, projectInstanceId, request) => {
+    try { return { ok: true, result: await dailyWorkspaceHandler.listLocations(event, projectInstanceId, request) }; }
+    catch (error) { return projectFailure(error); }
+  });
+ipcMain.handle('writcraft:project:list-current-outline',
+  async (event, projectInstanceId, request) => {
+    try { return { ok: true, result: await dailyWorkspaceHandler.listOutline(event, projectInstanceId, request) }; }
+    catch (error) { return projectFailure(error); }
+  });
+ipcMain.handle('writcraft:project:resolve-workspace-location',
+  async (event, projectInstanceId, locationId) => {
+    try { return { ok: true, result: await dailyWorkspaceHandler.resolveLocation(event, projectInstanceId, locationId) }; }
+    catch (error) { return projectFailure(error); }
+  });
+ipcMain.handle('writcraft:project:resolve-stable-workspace-location',
+  async (event, projectInstanceId, locator) => {
+    try { return { ok: true, result: await dailyWorkspaceHandler.resolveStableLocation(event, projectInstanceId, locator) }; }
+    catch (error) { return projectFailure(error); }
+  });
+// Public review locations are not Changes capabilities. Resolve them inside
+// Main for every display or mutation so Renderer reloads never persist or
+// receive the private token.
+ipcMain.handle('writcraft:project:hydrate-pending-review',
+  async (event, projectInstanceId, locationId) => {
+    try {
+      assertTrustedSender(event);
+      const project = requireCurrentProject();
+      if (projectInstanceId !== project.instanceId) return staleAiProjectResult();
+      const resolved = pendingChangeSets.resolvePublicReviewLocationForMain(projectInstanceId, locationId);
+      const review = changeSetReviewService.createReview(resolved.record.changeSet, {
+        reviewId: locationId,
+        selectionPolicy: resolved.record.selectionPolicy,
+        fileSelectionPolicies: resolved.record.fileSelectionPolicies,
+      });
+      return {
+        ok: true,
+        changeSetId: locationId,
+        review,
+        proposalKind: resolved.record.provenance?.kind || null,
+        provenance: resolved.record.provenance || null,
+        requireCompleteDecision: resolved.record.requireCompleteDecision === true,
+        publicReview: { locationId },
+      };
+    } catch (error) { return projectFailure(error); }
+  });
+ipcMain.handle('writcraft:project:apply-pending-review',
+  async (event, projectInstanceId, locationId, decision) => {
+    try {
+      assertTrustedSender(event);
+      const project = requireCurrentProject();
+      if (projectInstanceId !== project.instanceId) return staleAiProjectResult();
+      const resolved = pendingChangeSets.resolvePublicReviewLocationForMain(projectInstanceId, locationId);
+      const descriptor = Object.getOwnPropertyDescriptor(decision || {}, 'changeSetId');
+      if (!descriptor || descriptor.value !== locationId) {
+        return { ok: false, error: 'INVALID_REVIEW_DECISION', message: '待审阅修改身份无效' };
+      }
+      const privateDecision = {
+        ...decision,
+        changeSetId: resolved.capability,
+      };
+      const result = resolved.record.researchDependencies
+        ? researchApplyTransaction.apply({
+          project,
+          pending: resolved.record,
+          changeSetId: resolved.capability,
+          decision: privateDecision,
+        })
+        : changesHistoryHandler.applyChanges(projectInstanceId, privateDecision);
+      if (!result?.review || !result?.publicReview?.locationId) return result;
+      return {
+        ...result,
+        changeSetId: result.publicReview.locationId,
+        review: { ...result.review, changeSetId: result.publicReview.locationId },
+      };
+    } catch (error) { return projectFailure(error); }
+  });
+ipcMain.handle('writcraft:project:discard-pending-review',
+  async (event, projectInstanceId, locationId) => {
+    try {
+      assertTrustedSender(event);
+      const project = requireCurrentProject();
+      if (projectInstanceId !== project.instanceId) return staleAiProjectResult();
+      const resolved = pendingChangeSets.resolvePublicReviewLocationForMain(projectInstanceId, locationId);
+      let discarded = false;
+      if (resolved.record.researchDependencies) {
+        researchHandoffStore.discard({
+          projectInstanceId: project.instanceId,
+          rootPath: project.rootPath,
+          cardId: resolved.record.researchDependencies.cardId,
+        });
+        discarded = !pendingChangeSets.has(resolved.capability);
+      } else {
+        discarded = pendingChangeSets.delete(resolved.capability, 'public-review-discarded');
+      }
+      invalidateOnboardingReview(resolved.capability);
+      if (!discarded) {
+        return { ok: false, error: 'REVIEW_NOT_AVAILABLE', message: '待审阅修改已不可用' };
+      }
+      return { ok: true };
+    } catch (error) { return projectFailure(error); }
+  });
 ipcMain.handle(
   'writcraft:project:cancel-writing-navigation',
   writingNavigationHandlers.cancel
@@ -3013,6 +3374,8 @@ ipcMain.handle('writcraft:project:apply-graph-correction', async (event, project
     // supplies labels, evidence snapshots, paths, or revisions as authority.
     const indexed = graphIndexService.indexProjectGraph(projectService, project.rootPath);
     const submitted = graphCorrectionService.submitCorrection(project.rootPath, indexed.graph, command);
+    dailyWorkspaceGraphGeneration += 1;
+    dailyWorkspaceGraphCache = null;
     const refreshed = graphIndexService.indexProjectGraph(projectService, project.rootPath);
     const issueState = issueStateService.reconcileIssueStates(project.rootPath, refreshed.graph.issues);
     const graph = graphIssueHandoffService.decorateGraphIssues({
@@ -3039,6 +3402,8 @@ ipcMain.handle('writcraft:project:set-issue-status', async (event, projectInstan
     // renderer-supplied issue ID; stale or foreign IDs are rejected below.
     const indexed = graphIndexService.indexProjectGraph(projectService, project.rootPath);
     const result = issueStateService.setIssueStatus(project.rootPath, indexed.graph.issues, issueId, status);
+    dailyWorkspaceGraphGeneration += 1;
+    dailyWorkspaceGraphCache = null;
     return {
       ok: true,
       issue: result.issue,
@@ -3557,25 +3922,88 @@ ipcMain.handle('writcraft:project:get-ai-metrics-aggregate', async (event, proje
   }
 });
 
-ipcMain.handle('writcraft:project:load-workspace', async (event) => {
+ipcMain.handle('writcraft:project:load-workspace', async (event, projectInstanceId) => {
   try {
     assertTrustedSender(event);
     const project = requireCurrentProject();
+    if (projectInstanceId !== project.instanceId) {
+      throw new projectService.ProjectServiceError('PROJECT_CHANGED', '项目已切换，请重新读取工作区');
+    }
     return { ok: true, workspace: projectService.loadWorkspace(project.rootPath) };
   } catch (error) {
     return projectFailure(error);
   }
 });
 
-ipcMain.handle('writcraft:project:save-workspace', async (event, workspace) => {
+function assertWorkspaceSaveOwner(project, projectInstanceId, operationGeneration) {
+  if (projectInstanceId !== project.instanceId) {
+    throw new projectService.ProjectServiceError('PROJECT_CHANGED', '项目已切换，旧工作区状态未写入');
+  }
+  if (!Number.isSafeInteger(operationGeneration) || operationGeneration < 1 ||
+      operationGeneration <= workspaceSaveGeneration) {
+    throw new projectService.ProjectServiceError('STALE_WORKSPACE_SAVE', '较旧的工作区状态未写入');
+  }
+}
+
+ipcMain.on('writcraft:project:workspace-save-seed', event => {
   try {
     assertTrustedSender(event);
-    const project = requireMutableProject();
-    return { ok: true, workspace: projectService.saveWorkspace(project.rootPath, workspace) };
+    event.returnValue = workspaceSaveGeneration;
+  } catch (_) {
+    event.returnValue = 0;
+  }
+});
+
+ipcMain.handle('writcraft:project:save-workspace', async (event, projectInstanceId, operationGeneration, workspace) => {
+  try {
+    assertTrustedSender(event);
+    let project = requireCurrentProject();
+    // Deterministic real-Electron race injection. It is development-only,
+    // fixture-gated, and delays before owner validation so a later synchronous
+    // close flush can prove that this older request cannot overwrite it.
+    if (electronAiFixture && process.env.WRITCRAFT_E2E_WORKSPACE_SAVE_DELAY_MS &&
+        Object.values(workspace?.files || {}).some(view => view?.scrollTop === 999_999_999)) {
+      const delayMs = Number(process.env.WRITCRAFT_E2E_WORKSPACE_SAVE_DELAY_MS);
+      if (Number.isSafeInteger(delayMs) && delayMs > 0 && delayMs <= 1_000) {
+        await new Promise(resolve => setTimeout(resolve, delayMs));
+      }
+    }
+    // The project may have changed while a future awaited preflight or the
+    // deterministic race hook yielded. Never authorize against the frozen
+    // pre-await project object.
+    project = requireCurrentProject();
+    if (projectInstanceId !== project.instanceId) {
+      throw new projectService.ProjectServiceError('PROJECT_CHANGED', '项目已切换，旧工作区状态未写入');
+    }
+    project = requireMutableProject();
+    assertWorkspaceSaveOwner(project, projectInstanceId, operationGeneration);
+    assertInlineRewriteMutationAvailable(project);
+    const saved = projectService.saveWorkspace(project.rootPath, workspace);
+    workspaceSaveGeneration = operationGeneration;
+    return { ok: true, workspace: saved };
   } catch (error) {
     return projectFailure(error);
   }
 });
+
+ipcMain.on('writcraft:project:save-workspace-before-close',
+  (event, projectInstanceId, operationGeneration, workspace) => {
+    try {
+      assertTrustedSender(event);
+      let project = requireCurrentProject();
+      if (projectInstanceId !== project.instanceId) {
+        throw new projectService.ProjectServiceError('PROJECT_CHANGED', '项目已切换，旧工作区状态未写入');
+      }
+      project = requireMutableProject();
+      assertWorkspaceSaveOwner(project, projectInstanceId, operationGeneration);
+      assertInlineRewriteMutationAvailable(project);
+      const saved = projectService.saveWorkspace(project.rootPath, workspace);
+      workspaceSaveGeneration = operationGeneration;
+      event.returnValue = { ok: true, workspace: saved };
+    } catch (error) {
+      event.returnValue = projectFailure(error);
+    }
+  });
 
 ipcMain.handle('writcraft:project:write-recovery', async (event, relPath, content, baseRevision) => {
   try {

@@ -10,6 +10,11 @@ const WATCHER_FLUSH_RESULT_SCHEMA = 'writcraft.watcher-flush-result/v1';
 const WATCHER_FLUSH_BARRIER_SCHEMA = 'writcraft.watcher-flush-barrier/v1';
 const WATCHER_FLUSH_BARRIER_CHANNEL = 'writcraft:project:watcher-flushed';
 const WATCHER_FLUSH_TIMEOUT_MS = 15_000;
+let workspaceSaveGeneration = 0;
+try {
+  const seed = ipcRenderer.sendSync('writcraft:project:workspace-save-seed');
+  if (Number.isSafeInteger(seed) && seed >= 0) workspaceSaveGeneration = seed;
+} catch (_) {}
 
 function watcherFlushFailure(error, message) {
   return Object.freeze({ ok: false, error, message });
@@ -175,6 +180,23 @@ contextBridge.exposeInMainWorld('writCraft', {
     search: (query) => ipcRenderer.invoke('writcraft:project:search', query),
     getContext: () => ipcRenderer.invoke('writcraft:project:get-context'),
     resolveContext: (projectInstanceId, request) => ipcRenderer.invoke('writcraft:project:resolve-context', projectInstanceId, request),
+    dailyWorkspace: Object.freeze({
+      snapshot: projectInstanceId => ipcRenderer.invoke('writcraft:project:get-daily-workspace', projectInstanceId),
+      listLocations: (projectInstanceId, request) =>
+        ipcRenderer.invoke('writcraft:project:list-workspace-locations', projectInstanceId, request),
+      listOutline: (projectInstanceId, request) =>
+        ipcRenderer.invoke('writcraft:project:list-current-outline', projectInstanceId, request),
+      resolveLocation: (projectInstanceId, locationId) =>
+        ipcRenderer.invoke('writcraft:project:resolve-workspace-location', projectInstanceId, locationId),
+      resolveStableLocation: (projectInstanceId, locator) =>
+        ipcRenderer.invoke('writcraft:project:resolve-stable-workspace-location', projectInstanceId, locator),
+      hydratePendingReview: (projectInstanceId, reviewLocationId) =>
+        ipcRenderer.invoke('writcraft:project:hydrate-pending-review', projectInstanceId, reviewLocationId),
+      applyPendingReview: (projectInstanceId, reviewLocationId, decision) =>
+        ipcRenderer.invoke('writcraft:project:apply-pending-review', projectInstanceId, reviewLocationId, decision),
+      discardPendingReview: (projectInstanceId, reviewLocationId) =>
+        ipcRenderer.invoke('writcraft:project:discard-pending-review', projectInstanceId, reviewLocationId),
+    }),
     proposeChanges: (projectInstanceId, request) => ipcRenderer.invoke('writcraft:project:propose-changes', projectInstanceId, request),
     proposeChapter: (projectInstanceId, request) => ipcRenderer.invoke('writcraft:project:propose-chapter', projectInstanceId, request),
     proposeOnboarding: (projectInstanceId, request) => ipcRenderer.invoke('writcraft:project:propose-onboarding', projectInstanceId, request),
@@ -294,8 +316,24 @@ contextBridge.exposeInMainWorld('writCraft', {
       ipcRenderer.on('writcraft:project:external-change', listener);
       return () => ipcRenderer.removeListener('writcraft:project:external-change', listener);
     },
-    loadWorkspace: () => ipcRenderer.invoke('writcraft:project:load-workspace'),
-    saveWorkspace: (workspace) => ipcRenderer.invoke('writcraft:project:save-workspace', workspace),
+    loadWorkspace: (projectInstanceId) =>
+      ipcRenderer.invoke('writcraft:project:load-workspace', projectInstanceId),
+    saveWorkspace: (projectInstanceId, workspace) =>
+      ipcRenderer.invoke(
+        'writcraft:project:save-workspace',
+        projectInstanceId,
+        ++workspaceSaveGeneration,
+        workspace
+      ),
+    // beforeunload cannot await an invoke. This bounded synchronous handoff
+    // persists only disposable UI state; manuscript writes never use it.
+    saveWorkspaceBeforeClose: (projectInstanceId, workspace) =>
+      ipcRenderer.sendSync(
+        'writcraft:project:save-workspace-before-close',
+        projectInstanceId,
+        ++workspaceSaveGeneration,
+        workspace
+      ),
     writeRecovery: (relPath, content, baseRevision) => ipcRenderer.invoke('writcraft:project:write-recovery', relPath, content, baseRevision),
     readRecovery: (relPath) => ipcRenderer.invoke('writcraft:project:read-recovery', relPath),
     listRecoveries: () => ipcRenderer.invoke('writcraft:project:list-recoveries'),

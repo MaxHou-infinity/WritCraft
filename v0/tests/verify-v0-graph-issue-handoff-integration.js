@@ -71,7 +71,7 @@ test('Renderer uses shared issue epoch, blocks unrelated pending review and expo
   assert(changesView.includes('if (pending)'));
   assert(changesView.includes('请先应用或丢弃，再处理星图问题'));
   assert(changesView.includes('星图问题专用审阅'));
-  assert(changesView.includes('instruction.readOnly = Boolean(activePlanRequest || activeIssueRequest)'));
+  assert(changesView.includes('instruction.readOnly = Boolean(activeIssueRequest)'));
   assert(changesView.includes('proposalTransactions?.invalidate()'));
   assert(changesView.includes('leaveIssueMode'));
   assert(changesView.includes('issueModeLeaveButton.disabled = reviewCommitInFlight'));

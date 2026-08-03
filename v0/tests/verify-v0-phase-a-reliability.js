@@ -44,7 +44,11 @@ try {
     assert.deepEqual(service.loadWorkspace(ordinary), {
       tabs: ['chapters/01.md'],
       activePath: 'chapters/01.md',
-      files: { 'chapters/01.md': { cursorOffset: 0, scrollTop: 0 } },
+      files: { 'chapters/01.md': {
+        caretOffset: 0, selectionAnchorOffset: 0, selectionFocusOffset: 0,
+        scrollTop: 0, activeOutlineId: null, collapsedOutlineIds: [],
+      } },
+      returnStack: [],
     });
     assert(!fs.existsSync(path.join(ordinary, '.writcraft')), 'read/open must not create metadata');
   });

@@ -5,7 +5,7 @@
 })(typeof globalThis !== 'undefined' ? globalThis : window, function () {
   'use strict';
 
-  const MODES = Object.freeze(['normal', 'chapter', 'plan', 'issue', 'research']);
+  const MODES = Object.freeze(['normal', 'chapter', 'issue', 'research']);
 
   function normalizeChapterRequest(request) {
     if (!request || request.schema !== 'writcraft.chapter-generation-request/v1' ||

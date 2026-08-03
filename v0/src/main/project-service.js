@@ -8,6 +8,7 @@ const fs = require('fs');
 const path = require('path');
 const crypto = require('crypto');
 const os = require('os');
+const workspaceStateService = require('./workspace-state-service');
 
 const EDIT_FILE = 'edit.md';
 const LEGACY_EDIT_FILE = 'editor.md';
@@ -18,7 +19,7 @@ const TRASH_DIR = path.join(META_DIR, 'trash');
 const TRASH_MANIFEST_FILE = path.join(TRASH_DIR, 'manifest.json');
 const RECOVERY_DIR = path.join(META_DIR, 'recovery');
 const PROJECT_SCHEMA = 'writcraft.project/v1';
-const WORKSPACE_SCHEMA = 'writcraft.workspace/v1';
+const WORKSPACE_SCHEMA = workspaceStateService.SCHEMA_V2;
 const TRASH_SCHEMA = 'writcraft.trash/v1';
 const RECOVERY_SCHEMA = 'writcraft.recovery/v1';
 const RECENT_SCHEMA = 'writcraft.recent/v1';
@@ -355,7 +356,19 @@ function emptyWorkspace() {
   return {
     tabs: [EDIT_FILE],
     activePath: EDIT_FILE,
-    files: { [EDIT_FILE]: { cursorOffset: 0, scrollTop: 0 } },
+    files: { [EDIT_FILE]: emptyWorkspaceFileState() },
+    returnStack: [],
+  };
+}
+
+function emptyWorkspaceFileState() {
+  return {
+    caretOffset: 0,
+    selectionAnchorOffset: 0,
+    selectionFocusOffset: 0,
+    scrollTop: 0,
+    activeOutlineId: null,
+    collapsedOutlineIds: [],
   };
 }
 
@@ -375,14 +388,7 @@ function firstMarkdownPath(rootPath) {
 function defaultWorkspace(rootPath) {
   const initial = firstMarkdownPath(rootPath);
   if (!initial) fail('NOT_WRITCRAFT_PROJECT', '目录中没有可编辑的 Markdown 文件');
-  return { tabs: [initial], activePath: initial, files: { [initial]: { cursorOffset: 0, scrollTop: 0 } } };
-}
-
-function assertWorkspaceNumber(value, label, integer = false) {
-  if (typeof value !== 'number' || !Number.isFinite(value) || value < 0 || value > 1_000_000_000 || (integer && !Number.isInteger(value))) {
-    fail('INVALID_WORKSPACE', `${label}无效`);
-  }
-  return value;
+  return { tabs: [initial], activePath: initial, files: { [initial]: emptyWorkspaceFileState() }, returnStack: [] };
 }
 
 function assertExistingPublicMarkdown(rootPath, relPath) {
@@ -395,37 +401,15 @@ function assertExistingPublicMarkdown(rootPath, relPath) {
 }
 
 function normalizeWorkspace(rootPath, state) {
-  if (!state || typeof state !== 'object' || Array.isArray(state)) {
-    fail('INVALID_WORKSPACE', '工作区状态无效');
+  try {
+    return workspaceStateService.normalizeV2(
+      state,
+      relPath => assertExistingPublicMarkdown(rootPath, relPath)
+    );
+  } catch (error) {
+    if (error?.code === 'INVALID_WORKSPACE') fail(error.code, error.message);
+    throw error;
   }
-  if (!Array.isArray(state.tabs) || state.tabs.length === 0 || state.tabs.length > MAX_WORKSPACE_TABS) {
-    fail('INVALID_WORKSPACE', '工作区标签页无效');
-  }
-
-  const tabs = [];
-  const seen = new Set();
-  for (const relPath of state.tabs) {
-    const normalized = assertExistingPublicMarkdown(rootPath, relPath);
-    if (!seen.has(normalized)) {
-      seen.add(normalized);
-      tabs.push(normalized);
-    }
-  }
-  const activePath = assertExistingPublicMarkdown(rootPath, state.activePath);
-  if (!seen.has(activePath)) fail('INVALID_WORKSPACE', '当前文件必须在已打开标签页中');
-
-  if (!state.files || typeof state.files !== 'object' || Array.isArray(state.files)) {
-    fail('INVALID_WORKSPACE', '工作区文件位置无效');
-  }
-  const files = {};
-  for (const relPath of tabs) {
-    const position = state.files[relPath] || {};
-    files[relPath] = {
-      cursorOffset: assertWorkspaceNumber(position.cursorOffset ?? 0, '光标位置', true),
-      scrollTop: assertWorkspaceNumber(position.scrollTop ?? 0, '滚动位置'),
-    };
-  }
-  return { tabs, activePath, files };
 }
 
 function workspaceTarget(rootPath, createMetadataDirectory) {
@@ -445,7 +429,7 @@ function saveWorkspace(rootPath, state) {
   const workspace = normalizeWorkspace(rootPath, state);
   const payload = `${JSON.stringify({
     schema: WORKSPACE_SCHEMA,
-    schemaVersion: 1,
+    schemaVersion: 2,
     ...workspace,
     updatedAt: new Date().toISOString(),
   }, null, 2)}\n`;
@@ -456,7 +440,7 @@ function saveWorkspace(rootPath, state) {
   return workspace;
 }
 
-function loadWorkspace(rootPath) {
+function loadWorkspace(rootPath, options = {}) {
   const fallback = defaultWorkspace(rootPath);
   try {
     const target = workspaceTarget(rootPath, false);
@@ -464,8 +448,24 @@ function loadWorkspace(rootPath) {
     const stat = fs.lstatSync(target);
     if (stat.isSymbolicLink() || !stat.isFile() || stat.size > MAX_WORKSPACE_BYTES) return fallback;
     const parsed = JSON.parse(readBoundedAbsolute(target));
-    if (parsed.schema !== WORKSPACE_SCHEMA || parsed.schemaVersion !== 1) return fallback;
-    return normalizeWorkspace(rootPath, parsed);
+    if (parsed.schema === WORKSPACE_SCHEMA && parsed.schemaVersion === 2) {
+      return normalizeWorkspace(rootPath, {
+        tabs: parsed.tabs,
+        activePath: parsed.activePath,
+        files: parsed.files,
+        returnStack: parsed.returnStack,
+      });
+    }
+    if (parsed.schema === workspaceStateService.SCHEMA_V1 && parsed.schemaVersion === 1) {
+      const migrated = workspaceStateService.migrateV1(
+        parsed,
+        relPath => assertExistingPublicMarkdown(rootPath, relPath)
+      );
+      // Migration writes only after the complete v1 payload and every referenced
+      // file have validated. Corrupt or future schemas fall back without overwrite.
+      return options.migrate === false ? migrated : saveWorkspace(rootPath, migrated);
+    }
+    return fallback;
   } catch (_) {
     // Workspace state is disposable UI state. A corrupt or stale file must
     // never prevent the user's actual writing project from opening.

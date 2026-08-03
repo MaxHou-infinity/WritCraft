@@ -1,6 +1,6 @@
 'use strict';
 
-const blockAnchor = require('../renderer/block-anchor');
+const blockAnchor = require('../shared/block-anchor');
 
 // Main-owned boundary for model-authored localized edits. The provider never
 // returns a complete file: it identifies a unique, bounded substring in a
