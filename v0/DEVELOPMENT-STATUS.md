@@ -1,10 +1,10 @@
 # 笔触 · WritCraft 当前开发状态
 
-> 最后更新：2026-08-03（0.2.0 工程候选已形成，等待所有者一次最短主观验收）
+> 最后更新：2026-08-03（0.2.0 候选验收完成；尚未发布）
 > 当前公开版本：`writ-craft@0.1.2`，npm `preview`
 > 当前代码版本：`v0/package.json` 为 `0.1.2`
 > 下一候选版本：`0.2.0` 日常写作工作区
-> 当前阶段：**0.2.0 候选验收：工程门禁已关闭，等待所有者主观签字**
+> 当前阶段：**0.2.0 候选验收完成；发布门禁保持关闭**
 
 本文件只记录当前事实、开放风险和下一动作。0.1.x 的完整里程碑、红灯、测试数字和验收过程已归档到 [`docs/archive/development/DEVELOPMENT-STATUS-THROUGH-0.1.2.md`](../docs/archive/development/DEVELOPMENT-STATUS-THROUGH-0.1.2.md)，不得从归档旧 TODO 直接派发工作。
 
@@ -53,7 +53,7 @@
 - 真实旅程发现并修复 P1：从首页打开最近文件时正文已经切换，但大纲仍描述旧文件。现在 Home 打开动作必须等待目标文件大纲刷新，再恢复正文定位；Computer Use 复验确认目标标题出现、旧大纲消失，返回首页后继续位置和 pending=0 正确。
 - 最新源码 `npm test` 与非沙箱完整 `npm run verify` 通过；待审 focused Electron 3/3 通过。Daily Workspace focused 复跑再次在“外部文件 watcher 大纲刷新等待”处红灯；该非固定 harness 时序问题已保留为 P2，未用重跑绿灯覆盖。确定性 watcher/owner 专项、真实作者 UI 旅程和此前 focused 证据均通过，未形成稳定产品回归。
 - 最终独立复审：P0=0、P1=0、P2=2，可进入候选。P2-1 为缺少“`refreshOutline` await 期间切项目”的 mutation-sensitive 专项，生产实现已有 refresh 后 owner 复核；P2-2 为通用 store 配置超过 10 项时 public projection 可能隐藏最旧映射，生产 Main 上限与 projection 同为 10，当前不可触发。两项均允许候选，未来触及对应代码或提高上限时必须先补合同和反例。
-- 工程候选已经形成，但路线图要求的作者主观体验不能由自动化冒充。只剩所有者一次最短旅程确认信息是否清楚、工作流是否自然；这不是新的开发 TODO。未经另行授权，不发布、不打 Tag/Release、不推送或分发 App/ZIP。
+- 所有者于 2026-08-03 完成唯一一次最短主观旅程并明确回复“验收通过”。至此工程门禁、真实作者客观旅程和作者主观体验均已关闭，0.2.0 候选验收完成。未经另行授权，仍不发布、不打 Tag/Release、不推送或分发 App/ZIP。
 
 ### 0.2.0 阶段 E 当前事实（2026-08-03）
 
@@ -151,10 +151,9 @@
 
 ## 5. 下一动作（严格顺序）
 
-1. 所有者只需完成一次 0.2.0 主观旅程：“查看首页状态 → 继续写作或定位最近文件 → 查看大纲 → 返回首页”，判断信息是否清楚、工作流是否自然；无需重复接受、拒绝、撤销等 0.1.2 已签字动作。
-2. 若主观验收出现 P0/P1，只修复对应受影响路径并重验；若通过，将本文件和 Nowledge Mem 标记为 0.2.0 候选验收完成。
-3. 两项允许候选的 P2 不主动扩大本轮：只有触及 `refreshOutline` owner 测试时补 deferred 反例；只有提高 pending 上限时重做 public projection 合同。
-4. 未经所有者单独授权，不修改 npm dist-tag、不发布 0.2.0、不创建 Tag/GitHub Release、不推送或分发 App/ZIP。
+1. 当前版本没有剩余 P0/P1 开发任务；0.2.0 候选验收已经完成。
+2. 两项允许候选的 P2 不主动扩大本轮：只有触及 `refreshOutline` owner 测试时补 deferred 反例；只有提高 pending 上限时重做 public projection 合同。
+3. 后续发布、版本号、npm dist-tag、Tag/GitHub Release、推送或 App/ZIP 分发均属于新的外部动作，必须由所有者另行明确授权。
 
 ## 6. 本轮文档治理结果
 
