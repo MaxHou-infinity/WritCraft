@@ -3,7 +3,8 @@
 > 最后更新：2026-08-03（0.2.0 发布执行中；本地产物与自动门禁已通过）
 > 当前公开版本：`writ-craft@0.1.2`，npm `preview`
 > 当前代码版本：`v0/package.json` 为 `0.2.0`
-> 下一候选版本：`0.2.0` 日常写作工作区
+> 当前发布候选：`0.2.0` 日常写作工作区
+> 下一规划版本：`0.3.0` 透明 AI 协作（审阅草案，待批准）
 > 当前阶段：**0.2.0 发布门禁已获授权，正在执行 npm/GitHub/Tag/Release/App ZIP 发布**
 
 本文件只记录当前事实、开放风险和下一动作。0.1.x 的完整里程碑、红灯、测试数字和验收过程已归档到 [`docs/archive/development/DEVELOPMENT-STATUS-THROUGH-0.1.2.md`](../docs/archive/development/DEVELOPMENT-STATUS-THROUGH-0.1.2.md)，不得从归档旧 TODO 直接派发工作。
