@@ -1,22 +1,22 @@
 # 笔触 · WritCraft 当前开发状态
 
-> 最后更新：2026-08-03（0.2.0 发布执行中；本地产物与自动门禁已通过）
+> 最后更新：2026-08-04（0.3.0 透明 AI 协作阶段 A–D 第一可回归切片已形成；真实项目来源/实体候选、Context Catalog Main IPC、TTL 过期与 Chat 恢复提示、统一写作任务 focused Electron 已通过；阶段 E 已在真实作者源稿派生临时隔离副本完成 Chat → Navigation → Diff → 冲突阻止 → 重试接受 → Safe Undo 1/1，Chapter/Research/Graph/图片及独立复审仍未完成）
 > 当前公开版本：`writ-craft@0.1.2`，npm `preview`
 > 当前代码版本：`v0/package.json` 为 `0.2.0`
-> 当前发布候选：`0.2.0` 日常写作工作区
-> 下一规划版本：`0.3.0` 透明 AI 协作（已批准，待启动目标模式）
-> 当前阶段：**0.2.0 发布门禁已获授权，正在执行 npm/GitHub/Tag/Release/App ZIP 发布**
+> 当前发布候选：`0.2.0` 日常写作工作区（本地与 GitHub 候选已完成；npm OTP 门禁仍为历史开放项）
+> 当前开发版本：`0.3.0` 透明 AI 协作
+> 当前阶段：**阶段 0 已冻结；阶段 A–D 第一可回归切片已形成，正在补齐跨入口任务验收与作者隔离副本验收**
 
 本文件只记录当前事实、开放风险和下一动作。0.1.x 的完整里程碑、红灯、测试数字和验收过程已归档到 [`docs/archive/development/DEVELOPMENT-STATUS-THROUGH-0.1.2.md`](../docs/archive/development/DEVELOPMENT-STATUS-THROUGH-0.1.2.md)，不得从归档旧 TODO 直接派发工作。
 
 ## 1. 权威入口
 
-1. [`docs/ROADMAP.md`](../docs/ROADMAP.md)：唯一版本顺序和正式范围。
-2. [`docs/ROADMAP-0.2.0.md`](../docs/ROADMAP-0.2.0.md)：0.2.0 已批准详细合同、阶段顺序和验收门禁。
-3. 本文件：当前代码、开放风险和下一动作。
-4. [`docs/WRITCRAFT-PRD-V3.md`](../docs/WRITCRAFT-PRD-V3.md)：长期产品契约。
-5. [`docs/ARCHITECTURE.md`](../docs/ARCHITECTURE.md)：稳定架构与维护边界。
-6. [`docs/INDEX.md`](../docs/INDEX.md)：按任务选择需要阅读的合同，禁止全量读取历史文档派工。
+1. [`docs/ROADMAP.md`](../docs/ROADMAP.md)：当前版本顺序、0.3.0 范围和非目标。
+3. [`docs/ROADMAP-0.3.0.md`](../docs/ROADMAP-0.3.0.md)：0.3.0 生效详细合同、阶段顺序和验收门禁。
+4. 本文件：当前代码、开放风险和下一动作。
+5. [`docs/WRITCRAFT-PRD-V3.md`](../docs/WRITCRAFT-PRD-V3.md)：长期产品契约。
+6. [`docs/ARCHITECTURE.md`](../docs/ARCHITECTURE.md)：稳定架构与维护边界。
+7. [`docs/INDEX.md`](../docs/INDEX.md)：按任务选择需要阅读的合同，禁止全量读取历史文档派工。
 
 源码与可复现测试优先于文字快照。任何文档冲突先校准文档，再继续开发。
 
@@ -41,17 +41,49 @@
 
 以上能力除非 0.2.0 生产源码直接影响，不重复进行 0.1.2 的项目卡、接受/拒绝/撤销或付费作者验收。
 
-## 3. 当前开放项
+## 3. 0.3.0 当前执行事实
+
+- 阶段 0：当前源码核对已完成。旧 Project Plan 用户运行时已在 0.2.0 阶段 0 物理移除；现存 `chapter-generation-plan/v1` 仅属于 Chapter 内部区块规划，不得删除或误归类为退役 Project Plan。
+- 阶段 0：现有 `context-selection`、Main `context-resolver`、Context Inspector、`unified-writing-task-service` 和 Navigation 的取消/超时机制均已确认，0.3.0 只补统一入口和跨模块状态，不重复造解析器或 Key 存储。
+- 阶段 A：新增 Main-only `ai-task-state-service.js`，统一 task/attempt/owner/project/revision、15 秒取消、60 秒硬超时、迟到结果和项目切换失效；Navigation 动作已接入，Chat/Chapter/Research/Graph/Changes/图片入口已通过 `runAiRequest` 声明任务 kind/target。
+- 阶段 B：新增 Main-only `context-catalog-service.js` 与窄 IPC；文件、文件夹、章节、段落候选已从真实树和 revision 快照生成，来源/实体仅在明确搜索前缀时有界索引。Renderer 新增不重建输入节点的 `@` 补全；候选由 Main 签发短期 `@ref:<catalog>:<candidate>` 引用，提交时必须通过当前 project/revision 校验，过期或未知引用 fail-closed。Chat、导航目标和 Changes 指令已接入；候选不返回正文、root 或 capability。真实项目 focused 验证 1/1 与 Context Catalog real Electron 1/1 均通过，确认来源 revision、实体 ID、章节 revision、有效引用进入统一项目上下文，edit.md revision 漂移、foreign project identity 和 TTL 过期会失效；Chat UI 显示“上下文候选已过期，请重新选择”。目录同时覆盖 `person/place/organization/variable/concept/event/datum` 等图谱节点，并按 `entity/source` 前缀解释查询。跨入口作者验收仍待完成。
+- 阶段 C：Chat 既有 Context Resolver 继续作为权威入口；Navigation、Chapter、普通 Changes 和 Research 已接入同一 `compileEditPrompt` 有界编译结果。Research 的来源卡片仍由用户显式选择，但模型同时收到 Main 编译的 edit.md 项目 Prompt，并在 Context Manifest 中披露 edit.md revision/预算；不改变独立 Research 的来源与写入边界。
+- 阶段 D：Renderer 已挂载统一任务进度视图，Main 的 Chat/导航/Chapter/Research/Graph/Changes/图片入口声明真实业务阶段；任务服务严格要求 `attemptId` 字段（未提供时由 Main 生成），并在成功、失败、取消、超时和项目切换后清理 owner。项目卡真实 Electron 4/4 通过，覆盖冷启动、长正文滚动、严格 onboarding 审阅和初始文件二阶段确认。
+- 阶段 D：同一 profile 的 API Key “保存 → 完全退出 → 重启 → 状态恢复 → 发起请求”真实 Electron 专项已通过；设置页密码框仍按安全设计为空，状态行是配置真相。此前的 P1 记录保留为历史作者反馈，不再作为当前未决缺陷。
+- 本轮真实红灯已分类并修复：快速失败导致进度提示一闪而过、项目尚未 ready 时项目卡提前打开、严格 task 合同缺少 `attemptId` 键、成功提案后复用旧 review 草稿，以及 E2E 夹具未跟随 readiness/阶段数合同更新。修复后 Onboarding focused Electron 为 4/4，相关动态 Renderer 为 30/30，workspace draft owner 为 4/4。
+- 阶段 A/D 最新真实作者路径（2026-08-04）：在同一稳定 profile、已配置 `sk-cp-` Key 的隔离副本中，Navigation 生成耗时约 9.1 秒并生成建议；点击“处理这个建议”后约 15 秒内在正文编辑区显示 1 项 Diff，界面明确“尚未写入；接受后才会修改文件”。退出审阅后明确保持零写入。随后真实点击“停止整理”可在约 1 秒内终止请求，正文不变；取消结果已收口为 `REQUEST_ABORTED`/`cancelled`，不再伪装成通用失败。
+- 本次真实路径还定位并修复一个 P1 根因：Navigation 把含绝对路径和 JSON 标点的内部 lease key 误作 AI task owner，导致 provider 尚未调用即 28–37ms 失败。现改为 `navigation_<attemptId>` 有界 owner，并为返回式 `REQUEST_ABORTED` 保留 cancelled 终态；Main wiring 8/8、Navigation service 专项通过，修复后的真实生成与 Diff 已验证。
+- 2026-08-04 回归收口：`npm test` 通过，获批 GUI 环境的 `npm run verify` 退出码 0；本轮新增写作导航服务 31/31、AI task 7/7、进度 Renderer 3/3、Main wiring 8/8、Context catalog 2/2、真实项目 Context catalog 1/1、Context Catalog real Electron 1/1（含短 TTL 过期和 Chat 恢复 UI）、Context autocomplete 2/2，API Key 同 profile 重启 1/1、watcher Main/IPC 3/3、Chat 任务进度 focused Electron 1/1。统一写作任务 focused Electron 1/1 另行验证一次主要点击到正文 Diff、拒绝/接受/Safe Undo。该结果证明源码与既有 0.2.0 回归未被本轮修复破坏，但不等于阶段 E 的完整跨入口作者验收已完成。
+- 阶段 E 新增真实作者跨入口专项 1/1：从所有者指定的 `WRITCRAFT_E2E_AUTHOR_PROJECT` 源稿经生产 author-acceptance copy transaction 创建 disposable derived copy，仅在副本新增 `chapters/author-e2e.md` fixture；真实 Electron 完成 Chat（项目 Prompt + 当前文件 Context Chips）→ Navigation（一次主要动作）→ 正文 Diff 零写入→外部改动后的冲突阻止→退出审阅重试→接受写入→History Safe Undo。专项还证明源稿 Markdown 快照前后一致、AI fixture 没有真实 HTTP(S) 请求；首轮 Chat 上下文断言过窄和二次审阅状态等待红灯均已保留并校准后通过。
+- 2026-08-04 统一任务 focused Electron 1/1：在隔离临时项目和本地 AI fixture 中验证单一“处理这个建议”主动作、正文内 Diff、预览零写入、拒绝零写入、接受后写入、History 和 Safe Undo；未发送真实稿件或 Key。该专项不能替代 Chat/Chapter/Research/Graph/图片的跨入口作者验收。
+
+## 4. 当前开放项
+
+### 0.3.0 阶段 A–D 开放项（当前）
+
+- 统一任务条已完成基础 Renderer 接入，但 Chat/Chapter/Research/Graph/图片各入口的真实作者阶段文案、取消恢复和跨项目迟到结果仍需用完整 Electron 旅程逐项验收。
+- Navigation 单入口的真实生成、局部 Diff、退出审阅零写入和取消已通过；Chat/Chapter/Research/Graph/图片以及跨项目迟到结果的作者可理解文案仍需逐项验收。
+- `@` 来源/实体候选已有 Main 目录和 request-bound ID 合同；真实项目候选、Main IPC 的 revision 漂移、foreign project identity、TTL 过期及 Chat 恢复 UI 已由 focused Electron 1/1 验证，跨入口作者验收仍需补齐。
+- `edit.md` 编译器已有跨入口实现和 Research manifest；仍需完成同一真实项目的字段语义对照，确认旧任务在 edit.md revision 变化后全部失效。
+- 阶段 E 已开始但未完成：统一写作任务隔离夹具 1/1 已通过；仍需作者指定隔离副本完成最小三条写作任务、零写入取消/超时、跨入口 Diff 接受/拒绝/Safe Undo 及独立复审。
+- 阶段 E 最新：真实作者源稿派生副本的 Chat → Navigation → Diff → 冲突阻止 → 接受 → Safe Undo 已通过 1/1；这只关闭了跨入口第一条证据，不代表 Chapter、Research、Graph、图片、取消/超时或独立复审已签收。
 
 ### P0 / P1
 
 - 0.2.0 最终独立复审为 P0=0、P1=0；当前无工程阻断项。
 
-### 新增作者反馈：API Key 重启后似乎需要重输（2026-08-04）
+### 新增作者反馈：API Key 重启后似乎需要重输（2026-08-04，已关闭）
 
 - 源码事实：`src/main/api-key-config-service.js` 已实现原子持久化、schema 校验和 `0600` 权限；`src/main/user-data-service.js` 默认将 profile 固定为 `~/Library/Application Support/WritCraft`，显式 `--profile` 则按设计隔离。
 - 本机只读核对：稳定目录及两个历史目录均存在 `ai-config.json`，权限 `600`，Main `publicStatus` 均返回 `configured: true`；未读取或输出 Key 明文。
-- 当前判断：尚未复现“同一 profile 保存后文件丢失”，暂记为 **P1 profile 连续性/启动状态恢复验收缺口**。下一次验证必须固定同一个启动方式和 profile，比较保存前、重启后和设置页状态；若仍失败，再修改实现。
+- 结论：固定同一启动方式与 profile 的真实 Electron 专项已验证保存后完全退出、重启、状态恢复及一次请求均成功；未读取或输出 Key 明文。输入框重启后为空是安全设计，不再视为丢失。
+
+### 0.3.0 本轮真实 Electron 回归红灯（2026-08-04）
+
+- 受影响 focused 路径已通过：项目卡真实 Electron 4/4、API Key 同 profile 1/1；AI 任务 7/7、进度 Renderer 3/3、Navigation 生产集成 10/10、Research Main 13/13 + 15/15 + 12/12、Research Renderer 13/13。
+- 完整 `npm run e2e:electron` 首轮在前 12 个阶段通过后，于 Changes/History recovery 之后等待“一个统一 Writing Navigation 建议”超时；第二轮在更早的“普通 Markdown 可见回收区列表”等待处超时。两个红灯发生在不同阶段，且对应专项均全绿，当前归类为大型 Electron harness 的非固定时序 P2，不宣称完整 38/38 全绿。
+- 完整 `npm test` 与获批非沙箱环境的 `npm run verify` 均通过；沙箱内 DOM sanitizer 的 `Electron exited null` 仅记录为环境红灯，原样转入非沙箱后 13/13 通过。阶段 E 仍需在作者隔离副本上补受影响旅程的独立真实验收，不能用本轮专项绿灯替代候选签收。
+- 本轮完整 `npm run verify` 在获批 GUI 环境再次通过（退出码 0）；`npm run verify` 不包含完整 38 阶段 Electron harness，既有 `npm run e2e:electron` 不同时序红灯仍按 P2 保留，未用本次源码回归绿灯覆盖。
 
 ### 0.2.0 阶段 F 候选事实（2026-08-03）
 
@@ -86,6 +118,8 @@
 - 新增 pending review 无 capability hydration：preload/Renderer 只传 public `reviewLocationId`，Main 负责 hydrate/apply/discard 并把 residual review 重新映射为新的 public location。过期、项目切换、迟到 hydration/discard 和 discard 失败均不污染新项目或伪报成功。
 - 真实 Electron focused 2/2 通过，动态验证首页返回精确文件/光标、继续写作和最近修改卡片跳转；`npm run verify:daily-workspace`、Changes review UX 12/12、`npm test` 均通过。
 - 完整 `npm run verify` 沙箱首跑在真实 DOM sanitizer 以 Electron `code=null` 退出；同一命令在获批非沙箱 GUI 环境原样复跑通过。误用旧环境变量的一次 38 阶段 harness 在首页阶段通过，随后于既有 Graph 冷重建时序断言红灯；保留为既有大型 harness P2，不归因于首页产品代码。
+- 获批 GUI 环境曾完成一次完整 Electron 38/38；随后两次原样重跑分别在普通 Markdown 回收区列表和 Graph Issue undo recovery 超时。失败位置不同且专项回归全绿，按非固定时序 P2 保留，不能把一次 38/38 或后续 focused 绿灯写成完整 harness 永久稳定。
+- 新增 `npm run e2e:electron:ai-task-progress`：真实 Electron Chat 入口 1/1 证明 Main 的准备/阶段/完成事件进入共享任务条，终态显示“已完成”；使用本地注入夹具，无真实网络和稿件外传。
 - 独立复审先后发现 hydration owner、discard 失败误报、返回光标缺失和跨项目 discard 迟到污染等 P1，均已修复；最终 P0=0、P1=0。
 - 阶段 D 当时保留的 pending 动态矩阵缺口已在阶段 F 以真实 Electron 3/3 关闭。超过 10 项 projection 的通用配置风险仍作为允许候选的 P2 保留；生产 Main 上限与 projection 同为 10，当前不可触发。
 
@@ -136,7 +170,7 @@
 - Developer ID、签名、公证和 Gatekeeper：仅在未来选择独立 App 分发时启动。
 - 同 UID 0700 reserve 微窗口及已记录 filesystem residual：属于明确接受的威胁模型残余，不得伪装成未完成 TODO。
 
-## 4. 0.2.0 已批准范围
+## 5. 0.2.0 已批准范围
 
 已批准的产品范围：
 
@@ -163,20 +197,22 @@
 - 独立复审首轮 P0=0、P1=4、P2=2；后续复审继续发现生产 envelope、authority vector、临时 locationId 持久化和任意正文返回位置未闭合。全部在合同中修复；最终复审 P0=0、P1=0，最后一个 outline ID 边界 P2 也已补入冻结合同。
 - 阶段 A 只修改合同/状态文档，未制作假数据 UI、未新增产品写入权限、未运行付费调用。
 
-## 5. 下一动作（严格顺序）
+## 6. 下一动作（严格顺序）
 
-1. 当前版本没有剩余 P0/P1 开发任务；0.2.0 候选验收已经完成。
-2. 两项允许候选的 P2 不主动扩大本轮：只有触及 `refreshOutline` owner 测试时补 deferred 反例；只有提高 pending 上限时重做 public projection 合同。
-3. 后续发布、版本号、npm dist-tag、Tag/GitHub Release、推送或 App/ZIP 分发均属于新的外部动作，必须由所有者另行明确授权。
+1. 阶段 A：统一任务状态已接入基础事件流；Chat 与 Navigation 已有真实 Electron 进度证据，继续逐入口核对 Chapter/Research/Graph handoff/正文修改/图片的取消和终态文案。
+2. 阶段 B：继续完成 `@ref` Main IPC revision 漂移、过期引用和跨项目失效测试；真实项目候选已通过，不重建 `context-selection`、Main resolver 或 Context Inspector。
+3. 阶段 C–E：完成跨入口 edit.md 语义核对和剩余入口任务条验收，最后进行真实作者隔离副本验收与独立复审；API Key 同 profile 重启已通过。
+4. 每个阶段完成后更新本文件、受影响合同和 Nowledge Mem；未完成 0.3.0 验收前不得把当前候选写成已发布。
+5. npm 版本、dist-tag、Tag/GitHub Release、推送或 App/ZIP 分发均属于新的外部动作，必须由所有者另行明确授权。
 
-## 6. 本轮文档治理结果
+## 7. 本轮文档治理结果
 
 - 旧 Project Plan 合同、Phase A 长规格、0.1.x 完整状态账本、早期 PDCA 和 0.1.1 发布说明已移入 `docs/archive/`。
 - `docs/INDEX.md` 成为文档选择入口；`docs/ARCHITECTURE.md` 接替 Phase A 中仍有效的工程边界。
 - 0.1.2 作者验收、图片合同、首次使用指南、PRD、正式路线图和 `AGENTS.md` 的过时状态已校准或列入同批校准。
 - `raw/` 与 `deliverables/` 只作研究/历史输入，不得派发当前任务。
 
-## 7. 续作纪律
+## 8. 续作纪律
 
 - 新会话只先读 `docs/ROADMAP.md`、本文件、`docs/INDEX.md` 指向的相关合同和 `v0/package.json`。
 - 归档文档只能用于追溯“为什么”，不能回答“下一步做什么”。

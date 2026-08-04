@@ -180,6 +180,8 @@ contextBridge.exposeInMainWorld('writCraft', {
     search: (query) => ipcRenderer.invoke('writcraft:project:search', query),
     getContext: () => ipcRenderer.invoke('writcraft:project:get-context'),
     resolveContext: (projectInstanceId, request) => ipcRenderer.invoke('writcraft:project:resolve-context', projectInstanceId, request),
+    listContextCandidates: (projectInstanceId, request) =>
+      ipcRenderer.invoke('writcraft:project:list-context-candidates', projectInstanceId, request),
     dailyWorkspace: Object.freeze({
       snapshot: projectInstanceId => ipcRenderer.invoke('writcraft:project:get-daily-workspace', projectInstanceId),
       listLocations: (projectInstanceId, request) =>
@@ -241,6 +243,8 @@ contextBridge.exposeInMainWorld('writCraft', {
       ipcRenderer.on('writcraft:writing-task-progress', listener);
       return () => ipcRenderer.removeListener('writcraft:writing-task-progress', listener);
     },
+    cancelAiTask: (projectInstanceId, attemptId) =>
+      ipcRenderer.invoke('writcraft:ai-task:cancel', projectInstanceId, attemptId),
     prepareWritingStructure: (projectInstanceId, navigationId, alternativeId, chapters) =>
       ipcRenderer.invoke(
         'writcraft:project:prepare-writing-structure',

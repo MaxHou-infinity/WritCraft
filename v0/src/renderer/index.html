@@ -486,6 +486,14 @@
     #assistant-dock { min-width: 0; min-height: 0; background: #f7f4ef; border-left: 1px solid var(--line); display: flex; flex-direction: column; }
     #assistant-dock[hidden] { display: none; }
     .assistant-bookmarks { height: 42px; flex: 0 0 42px; display: grid; grid-template-columns: repeat(4, minmax(0,1fr)) 34px; align-items: stretch; border-bottom: 1px solid var(--line); background: #ece7df; }
+    #ai-task-progress { min-height: 34px; display: flex; align-items: center; gap: 8px; padding: 6px 10px; border-bottom: 1px solid #ded6ca; background: #fbfaf6; color: var(--ink-soft); font-size: 9px; }
+    #ai-task-progress[hidden] { display: none; }
+    #ai-task-progress[data-status="running"] { border-left: 3px solid #587a73; }
+    #ai-task-progress[data-status="failed"], #ai-task-progress[data-status="timed_out"], #ai-task-progress[data-status="cancelled"], #ai-task-progress[data-status="stale"], #ai-task-progress[data-status="conflict"] { border-left: 3px solid #b56c56; }
+    .ai-task-progress-copy { min-width: 0; flex: 1; display: flex; flex-direction: column; gap: 2px; }
+    .ai-task-progress-copy strong { overflow: hidden; text-overflow: ellipsis; white-space: nowrap; color: var(--ink); font-size: 9px; }
+    .ai-task-progress-detail, .ai-task-progress-status { color: var(--ink-soft); line-height: 1.35; }
+    .ai-task-progress-cancel { flex: 0 0 auto; border: 1px solid #b56c56; border-radius: 4px; padding: 3px 7px; background: transparent; color: #9b513e; cursor: pointer; font-size: 9px; }
     .assistant-bookmark { position: relative; border: 0; border-right: 1px solid #d9d1c5; background: transparent; color: var(--ink-soft); cursor: pointer; font-size: 10px; }
     .assistant-bookmark::before { content: ''; position: absolute; left: 12px; right: 12px; top: 0; height: 3px; border-radius: 0 0 3px 3px; background: transparent; }
     .assistant-bookmark[aria-selected="true"] { background: #fbfaf6; color: var(--ink); font-weight: 600; }
@@ -736,6 +744,11 @@
     .chat-input-row { display: grid; grid-template-columns: auto 1fr auto; gap: 7px; padding: 11px; border-top: 1px solid var(--line); }
     #chat-input { min-width: 0; padding: 8px 9px; border: 1px solid #d8d0c4; border-radius: 5px; background: #fff; outline: none; font-size: 11px; }
     #chat-input:focus { border-color: var(--theme); }
+    .context-autocomplete { position: fixed; z-index: 1200; max-height: 280px; overflow: auto; padding: 4px; border: 1px solid #c9b38f; border-radius: 8px; background: #fffdf9; box-shadow: 0 10px 24px rgba(61,45,26,.18); }
+    .context-autocomplete__item { display: grid; gap: 2px; width: 100%; padding: 7px 9px; border: 0; border-radius: 5px; background: transparent; color: var(--ink); text-align: left; cursor: pointer; }
+    .context-autocomplete__item[aria-selected="true"], .context-autocomplete__item:hover { background: #f0e9dc; }
+    .context-autocomplete__item strong { font-size: 11px; font-weight: 600; }
+    .context-autocomplete__item span { overflow: hidden; color: var(--ink-soft); font: 10px/1.35 "SF Mono", monospace; text-overflow: ellipsis; white-space: nowrap; }
     #chat-submit { border: 0; border-radius: 5px; background: var(--theme); color: white; padding: 8px 11px; cursor: pointer; font-size: 11px; }
 
     .welcome {
@@ -1162,6 +1175,7 @@
           <button class="assistant-bookmark" type="button" role="tab" data-assistant-mode="changes">修改</button>
           <button class="assistant-dock-close" type="button" data-assistant-close aria-label="关闭 AI 协作栏">×</button>
         </nav>
+        <div id="ai-task-progress" role="status" aria-live="polite" aria-atomic="true" hidden></div>
 
       <section id="chat-panel" class="assistant-page" data-assistant-panel="chat" role="tabpanel" aria-label="AI 写作助手" hidden>
         <div class="chat-header"><span class="title">✦ AI 写作助手</span><span id="chat-context-label">📄 当前文件</span><span id="chat-conversation-status" aria-live="polite">新对话</span><button id="chat-new-conversation" type="button" title="清空 Main 中的最近对话摘要">新对话</button><button id="chat-close" title="关闭">×</button></div>
@@ -1185,7 +1199,7 @@
           </section>
           <div id="image-result" aria-live="polite" hidden></div>
         </div>
-        <div class="chat-input-row"><button id="image-toggle" type="button" class="quiet-button" aria-expanded="false" aria-controls="image-compose">配图</button><input id="chat-input" type="text" maxlength="4000" placeholder="询问当前项目，或用 @ 引用文件…"><button id="chat-submit">发送</button></div>
+        <div class="chat-input-row"><button id="image-toggle" type="button" class="quiet-button" aria-expanded="false" aria-controls="image-compose">配图</button><input id="chat-input" data-context-input="true" type="text" maxlength="4000" placeholder="询问当前项目，或用 @ 引用文件…"><button id="chat-submit">发送</button></div>
       </section>
 
       <section id="navigation-panel" class="assistant-page" data-assistant-panel="navigation" role="tabpanel" aria-label="写作导航" hidden>
@@ -1199,7 +1213,7 @@
       <section id="changes-panel" class="assistant-page" data-assistant-panel="changes" role="tabpanel" aria-label="跨文件修改审阅" hidden>
         <div class="changes-header"><strong id="changes-panel-title">⇄ Project Changes</strong><button id="changes-close" title="关闭">×</button></div>
         <div class="changes-compose">
-          <textarea id="changes-instruction" maxlength="2000" placeholder="例如：统一所有章节对核心概念的定义，并修复与 edit.md 不一致的表述。"></textarea>
+          <textarea id="changes-instruction" data-context-input="true" maxlength="2000" placeholder="例如：统一所有章节对核心概念的定义，并修复与 edit.md 不一致的表述。"></textarea>
           <div class="composer-context project-changes-target-picker" id="project-changes-target-picker" aria-label="跨文件修改的可修改目标">
             <div class="composer-context-head"><strong>跨文件修改 · 可修改目标</strong><span id="project-changes-target-count" aria-live="polite">0 / 8</span></div>
             <p class="composer-context-note">只有在这里明确勾选的正文才可被修改。默认选中当前正文；edit.md、references/ 和 sources/ 永久只读。</p>
@@ -1353,6 +1367,8 @@
   <script src="citation-formatter.js"></script>
   <script src="ai-metrics-client.js"></script>
   <script src="ai-metrics-view.js"></script>
+  <script src="ai-task-progress-view.js"></script>
+  <script src="context-autocomplete.js"></script>
   <script src="inline-rewrite-transaction.js"></script>
   <script src="changes-history-recovery-transaction.js"></script>
   <script src="editor.js"></script>

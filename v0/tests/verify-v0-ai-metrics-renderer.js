@@ -457,7 +457,8 @@ console.log('════════ WritCraft V0 · AI metrics renderer verify
 
   await check('Changes 记录生成、应用、丢弃与失败，导航记录生成和失败', () => {
     for (const outcome of ['generated', 'accepted', 'discarded', 'failed']) assert(changes.includes(`recordChangeMetric('${outcome}'`));
-    assert.match(plan, /recordNavigationMetric\(result\?\.ok === true \? 'generated' : 'failed', metric\)/);
+    assert.match(plan, /result\?\.error === 'REQUEST_ABORTED'\s*\? 'cancelled'/);
+    assert.match(plan, /recordNavigationMetric\(outcome, metric\)/);
     assert.match(plan, /bridge\.proposeWritingNavigation\([\s\S]*projectInstanceId,[\s\S]*request,[\s\S]*attemptId/);
   });
 
@@ -471,8 +472,12 @@ console.log('════════ WritCraft V0 · AI metrics renderer verify
     const navigationCapture = plan.indexOf('originProjectInstanceId: projectInstanceId');
     assert(navigationCapture >= 0 && navigationCapture < plan.indexOf('await window.__workspace.persistCurrent(true)'));
     assert.match(plan, /record\?\.\(metric\.originProjectInstanceId, \{/);
-    for (const outcome of ['generated', 'accepted', 'rejected', 'discarded', 'failed']) {
-      assert(editor.includes(`recordRewriteMetric('${outcome}'`) || changes.includes(`recordChangeMetric('${outcome}'`) || plan.includes(`recordNavigationMetric('${outcome}'`));
+    for (const outcome of ['generated', 'accepted', 'rejected', 'discarded', 'failed', 'cancelled']) {
+      const navigationCancellation = outcome === 'cancelled' &&
+        plan.includes("result?.error === 'REQUEST_ABORTED'");
+      assert(editor.includes(`recordRewriteMetric('${outcome}'`) ||
+        changes.includes(`recordChangeMetric('${outcome}'`) ||
+        plan.includes(`recordNavigationMetric('${outcome}'`) || navigationCancellation);
     }
   });
 

@@ -41,6 +41,7 @@ function createWritingNavigationHandlers(options = {}) {
     staleAiProjectResult,
     projectFailure,
     recordFailure = () => {},
+    resolveContextRequest = request => request,
   } = options;
   const active = new Map();
 
@@ -101,6 +102,7 @@ function createWritingNavigationHandlers(options = {}) {
       assertTrustedSender(event);
       const project = requireCurrentProject();
       if (projectInstanceId !== project.instanceId) return staleAiProjectResult();
+      const resolvedRequest = resolveContextRequest(request);
       const owner = ownerId(event);
       const entryNavigationEpoch = getRendererNavigationEpoch();
       const lease = acquire(owner, project, entryNavigationEpoch, attemptId);
@@ -109,11 +111,31 @@ function createWritingNavigationHandlers(options = {}) {
         if (getRendererNavigationEpoch() !== entryNavigationEpoch) return staleAiProjectResult();
         const mutationGeneration = getMutationGeneration();
         const navigationEpoch = entryNavigationEpoch;
+        const callLLM = (messages, model, maxTokens, requestOptions = {}) => projectCallLLM(project.instanceId)(
+          messages,
+          model,
+          maxTokens,
+          {
+            ...requestOptions,
+            kind: 'writing_navigation',
+            targetLocator: { kind: 'writing_navigation', mode: resolvedRequest?.mode || 'navigation' },
+            inputRevision: mutationGeneration,
+            // The task-state contract intentionally accepts only a bounded,
+            // opaque owner token. `lease.key` contains the absolute project
+            // path and JSON punctuation for the Navigation store's own
+            // identity, so passing it through would fail task creation before
+            // the provider is called (the UI then showed a misleading generic
+            // "no navigation" message). Bind the AI task to this attempt;
+            // Navigation's lease remains the authoritative owner boundary.
+            ownerToken: `navigation_${lease.attemptId}`,
+            attemptId: lease.attemptId,
+          }
+        );
         const proposal = await writingNavigationService.proposeWritingNavigation({
           projectService,
           rootPath: project.rootPath,
-          request,
-          callLLM: projectCallLLM(project.instanceId),
+          request: resolvedRequest,
+          callLLM,
           signal: lease.controller.signal,
         });
         if (!proposal.ok) {

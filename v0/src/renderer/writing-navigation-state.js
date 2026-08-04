@@ -628,7 +628,8 @@
     if (action.type === 'action-progress') {
       const current = state.actions[action.actionId];
       if (!current || current.attemptId !== action.attemptId || current.status !== 'running' ||
-          !['saving_current_content', 'checking_evidence', 'generating_changes', 'preparing_diff']
+          !['saving_current_content', 'preparing_context', 'checking_evidence',
+            'generating_suggestion', 'generating_changes', 'validating_result', 'preparing_diff']
             .includes(action.phase)) return state;
       return updateAction(state, action.actionId, { ...current, phase: action.phase });
     }

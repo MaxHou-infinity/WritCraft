@@ -91,7 +91,7 @@ async function run() {
   await test('调用契约冻结 renderer 只传 question/sourceIds，Source Index 必须由 Main 注入', async () => {
     assert(Object.isFrozen(service.RESEARCH_CALL_CONTRACT));
     assert.deepStrictEqual(service.RESEARCH_CALL_CONTRACT.rendererInput, ['question', 'sourceIds']);
-    assert.deepStrictEqual(service.RESEARCH_CALL_CONTRACT.mainOwned, ['projectService', 'rootPath', 'sourceIndex', 'callLLM']);
+    assert.deepStrictEqual(service.RESEARCH_CALL_CONTRACT.mainOwned, ['projectService', 'rootPath', 'sourceIndex', 'projectPrompt', 'callLLM']);
     assert(Object.isFrozen(service.RESEARCH_CALL_CONTRACT.rendererInput));
   });
 
@@ -126,6 +126,37 @@ async function run() {
       assert.equal(result.contextManifest.sources[0].revision, selected.revision);
       assert.equal(result.contextManifest.sources[0].grade, 'A');
       assert.equal(result.contextManifest.totalBytes, Buffer.byteLength(item.contents[selected.filePath]));
+    } finally { fs.rmSync(item.root, { recursive: true, force: true }); }
+  });
+
+  await test('Research 使用 Main 编译的 edit.md 项目 Prompt，并将其 revision 写入 manifest', async () => {
+    const item = fixture();
+    try {
+      const selected = item.source('references/official.md');
+      let capturedPrompt = '';
+      const projectPrompt = { content: '# 项目主旨\n\n只研究 COPE 的证据。', revision: 'a'.repeat(64), truncated: false };
+      const result = await service.research({
+        projectService,
+        rootPath: item.root,
+        question: '验证',
+        sourceIds: [selected.id],
+        sourceIndex: item.index,
+        projectPrompt,
+        callLLM: async messages => {
+          capturedPrompt = messages[0].content;
+          return modelInput({ cards: [card(selected, item.contents[selected.filePath], '样本增长了 20%')] });
+        },
+      });
+      assert.match(capturedPrompt, /project-prompt/);
+      assert.match(capturedPrompt, /只研究 COPE 的证据/);
+      assert.deepStrictEqual(result.contextManifest.projectPrompt, {
+        path: 'edit.md',
+        revision: projectPrompt.revision,
+        bytes: Buffer.byteLength(projectPrompt.content, 'utf8'),
+        truncated: false,
+      });
+      assert.equal(result.contextManifest.totalBytes,
+        Buffer.byteLength(projectPrompt.content, 'utf8') + Buffer.byteLength(item.contents[selected.filePath], 'utf8'));
     } finally { fs.rmSync(item.root, { recursive: true, force: true }); }
   });
 

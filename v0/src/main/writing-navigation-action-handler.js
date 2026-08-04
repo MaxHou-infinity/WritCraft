@@ -23,6 +23,7 @@ function createWritingNavigationActionHandler(options = {}) {
     discardReview,
     staleAiProjectResult,
     projectFailure,
+    aiTaskState = null,
     // Leave a bounded hand-off window before the Renderer-wide 60 second
     // terminal so a completed Main review cannot race the visible timeout.
     deadlineMs = 50_000,
@@ -30,7 +31,16 @@ function createWritingNavigationActionHandler(options = {}) {
     clearTimer = clearTimeout,
   } = options;
 
-  function reportProgress(event, attemptId, phase) {
+  function reportProgress(event, attemptId, phase, taskHandle = null) {
+    const taskPhase = {
+      saving_current_content: 'preparing_context',
+      checking_evidence: 'checking_evidence',
+      generating_changes: 'generating_suggestion',
+      preparing_diff: 'validating_result',
+    }[phase];
+    if (taskHandle && taskPhase) {
+      try { taskHandle.phase(taskPhase); } catch (_) {}
+    }
     try {
       event?.sender?.send?.('writcraft:writing-task-progress', Object.freeze({
         attemptId,
@@ -85,7 +95,14 @@ function createWritingNavigationActionHandler(options = {}) {
       getRendererNavigationEpoch() === navigationEpoch);
   }
 
-  async function runBoundedChangesModel(projectInstanceId, messages, sourceSignal, providerOptions) {
+  async function runBoundedChangesModel(
+    projectInstanceId,
+    messages,
+    sourceSignal,
+    providerOptions,
+    additionalSignal = null,
+    taskHandle = null
+  ) {
     const controller = new AbortController();
     let rejectBoundary;
     let timeoutId;
@@ -97,7 +114,8 @@ function createWritingNavigationActionHandler(options = {}) {
         '修改建议已取消；没有创建待审内容'
       ));
     };
-    sourceSignal?.addEventListener?.('abort', abort, { once: true });
+    const abortSignals = [sourceSignal, additionalSignal].filter(Boolean);
+    for (const signal of abortSignals) signal.addEventListener?.('abort', abort, { once: true });
     timeoutId = setTimer(() => {
       controller.abort();
       rejectBoundary(new handoffService.WritingNavigationHandoffError(
@@ -106,7 +124,7 @@ function createWritingNavigationActionHandler(options = {}) {
       ));
     }, deadlineMs);
     try {
-      if (sourceSignal?.aborted) {
+      if (sourceSignal?.aborted || additionalSignal?.aborted) {
         abort();
         return await boundary;
       }
@@ -114,12 +132,12 @@ function createWritingNavigationActionHandler(options = {}) {
         messages,
         'MiniMax-M3',
         localizedEditService.STRUCTURED_MAX_TOKENS,
-        { signal: controller.signal, ...providerOptions }
+        { signal: controller.signal, taskHandle, ...providerOptions }
       ));
       return await Promise.race([provider, boundary]);
     } finally {
       clearTimer(timeoutId);
-      sourceSignal?.removeEventListener?.('abort', abort);
+      for (const signal of abortSignals) signal.removeEventListener?.('abort', abort);
     }
   }
 
@@ -135,6 +153,7 @@ function createWritingNavigationActionHandler(options = {}) {
     let leaseBinding = null;
     let settled = false;
     let cachedCapability = null;
+    let taskHandle = null;
 
     function assertLeaseCurrent() {
       return writingNavigationStore.assertLeaseCurrent({
@@ -180,6 +199,20 @@ function createWritingNavigationActionHandler(options = {}) {
         actionId,
         attemptId,
       });
+      if (aiTaskState) {
+        taskHandle = aiTaskState.begin({
+          projectInstanceId: project.instanceId,
+          kind: 'navigation_action',
+          targetLocator: {
+            kind: 'writing_navigation_suggestion',
+            navigationId: lease.navigationId,
+            suggestionId: lease.suggestion.suggestionId,
+          },
+          inputRevision: mutationGeneration,
+          ownerToken: lease.leaseId,
+          attemptId,
+        });
+      }
 
       if (typeof adjustment !== 'string' || adjustment.length > 500 ||
           adjustment !== adjustment.trim() || hasInvalidUnicode(adjustment) ||
@@ -213,7 +246,7 @@ function createWritingNavigationActionHandler(options = {}) {
         });
       }
 
-      reportProgress(event, attemptId, 'checking_evidence');
+      reportProgress(event, attemptId, 'checking_evidence', taskHandle);
       handoffService.revalidateAuthority({
         projectService,
         rootPath: project.rootPath,
@@ -246,12 +279,14 @@ function createWritingNavigationActionHandler(options = {}) {
       const providerOptions = unifiedWritingTaskService.providerOptions(
         preparedHandoff.prepared.structuredRanges
       );
-      reportProgress(event, attemptId, 'generating_changes');
+      reportProgress(event, attemptId, 'generating_changes', taskHandle);
       const model = await runBoundedChangesModel(
         project.instanceId,
         preparedHandoff.prepared.messages,
         lease.signal,
-        providerOptions
+        providerOptions,
+        taskHandle?.signal || null,
+        taskHandle
       );
       if (!isCurrent(project, mutationGeneration, navigationEpoch)) {
         throw new handoffService.WritingNavigationHandoffError(
@@ -261,7 +296,7 @@ function createWritingNavigationActionHandler(options = {}) {
       }
       await settleProjectAuthority(project);
       assertLeaseCurrent();
-      reportProgress(event, attemptId, 'preparing_diff');
+      reportProgress(event, attemptId, 'preparing_diff', taskHandle);
       handoffService.revalidateAuthority({
         projectService,
         rootPath: project.rootPath,
@@ -280,6 +315,7 @@ function createWritingNavigationActionHandler(options = {}) {
         });
         assertLeaseCurrent();
         const result = handoffService.needsSourcesHandoff(preparedHandoff, parsed);
+        taskHandle?.complete('needs_sources');
         settle('retryable_failure');
         return result;
       }
@@ -289,10 +325,12 @@ function createWritingNavigationActionHandler(options = {}) {
         changeSetService,
       });
       if (!result.ok) {
+        taskHandle?.fail(result.error || 'AI_TASK_FAILED', result.message || '没有形成可审阅修改；没有写入项目文件');
         settle('retryable_failure');
         return result;
       }
       if (result.noChanges) {
+        taskHandle?.fail('NO_CHANGES', '本次没有形成可审阅修改；没有写入项目文件');
         settle('retryable_failure');
         return result;
       }
@@ -318,6 +356,7 @@ function createWritingNavigationActionHandler(options = {}) {
       try {
         assertLeaseCurrent();
         settle('review_ready');
+        taskHandle?.complete('review');
       } catch (error) {
         discardReview(cachedCapability, 'writing-navigation-settle-rollback');
         cachedCapability = null;
@@ -335,6 +374,18 @@ function createWritingNavigationActionHandler(options = {}) {
     } catch (error) {
       if (cachedCapability) {
         try { discardReview(cachedCapability, 'writing-navigation-failure-rollback'); } catch (_) {}
+      }
+      if (taskHandle) {
+        try {
+          const status = taskHandle.snapshot().status;
+          if (status === 'running') {
+            if (error?.code === 'REQUEST_ABORTED') taskHandle.cancel();
+            else if (error?.code === 'TIMEOUT') taskHandle.timeout();
+            else if (/(?:STALE|PROJECT_CHANGED|NAVIGATION_NOT_FOUND|ACTION_NOT_FOUND|LEASE_NOT_FOUND)/.test(String(error?.code || ''))) {
+              taskHandle.stale();
+            } else taskHandle.fail(error?.code || 'AI_TASK_FAILED', error?.message);
+          }
+        } catch (_) {}
       }
       settleFailure(error);
       return projectFailure(error);

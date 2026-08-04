@@ -36,6 +36,7 @@ const writingNavigationProviderAdapter = require('./writing-navigation-provider-
 const writingNavigationHandoffService = require('./writing-navigation-handoff-service');
 const writingNavigationActionHandlerService = require('./writing-navigation-action-handler');
 const unifiedWritingTaskService = require('./unified-writing-task-service');
+const aiTaskStateService = require('./ai-task-state-service');
 const writingStructureService = require('./writing-structure-service');
 const writingStructureCapabilityStoreService = require('./writing-structure-capability-store');
 const writingStructureHandlerService = require('./writing-structure-handler');
@@ -52,6 +53,7 @@ const apiKeyConfigService = require('./api-key-config-service');
 const userDataService = require('./user-data-service');
 const apiHandshakeService = require('./api-handshake-service');
 const contextResolverService = require('./context-resolver-service');
+const contextCatalogService = require('./context-catalog-service');
 const contextPolicyService = require('./context-policy-service');
 const aiMetricsService = require('./ai-metrics-service');
 const minimaxTextService = require('./minimax-text-service');
@@ -109,12 +111,30 @@ const electronAiFixture = isElectronAiFixture
 const electronResearchTtlMs = isElectronAiFixture && /^\d+$/.test(process.env.WRITCRAFT_E2E_RESEARCH_TTL_MS || '')
   ? Number(process.env.WRITCRAFT_E2E_RESEARCH_TTL_MS)
   : null;
+// Context-catalog expiry is deliberately configurable only for the local
+// deterministic Electron fixture. Production and packaged builds always use
+// the fixed contract TTL below; a test-only override lets the real IPC/UI
+// journey prove that an expired opaque @ref fails closed without waiting ten
+// minutes.
+const electronContextCatalogTtlMs = isElectronAiFixture && /^\d+$/.test(process.env.WRITCRAFT_E2E_CONTEXT_CATALOG_TTL_MS || '')
+  ? Number(process.env.WRITCRAFT_E2E_CONTEXT_CATALOG_TTL_MS)
+  : null;
 
 // MiniMax API 端点（Anthropic 协议）
 
 let mainWindow = null;
 let currentProject = null;
 let currentProjectWatcher = null;
+const aiTaskState = aiTaskStateService.createAiTaskStateService({
+  onUpdate(snapshot) {
+    try {
+      if (!mainWindow || mainWindow.isDestroyed() || mainWindow.webContents.isDestroyed()) return;
+      mainWindow.webContents.send('writcraft:writing-task-progress', snapshot);
+    } catch (_) {
+      // Author-visible progress is advisory; Main task authority is independent.
+    }
+  },
+});
 const projectWatcherHealth = projectWatcherHealthService.createProjectWatcherHealth();
 const diagnosticRecorder = diagnosticExportService.createDiagnosticRecorder();
 const diagnosticPreviewStore = diagnosticExportService.createDiagnosticPreviewStore();
@@ -155,6 +175,15 @@ let dailyWorkspaceInventoryCache = null;
 let dailyWorkspaceGraphCache = null;
 let workspaceSaveGeneration = 0;
 let pendingChangeSets = null;
+// Context completion is a two-step Main transaction: the first IPC returns a
+// short-lived catalog, and later requests may submit only an opaque reference
+// minted from that exact catalog.  Renderer text is never trusted as a path
+// authority and a catalog is invalidated by a project/revision change.
+const CONTEXT_CATALOG_TTL_MS = Number.isSafeInteger(electronContextCatalogTtlMs) && electronContextCatalogTtlMs > 0
+  ? electronContextCatalogTtlMs
+  : 10 * 60 * 1000;
+const CONTEXT_CATALOG_MAX_ENTRIES = 32;
+const contextCatalogRegistry = new Map();
 const researchHandoffStore = researchHandoffService.createResearchHandoffStore({
   // Real-Electron expiry tests may shorten the existing Main-owned TTL. The
   // packaged App cannot activate the deterministic provider or this override.
@@ -457,6 +486,7 @@ function projectFailure(error) {
     error instanceof writingNavigationStoreService.WritingNavigationStoreError ||
     error instanceof writingNavigationHandoffService.WritingNavigationHandoffError ||
     error instanceof unifiedWritingTaskService.UnifiedWritingTaskError ||
+    error instanceof aiTaskStateService.AiTaskStateError ||
     error instanceof writingStructureService.WritingStructureError ||
     error instanceof writingStructureCapabilityStoreService.WritingStructureCapabilityStoreError ||
     error instanceof writingStructureHandlerService.WritingStructureHandlerError ||
@@ -469,6 +499,7 @@ function projectFailure(error) {
     error instanceof graphCorrectionService.GraphCorrectionError ||
     error instanceof graphIssueHandoffService.GraphIssueHandoffError ||
     error instanceof contextResolverService.ContextResolverError ||
+    error instanceof contextCatalogService.ContextCatalogError ||
     error instanceof contextPolicyService.ContextPolicyError ||
     error instanceof aiMetricsService.AiMetricsError ||
     error instanceof researchService.ResearchError ||
@@ -767,7 +798,10 @@ function attachPrivateProjectRootIdentity(project) {
 }
 
 function abortActiveAiRequests() {
-  for (const request of activeAiRequests) request.controller.abort();
+  for (const request of activeAiRequests) {
+    request.controller.abort();
+    try { aiTaskState.invalidateProject(request.projectInstanceId); } catch (_) {}
+  }
   activeAiRequests.clear();
 }
 
@@ -1084,19 +1118,78 @@ function endInternalMutation(token, project) {
   }
 }
 
-async function runAiRequest(projectInstanceId, task, externalSignal = null) {
+async function runAiRequest(projectInstanceId, task, externalSignal = null, metadata = {}) {
   if (currentProject && projectInstanceId === currentProject.instanceId) {
     assertProjectWatcherAvailable(currentProject);
   }
-  const request = { projectInstanceId, controller: new AbortController() };
+  const taskHandle = metadata?.taskHandle || aiTaskState.begin({
+    projectInstanceId,
+    kind: metadata?.kind || 'ai_request',
+    targetLocator: metadata?.targetLocator || { kind: 'ai_request' },
+    inputRevision: metadata?.inputRevision ?? projectMutationGeneration,
+    ownerToken: metadata?.ownerToken || `main_request_${crypto.randomUUID()}`,
+    // The task contract requires the key even when Main lets the service mint
+    // the attempt identity. `null` is explicitly accepted as “generate one”.
+    attemptId: metadata?.attemptId ?? null,
+  });
+  const ownsTask = !metadata?.taskHandle;
+  const request = { projectInstanceId, controller: new AbortController(), taskHandle };
   const relayAbort = () => request.controller.abort();
   if (externalSignal?.aborted) request.controller.abort();
   else externalSignal?.addEventListener?.('abort', relayAbort, { once: true });
+  const taskAbort = () => request.controller.abort();
+  if (taskHandle.signal.aborted) request.controller.abort();
+  else taskHandle.signal.addEventListener?.('abort', taskAbort, { once: true });
   activeAiRequests.add(request);
   try {
-    return await task(request.controller.signal);
+    try { taskHandle.phase(metadata?.startPhase || 'generating_suggestion'); } catch (_) {}
+    const result = await task(request.controller.signal);
+    if (ownsTask) {
+      if (taskHandle.snapshot().status === 'running') {
+        if (metadata?.postModelPhase) {
+          try { taskHandle.phase(metadata.postModelPhase); } catch (_) {}
+        }
+        if (result?.ok === false) {
+          // A provider adapter may return a bounded terminal result instead
+          // of throwing after an abort races the response. Preserve the
+          // cancellation authority in the task snapshot; otherwise the
+          // Renderer would truthfully show a generic failure even though the
+          // author explicitly stopped the request.
+          if (result.error === 'REQUEST_ABORTED') taskHandle.cancel();
+          else taskHandle.fail(result.error || 'LLM_FAILED', 'AI 任务未完成；没有写入项目文件');
+        }
+        else taskHandle.complete(metadata?.completionStatus || 'review');
+      }
+    }
+    const terminal = taskHandle.snapshot();
+    // `completed` is the non-writing terminal used by Chat and other
+    // informational turns. It must return the provider result just like a
+    // review/needs-sources terminal; otherwise a successful answer is
+    // converted into a false REQUEST_ABORTED after the task is settled.
+    if (terminal.status !== 'running' && terminal.status !== 'review' &&
+        terminal.status !== 'needs_sources' && terminal.status !== 'completed') {
+      return {
+        ok: false,
+        error: terminal.code || 'REQUEST_ABORTED',
+        message: terminal.message || 'AI 任务已结束；没有写入项目文件',
+      };
+    }
+    return result;
+  } catch (error) {
+    if (ownsTask) {
+      try {
+        if (taskHandle.snapshot().status === 'running') {
+          if (error?.code === 'TIMEOUT') taskHandle.timeout();
+          else if (error?.code === 'REQUEST_ABORTED' || request.controller.signal.aborted) taskHandle.cancel();
+          else if (error?.code === 'PROJECT_CHANGED') taskHandle.stale();
+          else taskHandle.fail(error?.code || 'AI_TASK_FAILED', 'AI 任务失败；没有写入项目文件');
+        }
+      } catch (_) {}
+    }
+    throw error;
   } finally {
     externalSignal?.removeEventListener?.('abort', relayAbort);
+    taskHandle.signal.removeEventListener?.('abort', taskAbort);
     activeAiRequests.delete(request);
   }
 }
@@ -1119,11 +1212,37 @@ function inlineRewriteBinding(event, project = requireCurrentProject()) {
 
 function projectCallLLM(projectInstanceId) {
   return (messages, model, maxTokens, requestOptions = {}) => {
-    const { signal: externalSignal, deadlineMs: _deadlineMs, ...providerOptions } = requestOptions;
+    const {
+      signal: externalSignal,
+      deadlineMs: _deadlineMs,
+      taskHandle,
+      kind,
+      targetLocator,
+      inputRevision,
+      ownerToken,
+      attemptId,
+      completionStatus,
+      startPhase,
+      postModelPhase,
+      ...providerOptions
+    } = requestOptions;
+    const effectiveStartPhase = startPhase || 'checking_evidence';
+    const effectivePostModelPhase = postModelPhase || 'validating_result';
     return runAiRequest(
       projectInstanceId,
       signal => callLLM(messages, model, maxTokens, signal, providerOptions),
-      externalSignal
+      externalSignal,
+      {
+        taskHandle,
+        kind: kind || 'project_llm',
+        targetLocator: targetLocator || { kind: 'project_llm' },
+        inputRevision: inputRevision ?? projectMutationGeneration,
+        ownerToken,
+        attemptId,
+        completionStatus,
+        startPhase: effectiveStartPhase,
+        postModelPhase: effectivePostModelPhase,
+      }
     );
   };
 }
@@ -1183,6 +1302,7 @@ function setCurrentProject(project) {
       inlineRewriteStore.clearOwner(`browserwindow:${mainWindow.id}`);
     }
     if (currentProject) {
+      try { aiTaskState.invalidateProject(currentProject.instanceId); } catch (_) {}
       onboardingCapabilityStore.invalidateByProject(currentProject.instanceId, currentProject.rootPath);
       researchHandoffStore.clearProject(currentProject.instanceId, currentProject.rootPath);
       const navigationOwnerId = currentChatConversationOwnerId();
@@ -1512,6 +1632,83 @@ function isAiProjectOriginCurrent(origin) {
   if (!origin || projectMutationGeneration !== origin.mutationGeneration) return false;
   if (!origin.instanceId) return currentProject === null;
   return Boolean(currentProject && currentProject.instanceId === origin.instanceId && currentProject.rootPath === origin.rootPath);
+}
+
+function pruneContextCatalogs(now = Date.now()) {
+  for (const [catalogId, record] of contextCatalogRegistry) {
+    if (record.expiresAt <= now || !currentProject ||
+        record.projectInstanceId !== currentProject.instanceId ||
+        record.mutationGeneration !== projectMutationGeneration) {
+      contextCatalogRegistry.delete(catalogId);
+    }
+  }
+  while (contextCatalogRegistry.size > CONTEXT_CATALOG_MAX_ENTRIES) {
+    const oldest = contextCatalogRegistry.keys().next().value;
+    if (!oldest) break;
+    contextCatalogRegistry.delete(oldest);
+  }
+}
+
+function registerContextCatalog(catalog) {
+  pruneContextCatalogs();
+  const now = Date.now();
+  const catalogId = `ctxcat_${crypto.randomBytes(16).toString('hex')}`;
+  const candidates = new Map((catalog?.candidates || []).map(candidate => [candidate.id, candidate]));
+  const record = Object.freeze({
+    catalogId,
+    projectInstanceId: catalog.projectInstanceId,
+    mutationGeneration: catalog.mutationGeneration,
+    candidates,
+    createdAt: now,
+    expiresAt: now + CONTEXT_CATALOG_TTL_MS,
+  });
+  contextCatalogRegistry.set(catalogId, record);
+  return {
+    ...catalog,
+    catalogId,
+    expiresAt: record.expiresAt,
+    candidates: (catalog.candidates || []).map(candidate => ({
+      ...candidate,
+      // The visible label/insertText is display metadata; only this token is
+      // accepted back by Main as a request authority.
+      referenceToken: `@ref:${catalogId}:${candidate.id}`,
+    })),
+  };
+}
+
+const CONTEXT_REFERENCE_RE = /@ref:(ctxcat_[A-Za-z0-9_-]{20,80}):(ctxcand_[A-Za-z0-9_-]{8,120})/g;
+
+function resolveContextReferenceText(value) {
+  if (typeof value !== 'string' || !value.includes('@ref:')) return value;
+  pruneContextCatalogs();
+  const resolved = value.replace(CONTEXT_REFERENCE_RE, (_raw, catalogId, candidateId) => {
+    const record = contextCatalogRegistry.get(catalogId);
+    if (!record || record.expiresAt <= Date.now()) {
+      throw new contextCatalogService.ContextCatalogError('CONTEXT_CANDIDATE_EXPIRED', '上下文候选已过期，请重新选择');
+    }
+    if (!currentProject || record.projectInstanceId !== currentProject.instanceId ||
+        record.mutationGeneration !== projectMutationGeneration) {
+      throw new contextCatalogService.ContextCatalogError('CONTEXT_CANDIDATE_STALE', '项目内容已变化，请重新选择上下文');
+    }
+    const candidate = record.candidates.get(candidateId);
+    if (!candidate || typeof candidate.insertText !== 'string') {
+      throw new contextCatalogService.ContextCatalogError('CONTEXT_CANDIDATE_UNKNOWN', '上下文候选不存在，请重新选择');
+    }
+    return candidate.insertText;
+  });
+  if (/@ref:/u.test(resolved)) {
+    throw new contextCatalogService.ContextCatalogError('INVALID_CONTEXT_REFERENCE', '上下文引用格式无效');
+  }
+  return resolved;
+}
+
+function resolveContextReferencesInRequest(request, fields = []) {
+  if (!request || typeof request !== 'object' || Array.isArray(request)) return request;
+  const next = { ...request };
+  for (const field of fields) {
+    if (typeof next[field] === 'string') next[field] = resolveContextReferenceText(next[field]);
+  }
+  return next;
 }
 
 function utf8Bytes(value) {
@@ -2026,7 +2223,16 @@ ipcMain.handle('writcraft:rewrite', async (event, projectInstanceId, request) =>
     const model = await runAiRequest(
       project.instanceId,
       signal => callLLM(prepared.messages, 'MiniMax-M3', 4096, signal),
-      generation.signal
+      generation.signal,
+      {
+        kind: 'inline_rewrite',
+        targetLocator: { kind: 'inline_rewrite', rewriteId: generation.rewriteId },
+        inputRevision: origin.mutationGeneration,
+        ownerToken: generation.rewriteId,
+        attemptId: generation.rewriteId,
+        startPhase: 'checking_evidence',
+        postModelPhase: 'validating_result',
+      }
     );
     if (!isAiProjectOriginCurrent(origin)) {
       throw new inlineRewriteService.InlineRewriteError('INLINE_REWRITE_STALE', '项目或改写上下文已变化');
@@ -2215,6 +2421,20 @@ ipcMain.handle('writcraft:chat', async (event, projectInstanceId, userMessage, p
   }
   const contextValidation = validateRendererContext(projectContext, contextRequest);
   if (!contextValidation.ok) return contextValidation;
+  try {
+    // Resolve only the short-lived opaque references issued by Main.  The
+    // visible draft remains the author's text for conversation history, while
+    // the provider receives the canonical @file/@section/@source/@entity form.
+    userMessage = resolveContextReferenceText(userMessage);
+    if (contextRequest && typeof contextRequest === 'object' && !Array.isArray(contextRequest)) {
+      contextRequest = resolveContextReferencesInRequest(contextRequest, ['message']);
+    }
+  } catch (error) {
+    return projectFailure(error);
+  }
+  if (Array.from(userMessage).length > MAX_CHAT_MESSAGE_CHARS || Buffer.byteLength(userMessage, 'utf8') > MAX_CHAT_MESSAGE_BYTES) {
+    return { ok: false, error: 'INPUT_TOO_LARGE', message: '解析上下文引用后，单次对话问题超过安全范围' };
+  }
   if (contextRequest && contextRequest.message !== undefined && contextRequest.message !== userMessage) {
     return { ok: false, error: 'INVALID_CONTEXT_REQUEST', message: '上下文问题必须与对话问题一致' };
   }
@@ -2279,7 +2499,14 @@ ipcMain.handle('writcraft:chat', async (event, projectInstanceId, userMessage, p
       'MiniMax-M3',
       1024,
       signal
-    ), conversationLease?.signal || null);
+    ), conversationLease?.signal || null, {
+      kind: 'chat',
+      targetLocator: { kind: 'chat', scope: contextRequest?.scope || 'file' },
+      inputRevision: origin.mutationGeneration,
+      completionStatus: 'completed',
+      startPhase: 'preparing_context',
+      postModelPhase: 'validating_result',
+    });
   } catch (error) {
     if (conversationLease) chatConversationStore.finish(conversationLease);
     throw error;
@@ -2345,6 +2572,18 @@ ipcMain.handle('writcraft:chat:cancel-pending', async (event, projectInstanceId)
   }
 });
 
+ipcMain.handle('writcraft:ai-task:cancel', async (event, projectInstanceId, attemptId) => {
+  try {
+    assertTrustedSender(event);
+    const project = requireCurrentProject();
+    if (projectInstanceId !== project.instanceId) return staleAiProjectResult();
+    const snapshot = aiTaskState.cancelByAttempt({ projectInstanceId, attemptId });
+    return { ok: true, task: snapshot };
+  } catch (error) {
+    return projectFailure(error);
+  }
+});
+
 const writingNavigationHandlers = writingNavigationHandlerService.createWritingNavigationHandlers({
   assertTrustedSender,
   requireCurrentProject,
@@ -2360,6 +2599,7 @@ const writingNavigationHandlers = writingNavigationHandlerService.createWritingN
   staleAiProjectResult,
   projectFailure,
   recordFailure: code => diagnosticRecorder.record('project', code),
+  resolveContextRequest: request => resolveContextReferencesInRequest(request, ['goal']),
 });
 
 ipcMain.handle('writcraft:project:propose-writing-navigation',
@@ -2501,6 +2741,7 @@ ipcMain.handle('writcraft:project:run-writing-navigation-action',
     discardReview: (capability, reason) => pendingChangeSets.delete(capability, reason),
     staleAiProjectResult,
     projectFailure,
+    aiTaskState,
   })
 );
 
@@ -2583,7 +2824,13 @@ ipcMain.handle('writcraft:project:handoff-graph-issue', async (event, projectIns
       'MiniMax-M3',
       minimaxTextService.MAX_MAX_TOKENS,
       signal
-    ));
+    ), null, {
+      kind: 'graph_issue_handoff',
+      targetLocator: { kind: 'graph_issue_handoff' },
+      inputRevision: origin.mutationGeneration,
+      startPhase: 'checking_evidence',
+      postModelPhase: 'validating_result',
+    });
     if (!isAiProjectOriginCurrent(origin)) return staleAiProjectResult();
 
     // Rebuild and reconcile immediately after generation. This catches file,
@@ -2753,6 +3000,31 @@ ipcMain.handle('writcraft:project:resolve-context', async (event, projectInstanc
         policy: contextPolicy,
       }),
     };
+  } catch (error) {
+    return projectFailure(error);
+  }
+});
+
+ipcMain.handle('writcraft:project:list-context-candidates', async (event, projectInstanceId, request = {}) => {
+  try {
+    assertTrustedSender(event);
+    if (!matchesAiProjectOrigin(projectInstanceId)) return staleAiProjectResult();
+    const project = requireCurrentProject();
+    if (!request || typeof request !== 'object' || Array.isArray(request)) {
+      throw new contextCatalogService.ContextCatalogError('INVALID_REQUEST', '上下文候选请求无效');
+    }
+    const currentFilePath = request.currentFilePath === null || request.currentFilePath === undefined
+      ? null
+      : String(request.currentFilePath);
+    const catalog = contextCatalogService.listContextCandidates({
+      projectService,
+      rootPath: project.rootPath,
+      projectInstanceId: project.instanceId,
+      mutationGeneration: projectMutationGeneration,
+      query: request.query,
+      currentFilePath,
+    });
+    return registerContextCatalog(catalog);
   } catch (error) {
     return projectFailure(error);
   }
@@ -3045,10 +3317,11 @@ ipcMain.handle('writcraft:project:propose-chapter', async (event, projectInstanc
     const project = requireCurrentProject();
     if (projectInstanceId !== project.instanceId) return staleAiProjectResult();
     const origin = captureAiProjectOrigin();
+    const resolvedRequest = resolveContextReferencesInRequest(request, ['instruction']);
     const proposal = await chapterProposalService.proposeChapter({
       projectService,
       rootPath: project.rootPath,
-      request,
+      request: resolvedRequest,
       callLLM: projectCallLLM(project.instanceId),
       changeSetService,
     });
@@ -3201,17 +3474,24 @@ ipcMain.handle('writcraft:project:propose-changes', async (event, projectInstanc
     const project = requireCurrentProject();
     if (projectInstanceId !== project.instanceId) return staleAiProjectResult();
     const origin = captureAiProjectOrigin();
+    const resolvedRequest = resolveContextReferencesInRequest(request, ['instruction']);
     const prepared = projectChangesProposalService.prepareProjectChangesProposal({
       projectService,
       rootPath: project.rootPath,
-      request,
+      request: resolvedRequest,
     });
     const model = await runAiRequest(project.instanceId, signal => callLLM(
       prepared.messages,
       'MiniMax-M3',
       minimaxTextService.MAX_MAX_TOKENS,
       signal
-    ));
+    ), null, {
+      kind: 'project_changes',
+      targetLocator: { kind: 'project_changes' },
+      inputRevision: origin.mutationGeneration,
+      startPhase: 'checking_evidence',
+      postModelPhase: 'validating_result',
+    });
     if (!isAiProjectOriginCurrent(origin)) return staleAiProjectResult();
     // Revalidate targets, edit.md and every explicit readonly context before a
     // capability is allocated. The same dependencies are checked again at
@@ -3505,12 +3785,19 @@ ipcMain.handle('writcraft:project:research', async (event, projectInstanceId, qu
     // Source Index is Main-owned authority. Renderer may submit only the
     // research question and IDs it selected from the public Sources view.
     const sourceIndex = sourceIndexService.buildSourceIndex(project.rootPath);
+    const editSnapshot = projectService.readFileWithRevision(project.rootPath, projectService.EDIT_FILE);
+    const compiledProjectPrompt = contextResolverService.compileEditPrompt(editSnapshot.content);
     const result = await researchService.research({
       projectService,
       rootPath: project.rootPath,
       question,
       sourceIds,
       sourceIndex,
+      projectPrompt: {
+        content: compiledProjectPrompt.content,
+        revision: editSnapshot.revision,
+        truncated: compiledProjectPrompt.truncated,
+      },
       callLLM: projectCallLLM(project.instanceId),
     });
     if (!result.ok) {
@@ -3648,7 +3935,13 @@ ipcMain.handle('writcraft:project:handoff-research-card', async (event, projectI
       'MiniMax-M3',
       minimaxTextService.MAX_MAX_TOKENS,
       signal
-    ), prepared.signal);
+    ), prepared.signal, {
+      kind: 'research_handoff',
+      targetLocator: { kind: 'research_card', cardId: request?.cardId || 'current' },
+      inputRevision: origin.mutationGeneration,
+      startPhase: 'checking_evidence',
+      postModelPhase: 'validating_result',
+    });
     if (!isAiProjectOriginCurrent(origin)) {
       try {
         researchHandoffStore.cancel({
@@ -3807,8 +4100,14 @@ ipcMain.handle('writcraft:project:generate-image', async (event, projectInstance
             );
           }
           assertInlineRewriteMutationAvailable(project);
-        },
-      }));
+      },
+      }), null, {
+        kind: 'image_generation',
+        targetLocator: { kind: 'image_generation', operationId },
+        inputRevision: mutationGeneration,
+        startPhase: 'generating_suggestion',
+        postModelPhase: 'validating_result',
+      });
     invalidateProjectDerivedState();
     const review = imageReviewHandler.issue(event, currentProject, operationId, result.image);
     return { ...result, review };

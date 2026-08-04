@@ -7,6 +7,7 @@
 
 const crypto = require('crypto');
 const blockAnchor = require('../shared/block-anchor');
+const contextResolverService = require('./context-resolver-service');
 const { SECTIONS: PROJECT_INTENT_SECTIONS } = require('./project-onboarding-v2-service');
 
 const REQUEST_SCHEMA = 'writcraft.writing-navigation-request/v1';
@@ -60,6 +61,7 @@ const PUBLIC_MODEL_FAILURES = new Set([
   'MODEL_OUTPUT_TOO_LARGE',
   'MODEL_OUTPUT_TRUNCATED',
 ]);
+const PUBLIC_CONTROL_FAILURES = new Set(['REQUEST_ABORTED', 'TIMEOUT']);
 
 const LIMITS = Object.freeze({
   organizingLogic: 120,
@@ -398,12 +400,22 @@ function readInputs(projectService, rootPath, request, availablePaths) {
       role: filePath === request.currentFilePath ? 'current_file' : 'explicit_context',
     }));
   }
+  let compiledEdit;
+  let editPromptFallback = false;
+  if (edit.content.trim()) {
+    try { compiledEdit = contextResolverService.compileEditPrompt(edit.content); }
+    catch (_) { compiledEdit = { content: edit.content, truncated: true }; editPromptFallback = true; }
+  } else {
+    compiledEdit = { content: '', truncated: false };
+  }
   return Object.freeze({
     edit: Object.freeze({
       path: 'edit.md',
-      content: edit.content,
+      content: compiledEdit.content,
       revision: edit.revision,
       bytes: Buffer.byteLength(edit.content, 'utf8'),
+      compiledBytes: Buffer.byteLength(compiledEdit.content, 'utf8'),
+      fallbackToRaw: editPromptFallback,
       limited: limitedProjectIntent(edit.content),
     }),
     bodyFiles: Object.freeze(bodyFiles),
@@ -833,6 +845,10 @@ async function proposeWritingNavigation({
       omittedBodyCount: Math.max(0, inputs.availableCount - inputs.bodyFiles.length),
       totalBodyBytes: inputs.bodyFiles.reduce((sum, file) => sum + file.bytes, 0),
       limitedProjectIntent: inputs.edit.limited,
+      editPromptCompilation: Object.freeze({
+        compiledBytes: inputs.edit.compiledBytes || inputs.edit.bytes,
+        fallbackToRaw: Boolean(inputs.edit.fallbackToRaw),
+      }),
       files: Object.freeze([
         Object.freeze({ path: 'edit.md', role: 'project_prompt', revision: inputs.edit.revision, bytes: inputs.edit.bytes }),
         ...inputs.bodyFiles.map(file => Object.freeze({
@@ -871,7 +887,22 @@ function isAuthenticWritingNavigationRecord(value) {
 }
 
 function publicWritingNavigationFailure(error) {
-  if (!(error instanceof WritingNavigationError) || !PUBLIC_MODEL_FAILURES.has(error.code)) return null;
+  if (!(error instanceof WritingNavigationError) ||
+      (!PUBLIC_MODEL_FAILURES.has(error.code) && !PUBLIC_CONTROL_FAILURES.has(error.code))) return null;
+  if (error.code === 'REQUEST_ABORTED') {
+    return Object.freeze({
+      ok: false,
+      error: 'REQUEST_ABORTED',
+      message: '写作导航已取消；本次没有修改任何项目文件。',
+    });
+  }
+  if (error.code === 'TIMEOUT') {
+    return Object.freeze({
+      ok: false,
+      error: 'TIMEOUT',
+      message: '写作导航已超时；本次没有修改任何项目文件，可以直接重试。',
+    });
+  }
   return Object.freeze({
     ok: false,
     error: error.code,

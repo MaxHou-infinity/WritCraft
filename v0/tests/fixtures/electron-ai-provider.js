@@ -49,6 +49,17 @@ const RESEARCH_AFTER = 'E2E_RESEARCH_APPLIED_WITH_PROVENANCE';
 const UNIFIED_NAVIGATION_GOAL = 'E2E 一次点击进入正文内 Diff';
 const UNIFIED_BEFORE = 'E2E_UNIFIED_TASK_BEFORE';
 const UNIFIED_AFTER = 'E2E_UNIFIED_TASK_AFTER';
+// The author-copy journey deliberately keeps its fixture marker in one new
+// file inside the derived copy.  The surrounding prompt still comes from the
+// selected real manuscript, so this provider can prove a real-author context
+// without mutating or uploading the owner's source files.
+const AUTHOR_CHAT_QUESTION = 'E2E 作者验收：请说明当前章节的目标。';
+const AUTHOR_CHAT_RESPONSE = 'E2E 作者验收 Chat 已读取项目 Prompt 与当前章节。';
+const AUTHOR_CANCEL_QUESTION = 'E2E 作者验收：取消一项长任务。';
+const AUTHOR_CANCEL_RESPONSE = 'E2E 作者验收长任务不应显示。';
+const AUTHOR_NAVIGATION_GOAL = 'E2E 作者验收：压缩当前章节的一处重复表达。';
+const AUTHOR_BEFORE = 'E2E_AUTHOR_CROSS_ENTRY_BEFORE';
+const AUTHOR_AFTER = 'E2E_AUTHOR_CROSS_ENTRY_AFTER';
 const CHANGES_REVIEW_GOAL = 'E2E 验证两个文件三块修改的独立审阅';
 const CHANGES_SECOND_PATH = 'chapters/01-arrival.md';
 const CHANGES_BEFORE = Object.freeze([
@@ -468,6 +479,69 @@ function unifiedWritingTaskAnswer(prompt, request) {
   };
 }
 
+function authorChatAnswer(prompt) {
+  const required = [
+    '[上下文 · project prompt · edit.md]',
+    '[上下文 · file · chapters/author-e2e.md]',
+  ];
+  console.log(`[e2e-fixture] AUTHOR_CHAT_PROVIDER_CALL required=${required.map(value => prompt.includes(value) ? '1' : '0').join('')} forbidden=${prompt.includes('[权威项目 Prompt · edit.md]') ? '1' : '0'}`);
+  if (required.some(value => !prompt.includes(value)) ||
+      prompt.includes('[权威项目 Prompt · edit.md]')) {
+    throw new Error('E2E_FIXTURE_INVALID_AUTHOR_CHAT_CONTEXT');
+  }
+  return AUTHOR_CHAT_RESPONSE;
+}
+
+function authorNavigationAnswer(prompt, request) {
+  if (!prompt.includes(`用户目标：${AUTHOR_NAVIGATION_GOAL}`) ||
+      !prompt.includes('WRITCRAFT_EVIDENCE_REF') || !prompt.includes(AUTHOR_BEFORE)) {
+    throw new Error('E2E_FIXTURE_INVALID_AUTHOR_NAVIGATION_PROMPT');
+  }
+  assertWritingNavigationToolRequest(request);
+  const candidates = request.tools[0].input_schema.properties.suggestions
+    .items.properties.evidenceRefs.items.enum;
+  const marker = [...prompt.matchAll(/<!-- WRITCRAFT_EVIDENCE_REF:(er_[a-f0-9]{16}_[1-9][0-9]{0,3}) -->\n([^\n]*)/g)]
+    .find(match => match[2].includes(AUTHOR_BEFORE));
+  if (!marker || !candidates.includes(marker[1])) {
+    throw new Error('E2E_FIXTURE_MISSING_AUTHOR_NAVIGATION_EVIDENCE');
+  }
+  return {
+    mode: 'navigation',
+    suggestions: [{
+      finding: '当前章节存在一处可以局部精简的重复表达。',
+      evidenceRefs: [marker[1]],
+      whyNow: '作者验收只处理一个明确、可撤销的局部任务。',
+      editIntent: 'compress',
+      expectedResult: '正文中出现一处可审阅的局部 Diff。',
+      action: 'changes',
+    }],
+  };
+}
+
+function authorUnifiedWritingTaskAnswer(prompt, request) {
+  if (!prompt.includes('必须且只能调用 submit_unified_writing_task 一次') ||
+      !prompt.includes(AUTHOR_BEFORE)) {
+    throw new Error('E2E_FIXTURE_INVALID_AUTHOR_UNIFIED_TASK_PROMPT');
+  }
+  assertUnifiedWritingTaskRequest(request);
+  const rangeIds = request.tools[0].input_schema.oneOf
+    .find(branch => branch.properties.status.const === 'changes')
+    .properties.edits.items.properties.rangeId.enum;
+  if (rangeIds.length !== 1 || !prompt.includes(`content=${JSON.stringify(AUTHOR_BEFORE)}`)) {
+    throw new Error('E2E_FIXTURE_MISSING_AUTHOR_UNIFIED_RANGE');
+  }
+  return {
+    status: 'changes',
+    edits: [{
+      rangeId: rangeIds[0],
+      newText: AUTHOR_AFTER,
+      summary: '真实作者隔离副本的局部精简 Diff',
+    }],
+    reason: '',
+    question: '',
+  };
+}
+
 function graphIssueChangesAnswer(prompt) {
   console.log('[e2e-fixture] GRAPH_ISSUE_PROVIDER_CALL');
   if (!prompt.includes('Graph Issue→Changes 修订执行器') ||
@@ -585,6 +659,14 @@ function createElectronAiProvider() {
         output = resetMultiTurnChatAnswer(prompt);
       } else if (prompt.includes(`问题：${SAME_PROJECT_REOPEN_QUESTION}`)) {
         output = sameProjectReopenChatAnswer(prompt);
+      } else if (prompt.includes(AUTHOR_CANCEL_QUESTION)) {
+        // Deliberately outlive the 15 s cancellation affordance. Main must
+        // settle the task and discard this late answer without writing or
+        // publishing it to the Renderer.
+        await new Promise(resolve => setTimeout(resolve, 18_000));
+        output = AUTHOR_CANCEL_RESPONSE;
+      } else if (prompt.includes(AUTHOR_CHAT_QUESTION)) {
+        output = authorChatAnswer(prompt);
       } else if (prompt.includes(`问题：${PROJECT_CHAT_QUERY}`)) {
         output = projectChatAnswer(prompt);
       } else if (prompt.includes(`问题：${SELECTION_CHAT_QUESTION}`)) {
@@ -594,10 +676,14 @@ function createElectronAiProvider() {
         researchToolInput = researchCard(prompt);
       } else if (prompt.includes('你是 WritCraft 的写作导航助手。')) {
         assertWritingNavigationToolRequest(request);
-        writingNavigationToolInput = writingNavigationAnswer(prompt, request);
+        writingNavigationToolInput = prompt.includes(`用户目标：${AUTHOR_NAVIGATION_GOAL}`)
+          ? authorNavigationAnswer(prompt, request)
+          : writingNavigationAnswer(prompt, request);
       } else if (prompt.includes('必须且只能调用 submit_unified_writing_task 一次')) {
         assertUnifiedWritingTaskRequest(request);
-        unifiedWritingTaskToolInput = unifiedWritingTaskAnswer(prompt, request);
+        unifiedWritingTaskToolInput = prompt.includes(AUTHOR_BEFORE)
+          ? authorUnifiedWritingTaskAnswer(prompt, request)
+          : unifiedWritingTaskAnswer(prompt, request);
       } else {
         throw new Error('E2E_FIXTURE_UNHANDLED_TEXT');
       }
@@ -708,6 +794,13 @@ module.exports = {
   UNIFIED_NAVIGATION_GOAL,
   UNIFIED_BEFORE,
   UNIFIED_AFTER,
+  AUTHOR_CHAT_QUESTION,
+  AUTHOR_CHAT_RESPONSE,
+  AUTHOR_CANCEL_QUESTION,
+  AUTHOR_CANCEL_RESPONSE,
+  AUTHOR_NAVIGATION_GOAL,
+  AUTHOR_BEFORE,
+  AUTHOR_AFTER,
   CHANGES_REVIEW_GOAL,
   CHANGES_SECOND_PATH,
   CHANGES_BEFORE,

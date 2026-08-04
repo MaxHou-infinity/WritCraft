@@ -10,12 +10,34 @@ function createWritingNavigationProviderAdapter(options = {}) {
       const {
         signal: externalSignal,
         deadlineMs: _deadlineMs,
+        taskHandle,
+        kind,
+        targetLocator,
+        inputRevision,
+        ownerToken,
+        attemptId,
+        completionStatus,
+        startPhase,
+        postModelPhase,
         ...providerOptions
       } = requestOptions;
+      const effectiveStartPhase = startPhase || 'checking_evidence';
+      const effectivePostModelPhase = postModelPhase || 'validating_result';
       return runAiRequest(
         projectInstanceId,
         signal => callLLM(messages, model, maxTokens, signal, providerOptions),
-        externalSignal
+        externalSignal,
+        {
+          taskHandle,
+          kind,
+          targetLocator,
+          inputRevision,
+          ownerToken,
+          attemptId,
+          completionStatus,
+          startPhase: effectiveStartPhase,
+          postModelPhase: effectivePostModelPhase,
+        }
       );
     };
   };

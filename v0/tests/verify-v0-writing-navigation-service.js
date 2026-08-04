@@ -609,6 +609,23 @@ const NAVIGATION = {
     ), null);
   });
 
+  await test('control failures retain explicit cancelled or retryable public states', async () => {
+    assert.deepStrictEqual(service.publicWritingNavigationFailure(
+      new service.WritingNavigationError('REQUEST_ABORTED', 'internal abort detail')
+    ), {
+      ok: false,
+      error: 'REQUEST_ABORTED',
+      message: '写作导航已取消；本次没有修改任何项目文件。',
+    });
+    assert.deepStrictEqual(service.publicWritingNavigationFailure(
+      new service.WritingNavigationError('TIMEOUT', 'internal timeout detail')
+    ), {
+      ok: false,
+      error: 'TIMEOUT',
+      message: '写作导航已超时；本次没有修改任何项目文件，可以直接重试。',
+    });
+  });
+
   await test('invalid revisions fail before they can become public authority', async () => {
     const project = fakeProject({ 'edit.md': '# Prompt\n' });
     project.readFileWithRevision = () => ({ content: '# Prompt\n', revision: 'not-a-revision' });

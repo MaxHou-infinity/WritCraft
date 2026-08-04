@@ -1,9 +1,9 @@
-# 笔触 WritCraft 0.3.0 开发路线图（审阅草案）
+# 笔触 WritCraft 0.3.0 开发路线图（生效合同）
 
 > 路线图编号：`WRC-0.3.0-R1`
 > 对应产品版本：`writ-craft@0.3.0`
 > 版本主题：透明 AI 协作
-> 当前状态：**已获所有者批准；目标模式待启动**
+> 当前状态：**已获所有者批准；阶段 A–D 第一可回归切片已形成，真实项目来源/实体候选、Context Catalog Main IPC、TTL 过期与 Chat 恢复提示、统一写作任务 focused Electron 均已通过；获批 GUI 环境 `npm test`、`npm run verify`、API Key 同 profile 1/1、watcher 3/3 和 Chat 任务进度 1/1 已通过；阶段 E 已在所有者选定源稿创建的临时隔离副本中通过 Chat → Navigation → 正文 Diff → 过期冲突阻止 → 重试接受 → Safe Undo 1/1，Chapter/Research/Graph/图片及独立复审仍未完成**
 
 本版本不是再增加一套 AI 功能，而是让现有 AI 写作能力变得可理解、可控、可恢复。作者应该始终知道：AI 当前在处理什么、读取了哪些内容、为什么没有继续，以及接受后到底会写入什么。
 
@@ -73,11 +73,11 @@
 | 阶段 | 交付 | 退出条件 |
 |---|---|---|
 | 0 | 合同冻结与历史清理 | 任务状态、引用 ID、manifest、超时和写入边界合同完成；旧 `plan/*` 仅保留兼容读取 |
-| A | Main 任务状态机与 owner 绑定 | 取消/超时/项目切换/迟到结果/重复提交专项测试通过 |
-| B | `@` 引用目录与 Context manifest | 真实文件、章节、来源和实体补全；revision 漂移全部 fail-closed |
-| C | `edit.md` 编译器与统一入口 | Chat/导航/Chapter 至少三条真实路径消费同一 manifest；Research 保持独立高级入口 |
-| D | Renderer 任务条与 Context 披露 | 不新增页面；窄窗口、键盘、长任务和错误恢复可用 |
-| E | 真实作者验收与发布候选 | 隔离副本完成三条写作任务；P0=0、P1=0；`npm test`、`npm run verify`、真实 Electron 和独立复审通过 |
+| A | Main 任务状态机与 owner 绑定 | **第一切片已完成并通过专项回归**；Navigation 真实生成/Diff/取消已验证，Chat 真实 Electron 任务进度已验证，完整跨入口取消/超时/项目切换验收仍在进行 |
+| B | `@` 引用目录与 Context manifest | **文件/文件夹/章节/段落补全与短期 request-bound opaque ID 已接入；真实项目候选 1/1、Context Catalog Main IPC Electron 1/1 已通过，短 TTL 过期与 Chat 恢复提示也已通过**，证明有效引用可进入统一项目上下文，edit.md revision 漂移、foreign project identity 和过期引用会 fail-closed；跨入口作者验收仍待完成 |
+| C | `edit.md` 编译器与统一入口 | **Chat/导航/Chapter/Changes/Research 已复用 Main 编译入口**；同一真实项目的字段语义对照、旧 manifest 失效和图片文本入口验收待完成 |
+| D | Renderer 任务条与 Context 披露 | **第一切片已接入**；项目卡 focused Electron 4/4、动态 Renderer 30/30、workspace owner 4/4、Chat 任务进度 1/1、统一写作任务 focused Electron 1/1；Navigation 一次主要点击到正文 Diff、拒绝零写入、接受和 Safe Undo 已验证；其余入口视觉/取消恢复验收待完成 |
+| E | 真实作者验收与发布候选 | **进行中**；源码回归、获批 `npm run verify`、API Key 同 profile 1/1、watcher 3/3 和一次完整 Electron 38/38 已通过；新增真实作者源稿派生临时隔离副本的 `e2e:electron:author-cross-entry` 1/1，覆盖 Chat、Navigation、正文内 Diff、过期冲突阻止、重试接受和 Safe Undo，且证明源稿未变化、没有真实网络请求。仍需在同一验收边界完成 Chapter、Research、Graph、图片、取消/超时和独立复审；后续全量 harness 在 Trash/Graph recovery 的不同位置仍有非固定时序红灯，继续按 P2 保留 |
 
 ## 7. 明确不做
 
@@ -98,7 +98,7 @@
 
 ## 9. 发布与文档门禁
 
-- 本文件已于 2026-08-04 获所有者审阅通过，现作为 0.3.0 生效合同；开始编码前仍须启动唯一的 0.3.0 目标模式。
+- 本文件已于 2026-08-04 获所有者审阅通过，现作为 0.3.0 生效合同；唯一的 0.3.0 目标模式已启动，后续按阶段边界推进。
 - 生效前必须同步 `docs/ROADMAP.md`、`v0/DEVELOPMENT-STATUS.md`、相关 Context/Navigation/Changes 合同和 Nowledge Mem。
 - 每个阶段只提交一个可运行、可验证的边界；自动化全绿不能替代真实作者路径。
 - 发布前保留所有真实红灯和 P2 风险，不用后续绿灯覆盖历史证据；未经单独授权不得发布 npm、Tag、GitHub Release 或 App/ZIP。

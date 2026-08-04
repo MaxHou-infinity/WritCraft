@@ -98,8 +98,9 @@ async function run() {
   await test('Main 自建 Source Index，renderer 不能提交 index/grade/path/revision', async () => {
     const block = handler('writcraft:project:research');
     assert(block.includes('const sourceIndex = sourceIndexService.buildSourceIndex(project.rootPath)'));
+    assert(block.includes('const compiledProjectPrompt = contextResolverService.compileEditPrompt(editSnapshot.content)'));
     assert(block.includes('researchService.research({'));
-    for (const field of ['projectService,', 'rootPath: project.rootPath', 'question,', 'sourceIds,', 'sourceIndex,', 'callLLM: projectCallLLM(project.instanceId)']) {
+    for (const field of ['projectService,', 'rootPath: project.rootPath', 'question,', 'sourceIds,', 'sourceIndex,', 'projectPrompt:', 'callLLM: projectCallLLM(project.instanceId)']) {
       assert(block.includes(field), `missing Main-owned field ${field}`);
     }
     assert(!/async \(event, projectInstanceId, question, sourceIds,\s*(?:sourceIndex|grade|filePath|revision)/.test(block));

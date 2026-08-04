@@ -7,15 +7,18 @@
 1. [`ROADMAP.md`](ROADMAP.md)：唯一正式版本顺序、范围和非目标。
 2. [`ROADMAP-0.2.0.md`](ROADMAP-0.2.0.md)：当前版本的已批准详细合同与阶段门禁。
 3. [`../v0/DEVELOPMENT-STATUS.md`](../v0/DEVELOPMENT-STATUS.md)：当前事实、开放风险和下一动作。
-4. [`WRITCRAFT-PRD-V3.md`](WRITCRAFT-PRD-V3.md)：长期产品契约。
-5. [`ARCHITECTURE.md`](ARCHITECTURE.md)：稳定工程边界。
-6. `v0/package.json` 与实际源码/测试：最终工程事实。
+4. [`ROADMAP-0.3.0.md`](ROADMAP-0.3.0.md)：当前 0.3.0 生效合同、阶段顺序和验收门禁。
+5. [`WRITCRAFT-PRD-V3.md`](WRITCRAFT-PRD-V3.md)：长期产品契约。
+6. [`ARCHITECTURE.md`](ARCHITECTURE.md)：稳定工程边界。
+7. `v0/package.json` 与实际源码/测试：最终工程事实。
 
 当前阶段 A 还必须阅读 [`DAILY-WORKSPACE-V1-CONTRACT.md`](DAILY-WORKSPACE-V1-CONTRACT.md)：它冻结 0.2.0 项目首页、大纲、`⌘P`、共享定位、workspace/v2、5 秒降级和性能验收边界。
 
+0.3.0 阶段 A–D 还必须阅读 [`AI-TASK-TRANSPARENCY-V1-CONTRACT.md`](AI-TASK-TRANSPARENCY-V1-CONTRACT.md)：它冻结跨入口任务身份、状态、取消/超时、进度事件和零写入边界。
+
 `ROADMAP-0.2.0.md` 已于 2026-08-03 获得所有者批准并生效。原审阅稿已直接转为该版本合同，不保留第二份活动路线图。
 
-`ROADMAP-0.3.0.md` 已于 2026-08-04 获所有者批准并成为 0.3.0 生效合同；目标模式启动后才可按阶段 0 → E 派发编码任务。
+`ROADMAP-0.3.0.md` 已于 2026-08-04 获所有者批准并成为 0.3.0 生效合同；目标模式已启动，按阶段 0 → E 派发编码任务，当前以路线图与 `v0/DEVELOPMENT-STATUS.md` 的实时证据为准。
 
 ## 用户与发布
 

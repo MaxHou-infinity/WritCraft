@@ -1,6 +1,7 @@
 'use strict';
 
 const blockAnchor = require('../shared/block-anchor');
+const contextResolverService = require('./context-resolver-service');
 const projectChangesProposalService = require('./project-changes-proposal-service');
 const unifiedWritingTaskService = require('./unified-writing-task-service');
 const { markdownPaths } = require('./writing-navigation-service');
@@ -105,9 +106,13 @@ function validateManifest(projectService, rootPath, record, editSnapshot, snapsh
   const manifest = record.result.contextManifest;
   if (!exactKeys(manifest, [
     'usedBodyCount', 'availableBodyCount', 'omittedBodyCount', 'totalBodyBytes',
-    'limitedProjectIntent', 'files', 'omissionReason', 'truncationReason', 'disclosure',
+    'limitedProjectIntent', 'editPromptCompilation', 'files', 'omissionReason',
+    'truncationReason', 'disclosure',
   ]) || !Array.isArray(manifest.files) || manifest.files.length !== record.sources.length + 1 ||
-      typeof manifest.limitedProjectIntent !== 'boolean') {
+      typeof manifest.limitedProjectIntent !== 'boolean' ||
+      !exactKeys(manifest.editPromptCompilation, ['compiledBytes', 'fallbackToRaw']) ||
+      !Number.isSafeInteger(manifest.editPromptCompilation.compiledBytes) ||
+      typeof manifest.editPromptCompilation.fallbackToRaw !== 'boolean') {
     fail('INVALID_NAVIGATION_AUTHORITY', '写作导航 Context 记录无效');
   }
   const available = availableBodyCount(projectService, rootPath);
@@ -132,12 +137,27 @@ function validateManifest(projectService, rootPath, record, editSnapshot, snapsh
       };
     }),
   ];
+  let compiledEdit = { content: '', fallbackToRaw: false };
+  if (editSnapshot.content.trim()) {
+    try {
+      compiledEdit = {
+        content: contextResolverService.compileEditPrompt(editSnapshot.content).content,
+        fallbackToRaw: false,
+      };
+    } catch (_) {
+      compiledEdit = { content: editSnapshot.content, fallbackToRaw: true };
+    }
+  }
   const expected = {
     usedBodyCount: record.sources.length,
     availableBodyCount: available,
     omittedBodyCount: Math.max(0, available - record.sources.length),
     totalBodyBytes,
     limitedProjectIntent: manifest.limitedProjectIntent,
+    editPromptCompilation: {
+      compiledBytes: Buffer.byteLength(compiledEdit.content, 'utf8'),
+      fallbackToRaw: compiledEdit.fallbackToRaw,
+    },
     files: expectedFiles,
     omissionReason: available === record.sources.length ? null : 'not_selected',
     truncationReason: null,

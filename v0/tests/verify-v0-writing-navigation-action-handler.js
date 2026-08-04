@@ -8,6 +8,7 @@ const handoffService = require('../src/main/writing-navigation-handoff-service')
 const handlerModule = require('../src/main/writing-navigation-action-handler');
 const changeSetService = require('../src/main/changeset-service');
 const localizedEditService = require('../src/main/localized-edit-service');
+const aiTaskStateService = require('../src/main/ai-task-state-service');
 
 let passed = 0;
 async function test(name, fn) {
@@ -327,6 +328,26 @@ async function setup(action, overrides = {}) {
     const result = await state.handler(event, PROJECT.instanceId, state.actionId);
     assert.strictEqual(result.ok, true);
     assert.deepStrictEqual(phases, ['checking_evidence', 'generating_changes', 'preparing_diff']);
+  });
+
+  await test('the Navigation action publishes the unified Main task identity and review terminal', async () => {
+    const snapshots = [];
+    const aiTaskState = aiTaskStateService.createAiTaskStateService({
+      onUpdate: snapshot => snapshots.push(snapshot),
+    });
+    const state = await setup('changes', { aiTaskState });
+    const result = await state.handler(EVENT, PROJECT.instanceId, state.actionId);
+    assert.strictEqual(result.ok, true);
+    assert(snapshots.length >= 5);
+    assert(snapshots.every(snapshot => snapshot.projectInstanceId === PROJECT.instanceId));
+    assert(snapshots.every(snapshot => snapshot.attemptId.startsWith('wno_')));
+    assert(snapshots.some(snapshot => snapshot.phase === 'checking_evidence'));
+    assert(snapshots.some(snapshot => snapshot.phase === 'generating_suggestion'));
+    assert(snapshots.some(snapshot => snapshot.phase === 'validating_result'));
+    const terminal = snapshots.at(-1);
+    assert.strictEqual(terminal.status, 'review');
+    assert.strictEqual(terminal.phase, 'waiting_review');
+    assert.strictEqual(terminal.canCancel, false);
   });
 
   await test('Main provider work ends before the Renderer-wide 60 second terminal', async () => {

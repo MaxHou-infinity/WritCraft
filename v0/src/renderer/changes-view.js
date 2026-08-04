@@ -759,10 +759,12 @@
     if (!window.__workspace?.state?.project) {
       const save = document.getElementById('save-state');
       if (save) save.textContent = '请先创建或打开写作项目';
-      return;
+      return false;
     }
     window.__graphView?.close?.();
-    if (window.__assistantDock) window.__assistantDock.open('changes');
+    if (window.__assistantDock) {
+      if (!window.__assistantDock.open('changes')) return false;
+    }
     else {
       window.__workspace?.setAIVisible?.(false);
       workArea.classList.add('has-changes');
@@ -773,6 +775,7 @@
     if (!activeIssueRequest && !activeResearchRequest) instruction.focus();
     loadHistory();
     loadMetrics();
+    return true;
   }
 
   function closePanel() {
@@ -2478,7 +2481,10 @@
     inlineReviewMode = options.inlineReview && typeof options.inlineReview === 'object'
       ? { ...options.inlineReview, activeHunkId: null }
       : null;
-    if (!inlineReviewMode) openPanel();
+    if (!inlineReviewMode && !openPanel()) {
+      inlineReviewMode = null;
+      return { ok: false, error: 'CHANGES_UNAVAILABLE', message: '项目仍在安全打开中，请稍候再试' };
+    }
     const onboardingAttempt = result?.proposalKind === 'onboarding_v2' &&
       /^[a-f0-9]{32}$/i.test(options?.onboardingAttempt?.operationId || '')
       ? options.onboardingAttempt : null;

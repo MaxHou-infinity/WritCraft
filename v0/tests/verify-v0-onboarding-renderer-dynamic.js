@@ -313,7 +313,10 @@ function loadChangesHarness(overrides = {}) {
   const window = {
     writCraft: { project: bridge },
     __workspace: workspace,
-    __assistantDock: { open() {}, close() {} },
+    // The production dock returns false when its readiness guard blocks the
+    // transition.  Keep the fixture explicit so Changes can distinguish a
+    // successful panel handoff from a blocked project entry.
+    __assistantDock: { open() { return true; }, close() {} },
     WritCraftChangesReviewState: reviewStateApi(),
     WritCraftAiMetrics: {
       createOperationId: () => 'f'.repeat(32),

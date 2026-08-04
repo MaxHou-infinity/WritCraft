@@ -6,6 +6,7 @@
 // turns bounded localized edits into complete ChangeSet files locally.
 
 const localizedEditService = require('./localized-edit-service');
+const contextResolverService = require('./context-resolver-service');
 
 const REQUEST_SCHEMA = 'writcraft.project-changes-request/v1';
 const MAX_REQUEST_BYTES = 16 * 1024;
@@ -208,6 +209,12 @@ function prepareProjectChangesProposal({
       fail('PROJECT_PROMPT_REQUIRED', 'edit.md 缺失、不可读或超过安全大小，普通跨文件修改已停止');
     }
   });
+  let compiledEdit;
+  try { compiledEdit = contextResolverService.compileEditPrompt(files.find(file => file.role === 'project_prompt').content); }
+  catch (_) { compiledEdit = { content: files.find(file => file.role === 'project_prompt').content, truncated: true, sections: [] }; }
+  const promptFiles = files.map(file => file.role === 'project_prompt'
+    ? Object.freeze({ ...file, content: compiledEdit.content, bytes: Buffer.byteLength(compiledEdit.content, 'utf8') })
+    : file);
   const contextBytes = files.reduce((total, file) => total + file.bytes, 0);
   if (contextBytes > MAX_CONTEXT_BYTES) {
     fail('PROJECT_CHANGES_CONTEXT_TOO_LARGE', `跨文件修改正文与上下文合计不能超过 ${MAX_CONTEXT_BYTES} 字节`);
@@ -256,7 +263,9 @@ function prepareProjectChangesProposal({
       : `可修改目标路径：${JSON.stringify(validated.targetPaths)}`,
     '',
     '【只读项目 Prompt / 附加上下文】',
-    readonlyFiles.length ? readonlyFiles.map(fileBlock).join('\n\n') : '（项目未提供只读上下文。）',
+    readonlyFiles.length ? readonlyFiles.map(file => file.role === 'project_prompt'
+      ? fileBlock(promptFiles.find(item => item.path === file.path) || file)
+      : fileBlock(file)).join('\n\n') : '（项目未提供只读上下文。）',
     '',
     '【可修改目标】',
     targetFiles.map((file, index) => targetFileBlock(
@@ -281,6 +290,10 @@ function prepareProjectChangesProposal({
     snapshots,
     structuredRanges,
     dependencies,
+    editPromptCompilation: Object.freeze({
+      truncated: compiledEdit.truncated,
+      usedSections: compiledEdit.sections.filter(section => section.status === 'used').length,
+    }),
     provenance: Object.freeze({
       schema: REQUEST_SCHEMA,
       kind: 'project_changes',
@@ -290,6 +303,10 @@ function prepareProjectChangesProposal({
     contextBytes,
     totalBytes,
     structuredOutput: structuredOutput === true,
+    editPromptCompilation: Object.freeze({
+      truncated: compiledEdit.truncated,
+      usedSections: compiledEdit.sections.filter(section => section.status === 'used').length,
+    }),
   });
 }
 

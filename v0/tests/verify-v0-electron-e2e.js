@@ -44,7 +44,7 @@ const GRAPH_CACHE_BUDGET_MS = 700;
 const GRAPH_INCREMENTAL_BUDGET_MS = 800;
 const GRAPH_INTERACTION_BUDGET_MS = 100;
 const GRAPH_RENDERER_HEAP_BUDGET_BYTES = 150 * 1024 * 1024;
-const EXPECTED_STAGE_COUNT = ONBOARDING_FOCUS || DAILY_WORKSPACE_FOCUS ? 2 :
+const EXPECTED_STAGE_COUNT = ONBOARDING_FOCUS ? 4 : DAILY_WORKSPACE_FOCUS ? 2 :
   (PENDING_REVIEW_FOCUS ? 3 : 38);
 
 let passed = 0;
@@ -374,7 +374,7 @@ async function waitForProject(client, expectedChapterCount = 6) {
   return waitForValue(client, `(() => {
     const state = window.__workspace?.state;
     const chapterCount = document.querySelectorAll('.tree-file[data-path^="chapters/"]').length;
-    if (!state?.project || !state.currentPath || chapterCount < ${expectedChapterCount}) return null;
+    if (!state?.project || state.projectReady !== true || !state.currentPath || chapterCount < ${expectedChapterCount}) return null;
     return {
       name: state.project.name,
       currentPath: state.currentPath,
@@ -472,6 +472,8 @@ async function launchElectron(profileRoot, recentProjectRoot, options = {}) {
       WRITCRAFT_E2E_WATCHER_FAILURE: options.watcherFailure === true ? '1' : '',
       WRITCRAFT_E2E_WORKSPACE_SAVE_DELAY_MS: '500',
       WRITCRAFT_E2E_RESEARCH_TTL_MS: PENDING_REVIEW_FOCUS ? '8000' : '',
+      WRITCRAFT_E2E_CONTEXT_CATALOG_TTL_MS: Number.isSafeInteger(options.contextCatalogTtlMs)
+        ? String(options.contextCatalogTtlMs) : '',
       ELECTRON_ENABLE_LOGGING: '1',
     },
     stdio: ['ignore', 'pipe', 'pipe'],
@@ -1242,7 +1244,10 @@ async function run() {
         })()`);
         await waitForValue(first.client, `document.querySelector('.research-card .research-to-changes:not(:disabled)')`, 'focused expiry Research judgment');
         await first.client.evaluate(`document.querySelector('.research-card .research-to-changes').click()`);
-        await waitForValue(first.client, `window.__assistantDock.getMode() === 'changes' && !document.querySelector('.changes-research-mode')?.hidden`, 'focused expiry Research Changes');
+        await waitForValue(first.client, `(() => {
+          const banner = document.querySelector('.changes-research-mode');
+          return window.__assistantDock.getMode() === 'changes' && Boolean(banner) && banner.hidden === false;
+        })()`, 'focused expiry Research Changes');
         await first.client.evaluate(`(() => {
           const target = document.querySelector('#project-changes-target-list input[data-path=${JSON.stringify(electronAiFixture.RESEARCH_TARGET_PATH)}]');
           if (!target) throw new Error('E2E_EXPIRY_TARGET_MISSING');
@@ -1782,11 +1787,24 @@ async function run() {
         return { ready: true };
       })()`);
       assert.strictEqual(trashed.ready, true);
-      await waitForValue(first.client, `(() => {
-        const toggle = document.getElementById('markdown-trash-toggle');
-        return !document.querySelector('.tree-file[data-path=${JSON.stringify(createdPath)}]') &&
-          toggle?.textContent === '项目回收区 · 1';
-      })()`, 'ordinary Markdown visible trash list');
+      try {
+        await waitForValue(first.client, `(() => {
+          const toggle = document.getElementById('markdown-trash-toggle');
+          return !document.querySelector('.tree-file[data-path=${JSON.stringify(createdPath)}]') &&
+            toggle?.textContent === '项目回收区 · 1';
+        })()`, 'ordinary Markdown visible trash list');
+      } catch (error) {
+        const snapshot = await first.client.evaluate(`(() => ({
+          toggle: document.getElementById('markdown-trash-toggle')?.textContent || '',
+          treeHasFile: Boolean(document.querySelector('.tree-file[data-path=${JSON.stringify(createdPath)}]')),
+          panelOpen: document.getElementById('markdown-trash')?.open || false,
+          panelBusy: document.getElementById('markdown-trash-panel')?.getAttribute('aria-busy') || '',
+          status: document.getElementById('changes-status')?.textContent || '',
+          saveState: document.getElementById('save-state')?.textContent || '',
+          runtimeLog: ${JSON.stringify(boundedLog(first.logRef.value))},
+        }))()`).catch(() => null);
+        throw new Error(`${error.message}; state=${JSON.stringify(snapshot)}`);
+      }
       assert.strictEqual(fs.existsSync(path.join(project.rootPath, ...createdPath.split('/'))), false);
       const listed = await first.client.evaluate(`(() => {
         const panel = document.getElementById('markdown-trash');
@@ -2436,10 +2454,22 @@ async function run() {
         window.confirm = () => true;
         document.querySelector('.history-card .history-undo').click();
       })()`);
-      await waitForValue(first.client, `(() => {
-        const remaining = document.querySelectorAll('.history-card .history-undo').length;
-        return document.getElementById('changes-status').textContent.includes('已撤销 1 个文件') && remaining === ${initialUndoCount - 1};
-      })()`, 'undoing the residual batch');
+      try {
+        await waitForValue(first.client, `(() => {
+          const remaining = document.querySelectorAll('.history-card .history-undo').length;
+          return document.getElementById('changes-status').textContent.includes('已撤销 1 个文件') && remaining === ${initialUndoCount - 1};
+        })()`, 'undoing the residual batch');
+      } catch (error) {
+        const snapshot = await first.client.evaluate(`(() => ({
+          status: document.getElementById('changes-status')?.textContent || '',
+          recovery: document.getElementById('changes-history-recovery')?.textContent || '',
+          cards: [...document.querySelectorAll('.history-card')].map(card => card.textContent),
+          undoCount: document.querySelectorAll('.history-card .history-undo').length,
+          saveState: document.getElementById('save-state')?.textContent || '',
+          blocked: window.__workspace?.state?.changesHistoryMutationBlocked || false,
+        }))()`).catch(() => null);
+        throw new Error(`${error.message}; state=${JSON.stringify(snapshot)}`);
+      }
       const afterUndoResidual = projectService.readFile(project.rootPath, createdPath);
       const secondAfterUndoResidual = projectService.readFile(project.rootPath, changesSecondPath);
       assert(afterUndoResidual.includes(electronAiFixture.CHANGES_AFTER[0]));
@@ -2661,18 +2691,33 @@ async function run() {
         hasGoal: true,
         hasEvidencePromise: true,
       });
-      const suggestion = await waitForValue(first.client, `(() => {
-        const card = document.querySelector('.writing-navigation__suggestion');
-        const primary = card?.querySelector('.writing-navigation__primary');
-        if (!card || primary?.textContent !== '处理这个建议') return null;
-        return {
-          mode: window.__assistantDock.getMode(),
-          primaryCount: [...document.querySelectorAll('.writing-navigation__suggestion .writing-navigation__primary')]
-            .filter(node => node.textContent === '处理这个建议').length,
-          hasFinding: card.textContent.includes('待验证的冗余表达'),
-          hasEvidence: card.textContent.includes(${JSON.stringify(electronAiFixture.UNIFIED_BEFORE)}),
-        };
-      })()`, 'one unified Writing Navigation suggestion');
+      let suggestion;
+      try {
+        suggestion = await waitForValue(first.client, `(() => {
+          const card = document.querySelector('.writing-navigation__suggestion');
+          const primary = card?.querySelector('.writing-navigation__primary');
+          if (!card || primary?.textContent !== '处理这个建议') return null;
+          return {
+            mode: window.__assistantDock.getMode(),
+            primaryCount: [...document.querySelectorAll('.writing-navigation__suggestion .writing-navigation__primary')]
+              .filter(node => node.textContent === '处理这个建议').length,
+            hasFinding: card.textContent.includes('待验证的冗余表达'),
+            hasEvidence: card.textContent.includes(${JSON.stringify(electronAiFixture.UNIFIED_BEFORE)}),
+          };
+        })()`, 'one unified Writing Navigation suggestion');
+      } catch (error) {
+        const snapshot = await first.client.evaluate(`(() => ({
+          mode: window.__assistantDock?.getMode?.() || '',
+          navigationMode: window.__writingNavigationView?.getState?.()?.mode || '',
+          stage: document.querySelector('[data-navigation-stage]')?.textContent || '',
+          status: document.querySelector('.writing-navigation__status')?.textContent || '',
+          error: document.querySelector('.writing-navigation__status--error')?.textContent || '',
+          task: document.getElementById('ai-task-progress')?.textContent || '',
+          generateText: document.querySelector('[data-navigation-action="generate"]')?.textContent || '',
+          generateDisabled: Boolean(document.querySelector('[data-navigation-action="generate"]')?.disabled),
+        }))()`).catch(() => null);
+        throw new Error(`${error.message}; navigation-state=${JSON.stringify(snapshot)}; process=${boundedLog(first.logRef.value)}`);
+      }
       assert.deepStrictEqual(suggestion, {
         mode: 'navigation', primaryCount: 1, hasFinding: true, hasEvidence: true,
       });
@@ -3587,6 +3632,7 @@ async function run() {
           elapsedMs: Date.now() - undoStartedAt,
           diskRestored,
           runtime,
+          runtimeLog: boundedLog(first.logRef.value),
         })}`;
         throw error;
       }
@@ -3681,6 +3727,17 @@ async function run() {
     await stage('sends one authoritative edit.md and current-file context through the real Chat IPC', async () => {
       assert.strictEqual(await first.client.evaluate(`window.__workspace.state.currentPath`), createdPath);
       await first.client.evaluate(`(() => {
+        window.__e2eTaskProgressStop?.();
+        window.__e2eTaskProgress = [];
+        window.__e2eTaskProgressStop = window.writCraft.project.onWritingTaskProgress(payload => {
+          window.__e2eTaskProgress.push({
+            schema: payload?.schema,
+            kind: payload?.kind,
+            phase: payload?.phase,
+            status: payload?.status,
+            projectInstanceId: payload?.projectInstanceId,
+          });
+        });
         document.querySelector('[data-assistant-mode="chat"]').click();
         const input = document.getElementById('chat-input');
         input.value = ${JSON.stringify(electronAiFixture.CHAT_QUESTION)};
@@ -3700,6 +3757,23 @@ async function run() {
       assert(response.chips.every(chip => chip.tag === 'BUTTON'));
       assert.strictEqual(response.chips.filter(chip => chip.type === 'project_prompt').length, 1);
       assert.strictEqual(response.chips.filter(chip => chip.type === 'file' && chip.text.includes(createdPath)).length, 1);
+      const progress = await first.client.evaluate(`(() => ({
+        events: window.__e2eTaskProgress || [],
+        host: {
+          hidden: document.getElementById('ai-task-progress')?.hidden ?? true,
+          status: document.getElementById('ai-task-progress')?.dataset.status || '',
+          text: document.getElementById('ai-task-progress')?.textContent || '',
+        },
+      }))()`);
+      assert(progress.events.length >= 3, 'Chat must publish Main-owned task progress events');
+      assert(progress.events.every(event => event.schema === 'writcraft.ai-task-progress/v1'));
+      assert(progress.events.every(event => event.kind === 'chat'));
+      assert(progress.events.some(event => event.phase === 'preparing_context'));
+      assert(progress.events.some(event => event.phase === 'completed' && event.status === 'completed'));
+      assert.strictEqual(progress.host.hidden, false, 'terminal task progress remains visible for the next action');
+      assert.strictEqual(progress.host.status, 'completed');
+      assert(progress.host.text.includes('已完成'));
+      await first.client.evaluate(`window.__e2eTaskProgressStop?.(); window.__e2eTaskProgressStop = null;`);
       await first.client.evaluate(`window.__assistantDock.close()`);
     });
 
@@ -4397,8 +4471,10 @@ async function run() {
         const card = document.querySelector('.research-card');
         card.querySelector('.research-to-changes').click();
       })()`);
-      await waitForValue(first.client, `window.__assistantDock.getMode() === 'changes' && !document.querySelector('.changes-research-mode')?.hidden`,
-        'opening dedicated Research Changes mode');
+      await waitForValue(first.client, `(() => {
+        const banner = document.querySelector('.changes-research-mode');
+        return window.__assistantDock.getMode() === 'changes' && Boolean(banner) && banner.hidden === false;
+      })()`, 'opening dedicated Research Changes mode');
       await first.client.evaluate(`(() => {
         const target = document.querySelector('#project-changes-target-list input[data-path=${JSON.stringify(electronAiFixture.RESEARCH_TARGET_PATH)}]');
         if (!target) return false;
@@ -4500,8 +4576,10 @@ async function run() {
         const card = document.querySelector('.research-card');
         card.querySelector('.research-to-changes').click();
       })()`);
-      await waitForValue(first.client, `window.__assistantDock.getMode() === 'changes' && !document.querySelector('.changes-research-mode')?.hidden`,
-        'opening reject-only Research Changes mode');
+      await waitForValue(first.client, `(() => {
+        const banner = document.querySelector('.changes-research-mode');
+        return window.__assistantDock.getMode() === 'changes' && Boolean(banner) && banner.hidden === false;
+      })()`, 'opening reject-only Research Changes mode');
       await first.client.evaluate(`(() => {
         const target = document.querySelector('#project-changes-target-list input[data-path=${JSON.stringify(electronAiFixture.RESEARCH_TARGET_PATH)}]');
         if (!target.checked) {

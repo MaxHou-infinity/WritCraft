@@ -6,11 +6,25 @@
   const dockElement = document.getElementById('assistant-dock');
   const navigationHost = document.getElementById('writing-navigation-host');
   const contextHost = document.getElementById('context-inspector-host');
+  const taskProgressHost = document.getElementById('ai-task-progress');
   const bridge = window.writCraft?.project;
   let navigationController = null;
   const cancelledNavigationGenerations = new Set();
   const cancelledNavigationActions = new Set();
   let contextController = null;
+  const taskProgressController = window.WritCraftAiTaskProgress && taskProgressHost
+    ? window.WritCraftAiTaskProgress.mount(taskProgressHost, {
+      onCancel: snapshot => bridge?.cancelAiTask?.(
+        snapshot.projectInstanceId,
+        snapshot.attemptId
+      ),
+    })
+    : null;
+  const contextAutocomplete = window.WritCraftContextAutocomplete?.mount(document, {
+    listCandidates: (projectInstanceId, request) => bridge?.listContextCandidates?.(projectInstanceId, request),
+    getProjectInstanceId: () => window.__workspace?.state?.project?.instanceId || null,
+    getCurrentFilePath: () => window.__workspace?.getCurrentPath?.() || null,
+  });
 
   function recordNavigationMetric(outcome, metric) {
     if (!metric?.operationId || !metric.originProjectInstanceId) return;
@@ -74,7 +88,12 @@
         request,
         attemptId
       );
-      recordNavigationMetric(result?.ok === true ? 'generated' : 'failed', metric);
+      const outcome = result?.ok === true
+        ? 'generated'
+        : result?.error === 'REQUEST_ABORTED'
+          ? 'cancelled'
+          : 'failed';
+      recordNavigationMetric(outcome, metric);
       return result;
     } catch (error) {
       recordNavigationMetric('failed', metric);
@@ -212,6 +231,7 @@
 
   bridge?.onWritingTaskProgress?.(payload => {
     navigationController?.progress?.(payload);
+    taskProgressController?.progress?.(payload);
   });
 
   if (window.WritCraftContextInspector && contextHost) {
@@ -260,6 +280,7 @@
       workspace?.state?.tree || [],
       workspace?.getCurrentPath?.() || null
     );
+    taskProgressController?.setProject?.(workspace?.state?.project?.instanceId || null);
     if (navigationState?.mode === 'structure') void navigationController?.recover?.();
     else if (navigationState?.mode === 'navigation') void navigationController?.resume?.();
     contextController?.update?.(
@@ -269,6 +290,7 @@
   }
   function clearEnteringProject() {
     navigationController?.updateProject?.(null, [], null);
+    taskProgressController?.setProject?.(null);
     contextController?.update?.(
       { scope: 'file', budgetChars: 10000, usedChars: 0, usedBytes: 0, chips: [] },
       []

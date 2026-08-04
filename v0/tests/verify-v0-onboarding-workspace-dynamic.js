@@ -137,6 +137,10 @@ function harness() {
     },
   });
   vm.runInContext(SOURCE, context, { filename: 'workspace.js' });
+  // These tests exercise the onboarding draft owner, not the asynchronous
+  // filesystem entry pipeline. Mark the fixture as already ready so the
+  // production readiness guard does not mask the behavior under test.
+  window.WritCraftWorkspace.state.projectReady = true;
   return {
     api: window.WritCraftWorkspace,
     mounts,

@@ -1470,22 +1470,33 @@
     // `openFile()` is a completion boundary used by evidence navigation.
     // Resolve only after deferred view restoration has run, otherwise a
     // caller's revealRange() is overwritten by this next-frame cursor restore.
-    await new Promise(resolve => requestAnimationFrame(() => {
-      if (openGeneration === state.openGeneration && state.currentPath === path) {
-        const caretOffset = Number.isSafeInteger(view.caretOffset)
-          ? view.caretOffset
-          : Number.isSafeInteger(view.cursorOffset) ? view.cursorOffset : 0;
-        const anchorOffset = Number.isSafeInteger(view.selectionAnchorOffset)
-          ? view.selectionAnchorOffset
-          : caretOffset;
-        const focusOffset = Number.isSafeInteger(view.selectionFocusOffset)
-          ? view.selectionFocusOffset
-          : caretOffset;
-        restoreSelection(anchorOffset, focusOffset);
-        if (editorScroll) editorScroll.scrollTop = Math.max(0, Number(view.scrollTop) || 0);
-      }
-      resolve();
-    }));
+    await new Promise(resolve => {
+      let settled = false;
+      const finish = () => {
+        if (settled) return;
+        settled = true;
+        if (openGeneration === state.openGeneration && state.currentPath === path) {
+          const caretOffset = Number.isSafeInteger(view.caretOffset)
+            ? view.caretOffset
+            : Number.isSafeInteger(view.cursorOffset) ? view.cursorOffset : 0;
+          const anchorOffset = Number.isSafeInteger(view.selectionAnchorOffset)
+            ? view.selectionAnchorOffset
+            : caretOffset;
+          const focusOffset = Number.isSafeInteger(view.selectionFocusOffset)
+            ? view.selectionFocusOffset
+            : caretOffset;
+          restoreSelection(anchorOffset, focusOffset);
+          if (editorScroll) editorScroll.scrollTop = Math.max(0, Number(view.scrollTop) || 0);
+        }
+        resolve();
+      };
+      requestAnimationFrame(finish);
+      // Electron can throttle animation frames while a side panel or a
+      // backgrounded window is busy.  Opening the file is already complete at
+      // this point; a bounded timer preserves the same state binding without
+      // leaving callers' async operations pending forever.
+      window.setTimeout(finish, 250);
+    });
     if (openGeneration !== state.openGeneration || state.currentPath !== path) return false;
     scheduleWorkspaceSave();
     document.dispatchEvent(new CustomEvent('writcraft:current-file-changed', { detail: { path } }));
@@ -2351,6 +2362,10 @@
 
   function openProjectOnboarding() {
     if (!state.project || state.projectPromptMissing || !onboardingHost || !window.WritCraftProjectOnboarding) return false;
+    if (state.projectReady !== true) {
+      setSaveState('项目仍在安全打开中，请稍候再打开项目卡', 'future');
+      return false;
+    }
     const availability = window.__changesView?.canStartOnboarding?.();
     if (availability?.ok === false) {
       window.__changesView?.open?.();
@@ -2391,6 +2406,10 @@
           await releaseProposalResult(projectInstanceId, result);
           return { ok: false, message: accepted?.message || '已有待处理审阅，项目提案未覆盖当前状态' };
         }
+        // The proposal now has an authoritative Changes owner. Do not reopen
+        // the completed review session on the next explicit project-card run;
+        // failed generations and Settings detours still retain their draft.
+        state.onboardingDraft = null;
         return result;
       },
       onComplete: () => {

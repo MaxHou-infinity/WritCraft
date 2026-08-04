@@ -90,14 +90,38 @@
   }
 
   async function openResearchSource(source) {
-    const opened = await window.__workspace?.openFile?.(source.locator.filePath);
-    if (opened !== false) {
+    const filePath = source?.locator?.filePath;
+    if (typeof filePath !== 'string' || !filePath) return false;
+    // `openFile()` also restores scroll/caret state and may wait on a
+    // renderer frame.  The authority boundary for Research is the moment the
+    // workspace has loaded the requested file, exposed by currentPath.  Use a
+    // bounded path observation as a fallback so a delayed frame cannot leave
+    // the author-facing judgment controls disabled forever.
+    let resolvePath;
+    const pathObserved = new Promise(resolve => { resolvePath = resolve; });
+    const observePath = () => {
+      if (window.__workspace?.state?.currentPath === filePath) {
+        resolvePath(true);
+        return;
+      }
+      window.setTimeout(observePath, 50);
+    };
+    observePath();
+    const openPromise = Promise.resolve().then(() => window.__workspace?.openFile?.(filePath))
+      .then(opened => ({ kind: 'result', opened }), error => ({ kind: 'error', error }));
+    const observed = await Promise.race([
+      openPromise,
+      pathObserved.then(() => ({ kind: 'path', opened: true })),
+      new Promise(resolve => window.setTimeout(() => resolve({ kind: 'timeout', opened: false }), 15_000)),
+    ]);
+    const opened = observed?.kind === 'path' ? true : observed?.opened === true;
+    if (opened) {
       window.__workspace?.revealRange?.(
         source.locator.offset,
         Math.max(0, source.locator.end - source.locator.offset)
       );
     }
-    return opened !== false;
+    return opened;
   }
 
   async function resolveResearchCard(card) {

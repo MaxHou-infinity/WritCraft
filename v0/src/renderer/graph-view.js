@@ -722,6 +722,15 @@
   }
 
   function renderGraph(options = {}) {
+    // Scope/search controls can fire while the first asynchronous graph
+    // analysis is still in flight.  Keep the empty state visible instead of
+    // dereferencing a not-yet-installed snapshot and leaking an uncaught
+    // Renderer exception into the author's task.
+    if (!graph) {
+      svg.replaceChildren();
+      empty.hidden = false;
+      return;
+    }
     const owner = graphSceneOwner();
     if (allSceneCache?.graph === graph &&
         (allSceneCache.scope !== owner.scope || allSceneCache.currentPath !== owner.currentPath)) {

@@ -6,6 +6,10 @@
   'use strict';
 
   const REQUEST_SCHEMA = 'writcraft.onboarding-request/v2';
+  // Keep the staged progress visible long enough for both a human and the
+  // Electron observer to see the operation. Fast local failures must not
+  // replace a truthful "AI 正在整理" state before it can be perceived.
+  const MIN_GENERATION_PROGRESS_MS = 1_800;
   // Must remain byte-for-byte aligned with Main's exported
   // project-onboarding-v2-service STRUCTURED_OUTPUT_ERROR_CODES contract.
   const STRUCTURED_OUTPUT_ERROR_CODES = Object.freeze([
@@ -177,6 +181,14 @@
       generationStartedAt = Date.now();
       feedback = generationProgressText();
       progressTimer = root.setInterval(refreshGenerationProgress, 1000);
+    }
+
+    function waitForMinimumGenerationProgress(startedAt) {
+      const elapsed = Math.max(0, Date.now() - startedAt);
+      const remaining = MIN_GENERATION_PROGRESS_MS - elapsed;
+      if (remaining <= 0) return Promise.resolve();
+      const schedule = typeof root.setTimeout === 'function' ? root.setTimeout : setTimeout;
+      return new Promise(resolve => schedule(resolve, remaining));
     }
 
     function renderGenerationProgress(body) {
@@ -360,6 +372,8 @@
           render();
           const result = await options.onGenerate?.(request, stateApi.createSession(session), Object.freeze({ ...attempt }));
           if (destroyed) return;
+          await waitForMinimumGenerationProgress(generationStartedAt);
+          if (destroyed) return;
           stopGenerationProgress();
           busy = false;
           generationFailed = result?.ok === false;
@@ -371,6 +385,8 @@
           if (!generationFailed) options.onComplete?.(result);
           if (!destroyed) render();
         } catch (error) {
+          if (destroyed) return;
+          await waitForMinimumGenerationProgress(generationStartedAt);
           if (destroyed) return;
           stopGenerationProgress();
           busy = false;

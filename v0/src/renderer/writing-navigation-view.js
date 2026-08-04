@@ -487,6 +487,7 @@
       const goal = element(document, 'textarea', 'writing-navigation__goal');
       goal.value = view.goal;
       goal.dataset.navigationFocus = 'goal';
+      goal.dataset.contextInput = 'true';
       goal.disabled = Boolean(view.generation) || view.phase === 'recovery';
       goal.setAttribute('maxlength', '2000');
       goal.setAttribute('placeholder', view.mode === 'structure'
@@ -737,9 +738,12 @@
 
     function phaseCopy(phase) {
       if (phase === 'saving_current_content') return '正在保存当前内容';
+      if (phase === 'preparing_context') return '正在准备当前任务上下文';
       if (phase === 'checking_evidence') return '正在核对依据';
+      if (phase === 'generating_suggestion') return '正在生成局部修改';
       if (phase === 'preparing_diff') return '正在准备 Diff';
-      return '正在生成局部修改';
+      if (phase === 'validating_result') return '正在校验修改结果';
+      return '正在处理…';
     }
 
     function recoveryAction(error) {
