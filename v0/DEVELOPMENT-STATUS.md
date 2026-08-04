@@ -53,7 +53,7 @@
 - 真实旅程发现并修复 P1：从首页打开最近文件时正文已经切换，但大纲仍描述旧文件。现在 Home 打开动作必须等待目标文件大纲刷新，再恢复正文定位；Computer Use 复验确认目标标题出现、旧大纲消失，返回首页后继续位置和 pending=0 正确。
 - 最新源码 `npm test` 与非沙箱完整 `npm run verify` 通过；待审 focused Electron 3/3 通过。Daily Workspace focused 复跑再次在“外部文件 watcher 大纲刷新等待”处红灯；该非固定 harness 时序问题已保留为 P2，未用重跑绿灯覆盖。确定性 watcher/owner 专项、真实作者 UI 旅程和此前 focused 证据均通过，未形成稳定产品回归。
 - 最终独立复审：P0=0、P1=0、P2=2，可进入候选。P2-1 为缺少“`refreshOutline` await 期间切项目”的 mutation-sensitive 专项，生产实现已有 refresh 后 owner 复核；P2-2 为通用 store 配置超过 10 项时 public projection 可能隐藏最旧映射，生产 Main 上限与 projection 同为 10，当前不可触发。两项均允许候选，未来触及对应代码或提高上限时必须先补合同和反例。
-- 所有者于 2026-08-03 完成唯一一次最短主观旅程并明确回复“验收通过”。至此工程门禁、真实作者客观旅程和作者主观体验均已关闭，0.2.0 候选验收完成。未经另行授权，仍不发布、不打 Tag/Release、不推送或分发 App/ZIP。
+- 所有者于 2026-08-03 完成唯一一次最短主观旅程并明确回复“验收通过”。至此工程门禁、真实作者客观旅程和作者主观体验均已关闭，0.2.0 候选验收完成。随后已授权并完成 GitHub main 推送、`v0.2.0` Tag、GitHub prerelease 及 App/ZIP 上传；npm 仍等待一次性验证码，未把 npm 候选误报为公开版本。
 
 ### 0.2.0 发布执行记录（2026-08-03）
 
