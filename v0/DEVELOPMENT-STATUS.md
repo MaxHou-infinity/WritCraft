@@ -47,6 +47,12 @@
 
 - 0.2.0 最终独立复审为 P0=0、P1=0；当前无工程阻断项。
 
+### 新增作者反馈：API Key 重启后似乎需要重输（2026-08-04）
+
+- 源码事实：`src/main/api-key-config-service.js` 已实现原子持久化、schema 校验和 `0600` 权限；`src/main/user-data-service.js` 默认将 profile 固定为 `~/Library/Application Support/WritCraft`，显式 `--profile` 则按设计隔离。
+- 本机只读核对：稳定目录及两个历史目录均存在 `ai-config.json`，权限 `600`，Main `publicStatus` 均返回 `configured: true`；未读取或输出 Key 明文。
+- 当前判断：尚未复现“同一 profile 保存后文件丢失”，暂记为 **P1 profile 连续性/启动状态恢复验收缺口**。下一次验证必须固定同一个启动方式和 profile，比较保存前、重启后和设置页状态；若仍失败，再修改实现。
+
 ### 0.2.0 阶段 F 候选事实（2026-08-03）
 
 - 当前会话 pending review 的真实 Electron 动态矩阵 3/3 通过：覆盖公开 `review_*` 身份 hydrate、丢弃、接受/拒绝、residual 新身份、旧身份失效、真实 TTL 过期、首页入口消失和正文零写入。Renderer 的 public ID 仅用于审阅决策，真实 ChangeSet capability 始终由 Main 解析。
