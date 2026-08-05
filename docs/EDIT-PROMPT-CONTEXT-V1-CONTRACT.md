@@ -16,6 +16,7 @@ An oversized root `edit.md` must no longer make Chat/Context requests fail merel
 - If required sections alone exceed 6,000 characters or 18 KiB, the request fails closed with a stable, path-free error.
 - Optional sections fill the remaining budget in source order. Empty or excessive heading catalogs are bounded.
 - A short `edit.md` preserves the existing full-file output and manifest semantics.
+- 0.3.0 的统一 v2 迁移只覆盖 Chat、Navigation、Research、Chapter 和普通 Project Changes 五个提案入口；Inline Rewrite（`⌘K`）明确保留本合同的 v1 Context Manifest 和独立 capability/写入边界，除非未来版本另行批准迁移。
 
 ## Manifest and Inspector
 

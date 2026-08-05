@@ -5,6 +5,8 @@
 // first obtains a bounded block plan, generates every block independently and
 // only then assembles one complete, revision-bound file proposal.
 
+const editPromptManifest = require('../shared/edit-prompt-manifest');
+const contextManifestService = require('../shared/context-manifest');
 const contextResolverService = require('./context-resolver-service');
 
 const REQUEST_SCHEMA = 'writcraft.chapter-generation-request/v1';
@@ -325,6 +327,14 @@ function prepareChapterProposal({ projectService, rootPath, request }) {
       truncated: compiledEdit.truncated,
       usedSections: compiledEdit.sections.filter(section => section.status === 'used').length,
     }),
+    editPrompt: editPromptManifest.createEditPromptManifest({
+      rawContent: files.find(file => file.role === 'project_prompt').content,
+      compiledContent: compiledEdit.content,
+      revision: files.find(file => file.role === 'project_prompt').revision,
+      compiledResult: compiledEdit,
+    }),
+    compiledEditContent: compiledEdit.content,
+    compiledEditResult: compiledEdit,
   });
 }
 
@@ -577,6 +587,30 @@ async function proposeChapter({ projectService, rootPath, request, callLLM, chan
     targetRevision: prepared.target.revision,
     files: Object.freeze(prepared.dependencies.map(item => Object.freeze({ ...item }))),
     editPromptCompilation: prepared.editPromptCompilation,
+    editPrompt: prepared.editPrompt,
+    unified: contextManifestService.createContextManifest({
+      entry: 'chapter',
+      editRevision: prepared.files.find(file => file.role === 'project_prompt').revision,
+      editCompilation: contextManifestService.createEditCompilation({
+        rawContent: prepared.files.find(file => file.role === 'project_prompt').content,
+        compiledContent: prepared.compiledEditContent,
+        revision: prepared.files.find(file => file.role === 'project_prompt').revision,
+        compiledResult: prepared.compiledEditResult,
+      }),
+      items: prepared.files.map(file => ({
+        id: `chapter_${file.role}_${file.path.replace(/[^A-Za-z0-9_-]/g, '_')}`,
+        kind: file.role === 'project_prompt' ? 'project_prompt' : file.role === 'target' ? 'target' : 'context',
+        path: file.path,
+        revision: file.revision,
+        status: 'included',
+        rawBytes: file.bytes,
+        includedBytes: file.role === 'project_prompt' ? prepared.editPrompt.compiledBytes : file.bytes,
+        budgetBytes: MAX_CONTEXT_BYTES,
+        omissionReason: null,
+        truncationReason: null,
+      })),
+      budgetBytes: MAX_CONTEXT_BYTES,
+    }),
     contextBytes: prepared.contextBytes,
     planPromptBytes: prepared.promptBytes,
     blockCount: plan.blocks.length,

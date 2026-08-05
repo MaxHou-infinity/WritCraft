@@ -14,10 +14,18 @@
   let contextController = null;
   const taskProgressController = window.WritCraftAiTaskProgress && taskProgressHost
     ? window.WritCraftAiTaskProgress.mount(taskProgressHost, {
-      onCancel: snapshot => bridge?.cancelAiTask?.(
-        snapshot.projectInstanceId,
-        snapshot.attemptId
-      ),
+      onCancel: async snapshot => {
+        await bridge?.cancelAiTask?.(
+          snapshot.projectInstanceId,
+          snapshot.attemptId
+        );
+        // A canceled Graph handoff owns a dedicated Changes mode. Release
+        // that Renderer capability with the same task cancellation boundary
+        // so a late result cannot leave the author trapped in a stale mode.
+        if (snapshot.kind === 'graph_issue_handoff') {
+          window.__changesView?.leaveIssueMode?.();
+        }
+      },
     })
     : null;
   const contextAutocomplete = window.WritCraftContextAutocomplete?.mount(document, {

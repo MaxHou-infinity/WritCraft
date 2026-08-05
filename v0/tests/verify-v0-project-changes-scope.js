@@ -78,6 +78,38 @@ test('范围确认仅在 instruction/targets/context 完全一致时有效', () 
   assert.strictEqual(scope.sameRequest(before, scope.createRequest('修改', ['a.md', 'b.md'], [])), false);
 });
 
+function contextManifest(request, revision) {
+  const items = [
+    { id: 'changes_project_prompt_edit_md', kind: 'project_prompt', path: 'edit.md', revision,
+      status: 'included', rawBytes: 10, includedBytes: 10, budgetBytes: 120 * 1024,
+      omissionReason: null, truncationReason: null },
+    ...request.contextPaths.map(path => ({
+      id: `changes_context_${path.replace(/[^A-Za-z0-9_-]/g, '_')}`, kind: 'context', path, revision,
+      status: 'included', rawBytes: 10, includedBytes: 10, budgetBytes: 120 * 1024,
+      omissionReason: null, truncationReason: null,
+    })),
+    ...request.targetPaths.map(path => ({
+      id: `changes_target_${path.replace(/[^A-Za-z0-9_-]/g, '_')}`, kind: 'target', path, revision,
+      status: 'included', rawBytes: 10, includedBytes: 10, budgetBytes: 120 * 1024,
+      omissionReason: null, truncationReason: null,
+    })),
+  ];
+  return {
+    schema: 'writcraft.context-manifest/v2', authority: 'main', entry: 'changes', editRevision: revision,
+    editCompilation: {
+      status: 'complete', rawBytes: 10, compiledBytes: 10, budgetBytes: 18 * 1024, budgetChars: 6000,
+      availableSections: 0, includedSections: 0, omittedSections: 0, omissionReason: null,
+      truncationReason: null, selectionPolicy: 'required_sections_then_source_order',
+    },
+    items,
+    totals: {
+      availableItems: items.length, includedItems: items.length, omittedItems: 0,
+      rawBytes: items.length * 10, includedBytes: items.length * 10, budgetBytes: 120 * 1024,
+    },
+    sourceIndexRevision: null,
+  };
+}
+
 test('Main response capability、review 与 provenance 必须精确绑定已确认范围', () => {
   const request = scope.createRequest('统一术语', ['chapters/a.md', 'chapters/b.md'], ['references/r.md']);
   const revision = 'a'.repeat(64);
@@ -92,6 +124,7 @@ test('Main response capability、review 与 provenance 必须精确绑定已确�
         { path: 'references/r.md', revision, role: 'context' },
       ],
     },
+    contextManifest: contextManifest(request, revision),
   };
   assert.strictEqual(scope.responseMatchesRequest(base, request), true);
   assert.strictEqual(scope.responseMatchesRequest({ ...base, changeSetId: 'other' }, request), false);

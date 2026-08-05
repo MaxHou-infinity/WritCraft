@@ -16,6 +16,8 @@
 
 0.3.0 阶段 A–D 还必须阅读 [`AI-TASK-TRANSPARENCY-V1-CONTRACT.md`](AI-TASK-TRANSPARENCY-V1-CONTRACT.md)：它冻结跨入口任务身份、状态、取消/超时、进度事件和零写入边界。
 
+0.3.0 阶段 E 的独立复审签收记录见 [`0.3.0-STAGE-E-INDEPENDENT-REVIEW.md`](0.3.0-STAGE-E-INDEPENDENT-REVIEW.md)；它记录 P0=0、P1=0、P2=3 和候选状态，不代表正式发布授权。
+
 `ROADMAP-0.2.0.md` 已于 2026-08-03 获得所有者批准并生效。原审阅稿已直接转为该版本合同，不保留第二份活动路线图。
 
 `ROADMAP-0.3.0.md` 已于 2026-08-04 获所有者批准并成为 0.3.0 生效合同；目标模式已启动，按阶段 0 → E 派发编码任务，当前以路线图与 `v0/DEVELOPMENT-STATUS.md` 的实时证据为准。
@@ -26,6 +28,7 @@
 - [`GETTING-STARTED.md`](GETTING-STARTED.md)：安装与首次使用。
 - [`NPM-DEVELOPER-PREVIEW-V1-CONTRACT.md`](NPM-DEVELOPER-PREVIEW-V1-CONTRACT.md)：npm Preview 分发合同。
 - [`RELEASE-NOTES-v0.1.2.md`](RELEASE-NOTES-v0.1.2.md)：当前公开 Preview 说明。
+- [`RELEASE-NOTES-v0.3.0.md`](RELEASE-NOTES-v0.3.0.md)：0.3.0 透明 AI 协作候选/发布说明。
 - [`../SECURITY.md`](../SECURITY.md)、[`../CONTRIBUTING.md`](../CONTRIBUTING.md)：安全与贡献。
 
 ## 冻结兼容合同（按受影响模块读取）

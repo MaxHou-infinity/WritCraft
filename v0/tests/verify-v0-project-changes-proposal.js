@@ -4,6 +4,7 @@
 const assert = require('assert');
 const crypto = require('crypto');
 const service = require('../src/main/project-changes-proposal-service');
+const contextManifest = require('../src/shared/context-manifest');
 const changeSetService = require('../src/main/changeset-service');
 
 let passed = 0;
@@ -121,8 +122,8 @@ test('首个超大文件立即 fail-fast，不会 break 或生成空 snapshot', 
 
 test('正文合计未超限但完整模型消息超限时也 fail-fast', () => {
   const project = fakeProject({
-    'edit.md': 'P'.repeat(61_000),
-    'a.md': 'A'.repeat(61_000),
+    'edit.md': `# Prompt\n${'P'.repeat(4_991)}`,
+    'a.md': 'A'.repeat(117_000),
   });
   expectCode('PROJECT_CHANGES_CONTEXT_TOO_LARGE', () => service.prepareProjectChangesProposal({
     projectService: project, rootPath: '/project', request: request(['a.md']),
@@ -145,6 +146,9 @@ test('两文件 localized edits 由 Main 在权威 before 上构造 after', () =
   assert.strictEqual(result.ok, true);
   assert.strictEqual(result.noChanges, false);
   assert.strictEqual(result.fileCount, 2);
+  assert.strictEqual(result.contextManifest.entry, 'changes');
+  assert.strictEqual(contextManifest.validContextManifest(result.contextManifest), true);
+  assert.strictEqual(result.contextManifest.editRevision, prepared.dependencies.find(item => item.role === 'project_prompt').revision);
   assert.deepStrictEqual(result.changeSet.changes.map(item => [item.path, item.after]), [
     ['a.md', 'A NEW\nkeep'], ['b.md', 'B NEW\nkeep'],
   ]);
@@ -227,6 +231,7 @@ test('空/no-op 局部结果返回 noChanges，截断输出返回明确错误', 
   });
   assert.deepStrictEqual({ ok: empty.ok, noChanges: empty.noChanges, fileCount: empty.fileCount },
     { ok: true, noChanges: true, fileCount: 0 });
+  assert.strictEqual(contextManifest.validContextManifest(empty.contextManifest), true);
   const noOp = service.finalizeProjectChangesProposal({
     prepared,
     model: { ok: true, stopReason: 'end_turn', text: JSON.stringify({ edits: [
@@ -235,6 +240,7 @@ test('空/no-op 局部结果返回 noChanges，截断输出返回明确错误', 
     changeSetService,
   });
   assert.strictEqual(noOp.noChanges, true);
+  assert.strictEqual(contextManifest.validContextManifest(noOp.contextManifest), true);
   expectCode('MODEL_OUTPUT_TRUNCATED', () => service.finalizeProjectChangesProposal({
     prepared, model: { ok: true, stopReason: 'max_tokens', text: '{"edits":[]}' }, changeSetService,
   }));

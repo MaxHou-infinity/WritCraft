@@ -7,6 +7,8 @@
 
 const crypto = require('crypto');
 const blockAnchor = require('../shared/block-anchor');
+const contextManifestService = require('../shared/context-manifest');
+const editPromptManifest = require('../shared/edit-prompt-manifest');
 const contextResolverService = require('./context-resolver-service');
 const { SECTIONS: PROJECT_INTENT_SECTIONS } = require('./project-onboarding-v2-service');
 
@@ -401,22 +403,25 @@ function readInputs(projectService, rootPath, request, availablePaths) {
     }));
   }
   let compiledEdit;
-  let editPromptFallback = false;
+  const editPromptFallback = false;
   if (edit.content.trim()) {
     try { compiledEdit = contextResolverService.compileEditPrompt(edit.content); }
-    catch (_) { compiledEdit = { content: edit.content, truncated: true }; editPromptFallback = true; }
+    catch (_) { fail('PROJECT_PROMPT_INVALID', 'edit.md 无法按统一项目 Prompt 合同编译，未发送原文给 AI'); }
   } else {
-    compiledEdit = { content: '', truncated: false };
+    compiledEdit = { content: '', truncated: false, sections: [] };
   }
   return Object.freeze({
     edit: Object.freeze({
       path: 'edit.md',
+      rawContent: edit.content,
       content: compiledEdit.content,
       revision: edit.revision,
       bytes: Buffer.byteLength(edit.content, 'utf8'),
       compiledBytes: Buffer.byteLength(compiledEdit.content, 'utf8'),
       fallbackToRaw: editPromptFallback,
       limited: limitedProjectIntent(edit.content),
+      compiledResult: compiledEdit,
+      unavailable: !edit.content.trim(),
     }),
     bodyFiles: Object.freeze(bodyFiles),
     availableCount: availablePaths.size,
@@ -848,6 +853,52 @@ async function proposeWritingNavigation({
       editPromptCompilation: Object.freeze({
         compiledBytes: inputs.edit.compiledBytes || inputs.edit.bytes,
         fallbackToRaw: Boolean(inputs.edit.fallbackToRaw),
+      }),
+      editPrompt: editPromptManifest.createEditPromptManifest({
+        rawContent: inputs.edit.rawContent,
+        compiledContent: inputs.edit.content,
+        revision: inputs.edit.revision,
+        compiledResult: inputs.edit.compiledResult,
+        fallbackToRaw: inputs.edit.fallbackToRaw,
+      }),
+      unified: contextManifestService.createContextManifest({
+        entry: 'navigation',
+        editRevision: inputs.edit.revision,
+        editCompilation: contextManifestService.createEditCompilation({
+          rawContent: inputs.edit.rawContent,
+          compiledContent: inputs.edit.content,
+          revision: inputs.edit.revision,
+          compiledResult: inputs.edit.compiledResult,
+          unavailable: inputs.edit.unavailable,
+        }),
+        items: [
+          {
+            id: 'nav_edit_prompt', kind: 'project_prompt', path: 'edit.md', revision: inputs.edit.revision,
+            status: inputs.edit.unavailable ? 'unavailable' : 'included',
+            rawBytes: inputs.edit.bytes, includedBytes: inputs.edit.unavailable ? 0 : inputs.edit.compiledBytes,
+            budgetBytes: MAX_CONTEXT_BYTES,
+            omissionReason: inputs.edit.unavailable ? 'invalid_edit' : null,
+            truncationReason: null,
+          },
+          ...inputs.bodyFiles.map(file => ({
+            id: `nav_${file.role}_${file.path.replace(/[^A-Za-z0-9_-]/g, '_')}`,
+            kind: file.role === 'current_file' ? 'current_file' : 'context',
+            path: file.path,
+            revision: file.revision,
+            status: 'included',
+            rawBytes: file.bytes,
+            includedBytes: file.bytes,
+            budgetBytes: MAX_CONTEXT_BYTES,
+            omissionReason: null,
+            truncationReason: null,
+          })),
+          ...Array.from({ length: Math.max(0, inputs.availableCount - inputs.bodyFiles.length) }, (_, index) => ({
+            id: `nav_omitted_body_${index + 1}`,
+            kind: 'context', path: null, revision: null, status: 'omitted', rawBytes: null,
+            includedBytes: 0, budgetBytes: MAX_CONTEXT_BYTES, omissionReason: 'not_selected', truncationReason: null,
+          })),
+        ],
+        budgetBytes: MAX_CONTEXT_BYTES,
       }),
       files: Object.freeze([
         Object.freeze({ path: 'edit.md', role: 'project_prompt', revision: inputs.edit.revision, bytes: inputs.edit.bytes }),

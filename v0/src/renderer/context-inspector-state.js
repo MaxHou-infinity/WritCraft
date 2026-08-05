@@ -117,6 +117,46 @@
     });
   }
 
+  function normalizeUnified(manifest) {
+    if (!manifest || typeof manifest !== 'object' || Array.isArray(manifest) ||
+        manifest.schema !== 'writcraft.context-manifest/v2' || manifest.authority !== 'main' ||
+        typeof manifest.entry !== 'string' || typeof manifest.editRevision !== 'string' ||
+        !Array.isArray(manifest.items) || !manifest.totals || typeof manifest.editCompilation !== 'object') return null;
+    const editCompilation = manifest.editCompilation;
+    const items = manifest.items.slice(0, 65).map(item => {
+      if (!item || typeof item !== 'object' || typeof item.id !== 'string' ||
+          !['included', 'omitted', 'unavailable', 'stale'].includes(item.status)) return null;
+      return deepFreeze({
+        id: text(item.id, 256), kind: text(item.kind, 64), path: text(item.path, 512) || null,
+        revision: text(item.revision, 256) || null, status: item.status,
+        rawBytes: item.rawBytes === null ? null : integer(item.rawBytes),
+        includedBytes: integer(item.includedBytes), budgetBytes: integer(item.budgetBytes),
+        omissionReason: text(item.omissionReason, 64) || null,
+        truncationReason: text(item.truncationReason, 64) || null,
+      });
+    }).filter(Boolean);
+    return deepFreeze({
+      schema: 'writcraft.context-manifest/v2', authority: 'main', entry: text(manifest.entry, 32),
+      editRevision: text(manifest.editRevision, 256),
+      editCompilation: deepFreeze({
+        status: text(editCompilation.status, 32), rawBytes: integer(editCompilation.rawBytes),
+        compiledBytes: integer(editCompilation.compiledBytes), budgetBytes: integer(editCompilation.budgetBytes),
+        budgetChars: integer(editCompilation.budgetChars), availableSections: integer(editCompilation.availableSections),
+        includedSections: integer(editCompilation.includedSections), omittedSections: integer(editCompilation.omittedSections),
+        omissionReason: text(editCompilation.omissionReason, 64) || null,
+        truncationReason: text(editCompilation.truncationReason, 64) || null,
+        selectionPolicy: text(editCompilation.selectionPolicy, 128),
+      }),
+      items,
+      totals: deepFreeze({
+        availableItems: integer(manifest.totals.availableItems), includedItems: integer(manifest.totals.includedItems),
+        omittedItems: integer(manifest.totals.omittedItems), rawBytes: manifest.totals.rawBytes === null ? null : integer(manifest.totals.rawBytes),
+        includedBytes: integer(manifest.totals.includedBytes), budgetBytes: integer(manifest.totals.budgetBytes),
+      }),
+      sourceIndexRevision: text(manifest.sourceIndexRevision, 256) || null,
+    });
+  }
+
   function normalizeSnapshot(manifest, errors) {
     const source = manifest && typeof manifest === 'object' && !Array.isArray(manifest) ? manifest : {};
     const seen = new Set();
@@ -160,6 +200,7 @@
       usedChars: integer(source.usedChars),
       usedBytes: integer(source.usedBytes),
       chips,
+      unified: normalizeUnified(source.unified),
       errors: normalizedErrors,
     });
   }
@@ -229,6 +270,7 @@
         : state.snapshot.scope === 'selection' ? '选区范围' : '文件范围',
       currentFilePath: state.snapshot.currentFilePath,
       currentRevision: state.snapshot.currentRevision,
+      unified: state.snapshot.unified,
       usedLabel: state.snapshot.usedBytes ? formatBytes(state.snapshot.usedBytes) : `${state.snapshot.usedChars} 字符`,
       budgetLabel: `${state.snapshot.budgetChars} 字符上限`,
       chips: state.snapshot.chips.map(chip => ({

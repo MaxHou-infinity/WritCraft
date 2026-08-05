@@ -21,6 +21,50 @@ const ACTION_ID = `wna_${'f'.repeat(32)}`;
 
 const tree = (...paths) => paths.map(path => ({ type: 'file', path }));
 
+function editPrompt(revision = '1'.repeat(64), rawBytes = 12, compiledBytes = rawBytes) {
+  return {
+    schema: 'writcraft.edit-prompt-manifest/v1', path: 'edit.md', revision,
+    rawChars: rawBytes, rawBytes, compiledChars: compiledBytes, compiledBytes,
+    budgetChars: 6000, budgetBytes: 18 * 1024,
+    selectionPolicy: 'required_sections_then_source_order',
+    totalSectionCount: 0, usedSectionCount: 0, omittedSectionCount: 0,
+    omissionReason: null, truncated: false, truncationReason: null, fallbackToRaw: false,
+  };
+}
+
+function unified(used, available, revision = '1'.repeat(64), rawBytes = 12, compiledBytes = rawBytes) {
+  const items = [{
+    id: 'nav_edit_prompt', kind: 'project_prompt', path: 'edit.md', revision,
+    status: 'included', rawBytes, includedBytes: compiledBytes, budgetBytes: 240 * 1024,
+    omissionReason: null, truncationReason: null,
+  }];
+  for (let index = 0; index < used; index += 1) items.push({
+    id: `nav_current_file_chapters_01_md_${index}`, kind: 'current_file', path: 'chapters/01.md',
+    revision: '2'.repeat(64), status: 'included', rawBytes: 1012, includedBytes: 1012,
+    budgetBytes: 240 * 1024, omissionReason: null, truncationReason: null,
+  });
+  for (let index = used; index < available; index += 1) items.push({
+    id: `nav_omitted_body_${index + 1}`, kind: 'context', path: null, revision: null,
+    status: 'omitted', rawBytes: null, includedBytes: 0, budgetBytes: 240 * 1024,
+    omissionReason: 'not_selected', truncationReason: null,
+  });
+  return {
+    schema: 'writcraft.context-manifest/v2', authority: 'main', entry: 'navigation', editRevision: revision,
+    editCompilation: {
+      status: 'complete', rawBytes, compiledBytes, budgetBytes: 18 * 1024, budgetChars: 6000,
+      availableSections: 0, includedSections: 0, omittedSections: 0, omissionReason: null,
+      truncationReason: null, selectionPolicy: 'required_sections_then_source_order',
+    },
+    items,
+    totals: {
+      availableItems: items.length, includedItems: used + 1, omittedItems: available - used,
+      rawBytes: available === used ? rawBytes + used * 1012 : null,
+      includedBytes: compiledBytes + used * 1012, budgetBytes: 240 * 1024,
+    },
+    sourceIndexRevision: null,
+  };
+}
+
 function manifest(used, available, limited = false) {
   return {
     usedBodyCount: used,
@@ -28,6 +72,8 @@ function manifest(used, available, limited = false) {
     omittedBodyCount: available - used,
     totalBodyBytes: 1024,
     limitedProjectIntent: limited,
+    editPrompt: editPrompt(),
+    unified: unified(used, available),
     files: [
       { path: 'edit.md', role: 'project_prompt', revision: '1'.repeat(64), bytes: 12 },
       ...(used ? [{ path: 'chapters/01.md', role: 'current_file', revision: '2'.repeat(64), bytes: 1012 }] : []),

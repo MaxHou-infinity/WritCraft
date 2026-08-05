@@ -1,10 +1,12 @@
 'use strict';
 
 const blockAnchor = require('../shared/block-anchor');
+const contextManifestService = require('../shared/context-manifest');
+const editPromptManifest = require('../shared/edit-prompt-manifest');
 const contextResolverService = require('./context-resolver-service');
 const projectChangesProposalService = require('./project-changes-proposal-service');
 const unifiedWritingTaskService = require('./unified-writing-task-service');
-const { markdownPaths } = require('./writing-navigation-service');
+const { markdownPaths, MAX_CONTEXT_BYTES: NAVIGATION_CONTEXT_BUDGET_BYTES } = require('./writing-navigation-service');
 
 const RESEARCH_HANDOFF_SCHEMA = 'writcraft.writing-navigation-research/v1';
 const CHANGES_PROVENANCE_SCHEMA = 'writcraft.writing-navigation-changes/v1';
@@ -106,7 +108,7 @@ function validateManifest(projectService, rootPath, record, editSnapshot, snapsh
   const manifest = record.result.contextManifest;
   if (!exactKeys(manifest, [
     'usedBodyCount', 'availableBodyCount', 'omittedBodyCount', 'totalBodyBytes',
-    'limitedProjectIntent', 'editPromptCompilation', 'files', 'omissionReason',
+    'limitedProjectIntent', 'editPromptCompilation', 'editPrompt', 'unified', 'files', 'omissionReason',
     'truncationReason', 'disclosure',
   ]) || !Array.isArray(manifest.files) || manifest.files.length !== record.sources.length + 1 ||
       typeof manifest.limitedProjectIntent !== 'boolean' ||
@@ -137,15 +139,17 @@ function validateManifest(projectService, rootPath, record, editSnapshot, snapsh
       };
     }),
   ];
-  let compiledEdit = { content: '', fallbackToRaw: false };
+  let compiledEdit = { content: '', fallbackToRaw: false, result: { truncated: false, sections: [] } };
   if (editSnapshot.content.trim()) {
     try {
+      const compiledResult = contextResolverService.compileEditPrompt(editSnapshot.content);
       compiledEdit = {
-        content: contextResolverService.compileEditPrompt(editSnapshot.content).content,
+        content: compiledResult.content,
         fallbackToRaw: false,
+        result: compiledResult,
       };
     } catch (_) {
-      compiledEdit = { content: editSnapshot.content, fallbackToRaw: true };
+      fail('NAVIGATION_STALE', 'edit.md 无法按统一项目 Prompt 合同重新编译，请重新生成导航');
     }
   }
   const expected = {
@@ -158,6 +162,57 @@ function validateManifest(projectService, rootPath, record, editSnapshot, snapsh
       compiledBytes: Buffer.byteLength(compiledEdit.content, 'utf8'),
       fallbackToRaw: compiledEdit.fallbackToRaw,
     },
+    editPrompt: editPromptManifest.createEditPromptManifest({
+      rawContent: editSnapshot.content,
+      compiledContent: compiledEdit.content,
+      revision: editSnapshot.revision,
+      compiledResult: compiledEdit.result,
+      fallbackToRaw: compiledEdit.fallbackToRaw,
+    }),
+    unified: contextManifestService.createContextManifest({
+      entry: 'navigation',
+      editRevision: editSnapshot.revision,
+      editCompilation: contextManifestService.createEditCompilation({
+        rawContent: editSnapshot.content,
+        compiledContent: compiledEdit.content,
+        revision: editSnapshot.revision,
+        compiledResult: compiledEdit.result,
+        unavailable: !editSnapshot.content.trim(),
+      }),
+      items: [
+        {
+          id: 'nav_edit_prompt', kind: 'project_prompt', path: 'edit.md', revision: editSnapshot.revision,
+          status: editSnapshot.content.trim() ? 'included' : 'unavailable',
+          rawBytes: Buffer.byteLength(editSnapshot.content, 'utf8'),
+          includedBytes: editSnapshot.content.trim() ? Buffer.byteLength(compiledEdit.content, 'utf8') : 0,
+          budgetBytes: NAVIGATION_CONTEXT_BUDGET_BYTES,
+          omissionReason: editSnapshot.content.trim() ? null : 'invalid_edit',
+          truncationReason: null,
+        },
+        ...record.sources.map(source => {
+          const snapshot = snapshots.get(source.path);
+          const existing = manifest.files.find(file => file.path === source.path);
+          return {
+            id: `nav_${existing.role}_${source.path.replace(/[^A-Za-z0-9_-]/g, '_')}`,
+            kind: existing.role === 'current_file' ? 'current_file' : 'context',
+            path: source.path,
+            revision: snapshot.revision,
+            status: 'included',
+            rawBytes: Buffer.byteLength(snapshot.content, 'utf8'),
+            includedBytes: Buffer.byteLength(snapshot.content, 'utf8'),
+            budgetBytes: NAVIGATION_CONTEXT_BUDGET_BYTES,
+            omissionReason: null,
+            truncationReason: null,
+          };
+        }),
+        ...Array.from({ length: Math.max(0, available - record.sources.length) }, (_, index) => ({
+          id: `nav_omitted_body_${index + 1}`,
+          kind: 'context', path: null, revision: null, status: 'omitted', rawBytes: null,
+          includedBytes: 0, budgetBytes: NAVIGATION_CONTEXT_BUDGET_BYTES, omissionReason: 'not_selected', truncationReason: null,
+        })),
+      ],
+      budgetBytes: NAVIGATION_CONTEXT_BUDGET_BYTES,
+    }),
     files: expectedFiles,
     omissionReason: available === record.sources.length ? null : 'not_selected',
     truncationReason: null,

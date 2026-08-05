@@ -57,10 +57,29 @@ const AUTHOR_CHAT_QUESTION = 'E2E 作者验收：请说明当前章节的目标�
 const AUTHOR_CHAT_RESPONSE = 'E2E 作者验收 Chat 已读取项目 Prompt 与当前章节。';
 const AUTHOR_CANCEL_QUESTION = 'E2E 作者验收：取消一项长任务。';
 const AUTHOR_CANCEL_RESPONSE = 'E2E 作者验收长任务不应显示。';
+const AUTHOR_SWITCH_QUESTION = 'E2E 作者验收：切换项目后丢弃迟到结果。';
+const AUTHOR_SWITCH_RESPONSE = 'E2E 项目 A 切换后迟到答案不应显示。';
+const AUTHOR_TIMEOUT_QUESTION = 'E2E 作者验收：验证硬超时。';
+const AUTHOR_TIMEOUT_RESPONSE = 'E2E 作者验收超时后的迟到答案不应显示。';
+const AUTHOR_EDIT_REVISION_QUESTION = 'E2E 作者验收：edit.md revision 漂移后丢弃旧任务。';
+const AUTHOR_EDIT_REVISION_RESPONSE = 'E2E edit.md revision 漂移后的迟到答案不应显示。';
 const AUTHOR_NAVIGATION_GOAL = 'E2E 作者验收：压缩当前章节的一处重复表达。';
+const AUTHOR_NAVIGATION_REVISION_GOAL = 'E2E 作者验收：Navigation edit.md revision 漂移后丢弃旧建议。';
+const AUTHOR_NAVIGATION_REVISION_RESPONSE = 'E2E Navigation edit.md revision 漂移后的迟到建议不应显示。';
+const AUTHOR_NAVIGATION_CANCEL_GOAL = 'E2E 作者验收：取消导航生成。';
+const AUTHOR_NAVIGATION_CANCEL_RESPONSE = 'E2E 作者验收导航取消后的迟到答案不应显示。';
+const AUTHOR_RESEARCH_REVISION_QUESTION = 'E2E 作者验收：Research edit.md revision 漂移后丢弃旧证据。';
+const AUTHOR_RESEARCH_REVISION_RESPONSE = 'E2E Research edit.md revision 漂移后的迟到证据不应显示。';
+const AUTHOR_RESEARCH_CANCEL_QUESTION = 'E2E 作者验收：取消 Research 证据检索。';
+const AUTHOR_RESEARCH_CANCEL_RESPONSE = 'E2E 作者验收 Research 取消后的迟到答案不应显示。';
+const AUTHOR_SOURCE_NEEDED_GOAL = 'E2E 作者验收：验证来源不足时显示添加来源。';
+const AUTHOR_SOURCE_NEEDED_FINDING = 'E2E_SOURCE_NEEDED_FINDING';
+let authorNeedsSourcesIssued = false;
 const AUTHOR_BEFORE = 'E2E_AUTHOR_CROSS_ENTRY_BEFORE';
 const AUTHOR_AFTER = 'E2E_AUTHOR_CROSS_ENTRY_AFTER';
 const CHANGES_REVIEW_GOAL = 'E2E 验证两个文件三块修改的独立审阅';
+const AUTHOR_CHANGES_REVISION_GOAL = 'E2E 作者验收：Changes edit.md revision 漂移后丢弃旧 Diff。';
+const AUTHOR_CHANGES_REVISION_RESPONSE = 'E2E Changes edit.md revision 漂移后的迟到 Diff 不应显示。';
 const CHANGES_SECOND_PATH = 'chapters/01-arrival.md';
 const CHANGES_BEFORE = Object.freeze([
   'E2E_CHANGES_HUNK_ONE_BEFORE',
@@ -73,12 +92,18 @@ const CHANGES_AFTER = Object.freeze([
   'E2E_CHANGES_HUNK_THREE_AFTER',
 ]);
 const CHAPTER_GOAL = 'E2E 分阶段生成并整体重写当前章节';
+const AUTHOR_CHAPTER_REVISION_GOAL = 'E2E 作者验收：Chapter edit.md revision 漂移后丢弃旧计划。';
+const AUTHOR_CHAPTER_REVISION_RESPONSE = 'E2E Chapter edit.md revision 漂移后的迟到计划不应显示。';
+const CHAPTER_CANCEL_GOAL = 'E2E 作者验收：取消章节生成。';
+const CHAPTER_CANCEL_RESPONSE = 'E2E 作者验收章节取消后的迟到答案不应显示。';
 const CHAPTER_GENERATED_MARKER = 'E2E_CHAPTER_PLANNED_BLOCK_GENERATED';
 const GRAPH_ISSUE_BEFORE_ONE = '正式签约早于社区调查。';
 const GRAPH_ISSUE_AFTER_ONE = '正式签约晚于社区调查。';
 const GRAPH_ISSUE_BEFORE_TWO = '之后每次引用效率数字，都必须同时说明时间范围和统计口径。';
 const GRAPH_ISSUE_AFTER_TWO = '之后每次引用效率数字，都必须同时说明时间范围、统计口径与对应证据。';
 const PNG_BASE64 = 'iVBORw0KGgoAAAANSUhEUgAAABAAAAAJCAYAAAA7KqwyAAAAFklEQVR4nGPQ9wz/TwlmGDVg1AAgBgBNoQPwF6IA3wAAAABJRU5ErkJggg==';
+let graphIssueCalls = 0;
+let imageCalls = 0;
 
 function jsonResponse(payload) {
   const body = JSON.stringify(payload);
@@ -114,7 +139,9 @@ function researchCard(prompt) {
   const offset = content.indexOf(quote);
   return {
     cards: [{
-      claim: '公开听证纪要支持“调度系统仅进入附条件试运行”这一主张。',
+      claim: prompt.includes(AUTHOR_RESEARCH_REVISION_QUESTION)
+        ? AUTHOR_RESEARCH_REVISION_RESPONSE
+        : '公开听证纪要支持“调度系统仅进入附条件试运行”这一主张。',
       sourceId,
       quote,
       offset,
@@ -342,7 +369,9 @@ function changesReviewAnswer(prompt) {
       path: primary.path,
       oldText: marker,
       newText: CHANGES_AFTER[index],
-      summary: '主文件的两个独立审阅修改块',
+      summary: prompt.includes(AUTHOR_CHANGES_REVISION_GOAL)
+        ? AUTHOR_CHANGES_REVISION_RESPONSE
+        : '主文件的两个独立审阅修改块',
     })),
     {
       path: secondary.path,
@@ -354,14 +383,17 @@ function changesReviewAnswer(prompt) {
 }
 
 function chapterPlanAnswer(prompt) {
-  if (!prompt.includes(`用户指令：${CHAPTER_GOAL}`) ||
+  if (!prompt.includes(`用户指令：${CHAPTER_GOAL}`) &&
+      !prompt.includes(`用户指令：${AUTHOR_CHAPTER_REVISION_GOAL}`) ||
       !prompt.includes(`<project-file role="project_prompt" path="edit.md"`) ||
       !prompt.includes(`<project-file role="target" path="${CHAT_CURRENT_PATH}"`)) {
     throw new Error('E2E_FIXTURE_INVALID_CHAPTER_PLAN');
   }
   return {
     schema: 'writcraft.chapter-generation-plan/v1',
-    summary: 'E2E 分阶段整体重写章节',
+    summary: prompt.includes(`用户指令：${AUTHOR_CHAPTER_REVISION_GOAL}`)
+      ? AUTHOR_CHAPTER_REVISION_RESPONSE
+      : 'E2E 分阶段整体重写章节',
     blocks: [{ id: 'whole', heading: '完整章节', goal: '保留正文并追加分阶段生成标记', targetChars: 3200 }],
   };
 }
@@ -493,7 +525,9 @@ function authorChatAnswer(prompt) {
 }
 
 function authorNavigationAnswer(prompt, request) {
-  if (!prompt.includes(`用户目标：${AUTHOR_NAVIGATION_GOAL}`) ||
+  if (!prompt.includes(`用户目标：${AUTHOR_NAVIGATION_GOAL}`) &&
+      !prompt.includes(`用户目标：${AUTHOR_NAVIGATION_REVISION_GOAL}`) &&
+      !prompt.includes(`用户目标：${AUTHOR_SOURCE_NEEDED_GOAL}`) ||
       !prompt.includes('WRITCRAFT_EVIDENCE_REF') || !prompt.includes(AUTHOR_BEFORE)) {
     throw new Error('E2E_FIXTURE_INVALID_AUTHOR_NAVIGATION_PROMPT');
   }
@@ -505,10 +539,13 @@ function authorNavigationAnswer(prompt, request) {
   if (!marker || !candidates.includes(marker[1])) {
     throw new Error('E2E_FIXTURE_MISSING_AUTHOR_NAVIGATION_EVIDENCE');
   }
+  const sourceNeeded = prompt.includes(`用户目标：${AUTHOR_SOURCE_NEEDED_GOAL}`);
   return {
     mode: 'navigation',
     suggestions: [{
-      finding: '当前章节存在一处可以局部精简的重复表达。',
+      finding: prompt.includes(`用户目标：${AUTHOR_NAVIGATION_REVISION_GOAL}`)
+        ? AUTHOR_NAVIGATION_REVISION_RESPONSE
+        : sourceNeeded ? AUTHOR_SOURCE_NEEDED_FINDING : '当前章节存在一处可以局部精简的重复表达。',
       evidenceRefs: [marker[1]],
       whyNow: '作者验收只处理一个明确、可撤销的局部任务。',
       editIntent: 'compress',
@@ -539,6 +576,21 @@ function authorUnifiedWritingTaskAnswer(prompt, request) {
     }],
     reason: '',
     question: '',
+  };
+}
+
+function authorNeedsSourcesAnswer(prompt, request) {
+  if (!prompt.includes('必须且只能调用 submit_unified_writing_task 一次') ||
+      !prompt.includes(AUTHOR_SOURCE_NEEDED_FINDING)) {
+    throw new Error('E2E_FIXTURE_INVALID_AUTHOR_NEEDS_SOURCES_PROMPT');
+  }
+  assertUnifiedWritingTaskRequest(request);
+  authorNeedsSourcesIssued = true;
+  return {
+    status: 'needs_sources',
+    edits: [],
+    reason: '这项判断需要作者补充可核验来源。',
+    question: '请添加支持该判断的来源后再继续。',
   };
 }
 
@@ -611,11 +663,29 @@ function createElectronAiProvider() {
         await new Promise(resolve => setTimeout(resolve, 60));
         output = rewriteAnswer(prompt);
       } else if (prompt.includes('WritCraft 的 Graph Issue→Changes 修订执行器')) {
+        graphIssueCalls += 1;
+        if (graphIssueCalls === 1) await new Promise(resolve => setTimeout(resolve, 18_000));
         output = JSON.stringify(graphIssueChangesAnswer(prompt));
+        console.log('[e2e-fixture] GRAPH_ISSUE_PROVIDER_COMPLETE');
       } else if (prompt.includes('WritCraft 的 Research→Changes 局部修订执行器')) {
         output = JSON.stringify(researchChangesAnswer(prompt));
+      } else if (prompt.includes(`用户指令：${AUTHOR_CHANGES_REVISION_GOAL}`)) {
+        console.log('[e2e-fixture] AUTHOR_CHANGES_REVISION_PROVIDER_CALL');
+        await new Promise(resolve => setTimeout(resolve, 2_200));
+        output = JSON.stringify(changesReviewAnswer(prompt));
+        console.log('[e2e-fixture] AUTHOR_CHANGES_REVISION_PROVIDER_COMPLETE');
       } else if (prompt.includes(`用户指令：${CHANGES_REVIEW_GOAL}`)) {
         output = JSON.stringify(changesReviewAnswer(prompt));
+      } else if (prompt.includes('WritCraft 的完整章节生成规划器') && prompt.includes(`用户指令：${AUTHOR_CHAPTER_REVISION_GOAL}`)) {
+        console.log('[e2e-fixture] AUTHOR_CHAPTER_REVISION_PROVIDER_CALL');
+        await new Promise(resolve => setTimeout(resolve, 2_200));
+        output = JSON.stringify(chapterPlanAnswer(prompt));
+        console.log('[e2e-fixture] AUTHOR_CHAPTER_REVISION_PROVIDER_COMPLETE');
+      } else if (prompt.includes('WritCraft 的完整章节生成规划器') && prompt.includes(`用户指令：${CHAPTER_CANCEL_GOAL}`)) {
+        console.log('[e2e-fixture] AUTHOR_CHAPTER_CANCEL_PROVIDER_CALL');
+        await new Promise(resolve => setTimeout(resolve, 18_000));
+        output = CHAPTER_CANCEL_RESPONSE;
+        console.log('[e2e-fixture] AUTHOR_CHAPTER_CANCEL_PROVIDER_COMPLETE');
       } else if (prompt.includes('WritCraft 的完整章节生成规划器')) {
         output = JSON.stringify(chapterPlanAnswer(prompt));
       } else if (prompt.includes('WritCraft 的完整章节区块生成器')) {
@@ -663,8 +733,30 @@ function createElectronAiProvider() {
         // Deliberately outlive the 15 s cancellation affordance. Main must
         // settle the task and discard this late answer without writing or
         // publishing it to the Renderer.
+        console.log('[e2e-fixture] AUTHOR_CANCEL_PROVIDER_CALL');
         await new Promise(resolve => setTimeout(resolve, 18_000));
         output = AUTHOR_CANCEL_RESPONSE;
+        console.log('[e2e-fixture] AUTHOR_CANCEL_PROVIDER_COMPLETE');
+      } else if (prompt.includes(AUTHOR_SWITCH_QUESTION)) {
+        // Project A is switched to B by the real E2E harness while this
+        // promise is alive. Main must invalidate the owner and discard this
+        // response without publishing it to B.
+        console.log('[e2e-fixture] AUTHOR_SWITCH_PROVIDER_CALL');
+        await new Promise(resolve => setTimeout(resolve, 18_000));
+        console.log('[e2e-fixture] AUTHOR_SWITCH_PROVIDER_COMPLETE');
+        output = AUTHOR_SWITCH_RESPONSE;
+      } else if (prompt.includes(AUTHOR_TIMEOUT_QUESTION)) {
+        // Deliberately outlive the 60 s Main deadline. The late provider
+        // result must never reach the Renderer or mutate the author copy.
+        console.log('[e2e-fixture] AUTHOR_TIMEOUT_PROVIDER_CALL');
+        await new Promise(resolve => setTimeout(resolve, 61_000));
+        output = AUTHOR_TIMEOUT_RESPONSE;
+        console.log('[e2e-fixture] AUTHOR_TIMEOUT_PROVIDER_COMPLETE');
+      } else if (prompt.includes(AUTHOR_EDIT_REVISION_QUESTION)) {
+        console.log('[e2e-fixture] AUTHOR_EDIT_REVISION_PROVIDER_CALL');
+        await new Promise(resolve => setTimeout(resolve, 18_000));
+        output = AUTHOR_EDIT_REVISION_RESPONSE;
+        console.log('[e2e-fixture] AUTHOR_EDIT_REVISION_PROVIDER_COMPLETE');
       } else if (prompt.includes(AUTHOR_CHAT_QUESTION)) {
         output = authorChatAnswer(prompt);
       } else if (prompt.includes(`问题：${PROJECT_CHAT_QUERY}`)) {
@@ -673,17 +765,44 @@ function createElectronAiProvider() {
         output = selectionChatAnswer(prompt);
       } else if (prompt.includes('WritCraft 的本地证据 Research 助手')) {
         assertResearchToolRequest(request);
-        researchToolInput = researchCard(prompt);
+        if (prompt.includes(AUTHOR_RESEARCH_REVISION_QUESTION)) {
+          console.log('[e2e-fixture] AUTHOR_RESEARCH_REVISION_PROVIDER_CALL');
+          await new Promise(resolve => setTimeout(resolve, 2_200));
+          researchToolInput = researchCard(prompt);
+          console.log('[e2e-fixture] AUTHOR_RESEARCH_REVISION_PROVIDER_COMPLETE');
+        } else if (prompt.includes(AUTHOR_RESEARCH_CANCEL_QUESTION)) {
+          console.log('[e2e-fixture] AUTHOR_RESEARCH_CANCEL_PROVIDER_CALL');
+          await new Promise(resolve => setTimeout(resolve, 18_000));
+          output = AUTHOR_RESEARCH_CANCEL_RESPONSE;
+          console.log('[e2e-fixture] AUTHOR_RESEARCH_CANCEL_PROVIDER_COMPLETE');
+        } else {
+          researchToolInput = researchCard(prompt);
+        }
       } else if (prompt.includes('你是 WritCraft 的写作导航助手。')) {
         assertWritingNavigationToolRequest(request);
-        writingNavigationToolInput = prompt.includes(`用户目标：${AUTHOR_NAVIGATION_GOAL}`)
-          ? authorNavigationAnswer(prompt, request)
-          : writingNavigationAnswer(prompt, request);
+        if (prompt.includes(`用户目标：${AUTHOR_NAVIGATION_CANCEL_GOAL}`)) {
+          console.log('[e2e-fixture] AUTHOR_NAVIGATION_CANCEL_PROVIDER_CALL');
+          await new Promise(resolve => setTimeout(resolve, 18_000));
+          output = AUTHOR_NAVIGATION_CANCEL_RESPONSE;
+          console.log('[e2e-fixture] AUTHOR_NAVIGATION_CANCEL_PROVIDER_COMPLETE');
+        } else if (prompt.includes(`用户目标：${AUTHOR_NAVIGATION_REVISION_GOAL}`)) {
+          console.log('[e2e-fixture] AUTHOR_NAVIGATION_REVISION_PROVIDER_CALL');
+          await new Promise(resolve => setTimeout(resolve, 2_200));
+          writingNavigationToolInput = authorNavigationAnswer(prompt, request);
+          console.log('[e2e-fixture] AUTHOR_NAVIGATION_REVISION_PROVIDER_COMPLETE');
+        } else {
+          writingNavigationToolInput = prompt.includes(`用户目标：${AUTHOR_NAVIGATION_GOAL}`) ||
+            prompt.includes(`用户目标：${AUTHOR_SOURCE_NEEDED_GOAL}`)
+            ? authorNavigationAnswer(prompt, request)
+            : writingNavigationAnswer(prompt, request);
+        }
       } else if (prompt.includes('必须且只能调用 submit_unified_writing_task 一次')) {
         assertUnifiedWritingTaskRequest(request);
-        unifiedWritingTaskToolInput = prompt.includes(AUTHOR_BEFORE)
-          ? authorUnifiedWritingTaskAnswer(prompt, request)
-          : unifiedWritingTaskAnswer(prompt, request);
+        unifiedWritingTaskToolInput = prompt.includes(AUTHOR_SOURCE_NEEDED_FINDING) && !authorNeedsSourcesIssued
+          ? authorNeedsSourcesAnswer(prompt, request)
+          : prompt.includes(AUTHOR_BEFORE)
+            ? authorUnifiedWritingTaskAnswer(prompt, request)
+            : unifiedWritingTaskAnswer(prompt, request);
       } else {
         throw new Error('E2E_FIXTURE_UNHANDLED_TEXT');
       }
@@ -740,9 +859,12 @@ function createElectronAiProvider() {
           request.n !== 1 || !['1:1', '16:9', '4:3', '3:4', '9:16'].includes(request.aspect_ratio)) {
         throw new Error('E2E_FIXTURE_UNHANDLED_IMAGE');
       }
-      // Keep the request in flight beyond native debounce and a full 1200 ms
+      imageCalls += 1;
+      if (imageCalls === 1) await new Promise(resolve => setTimeout(resolve, 18_000));
+      // Keep normal requests in flight beyond native debounce and a full 1200 ms
       // polling round so E2E covers both own-save echo paths.
-      await new Promise(resolve => setTimeout(resolve, 1700));
+      if (imageCalls !== 1) await new Promise(resolve => setTimeout(resolve, 1700));
+      console.log('[e2e-fixture] IMAGE_PROVIDER_COMPLETE');
       return jsonResponse({ data: { image_base64: [PNG_BASE64] }, base_resp: { status_code: 0, status_msg: 'success' } });
     },
   });
@@ -798,14 +920,36 @@ module.exports = {
   AUTHOR_CHAT_RESPONSE,
   AUTHOR_CANCEL_QUESTION,
   AUTHOR_CANCEL_RESPONSE,
+  AUTHOR_SWITCH_QUESTION,
+  AUTHOR_SWITCH_RESPONSE,
+  AUTHOR_TIMEOUT_QUESTION,
+  AUTHOR_TIMEOUT_RESPONSE,
+  AUTHOR_EDIT_REVISION_QUESTION,
+  AUTHOR_EDIT_REVISION_RESPONSE,
+  AUTHOR_NAVIGATION_CANCEL_GOAL,
+  AUTHOR_NAVIGATION_CANCEL_RESPONSE,
+  AUTHOR_NAVIGATION_REVISION_GOAL,
+  AUTHOR_NAVIGATION_REVISION_RESPONSE,
+  AUTHOR_RESEARCH_REVISION_QUESTION,
+  AUTHOR_RESEARCH_REVISION_RESPONSE,
+  AUTHOR_RESEARCH_CANCEL_QUESTION,
+  AUTHOR_RESEARCH_CANCEL_RESPONSE,
   AUTHOR_NAVIGATION_GOAL,
+  AUTHOR_SOURCE_NEEDED_GOAL,
+  AUTHOR_SOURCE_NEEDED_FINDING,
   AUTHOR_BEFORE,
   AUTHOR_AFTER,
   CHANGES_REVIEW_GOAL,
+  AUTHOR_CHANGES_REVISION_GOAL,
+  AUTHOR_CHANGES_REVISION_RESPONSE,
   CHANGES_SECOND_PATH,
   CHANGES_BEFORE,
   CHANGES_AFTER,
   CHAPTER_GOAL,
+  AUTHOR_CHAPTER_REVISION_GOAL,
+  AUTHOR_CHAPTER_REVISION_RESPONSE,
+  CHAPTER_CANCEL_GOAL,
+  CHAPTER_CANCEL_RESPONSE,
   CHAPTER_GENERATED_MARKER,
   GRAPH_ISSUE_BEFORE_ONE,
   GRAPH_ISSUE_AFTER_ONE,

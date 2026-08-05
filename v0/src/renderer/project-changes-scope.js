@@ -86,10 +86,47 @@
     return actual.length === expected.length && actual.every((key, index) => key === expected[index]);
   }
 
+  function validContextManifest(value) {
+    if (!exactKeys(value, ['schema', 'authority', 'entry', 'editRevision', 'editCompilation', 'items', 'totals', 'sourceIndexRevision']) ||
+        value.schema !== 'writcraft.context-manifest/v2' || value.authority !== 'main' ||
+        value.entry !== 'changes' || !/^[a-f0-9]{64}$/.test(value.editRevision || '') ||
+        !Array.isArray(value.items) || !value.totals ||
+        !exactKeys(value.totals, ['availableItems', 'includedItems', 'omittedItems', 'rawBytes', 'includedBytes', 'budgetBytes'])) return false;
+    if (!value.editCompilation || !exactKeys(value.editCompilation, [
+      'status', 'rawBytes', 'compiledBytes', 'budgetBytes', 'budgetChars', 'availableSections',
+      'includedSections', 'omittedSections', 'omissionReason', 'truncationReason', 'selectionPolicy',
+    ]) || !['complete', 'truncated', 'unavailable'].includes(value.editCompilation.status) ||
+        value.editCompilation.budgetBytes !== 18 * 1024 || value.editCompilation.budgetChars !== 6000 ||
+        value.editCompilation.selectionPolicy !== 'required_sections_then_source_order') return false;
+    const nonnegative = value => Number.isSafeInteger(value) && value >= 0;
+    if (![value.editCompilation.rawBytes, value.editCompilation.compiledBytes, value.editCompilation.budgetBytes,
+      value.editCompilation.budgetChars, value.editCompilation.availableSections,
+      value.editCompilation.includedSections, value.editCompilation.omittedSections].every(nonnegative) ||
+        value.editCompilation.includedSections + value.editCompilation.omittedSections !== value.editCompilation.availableSections ||
+        ![value.totals.availableItems, value.totals.includedItems, value.totals.omittedItems,
+          value.totals.includedBytes, value.totals.budgetBytes].every(nonnegative) ||
+        value.totals.includedItems + value.totals.omittedItems !== value.totals.availableItems ||
+        value.totals.availableItems !== value.items.length) return false;
+    const ids = new Set();
+    return value.items.every(item => {
+      if (!exactKeys(item, ['id', 'kind', 'path', 'revision', 'status', 'rawBytes', 'includedBytes', 'budgetBytes', 'omissionReason', 'truncationReason']) ||
+          typeof item.id !== 'string' || ids.has(item.id) ||
+          !['project_prompt', 'current_file', 'context', 'source', 'entity', 'target', 'selection'].includes(item.kind) ||
+          !['included', 'omitted', 'unavailable', 'stale'].includes(item.status) ||
+          (item.path !== null && (typeof item.path !== 'string' || item.path.startsWith('/') || item.path.includes('\\'))) ||
+          (item.rawBytes !== null && !nonnegative(item.rawBytes)) || !nonnegative(item.includedBytes) ||
+          !nonnegative(item.budgetBytes) || (item.status === 'included' && item.omissionReason !== null) ||
+          (item.status !== 'included' && item.omissionReason === null)) return false;
+      ids.add(item.id);
+      return true;
+    });
+  }
+
   function responseMatchesRequest(result, request) {
     if (!result || result.ok !== true || !request || request.schema !== REQUEST_SCHEMA) return false;
     const provenance = result.provenance;
-    if (!exactKeys(provenance, ['schema', 'kind', 'targets', 'context']) ||
+    if (!validContextManifest(result.contextManifest) ||
+        !exactKeys(provenance, ['schema', 'kind', 'targets', 'context']) ||
         provenance.schema !== REQUEST_SCHEMA || provenance.kind !== 'project_changes' ||
         !Array.isArray(provenance.targets) || !Array.isArray(provenance.context) ||
         provenance.targets.length !== request.targetPaths.length) return false;

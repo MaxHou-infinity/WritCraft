@@ -13,6 +13,10 @@
   const ACTION_ID_RE = /^wna_[a-f0-9]{32}$/;
   const ATTEMPT_ID_RE = /^wno_[a-f0-9]{32}$/;
   const CAPABILITY_ID_RE = /^wsc_[a-f0-9]{32}$/;
+  const REVISION_RE = /^[a-f0-9]{64}$/;
+  const EDIT_PROMPT_SCHEMA = 'writcraft.edit-prompt-manifest/v1';
+  const EDIT_PROMPT_BUDGET_CHARS = 6000;
+  const EDIT_PROMPT_BUDGET_BYTES = 18 * 1024;
   const ALTERNATIVE_ID_RE = /^alternative_[1-3]$/;
   const SAFE_TEXT = /^(?:[^\u0000-\u001f\uD800-\uDFFF]|[\uD800-\uDBFF][\uDC00-\uDFFF])*$/u;
   const ACTIONS = new Set(['changes']);
@@ -106,12 +110,77 @@
     return base();
   }
 
+  function validEditPromptManifest(raw) {
+    const keys = [
+      'schema', 'path', 'revision', 'rawChars', 'rawBytes', 'compiledChars', 'compiledBytes',
+      'budgetChars', 'budgetBytes', 'selectionPolicy', 'totalSectionCount', 'usedSectionCount',
+      'omittedSectionCount', 'omissionReason', 'truncated', 'truncationReason', 'fallbackToRaw',
+    ];
+    if (!raw || typeof raw !== 'object' || Array.isArray(raw) ||
+        Object.keys(raw).sort().join(',') !== keys.sort().join(',') ||
+        raw.schema !== EDIT_PROMPT_SCHEMA || raw.path !== 'edit.md' ||
+        !REVISION_RE.test(raw.revision || '') ||
+        ![raw.rawChars, raw.rawBytes, raw.compiledChars, raw.compiledBytes,
+          raw.budgetChars, raw.budgetBytes, raw.totalSectionCount,
+          raw.usedSectionCount, raw.omittedSectionCount].every(value =>
+          Number.isSafeInteger(value) && value >= 0) ||
+        raw.budgetChars !== EDIT_PROMPT_BUDGET_CHARS ||
+        raw.budgetBytes !== EDIT_PROMPT_BUDGET_BYTES ||
+        raw.selectionPolicy !== 'required_sections_then_source_order' ||
+        raw.usedSectionCount + raw.omittedSectionCount !== raw.totalSectionCount ||
+        (raw.omittedSectionCount > 0 ? raw.omissionReason !== 'budget' : raw.omissionReason !== null) ||
+        typeof raw.truncated !== 'boolean' || typeof raw.fallbackToRaw !== 'boolean' ||
+        (raw.fallbackToRaw
+          ? raw.truncationReason !== 'fallback_to_raw'
+          : (raw.truncated ? raw.truncationReason !== 'budget' : raw.truncationReason !== null))) {
+      return null;
+    }
+    return raw;
+  }
+
+  function validUnifiedContextManifest(raw) {
+    if (!raw || typeof raw !== 'object' || Array.isArray(raw) ||
+        Object.keys(raw).sort().join(',') !== 'authority,editCompilation,editRevision,entry,items,schema,sourceIndexRevision,totals' ||
+        raw.schema !== 'writcraft.context-manifest/v2' || raw.authority !== 'main' || raw.entry !== 'navigation' ||
+        !REVISION_RE.test(raw.editRevision || '') || !Array.isArray(raw.items) || !raw.totals ||
+        Object.keys(raw.totals).sort().join(',') !== 'availableItems,budgetBytes,includedBytes,includedItems,omittedItems,rawBytes') return null;
+    const nonnegative = value => Number.isSafeInteger(value) && value >= 0;
+    const edit = raw.editCompilation;
+    if (!edit || Object.keys(edit).sort().join(',') !== 'availableSections,budgetBytes,budgetChars,compiledBytes,includedSections,omissionReason,omittedSections,rawBytes,selectionPolicy,status,truncationReason' ||
+        !['complete', 'truncated', 'unavailable'].includes(edit.status) ||
+        edit.budgetBytes !== 18 * 1024 || edit.budgetChars !== 6000 ||
+        edit.selectionPolicy !== 'required_sections_then_source_order' ||
+        ![edit.rawBytes, edit.compiledBytes, edit.budgetBytes, edit.budgetChars, edit.availableSections,
+          edit.includedSections, edit.omittedSections].every(nonnegative) ||
+        edit.includedSections + edit.omittedSections !== edit.availableSections ||
+        !['budget', 'invalid_edit', null].includes(edit.omissionReason) ||
+        !['edit_prompt_budget', null].includes(edit.truncationReason) ||
+        (edit.status === 'truncated') !== (edit.truncationReason === 'edit_prompt_budget')) return null;
+    const totals = raw.totals;
+    if ((totals.rawBytes !== null && !nonnegative(totals.rawBytes)) ||
+        ![totals.availableItems, totals.includedItems, totals.omittedItems, totals.includedBytes, totals.budgetBytes].every(nonnegative) ||
+        totals.includedItems + totals.omittedItems !== totals.availableItems || totals.availableItems !== raw.items.length) return null;
+    const ids = new Set();
+    for (const item of raw.items) {
+      if (!item || typeof item !== 'object' || Object.keys(item).sort().join(',') !== 'budgetBytes,id,includedBytes,kind,omissionReason,path,rawBytes,revision,status,truncationReason' ||
+          typeof item.id !== 'string' || ids.has(item.id) ||
+          !['project_prompt', 'current_file', 'context', 'source', 'entity', 'target', 'selection'].includes(item.kind) ||
+          !['included', 'omitted', 'unavailable', 'stale'].includes(item.status) ||
+          (item.path !== null && (typeof item.path !== 'string' || item.path.startsWith('/') || item.path.includes('\\'))) ||
+          (item.rawBytes !== null && !nonnegative(item.rawBytes)) || !nonnegative(item.includedBytes) || !nonnegative(item.budgetBytes) ||
+          (item.status === 'included' && item.omissionReason !== null) ||
+          (item.status !== 'included' && item.omissionReason === null)) return null;
+      ids.add(item.id);
+    }
+    return raw;
+  }
+
   function validManifest(raw) {
     if (!raw || typeof raw !== 'object' || Array.isArray(raw) ||
         !Number.isSafeInteger(raw.usedBodyCount) || raw.usedBodyCount < 0 ||
         !Number.isSafeInteger(raw.availableBodyCount) ||
         raw.availableBodyCount < raw.usedBodyCount ||
-        !Array.isArray(raw.files)) return null;
+        !Array.isArray(raw.files) || !validEditPromptManifest(raw.editPrompt) || !validUnifiedContextManifest(raw.unified)) return null;
     return clone(raw);
   }
 

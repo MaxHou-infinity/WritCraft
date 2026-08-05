@@ -102,7 +102,7 @@ MiniMax API Key 只应在应用设置中配置。不要把 Key 写进项目文�
 
 `0.2.0` 在 `0.1.2` 的基础上加入“项目状态 → 定位工作 → 编辑或审阅 → 返回项目状态”的日常写作工作区，并完成候选验收。GitHub/App 候选状态已记录；npm registry 的 `0.2.0` 公开状态尚未重新核实，因此不把它写成当前公开安装版本。
 
-当前正在收口的 `0.3.0` 透明 AI 协作，已验证统一任务进度、受限 `@` 引用、Context Catalog 过期保护、正文内 Diff、Safe Undo、同 profile Key 重启恢复，以及真实作者源稿派生副本的 Chat → Navigation → Diff → 冲突阻止 → 接受 → Safe Undo；Chapter、Research、Graph、图片和独立复审尚未完成，不能视为已发布版本。
+当前候选的 `0.3.0` 透明 AI 协作，已验证统一任务进度、受限 `@` 引用、Context Catalog 过期保护、五入口统一 Context Manifest v2、正文内 Diff、Safe Undo、同 profile Key 重启恢复，以及真实作者隔离副本的 Chat → Navigation → Diff → 冲突阻止 → 接受 → Safe Undo。Chapter、Research、普通 Changes、Graph、图片、五入口 edit.md revision 漂移旧结果丢弃、来源不足“添加来源”恢复、取消/60 秒超时和跨项目迟到结果零写入均已有获批 GUI 证据；阶段 E 独立复审已签收 P0=0、P1=0、P2=3，当前为 0.3.0 候选状态，不能视为已发布版本。
 
 ## Preview 边界
 

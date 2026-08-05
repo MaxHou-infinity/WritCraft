@@ -70,7 +70,7 @@ test('Research renders Claim Source Boundary with A-D grade and exact quote', ()
 });
 
 test('Research exposes safely dropped unverifiable quotes instead of silently hiding partial failure', () => {
-  assert.match(sourceView, /renderResearchCards\(result\.cards, result\.warnings\)/);
+  assert.match(sourceView, /renderResearchCards\(result\.cards, result\.warnings, result\.contextManifest\)/);
   assert.match(sourceView, /UNVERIFIED_QUOTES_DROPPED/);
   assert.match(sourceView, /warning\.message/);
   assert.match(html, /\.research-state\.is-warning/);
@@ -147,7 +147,7 @@ test('统一任务只在缺来源时打开选择器，并把来源 ID 返回原�
   assert.match(sourceView, /只用于保留写作现场/);
   assert.match(sourceView, /navigationSourceReturn\(sourceIds\)|resume\(sourceIds\)/);
   assert.match(sourceView, /使用所选来源继续处理/);
-  assert.match(sourceView, /window\.__sourcesView = \{ activate: open, openWritingNavigation \}/);
+  assert.match(sourceView, /window\.__sourcesView = \{[\s\S]*activate: open,[\s\S]*openWritingNavigation,[\s\S]*getResearchContextManifest/);
 });
 
 console.log(`\n${passed}/17 sources UI checks passed.`);

@@ -75,6 +75,8 @@ function harness(bridge) {
   };
   let refreshTreeCalls = 0;
   const window = {
+    setTimeout,
+    clearTimeout,
     writCraft: { project: bridge },
     __workspace: {
       state: { project: { instanceId: 'A' } },

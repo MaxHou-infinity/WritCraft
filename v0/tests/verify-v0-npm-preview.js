@@ -38,12 +38,14 @@ function runCli(args, environment = {}) {
 }
 
 function packDryRun() {
+  const npmCache = fs.mkdtempSync(path.join(os.tmpdir(), 'writcraft-npm-cache-'));
   const packed = childProcess.spawnSync('npm', ['pack', '--dry-run', '--json'], {
     cwd: root,
     encoding: 'utf8',
-    env: { ...process.env, npm_config_loglevel: 'silent' },
+    env: { ...process.env, npm_config_loglevel: 'silent', npm_config_cache: npmCache },
     timeout: 30_000,
   });
+  fs.rmSync(npmCache, { recursive: true, force: true });
   assert.strictEqual(packed.status, 0, packed.stderr);
   const report = JSON.parse(packed.stdout);
   assert(Array.isArray(report) && report.length === 1);
@@ -295,16 +297,18 @@ test('actual npm tarball has the shrinkwrap, notices, safe paths and executable 
 
   const scratch = fs.realpathSync(fs.mkdtempSync(path.join(os.tmpdir(), 'writcraft-pack-content-')));
   try {
+    const npmCache = fs.mkdtempSync(path.join(os.tmpdir(), 'writcraft-npm-cache-'));
     const packed = childProcess.spawnSync(
       'npm',
       ['pack', '--json', '--pack-destination', scratch],
       {
         cwd: root,
         encoding: 'utf8',
-        env: { ...process.env, npm_config_loglevel: 'silent' },
+        env: { ...process.env, npm_config_loglevel: 'silent', npm_config_cache: npmCache },
         timeout: 30_000,
       }
     );
+    fs.rmSync(npmCache, { recursive: true, force: true });
     assert.strictEqual(packed.status, 0, packed.stderr);
     const actual = JSON.parse(packed.stdout);
     assert(Array.isArray(actual) && actual.length === 1);

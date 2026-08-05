@@ -6,6 +6,7 @@
 // turns bounded localized edits into complete ChangeSet files locally.
 
 const localizedEditService = require('./localized-edit-service');
+const contextManifestService = require('../shared/context-manifest');
 const contextResolverService = require('./context-resolver-service');
 
 const REQUEST_SCHEMA = 'writcraft.project-changes-request/v1';
@@ -211,7 +212,7 @@ function prepareProjectChangesProposal({
   });
   let compiledEdit;
   try { compiledEdit = contextResolverService.compileEditPrompt(files.find(file => file.role === 'project_prompt').content); }
-  catch (_) { compiledEdit = { content: files.find(file => file.role === 'project_prompt').content, truncated: true, sections: [] }; }
+  catch (_) { fail('PROJECT_PROMPT_INVALID', 'edit.md 无法按统一项目 Prompt 合同编译，未发送原文给 AI'); }
   const promptFiles = files.map(file => file.role === 'project_prompt'
     ? Object.freeze({ ...file, content: compiledEdit.content, bytes: Buffer.byteLength(compiledEdit.content, 'utf8') })
     : file);
@@ -284,12 +285,39 @@ function prepareProjectChangesProposal({
   const dependencies = Object.freeze(files.map(file => Object.freeze({
     path: file.path, revision: file.revision, role: file.role,
   })));
+  const editFile = files.find(file => file.role === 'project_prompt');
+  const contextManifest = contextManifestService.createContextManifest({
+    entry: 'changes',
+    editRevision: editFile.revision,
+    editCompilation: contextManifestService.createEditCompilation({
+      rawContent: editFile.content,
+      compiledContent: compiledEdit.content,
+      revision: editFile.revision,
+      compiledResult: compiledEdit,
+    }),
+    items: files.map(file => ({
+      id: `changes_${file.role}_${file.path.replace(/[^A-Za-z0-9_-]/g, '_')}`,
+      kind: file.role === 'project_prompt' ? 'project_prompt' : file.role === 'target' ? 'target' : 'context',
+      path: file.path,
+      revision: file.revision,
+      status: 'included',
+      rawBytes: file.bytes,
+      includedBytes: file.role === 'project_prompt' ? Buffer.byteLength(compiledEdit.content, 'utf8') : file.bytes,
+      budgetBytes: MAX_CONTEXT_BYTES,
+      omissionReason: null,
+      truncationReason: null,
+    })),
+    budgetBytes: MAX_CONTEXT_BYTES,
+  });
   return Object.freeze({
     request: validated,
     messages,
     snapshots,
     structuredRanges,
     dependencies,
+    contextManifest,
+    compiledEditContent: compiledEdit.content,
+    compiledEditResult: compiledEdit,
     editPromptCompilation: Object.freeze({
       truncated: compiledEdit.truncated,
       usedSections: compiledEdit.sections.filter(section => section.status === 'used').length,
@@ -355,7 +383,7 @@ function finalizeProjectChangesProposal({ prepared, model, changeSetService }) {
       changeSetService,
     });
   if (localized.noChanges) {
-    return { ok: true, noChanges: true, fileCount: 0, provenance: prepared.provenance };
+    return { ok: true, noChanges: true, fileCount: 0, provenance: prepared.provenance, contextManifest: prepared.contextManifest };
   }
   return {
     ok: true,
@@ -363,6 +391,7 @@ function finalizeProjectChangesProposal({ prepared, model, changeSetService }) {
     changeSet: localized.changeSet,
     fileCount: localized.changeSet.changes.length,
     provenance: prepared.provenance,
+    contextManifest: prepared.contextManifest,
   };
 }
 

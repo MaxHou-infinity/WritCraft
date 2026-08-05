@@ -6,12 +6,14 @@ const sourceIndexService = require('./source-index-service');
 const graphIndexService = require('./graph-index-service');
 const contextPolicyService = require('./context-policy-service');
 const blockAnchor = require('../shared/block-anchor');
+const contextManifestService = require('../shared/context-manifest');
+const editPromptManifest = require('../shared/edit-prompt-manifest');
 
 const MAX_CONTEXT_CHARS = 10000;
 const MAX_CONTEXT_BYTES = 32 * 1024;
 const MAX_CONTEXT_FILES = 40;
-const MAX_EDIT_CONTEXT_CHARS = 6000;
-const MAX_EDIT_CONTEXT_BYTES = 18 * 1024;
+const MAX_EDIT_CONTEXT_CHARS = editPromptManifest.BUDGET_CHARS;
+const MAX_EDIT_CONTEXT_BYTES = editPromptManifest.BUDGET_BYTES;
 const MAX_EDIT_CONTEXT_SECTIONS = 64;
 const MAX_EDIT_HEADING_CHARS = 256;
 const MAX_EDIT_HEADING_BYTES = 1024;
@@ -816,6 +818,36 @@ function resolveProjectContext({ projectService, rootPath, message, currentFileP
     });
   }
   const contextText = blocks.join('\n\n');
+  const unifiedItems = candidateChips.map(chip => {
+    const included = (chip.bytes || 0) > 0;
+    const kind = chip.type === 'project_prompt' ? 'project_prompt'
+      : chip.type === 'file' && chip.filePath === currentFilePath ? 'current_file'
+        : ['source', 'entity', 'selection'].includes(chip.type) ? chip.type : 'context';
+    return {
+      id: chip.id,
+      kind,
+      path: typeof chip.filePath === 'string' ? chip.filePath : null,
+      revision: typeof chip.revision === 'string' ? chip.revision : null,
+      status: included ? 'included' : 'omitted',
+      rawBytes: null,
+      includedBytes: included ? chip.bytes : 0,
+      budgetBytes: MAX_CONTEXT_BYTES,
+      omissionReason: included ? null : (chip.truncated ? 'budget' : 'not_selected'),
+      truncationReason: chip.truncated ? 'aggregate_budget' : null,
+    };
+  });
+  const unified = contextManifestService.createContextManifest({
+    entry: 'chat',
+    editRevision: edit.revision,
+    editCompilation: contextManifestService.createEditCompilation({
+      rawContent: edit.content,
+      compiledContent: editContent,
+      revision: edit.revision,
+      compiledResult: compiledEdit,
+    }),
+    items: unifiedItems,
+    budgetBytes: MAX_CONTEXT_BYTES,
+  });
   return {
     query: parsed.query,
     chips,
@@ -834,6 +866,13 @@ function resolveProjectContext({ projectService, rootPath, message, currentFileP
       chips: chips.map(chipManifest),
       omittedChips: omittedChips.map(chipManifest),
       retrieval: retrieval.summary,
+      unified,
+      editPrompt: editPromptManifest.createEditPromptManifest({
+        rawContent: edit.content,
+        compiledContent: compiledEdit.content,
+        revision: edit.revision,
+        compiledResult: compiledEdit,
+      }),
     },
   };
 }

@@ -1,6 +1,8 @@
 'use strict';
 
 const crypto = require('crypto');
+const contextManifestService = require('../shared/context-manifest');
+const editPromptManifest = require('../shared/edit-prompt-manifest');
 
 const SOURCE_INDEX_SCHEMA = 'writcraft.sources/v1';
 const RESEARCH_SCHEMA = 'writcraft.research/v1';
@@ -279,10 +281,12 @@ function normalizeProjectPrompt(projectPrompt) {
   }
   return {
     path: 'edit.md',
+    rawContent: typeof projectPrompt.rawContent === 'string' ? projectPrompt.rawContent : projectPrompt.content,
     revision: projectPrompt.revision,
     content: projectPrompt.content,
     bytes,
     truncated: projectPrompt.truncated === true,
+    compiledResult: projectPrompt.compiledResult || { truncated: projectPrompt.truncated === true, sections: [] },
   };
 }
 
@@ -425,6 +429,50 @@ async function research({ projectService, rootPath, question, sourceIds, sourceI
       rejectedQuoteCards,
       projectPrompt: promptSnapshot
         ? { path: promptSnapshot.path, revision: promptSnapshot.revision, bytes: promptSnapshot.bytes, truncated: promptSnapshot.truncated }
+        : null,
+      editPrompt: promptSnapshot
+        ? editPromptManifest.createEditPromptManifest({
+          rawContent: promptSnapshot.rawContent,
+          compiledContent: promptSnapshot.content,
+          revision: promptSnapshot.revision,
+          compiledResult: promptSnapshot.compiledResult,
+        })
+        : null,
+      unified: promptSnapshot
+        ? contextManifestService.createContextManifest({
+          entry: 'research',
+          editRevision: promptSnapshot.revision,
+          editCompilation: contextManifestService.createEditCompilation({
+            rawContent: promptSnapshot.rawContent,
+            compiledContent: promptSnapshot.content,
+            revision: promptSnapshot.revision,
+            compiledResult: promptSnapshot.compiledResult,
+          }),
+          items: [
+            {
+              id: 'research_edit_prompt', kind: 'project_prompt', path: 'edit.md', revision: promptSnapshot.revision,
+              status: 'included', rawBytes: Buffer.byteLength(promptSnapshot.rawContent, 'utf8'),
+              includedBytes: promptSnapshot.bytes, budgetBytes: MAX_CONTEXT_BYTES,
+              omissionReason: null, truncationReason: null,
+            },
+            ...sourceIndex.sources.map(source => {
+              const selectedSource = snapshots.find(snapshot => snapshot.id === source.id);
+              return selectedSource
+                ? {
+                  id: source.id, kind: 'source', path: selectedSource.filePath, revision: selectedSource.revision,
+                  status: 'included', rawBytes: selectedSource.bytes, includedBytes: selectedSource.bytes,
+                  budgetBytes: MAX_CONTEXT_BYTES, omissionReason: null, truncationReason: null,
+                }
+                : {
+                  id: source.id, kind: 'source', path: source.filePath || null, revision: source.revision || null,
+                  status: 'omitted', rawBytes: null, includedBytes: 0, budgetBytes: MAX_CONTEXT_BYTES,
+                  omissionReason: 'not_selected', truncationReason: null,
+                };
+            }),
+          ],
+          budgetBytes: MAX_CONTEXT_BYTES,
+          sourceIndexRevision: typeof sourceIndex.revision === 'string' ? sourceIndex.revision : null,
+        })
         : null,
       sources: snapshots.map(source => ({ id: source.id, filePath: source.filePath, revision: source.revision, bytes: source.bytes, grade: source.grade.grade, gradeRule: source.grade.rule })),
     },

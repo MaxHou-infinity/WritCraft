@@ -687,7 +687,7 @@ const NAVIGATION = {
     assert.strictEqual(calls, 0);
   });
 
-  await test('provider request accepts its largest legal byte size and rejects the next byte', async () => {
+  await test('edit.md 编译达到硬边界后稳定阻断且不回退发送原文', async () => {
     async function acceptedAt(size) {
       let called = false;
       try {
@@ -702,7 +702,7 @@ const NAVIGATION = {
         });
         return called;
       } catch (error) {
-        if (error.code === 'NAVIGATION_PROMPT_TOO_LARGE') return false;
+        if (error.code === 'PROJECT_PROMPT_INVALID') return false;
         throw error;
       }
     }
@@ -717,7 +717,7 @@ const NAVIGATION = {
     assert.strictEqual(await acceptedAt(low + 1), false);
   });
 
-  await test('maximum legal navigation goal, evidence catalog and Unicode output close together', async () => {
+  await test('最大合法导航 Unicode 输出与 edit.md 编译边界保持独立', async () => {
     const body = Array.from({ length: service.MAX_EVIDENCE_CANDIDATES }, (_, index) =>
       `证据${String(index + 1).padStart(4, '0')}具有唯一内容。`
     ).join('\n\n');
@@ -771,15 +771,15 @@ const NAVIGATION = {
 
     const baseline = await run(0);
     assert.strictEqual(baseline.result?.ok, true);
-    const padding = service.MAX_REQUEST_BYTES - baseline.providerBytes;
+    const padding = 6000 - '# Prompt\n'.length;
     assert(padding > 0);
     const exact = await run(padding);
     assert.strictEqual(exact.result?.ok, true);
     assert.strictEqual(exact.providerCalls, 1);
-    assert.strictEqual(exact.providerBytes, service.MAX_REQUEST_BYTES);
+    assert(exact.providerBytes < service.MAX_REQUEST_BYTES);
     assert.strictEqual(exact.result.result.suggestions[0].evidence.length, 1);
     const overflow = await run(padding + 1);
-    assert.strictEqual(overflow.error?.code, 'NAVIGATION_PROMPT_TOO_LARGE');
+    assert.strictEqual(overflow.error?.code, 'PROJECT_PROMPT_INVALID');
     assert.strictEqual(overflow.providerCalls, 0);
   });
 

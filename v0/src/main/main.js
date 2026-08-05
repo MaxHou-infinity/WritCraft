@@ -3519,6 +3519,7 @@ ipcMain.handle('writcraft:project:propose-changes', async (event, projectInstanc
       review: cached.review,
       fileCount: result.fileCount,
       provenance: result.provenance,
+      contextManifest: result.contextManifest,
     };
   } catch (error) {
     return projectFailure(error);
@@ -3794,9 +3795,11 @@ ipcMain.handle('writcraft:project:research', async (event, projectInstanceId, qu
       sourceIds,
       sourceIndex,
       projectPrompt: {
+        rawContent: editSnapshot.content,
         content: compiledProjectPrompt.content,
         revision: editSnapshot.revision,
         truncated: compiledProjectPrompt.truncated,
+        compiledResult: compiledProjectPrompt,
       },
       callLLM: projectCallLLM(project.instanceId),
     });

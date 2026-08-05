@@ -21,6 +21,7 @@
   let importRequestSequence = 0;
   let navigationHandoff = null;
   let navigationSourceReturn = null;
+  let latestResearchContextManifest = null;
 
   function exactKeys(value, keys) {
     if (!value || typeof value !== 'object' || Array.isArray(value)) return false;
@@ -98,13 +99,17 @@
     // bounded path observation as a fallback so a delayed frame cannot leave
     // the author-facing judgment controls disabled forever.
     let resolvePath;
+    let observationTimer = null;
+    let observationStopped = false;
+    let timeoutTimer = null;
     const pathObserved = new Promise(resolve => { resolvePath = resolve; });
     const observePath = () => {
+      if (observationStopped) return;
       if (window.__workspace?.state?.currentPath === filePath) {
         resolvePath(true);
         return;
       }
-      window.setTimeout(observePath, 50);
+      observationTimer = window.setTimeout(observePath, 50);
     };
     observePath();
     const openPromise = Promise.resolve().then(() => window.__workspace?.openFile?.(filePath))
@@ -112,8 +117,13 @@
     const observed = await Promise.race([
       openPromise,
       pathObserved.then(() => ({ kind: 'path', opened: true })),
-      new Promise(resolve => window.setTimeout(() => resolve({ kind: 'timeout', opened: false }), 15_000)),
+      new Promise(resolve => {
+        timeoutTimer = window.setTimeout(() => resolve({ kind: 'timeout', opened: false }), 15_000);
+      }),
     ]);
+    observationStopped = true;
+    if (observationTimer !== null) window.clearTimeout(observationTimer);
+    if (timeoutTimer !== null) window.clearTimeout(timeoutTimer);
     const opened = observed?.kind === 'path' ? true : observed?.opened === true;
     if (opened) {
       window.__workspace?.revealRange?.(
@@ -187,10 +197,32 @@
     researchResults.appendChild(card);
   }
 
-  function renderResearchCards(cards, warnings = []) {
+  function renderResearchContextManifest(manifest) {
+    if (!researchResults || !manifest || typeof manifest !== 'object') return;
+    latestResearchContextManifest = manifest;
+    const disclosure = document.createElement('section');
+    disclosure.className = 'research-context-manifest';
+    disclosure.dataset.sourceIndexRevision = typeof manifest.sourceIndexRevision === 'string'
+      ? manifest.sourceIndexRevision : '';
+    disclosure.dataset.projectPromptRevision = typeof manifest.projectPrompt?.revision === 'string'
+      ? manifest.projectPrompt.revision : '';
+    const title = document.createElement('strong');
+    title.textContent = '本次 Research 上下文（Main 已绑定）';
+    const detail = document.createElement('span');
+    const sourceCount = Array.isArray(manifest.sources) ? manifest.sources.length : 0;
+    const prompt = manifest.projectPrompt;
+    detail.textContent = prompt?.revision
+      ? `edit.md revision ${prompt.revision.slice(0, 10)} · ${sourceCount} 个来源 · ${manifest.totalBytes || 0} bytes 上限内`
+      : `${sourceCount} 个来源 · 未读取项目 Prompt`;
+    disclosure.append(title, detail);
+    researchResults.appendChild(disclosure);
+  }
+
+  function renderResearchCards(cards, warnings = [], contextManifest = null) {
     if (!researchResults) return;
     researchResults.hidden = false;
     researchResults.replaceChildren();
+    renderResearchContextManifest(contextManifest);
     if (!cards?.length) {
       researchState('没有形成可核验的证据卡。可以缩小问题范围或补充来源。');
       return;
@@ -486,7 +518,7 @@
       researchState(result?.message || result?.error || '本地证据研究失败，项目文件没有被修改。', true);
       return;
     }
-    renderResearchCards(result.cards, result.warnings);
+    renderResearchCards(result.cards, result.warnings, result.contextManifest);
   }
 
   function openWritingNavigation(value, onSelected) {
@@ -595,5 +627,9 @@
     active = event.detail === 'sources';
   });
 
-  window.__sourcesView = { activate: open, openWritingNavigation };
+  window.__sourcesView = {
+    activate: open,
+    openWritingNavigation,
+    getResearchContextManifest: () => latestResearchContextManifest,
+  };
 })();
