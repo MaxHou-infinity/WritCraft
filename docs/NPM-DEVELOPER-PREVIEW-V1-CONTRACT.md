@@ -1,6 +1,8 @@
 # WritCraft V0 · npm Developer Preview v1
 
-> Status: `writ-craft@0.3.0` is the explicitly authorized npm `preview` publication after real-author acceptance. The prior `0.1.2` publication remains historical: registry shasum `553bec35246b118ae5a47b2d4dd327c16c171029`, tag `v0.1.2`, release commit `395b863`. The 0.3.0 shasum, tag, GitHub Release, and post-publication install evidence are recorded only after each publication step completes. Registry tags remain intentionally split: `preview: 0.1.2` until the new publish succeeds, `latest: 0.1.0`.
+> Status: `writ-craft@0.3.0` was published to npm `preview` on 2026-08-05 after real-author acceptance. Registry tags remain intentionally split: `preview: 0.3.0`, `latest: 0.1.0`; this is still a macOS Developer Preview, not a stable release. The prior `0.1.2` publication remains historical: registry shasum `553bec35246b118ae5a47b2d4dd327c16c171029`, tag `v0.1.2`, release commit `395b863`.
+
+Published package evidence: version `0.3.0`, shasum `c3294a3f106119096751f8c2b67afa55e91bd702`, integrity `sha512-mVU4thULwrwHMmdZ5ZXF4VYMh3HzWR91G5mvuxQeCIl4WU34NhLNvw0gU1vaWiWa3ha4oVeQ41f0N6WLGu/6Gw==`, tarball [`writ-craft-0.3.0.tgz`](https://registry.npmjs.org/writ-craft/-/writ-craft-0.3.0.tgz). GitHub prerelease: [`v0.3.0`](https://github.com/MaxHou-infinity/WritCraft/releases/tag/v0.3.0), tag and release commit `a747683`. Approved isolated public-registry install verification passed **2/2**; no App/ZIP was distributed.
 
 ## Distribution boundary
 
@@ -68,3 +70,13 @@ Before a preview tag is published:
 7. after publication, repeat installation and startup through `npx writ-craft@preview` in a clean directory.
 
 This route does not waive real-author acceptance, image review, privacy, or source-integrity gates.
+
+## Post-publication verification
+
+On 2026-08-05, `npm view writ-craft version dist-tags --json` returned
+`preview: 0.3.0` and `latest: 0.1.0`. The isolated
+`verify:npm-preview:installed` check downloaded the public `writ-craft@preview`
+tarball, matched the published shasum, observed Main IPC after page load,
+confirmed profile isolation and signal forwarding, and passed **2/2**. This
+does not claim a stable release, Apple signing/notarization, or App/ZIP
+distribution.

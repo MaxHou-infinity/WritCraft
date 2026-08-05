@@ -36,7 +36,7 @@ npx writ-craft@preview --profile "$HOME/WritCraft-Preview-Profile"
 ## 预览边界
 
 - 清单和 universal helpers 面向 macOS arm64/x64。当前公开 `@preview`
-  为 0.1.2；统一写作任务、图片受影响路径、真实作者和公网隔离安装检查均已完成。
+  为 0.3.0；统一任务状态、透明 Diff、真实作者路径和公网隔离安装检查均已完成。
 - `--profile` 必须位于当前用户 HOME 内，且路径祖先、目录权限和 macOS ACL 都通过双重校验；同一账户下已运行进程仍属于接受的本地信任边界。
 - WritCraft 按 `WritCraft Proprietary Evaluation License 1.0` 提供，只允许
   个人或组织内部授权评估；禁止生产、商业交付、托管服务、转售和对外再分发。

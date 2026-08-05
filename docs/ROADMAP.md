@@ -2,8 +2,8 @@
 
 > 路线图版本：`RM-1.2`
 > 生效日期：2026-08-01
-> 当前公开产品版本：`writ-craft@0.1.2` Developer Preview
-> 当前目标版本：`writ-craft@0.3.0`（目标模式已完成候选门禁；阶段 0–D 的合同、Main 状态机、Context Catalog、统一 edit.md 编译器和 Renderer 任务体验已有证据；阶段 E 的真实作者隔离副本 `author-cross-entry` 1/1、`author-affected` 1/1 及独立复审已通过，P0=0、P1=0、P2=3；正式发布仍需另行授权）
+> 当前公开产品版本：`writ-craft@0.3.0` Developer Preview（npm `preview`）
+> 当前目标版本：`writ-craft@0.3.0`（阶段 0–E 已完成；真实作者隔离副本与独立复审通过，P0=0、P1=0、P2=3；已按授权发布到 npm `preview`、GitHub prerelease，并保留 `latest:0.1.0`）
 > 上一候选：`writ-craft@0.2.0`（GitHub/App 候选已完成；npm preview 的 OTP 门禁仍按历史记录保留）
 > 状态：**当前开发顺序与版本边界的唯一权威**
 
@@ -44,8 +44,8 @@
 |---|---|---:|---|
 | `0.1.1` | Developer Preview 公开基线 | ✅ 已发布并冻结 | 三级协作、审阅/恢复、Research、图片与 Graph 已公开到 `preview` |
 | `0.1.2` | 真实作者可用性闭环 | ✅ 已发布并冻结 | 结构规划、统一写作任务流、图片受影响路径与真实长文闭环；npm `preview` / GitHub prerelease |
-| `0.2.0` | 日常写作工作区 | 🚧 GitHub 已发布，npm preview 等待 OTP | 项目驾驶舱、章节大纲与快速导航 |
-| `0.3.0` | 透明 AI 协作 | ✅ 候选门禁完成；阶段 0–E 证据、真实作者隔离副本和独立复审已通过，P0=0、P1=0、P2=3；正式发布仍需另行授权 | 统一任务状态、`@` 引用和项目 Prompt 编译 |
+| `0.2.0` | 日常写作工作区 | ✅ GitHub/App 候选已完成；未独立发布 npm，能力随 0.3.0 Preview 交付 | 项目驾驶舱、章节大纲与快速导航 |
+| `0.3.0` | 透明 AI 协作 | ✅ 已发布 Developer Preview；npm `preview:0.3.0`、GitHub `v0.3.0` prerelease，`latest:0.1.0`；P0=0、P1=0、P2=3 | 统一任务状态、`@` 引用和项目 Prompt 编译 |
 | `0.4.0` | 证据与交付闭环 | ⬜ 后续 | 快照/恢复、正式导出、Graph 多视图与引用健康度 |
 | `1.0.0` | 稳定个人写作产品 | ⬜ 后续 | 经真实作者内测，可正式使用和推荐 |
 | Pro | 专业付费能力 | 候选池 | 在个人版价值与付费意愿得到证明后立项 |
@@ -96,7 +96,7 @@
 
 ## 5. 上一候选：`0.2.0` 日常写作工作区（候选验收完成）
 
-> 详细范围、已批准产品决定、阶段退出条件和目标模式文本见 [`ROADMAP-0.2.0.md`](ROADMAP-0.2.0.md)。所有者已于 2026-08-03 批准；阶段 0–F、自动化、Computer Use、真实长文隔离副本、完整回归、独立复审与作者一次最短主观验收均已完成，P0/P1=0。GitHub `v0.2.0` prerelease 与 App/ZIP 已完成，npm `preview` 仍等待 OTP；在 npm 完成前不把 0.2.0 写成全链路已公开。
+> 详细范围、已批准产品决定、阶段退出条件和目标模式文本见 [`ROADMAP-0.2.0.md`](ROADMAP-0.2.0.md)。所有者已于 2026-08-03 批准；阶段 0–F、自动化、Computer Use、真实长文隔离副本、完整回归、独立复审与作者一次最短主观验收均已完成，P0/P1=0。GitHub `v0.2.0` prerelease 与 App/ZIP 已完成；npm 未独立发布 0.2.0，其能力已纳入并随 0.3.0 Preview 交付。
 
 ### 5.1 目标结果
 
@@ -127,7 +127,7 @@
 
 ## 6. `0.3.0` 透明 AI 协作（已批准）
 
-> 详细合同见 [`ROADMAP-0.3.0.md`](ROADMAP-0.3.0.md)。该合同已按 2026-08-04 的源码核对并获批准；阶段 0–D 已形成可回归实现，阶段 E 已通过真实作者隔离副本的 Chat→Navigation→Diff→冲突阻止→接受→Safe Undo、受影响入口、零写入和独立复审（P0=0、P1=0、P2=3）。API Key 持久化、Navigation 任务超时、`@` 解析和 Context Manifest 均已区分既有基础与本轮新增证据；0.3.0 当前为候选状态，正式发布仍需另行授权。
+> 详细合同见 [`ROADMAP-0.3.0.md`](ROADMAP-0.3.0.md)。该合同已按 2026-08-04 的源码核对并获批准；阶段 0–D 已形成可回归实现，阶段 E 已通过真实作者隔离副本的 Chat→Navigation→Diff→冲突阻止→接受→Safe Undo、受影响入口、零写入和独立复审（P0=0、P1=0、P2=3）。API Key 持久化、Navigation 任务超时、`@` 解析和 Context Manifest 均已区分既有基础与本轮新增证据；0.3.0 已发布为 npm `preview` 和 GitHub prerelease，`latest` 保持 `0.1.0`，稳定版与 App/ZIP 分发仍未声明。
 
 ### 6.1 目标结果
 

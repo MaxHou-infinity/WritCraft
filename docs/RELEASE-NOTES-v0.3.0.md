@@ -24,3 +24,15 @@ npx writ-craft@preview --check
 ```
 
 Requires macOS 12+, Node.js 22.12+, and npm 10 or 11. Use `@preview` explicitly; `latest` remains `0.1.0` and is not moved by this release.
+
+## Publication
+
+Published to npm `preview` on 2026-08-05 as `writ-craft@0.3.0`.
+
+- Registry: `preview: 0.3.0`, `latest: 0.1.0`
+- Shasum: `c3294a3f106119096751f8c2b67afa55e91bd702`
+- GitHub prerelease: https://github.com/MaxHou-infinity/WritCraft/releases/tag/v0.3.0
+- Tag and release commit: `v0.3.0` → `a747683`
+- Public-registry isolated install verification: **2/2**
+
+This remains a macOS Developer Preview. No signed App/ZIP distribution is included.

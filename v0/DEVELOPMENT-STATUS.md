@@ -1,11 +1,11 @@
 # 笔触 · WritCraft 当前开发状态
 
 > 最后更新：2026-08-05（0.3.0 阶段 E 作者路径收敛：获批 GUI 环境 `author-cross-entry` 1/1、`author-affected` 1/1；新增 Navigation/Chapter/Research/普通 Changes 的真实 Provider 边界 edit.md revision 漂移旧结果丢弃和 Markdown 零写入；五入口统一 Context Manifest v2 exact envelope、UTF-8 字节语义、预算、遗漏/截断/不可用原因和相对路径边界专项通过；完整 `npm test` 与获批 GUI `npm run verify` 均退出码 0。独立复审已签收：P0=0、P1=0、P2=3；大型 Electron harness、quick-open 单次性能和作者目录私有防嵌套标记首红均按证据保留）
-> 当前公开版本：`writ-craft@0.1.2`，npm `preview`
+> 当前公开版本：`writ-craft@0.3.0`，npm `preview`
 > 当前代码版本：`v0/package.json` 为 `0.3.0`
-> 当前发布候选：`0.3.0` 透明 AI 协作（发布已获明确授权；npm 使用 `preview`，GitHub 使用 `v0.3.0` prerelease；实际公开状态待逐项回查）
+> 当前发布版本：`0.3.0` 透明 AI 协作（npm `preview:0.3.0`，GitHub `v0.3.0` prerelease，`latest:0.1.0`）
 > 当前开发版本：`0.3.0` 透明 AI 协作
-> 当前阶段：**阶段 0–D 已形成可回归切片；阶段 E 作者路径、统一 Manifest、完整回归、真实 Electron 和独立复审已通过，0.3.0 进入候选状态；正式发布仍需另行授权**
+> 当前阶段：**阶段 0–E 已完成；真实作者路径、统一 Manifest、完整回归、真实 Electron、独立复审、npm 公网隔离安装和 GitHub 发布核验均已通过。0.3.0 作为 Developer Preview 已发布；稳定版与 App/ZIP 分发未声明**
 
 本文件只记录当前事实、开放风险和下一动作。0.1.x 的完整里程碑、红灯、测试数字和验收过程已归档到 [`docs/archive/development/DEVELOPMENT-STATUS-THROUGH-0.1.2.md`](../docs/archive/development/DEVELOPMENT-STATUS-THROUGH-0.1.2.md)，不得从归档旧 TODO 直接派发工作。
 
@@ -70,7 +70,15 @@
 - Navigation 单入口的真实生成、局部 Diff、退出审阅零写入和取消已通过；Chat/Chapter/Research/普通 Changes/Graph/图片的作者路径、迟到结果隔离和零写入也已逐项验收。
 - `@` 来源/实体候选已有 Main 目录和 request-bound ID 合同；真实项目候选、Main IPC 的 revision 漂移、foreign project identity、TTL 过期及 Chat 恢复 UI 已由 focused Electron 1/1 验证，五入口作者路径均使用同一 Context Manifest v2。
 - `edit.md` 编译器已有跨入口实现；真实作者已对照 Chat/Navigation/Research/Chapter/Changes 的统一 revision、预算、遗漏/截断语义，并通过 Navigation/Chapter/Research/Changes 的旧结果丢弃；compile-invalid 不再回退发送原文。
-- 阶段 E 已完成两条真实作者 Electron 证据：`author-cross-entry` 1/1 与 `author-affected` 1/1；覆盖 Chat → Navigation → Diff → 冲突阻止 → 接受 → Safe Undo，以及 Chapter、Research、普通 Changes、Graph、图片、五入口 edit.md revision 漂移、Chat 取消/60 秒超时、Navigation/Chapter/Research/Graph/图片取消、来源充足/不足“添加来源”双分支、添加来源后原 action identity 保留并回到 review、跨项目 A→B 迟到结果丢弃、A/B 零写入边界。Manifest 完整字段语义矩阵已由 `verify-v0-context-manifest.js` 4/4、服务专项和真实作者对照覆盖；独立复审已签收 P0=0、P1=0、P2=3，0.3.0 进入候选状态。
+- 阶段 E 已完成两条真实作者 Electron 证据：`author-cross-entry` 1/1 与 `author-affected` 1/1；覆盖 Chat → Navigation → Diff → 冲突阻止 → 接受 → Safe Undo，以及 Chapter、Research、普通 Changes、Graph、图片、五入口 edit.md revision 漂移、Chat 取消/60 秒超时、Navigation/Chapter/Research/Graph/图片取消、来源充足/不足“添加来源”双分支、添加来源后原 action identity 保留并回到 review、跨项目 A→B 迟到结果丢弃、A/B 零写入边界。Manifest 完整字段语义矩阵已由 `verify-v0-context-manifest.js` 4/4、服务专项和真实作者对照覆盖；独立复审已签收 P0=0、P1=0、P2=3，0.3.0 已进入公开 Developer Preview。
+
+### 0.3.0 发布事实（2026-08-05）
+
+- npm：`writ-craft@0.3.0` 已发布到 `preview`；registry 反查为 `preview: 0.3.0`、`latest: 0.1.0`。
+- npm 完整性：shasum `c3294a3f106119096751f8c2b67afa55e91bd702`；公开 tarball 为 `https://registry.npmjs.org/writ-craft/-/writ-craft-0.3.0.tgz`。
+- GitHub：`main`、annotated tag `v0.3.0` 与 prerelease 已生效；Tag/Release commit 为 `a747683`，Release 为 `https://github.com/MaxHou-infinity/WritCraft/releases/tag/v0.3.0`。
+- 公网隔离安装验证：`WRITCRAFT_NPM_PREVIEW_PACKAGE_SPEC=writ-craft@preview` 的 `verify:npm-preview:installed` 通过 **2/2**，覆盖公开 tarball、Main `did-finish-load` IPC、profile 隔离、信号转发和清理；未打开作者稿件。
+- 发布边界：这是 macOS npm Developer Preview；未移动 `latest`，未分发新的 App/ZIP，也不宣称稳定版。
 
 ### P0 / P1
 
