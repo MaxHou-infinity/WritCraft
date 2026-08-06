@@ -2,7 +2,7 @@
 
 ## Project Structure & Module Organization
 
-Use `docs/INDEX.md` to select documentation. The mandatory current entry set is `docs/ROADMAP.md`, `v0/DEVELOPMENT-STATUS.md`, `docs/WRITCRAFT-PRD-V3.md`, `docs/ARCHITECTURE.md`, and `v0/package.json`. Treat `docs/ROADMAP.md` as the only authority for target-version order and scope, and `v0/DEVELOPMENT-STATUS.md` as the current execution ledger. Archived documents explain history but cannot dispatch work.
+Use `docs/INDEX.md` to select documentation. The mandatory current entry set is `docs/ROADMAP.md`, `docs/ROADMAP-0.4.0.md`, `v0/DEVELOPMENT-STATUS.md`, `docs/WRITCRAFT-PRD-V3.md`, `docs/ARCHITECTURE.md`, and `v0/package.json`. Treat `docs/ROADMAP.md` as the only authority for target-version order and scope, `docs/ROADMAP-0.4.0.md` as the approved detailed contract, and `v0/DEVELOPMENT-STATUS.md` as the current execution ledger. 0.1.x–0.3.0 route/contracts are frozen compatibility evidence and cannot dispatch work; archived documents explain history only.
 
 The Electron application is under `v0/`. Main-process services and the narrow preload bridge live in `v0/src/main/`; UI, state machines, CSS, and vendored browser assets live in `v0/src/renderer/`. Standalone verification scripts are in `v0/tests/`, fixtures in `v0/tests/fixtures/`, and packaging utilities in `v0/scripts/`. Research inputs and historical product deliverables remain in `raw/` and `deliverables/`; do not mix them into runtime code or use them to dispatch current work.
 
@@ -23,7 +23,7 @@ Run commands from `v0/`:
 
 Real API checks require explicit gates; never enable them casually or log keys, prompts, or document content.
 
-The initial distribution route is the macOS npm Developer Preview in `docs/NPM-DEVELOPER-PREVIEW-V1-CONTRACT.md`. `writ-craft@0.1.2` is public under npm `preview`; `latest` intentionally remains `0.1.0`. Do not publish another version, move a dist-tag, or create a GitHub Release without explicit authorization.
+The distribution route is the macOS npm Developer Preview in `docs/NPM-DEVELOPER-PREVIEW-V1-CONTRACT.md`. `writ-craft@0.3.0` is public under npm `preview`; `latest` intentionally remains `0.1.0`. Do not publish another version, move a dist-tag, create a GitHub Release/Tag, or distribute App/ZIP without explicit authorization.
 
 Do not infer a validated platform matrix from manifest declarations or universal helper slices. Record the exact Node/npm/architecture used by installed-tarball evidence. The 0.1.1 candidate closed Node 22/npm 10 arm64 and Node 24/npm 11 x64 at 2/2 each; future candidates must repeat their own applicable matrix. Main-observed page-load IPC proves `did-finish-load`, not every workspace/bootstrap behavior.
 
@@ -33,7 +33,7 @@ Use CommonJS JavaScript with `'use strict'`, two-space indentation, semicolons, 
 
 Main owns filesystem, revision, capability, and network authority. Renderer code must not access Node APIs or make HTTP(S) requests directly. AI writes must remain reviewable through ChangeSet/History boundaries.
 
-Main must not import or `require` Renderer modules. Put pure logic needed by both processes in `v0/src/shared/`, keep it free of Electron/filesystem/network authority, and cover it with parity tests plus a static Main-to-Renderer dependency gate. The 0.2.0 phase 0 removes existing reverse dependencies; do not add new ones meanwhile. New 0.2.0 IPC should enter through a focused service/handler instead of further expanding `main.js`.
+Main must not import or `require` Renderer modules. Put pure logic needed by both processes in `v0/src/shared/`, keep it free of Electron/filesystem/network authority, and cover it with parity tests plus a static Main-to-Renderer dependency gate. The reverse dependencies were removed in frozen 0.2.0 stage 0; preserve that completed boundary. Any future 0.4.0 IPC must enter through a focused service/handler instead of further expanding `main.js`.
 
 Never infer provider capability from a credential prefix. `sk-cp-` and `sk-api-` identify credential/billing families; current official documentation plus a gated, privacy-safe provider response decide whether `image-01` is available. Pin Electron to a currently supported stable release and re-run real-Electron behavior after every upgrade.
 
@@ -53,11 +53,11 @@ Security precision belongs in a private authority record, not by silently changi
 
 Before resuming work, read `docs/ROADMAP.md`, `v0/DEVELOPMENT-STATUS.md`, the relevant contract in `docs/`, and `v0/package.json`; source and current test evidence override historical snapshots. Work only inside the single current target version declared by the roadmap. New ideas go to its candidate pool unless they are P0/P1, data-safety issues, or required by the current version's acceptance. In the same change set as every completed feature, review, or verification result, update the status ledger and any affected contract/README/roadmap. Mark old figures as **historical focused evidence** with scope and date—never present them as the current total. Do not begin a follow-up fix from an old TODO until the status ledger confirms it remains open.
 
-The 0.1.2 Navigation, structure, unified-task, real-Electron and author journeys are signed and frozen. The old public Project Plan has no user authority, but its unreachable source/tests remain a 0.2.0 stage-0 cleanup item. Do not reuse that UI or `submit_project_plan`; remove it without deleting Chapter's internal block planning, normal Changes scope planning, or standalone advanced Research.
+The 0.1.2 Navigation, structure, unified-task, real-Electron and author journeys are signed and frozen. The old public Project Plan and retired `submit_project_plan` assets were physically removed in frozen 0.2.0 stage 0; do not restore them. Chapter's internal block planning, normal Changes scope planning, and standalone advanced Research remain valid compatibility capabilities.
 
 Do not use one green row or “module complete” sentence for a composite experience when any required sub-capability is absent. Split status by user-visible boundary—for example single-turn Chat versus conversation continuity, conflict recovery versus trash restore UI, and `edit.md` onboarding versus section-aware context compilation. A Main service without preload/IPC/Renderer access is not an App feature.
 
-The owner approved `docs/ROADMAP-0.2.0.md` on 2026-08-03. Begin only with its stage 0: remove Main-to-Renderer reverse dependencies through `src/shared/` plus a static gate, align Navigation to `changes-only` without deleting localized edits/evidence/standalone Research, physically remove retired Project Plan assets from the package, add the maximum legal request fixture, and freeze the existing search/workspace/current-session pending-Changes reuse matrix. Do not skip stage 0 to start the new workspace UI.
+The owner approved `docs/ROADMAP-0.4.0.md` as `WRC-0.4.0-R1` and then submitted its complete target-mode instruction on 2026-08-06. Stage 0 completed as a documentation-only contract/baseline freeze with independent review P0=0, P1=0, P2=4 and no product, test, package, or shrinkwrap changes. Stage A is now current; follow A → B → C → D → E and never resume work from a 0.1.x–0.3.0 TODO or historical target-mode text.
 
 At each durable closeout, compare current `main`, test evidence, README, PRD, architecture, affected contracts and the current status ledger. Search active documents for superseded version/status claims, run `git diff --check`, then update and re-query the same Nowledge authority memory. Do not use archived PDCA, Phase A milestones, or old test totals as current status.
 

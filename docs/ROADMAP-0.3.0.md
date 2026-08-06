@@ -3,7 +3,7 @@
 > 路线图编号：`WRC-0.3.0-R1`
 > 对应产品版本：`writ-craft@0.3.0`
 > 版本主题：透明 AI 协作
-> 当前状态：**阶段 0–E 已完成，0.3.0 已按授权发布为 npm `preview` 和 GitHub prerelease。阶段 E 的所有者选定目录经临时去除私有防嵌套标记后，由生产 copy transaction 创建隔离副本；获批 GUI 环境 `author-cross-entry` 1/1 与 `author-affected` 1/1 通过，覆盖 Chat、Navigation、Chapter、Research、Changes、Graph、图片、取消、60 秒硬超时、跨项目迟到结果、同项目 `edit.md` revision 漂移、来源不足恢复、Diff/冲突/接受/Safe Undo 和零写入。五入口统一 Context Manifest v2 的 exact envelope、UTF-8 字节语义、预算、遗漏/截断/不可用原因及相对路径边界已通过专项与真实作者对照；当前 `npm test` 和获批 GUI `npm run verify` 均退出码 0。阶段 E 独立复审已签收：P0=0、P1=0、P2=3；大型 Electron harness 时序红灯、quick-open 单次性能红灯、源目录私有防嵌套标记首红均保留为明确证据，不得改写成产品绿灯。npm 公网隔离安装验证 2/2，`preview:0.3.0`、`latest:0.1.0`；0.3.0 仍是 Developer Preview，不等同于稳定版或 App/ZIP 分发。**
+> 当前状态：**阶段 0–E 已完成并冻结，0.3.0 已按授权发布为 npm `preview` 和 GitHub prerelease。阶段 E 的所有者选定目录经临时去除私有防嵌套标记后，由生产 copy transaction 创建隔离副本；获批 GUI 环境 `author-cross-entry` 1/1 与 `author-affected` 1/1 通过，覆盖 Chat、Navigation、Chapter、Research、Changes、Graph、图片、取消、60 秒硬超时、跨项目迟到结果、同项目 `edit.md` revision 漂移、来源不足恢复、Diff/冲突/接受/Safe Undo 和零写入。五入口统一 Context Manifest v2 的 exact envelope、UTF-8 字节语义、预算、遗漏/截断/不可用原因及相对路径边界已通过专项与真实作者对照；最终 `npm test` 和获批 GUI `npm run verify` 均退出码 0。阶段 E 独立复审已签收：P0=0、P1=0、P2=3；大型 Electron harness 时序红灯、quick-open 单次性能红灯、源目录私有防嵌套标记首红均保留为明确证据，不得改写成产品绿灯。npm 公网隔离安装验证 2/2，`preview:0.3.0`、`latest:0.1.0`；0.3.0 仍是 Developer Preview，不等同于稳定版或 App/ZIP 分发。本文件只作为冻结兼容合同，不得派发 0.4.0 工作。**
 
 本版本不是再增加一套 AI 功能，而是让现有 AI 写作能力变得可理解、可控、可恢复。作者应该始终知道：AI 当前在处理什么、读取了哪些内容、为什么没有继续，以及接受后到底会写入什么。
 
@@ -99,7 +99,7 @@
 
 ## 9. 发布与文档门禁
 
-- 本文件已于 2026-08-04 获所有者审阅通过，现作为 0.3.0 生效合同；唯一的 0.3.0 目标模式已启动，后续按阶段边界推进。
+- 本文件已于 2026-08-04 获所有者审阅通过；0.3.0 目标模式现已结束并冻结。后续只在 0.4.0 实际触及透明任务边界时用作兼容与回归约束，不得续派旧阶段任务。
 - 生效前必须同步 `docs/ROADMAP.md`、`v0/DEVELOPMENT-STATUS.md`、相关 Context/Navigation/Changes 合同和 Nowledge Mem。
 - 每个阶段只提交一个可运行、可验证的边界；自动化全绿不能替代真实作者路径。
 - 发布后保留所有真实红灯和 P2 风险，不用后续绿灯覆盖历史证据；本轮已完成经授权的 npm、Tag 和 GitHub Release，未分发 App/ZIP。`latest` 不移动；稳定版仍需新的候选、独立验收和单独授权。

@@ -1,6 +1,6 @@
 # Unified Writing Task v1 Contract
 
-> Status: **exact candidate `e8b9588` independently reviewed P0/P1/P2=0 and accepted by a real author** (2026-08-03, checkpoint 0.0CO)
+> Status: **frozen compatibility contract; exact candidate `e8b9588` independently reviewed P0/P1/P2=0 and accepted by a real author** (2026-08-03, checkpoint 0.0CO). It constrains 0.4.0 AI-to-Diff compatibility but cannot dispatch new work outside `WRC-0.4.0-R1`.
 > Product version: `writ-craft@0.1.2`
 > Public journey: Writing Navigation suggestion → inline review → explicit decision
 

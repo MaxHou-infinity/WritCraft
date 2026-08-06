@@ -5,30 +5,46 @@
 ## 开始任何开发前必读
 
 1. [`ROADMAP.md`](ROADMAP.md)：唯一正式版本顺序、范围和非目标。
-2. [`ROADMAP-0.2.0.md`](ROADMAP-0.2.0.md)：当前版本的已批准详细合同与阶段门禁。
-3. [`../v0/DEVELOPMENT-STATUS.md`](../v0/DEVELOPMENT-STATUS.md)：当前事实、开放风险和下一动作。
-4. [`ROADMAP-0.3.0.md`](ROADMAP-0.3.0.md)：当前 0.3.0 生效合同、阶段顺序和验收门禁。
-5. [`WRITCRAFT-PRD-V3.md`](WRITCRAFT-PRD-V3.md)：长期产品契约。
-6. [`ARCHITECTURE.md`](ARCHITECTURE.md)：稳定工程边界。
-7. `v0/package.json` 与实际源码/测试：最终工程事实。
+2. [`../v0/DEVELOPMENT-STATUS.md`](../v0/DEVELOPMENT-STATUS.md)：当前事实、开放风险和下一动作。
+3. [`ROADMAP-0.4.0.md`](ROADMAP-0.4.0.md)：已启动的 0.4.0 生效合同；只按阶段 0 → E 派工，当前阶段 A。
+4. [`EVIDENCE-DELIVERY-V1-CONTRACT.md`](EVIDENCE-DELIVERY-V1-CONTRACT.md)：阶段 0 已冻结并签收的 Snapshot、DOCX、delivery authority、引用健康度、Graph 多视图和真实渲染合同。
+5. [`0.4.0-STAGE-0-INDEPENDENT-REVIEW.md`](0.4.0-STAGE-0-INDEPENDENT-REVIEW.md)：阶段 0 P0=0、P1=0、P2=4 的独立复审签收与首红记录。
+6. [`WRITCRAFT-PRD-V3.md`](WRITCRAFT-PRD-V3.md)：长期产品契约。
+7. [`ARCHITECTURE.md`](ARCHITECTURE.md)：稳定工程边界。
+8. `v0/package.json` 与实际源码/测试：最终工程事实。
 
-当前阶段 A 还必须阅读 [`DAILY-WORKSPACE-V1-CONTRACT.md`](DAILY-WORKSPACE-V1-CONTRACT.md)：它冻结 0.2.0 项目首页、大纲、`⌘P`、共享定位、workspace/v2、5 秒降级和性能验收边界。
+0.2.0 的 [`ROADMAP-0.2.0.md`](ROADMAP-0.2.0.md) 与 [`DAILY-WORKSPACE-V1-CONTRACT.md`](DAILY-WORKSPACE-V1-CONTRACT.md) 已冻结；只有生产源码实际影响项目首页、大纲、`⌘P`、workspace/v2 或性能边界时才阅读并回归。
 
-0.3.0 阶段 A–D 还必须阅读 [`AI-TASK-TRANSPARENCY-V1-CONTRACT.md`](AI-TASK-TRANSPARENCY-V1-CONTRACT.md)：它冻结跨入口任务身份、状态、取消/超时、进度事件和零写入边界。
+0.3.0 的 [`ROADMAP-0.3.0.md`](ROADMAP-0.3.0.md) 与 [`AI-TASK-TRANSPARENCY-V1-CONTRACT.md`](AI-TASK-TRANSPARENCY-V1-CONTRACT.md) 已冻结；只有生产源码实际影响跨入口 AI 任务、Context Manifest、取消/超时或零写入边界时才阅读并回归。
 
 0.3.0 阶段 E 的独立复审签收记录见 [`0.3.0-STAGE-E-INDEPENDENT-REVIEW.md`](0.3.0-STAGE-E-INDEPENDENT-REVIEW.md)；它记录 P0=0、P1=0、P2=3 和候选状态，不代表正式发布授权。
 
 `ROADMAP-0.2.0.md` 已于 2026-08-03 获得所有者批准并生效。原审阅稿已直接转为该版本合同，不保留第二份活动路线图。
 
-`ROADMAP-0.3.0.md` 已于 2026-08-04 获所有者批准并成为 0.3.0 生效合同；目标模式已启动，按阶段 0 → E 派发编码任务，当前以路线图与 `v0/DEVELOPMENT-STATUS.md` 的实时证据为准。
+`ROADMAP-0.3.0.md` 已于 2026-08-04 获批并完成阶段 0 → E，0.3.0 已发布为 npm/GitHub Developer Preview。
+
+`ROADMAP-0.4.0.md` 已于 2026-08-06 获批为 `WRC-0.4.0-R1`；所有者随后提交了其中 §11 的完整目标模式文本。阶段 0 已完成并由独立复审以 P0=0、P1=0、P2=4 签收；当前只允许阶段 A 的实现与验证工作。
+
+## 派工权与冻结关系
+
+| 文档层级 | 文件 | 是否可派工 |
+|---|---|---|
+| 当前版本顺序 | `ROADMAP.md` | 是；只决定当前/下一版本、范围和非目标 |
+| 当前详细合同 | `ROADMAP-0.4.0.md`、`EVIDENCE-DELIVERY-V1-CONTRACT.md` | 是；阶段 0 已关闭，当前只从阶段 A 开放项派工，按 A → B → C → D → E 推进 |
+| 当前事实账本 | `v0/DEVELOPMENT-STATUS.md` | 是；只从其中尚未关闭的当前阶段和开放项续作 |
+| 长期产品/稳定架构 | `WRITCRAFT-PRD-V3.md`、`ARCHITECTURE.md` | 只约束边界，不能自行新增当前版本任务 |
+| 冻结兼容合同 | 0.1.x–0.3.0 路线图、`*-V1-CONTRACT.md`、阶段复审记录 | 否；只有 0.4.0 实际触及对应生产边界时才作为兼容与回归约束 |
+| 历史材料 | `docs/archive/`、`raw/`、`deliverables/` | 否；仅追溯证据，不得恢复旧 TODO、里程碑或目标模式文本 |
+
+旧路线图中的“下一动作”“目标模式已启动”“等待发布/授权”等文字，即使为当时真实记录，也不得覆盖本页、`ROADMAP.md` 和当前状态账本。若旧合同的安全边界与新实现发生冲突，先按源码和当前测试确认事实，再在 0.4.0 合同中明确兼容或迁移，不能直接从旧文档派发工作。
 
 ## 用户与发布
 
 - [`../README.md`](../README.md)：产品首页。
 - [`GETTING-STARTED.md`](GETTING-STARTED.md)：安装与首次使用。
 - [`NPM-DEVELOPER-PREVIEW-V1-CONTRACT.md`](NPM-DEVELOPER-PREVIEW-V1-CONTRACT.md)：npm Preview 分发合同。
-- [`RELEASE-NOTES-v0.1.2.md`](RELEASE-NOTES-v0.1.2.md)：当前公开 Preview 说明。
-- [`RELEASE-NOTES-v0.3.0.md`](RELEASE-NOTES-v0.3.0.md)：0.3.0 透明 AI 协作候选/发布说明。
+- [`RELEASE-NOTES-v0.1.2.md`](RELEASE-NOTES-v0.1.2.md)：历史 0.1.2 Preview 说明。
+- [`RELEASE-NOTES-v0.3.0.md`](RELEASE-NOTES-v0.3.0.md)：当前公开 0.3.0 透明 AI 协作 Preview 说明。
 - [`../SECURITY.md`](../SECURITY.md)、[`../CONTRIBUTING.md`](../CONTRIBUTING.md)：安全与贡献。
 
 ## 冻结兼容合同（按受影响模块读取）

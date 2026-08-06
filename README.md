@@ -120,6 +120,8 @@ MiniMax API Key 只应在应用设置中配置。不要把 Key 写进项目文�
 
 查看 [公开路线图](docs/ROADMAP.md)，了解当前阶段、未来付费方向和不会越过的产品边界。
 
+下一目标版本 0.4.0“证据与交付闭环”的 `WRC-0.4.0-R1` 已完成阶段 0 合同/基线冻结，独立复审为 P0=0、P1=0、P2=4；当前进入阶段 A，建立 Main 项目快照、比较、Markdown 选择性恢复和安全删除权威。阶段 0 未修改产品代码，公开版本仍是 0.3.0 Preview。
+
 ## 参与笔触
 
 - 遇到问题：提交 [Bug Report](https://github.com/MaxHou-infinity/WritCraft/issues/new)

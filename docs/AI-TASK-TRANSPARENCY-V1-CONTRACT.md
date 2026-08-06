@@ -1,7 +1,7 @@
 # AI 任务透明协作 v1 合同
 
 > 适用版本：`writ-craft@0.3.0`（WRC-0.3.0-R1）
-> 状态：0.3.0 阶段 0 已冻结；阶段 A–D 第一可回归实现切片已形成，Navigation 单入口、Context Catalog Main IPC（含 TTL 过期与 Chat 恢复提示）与统一写作任务 focused 作者路径已通过；阶段 E 新增真实作者源稿派生隔离副本的 Chat → Navigation → Diff → 冲突阻止 → 接受 → Safe Undo 1/1，Chapter/Research/Graph/图片和独立复审仍未完成（2026-08-04）
+> 状态：**0.3.0 阶段 A–E 已完成、独立复审 P0=0/P1=0/P2=3，并随 0.3.0 Preview 发布后冻结。Chat、Navigation、Chapter、Research、Changes、Graph、图片、15 秒取消入口、60 秒硬超时、跨项目迟到结果、Context Manifest v2 和零写入边界均已有最终证据。本文件只作为 0.4.0 的兼容与回归约束；正文中的中间阶段“仍未完成”描述均为历史现场，不得派发旧任务。**
 
 ## 1. 目的
 
@@ -61,4 +61,4 @@ AI 结果只能成为预览或 Main-owned ChangeSet。`edit.md`、`references/**
 
 ## 8. 验收口径
 
-专项测试必须覆盖：正常完成、15 秒取消可见、60 秒超时、provider 失败、重复提交、旧 attempt、旧 project、旧 revision、过期 `@ref`、Research edit.md manifest、迟到结果、零写入以及终态后的重试。当前已通过项目卡 focused Electron 4/4、Onboarding Renderer 动态 30/30、workspace owner 4/4、写作导航服务 31/31、AI task 7/7、进度 Renderer 3/3、Main wiring 8/8、真实项目 Context Catalog 1/1、Context Catalog Main IPC Electron 1/1（含 TTL 过期与 Chat 恢复 UI）、Chat 任务进度 focused Electron 1/1、统一写作任务 focused Electron 1/1，以及 Navigation 真实生成→正文 Diff→退出审阅零写入→取消路径；阶段 E 真实作者跨入口 Electron 1/1 另证明源稿不变、Chat→Navigation→Diff、过期冲突阻止、重试接受和 Safe Undo；`npm test`、获批 GUI 环境 `npm run verify`、API Key 同 profile 1/1 和 watcher Main/IPC 3/3 也通过。统一写作专项同时证明一次主要点击、正文内 Diff、拒绝零写入、接受和 Safe Undo。完整 Electron harness 曾有一次 38/38 通过，但后续在 Trash/Graph recovery 的不同位置出现非固定时序红灯，红灯保留为 P2；完整跨入口真实作者验收仍未完成，且 `npm run verify` 不等于完整 38 阶段 Electron harness。真实 Electron 验收必须证明作者能看懂“目标、读取范围、阶段、是否写入和下一步”。
+专项测试必须覆盖：正常完成、15 秒取消可见、60 秒超时、provider 失败、重复提交、旧 attempt、旧 project、旧 revision、过期 `@ref`、Research edit.md manifest、迟到结果、零写入以及终态后的重试。阶段 A–E 最终证据已覆盖项目卡、Onboarding、workspace owner、写作导航、AI task、进度 Renderer、Main wiring、真实项目 Context Catalog、同 profile API Key 重启、watcher Main/IPC，以及 Chat、Navigation、Chapter、Research、Changes、Graph、图片的真实作者受影响路径。完整 Electron harness 的非固定时序红灯仍作为 P2 历史证据保留；它不表示跨入口验收未完成，也不能被绿灯抹除。真实 Electron 回归仍必须证明作者能看懂“目标、读取范围、阶段、是否写入和下一步”。

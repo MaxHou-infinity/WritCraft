@@ -1,18 +1,19 @@
 # 笔触 · WritCraft 当前开发状态
 
-> 最后更新：2026-08-05（0.3.0 阶段 E 作者路径收敛：获批 GUI 环境 `author-cross-entry` 1/1、`author-affected` 1/1；新增 Navigation/Chapter/Research/普通 Changes 的真实 Provider 边界 edit.md revision 漂移旧结果丢弃和 Markdown 零写入；五入口统一 Context Manifest v2 exact envelope、UTF-8 字节语义、预算、遗漏/截断/不可用原因和相对路径边界专项通过；完整 `npm test` 与获批 GUI `npm run verify` 均退出码 0。独立复审已签收：P0=0、P1=0、P2=3；大型 Electron harness、quick-open 单次性能和作者目录私有防嵌套标记首红均按证据保留）
+> 最后更新：2026-08-06（`WRC-0.4.0-R1` 阶段 0 合同/基线冻结已完成，独立复审最终 P0=0、P1=0、P2=4，阶段 A 已解锁。阶段 0 产品源码、测试、脚本、`v0/package.json` 和 `v0/npm-shrinkwrap.json` 零修改；focused baseline：History 14/14、Diagnostic Export 13/13、SourceIndex 10/10、Citation 10/10、Graph Filter 17/17、Graph Workbench 14/14、Image Trash 21/21、PDF extraction timeout 3/3；这些不是 0.4.0 实现、真实作者或候选完成证据）
 > 当前公开版本：`writ-craft@0.3.0`，npm `preview`
 > 当前代码版本：`v0/package.json` 为 `0.3.0`
 > 当前发布版本：`0.3.0` 透明 AI 协作（npm `preview:0.3.0`，GitHub `v0.3.0` prerelease，`latest:0.1.0`）
-> 当前开发版本：`0.3.0` 透明 AI 协作
-> 当前阶段：**阶段 0–E 已完成；真实作者路径、统一 Manifest、完整回归、真实 Electron、独立复审、npm 公网隔离安装和 GitHub 发布核验均已通过。0.3.0 作为 Developer Preview 已发布；稳定版与 App/ZIP 分发未声明**
+> 下一目标版本：`0.4.0` 证据与交付闭环（`WRC-0.4.0-R1` 已批准）
+> 当前阶段：**0.4.0 阶段 0 已签收，阶段 A 当前；只实现 Main 项目快照、比较、Markdown 选择性恢复和安全删除权威。当前代码版本仍为 0.3.0，0.3.0 阶段 0–E 与发布已完成并冻结**
 
 本文件只记录当前事实、开放风险和下一动作。0.1.x 的完整里程碑、红灯、测试数字和验收过程已归档到 [`docs/archive/development/DEVELOPMENT-STATUS-THROUGH-0.1.2.md`](../docs/archive/development/DEVELOPMENT-STATUS-THROUGH-0.1.2.md)，不得从归档旧 TODO 直接派发工作。
 
 ## 1. 权威入口
 
-1. [`docs/ROADMAP.md`](../docs/ROADMAP.md)：当前版本顺序、0.3.0 范围和非目标。
-3. [`docs/ROADMAP-0.3.0.md`](../docs/ROADMAP-0.3.0.md)：0.3.0 生效详细合同、阶段顺序和验收门禁。
+1. [`docs/ROADMAP.md`](../docs/ROADMAP.md)：当前版本顺序、0.4.0 范围和非目标。
+2. [`docs/ROADMAP-0.4.0.md`](../docs/ROADMAP-0.4.0.md)、[`docs/EVIDENCE-DELIVERY-V1-CONTRACT.md`](../docs/EVIDENCE-DELIVERY-V1-CONTRACT.md) 与 [`docs/0.4.0-STAGE-0-INDEPENDENT-REVIEW.md`](../docs/0.4.0-STAGE-0-INDEPENDENT-REVIEW.md)：0.4.0 生效路线、冻结合同和阶段 0 签收；当前只可派发阶段 A 工作。
+3. [`docs/ROADMAP-0.3.0.md`](../docs/ROADMAP-0.3.0.md)：已完成并冻结的 0.3.0 合同。
 4. 本文件：当前代码、开放风险和下一动作。
 5. [`docs/WRITCRAFT-PRD-V3.md`](../docs/WRITCRAFT-PRD-V3.md)：长期产品契约。
 6. [`docs/ARCHITECTURE.md`](../docs/ARCHITECTURE.md)：稳定架构与维护边界。
@@ -41,7 +42,7 @@
 
 以上能力除非 0.2.0 生产源码直接影响，不重复进行 0.1.2 的项目卡、接受/拒绝/撤销或付费作者验收。
 
-## 3. 0.3.0 当前执行事实
+## 3. 0.3.0 已完成执行事实
 
 - 阶段 0：当前源码核对已完成。旧 Project Plan 用户运行时已在 0.2.0 阶段 0 物理移除；现存 `chapter-generation-plan/v1` 仅属于 Chapter 内部区块规划，不得删除或误归类为退役 Project Plan。
 - 阶段 0：现有 `context-selection`、Main `context-resolver`、Context Inspector、`unified-writing-task-service` 和 Navigation 的取消/超时机制均已确认，0.3.0 只补统一入口和跨模块状态，不重复造解析器或 Key 存储。
@@ -64,9 +65,29 @@
 
 ## 4. 当前开放项
 
-### 0.3.0 候选风险（当前）
+### 0.4.0 阶段 0 合同/基线冻结（已完成）
 
-- 统一任务条已完成基础 Renderer 接入；Chat/Navigation/Chapter/Research/Graph/Changes/图片作者路径和入口取消、Chat 硬超时已在真实作者副本通过；阶段 E 独立复审已签收，当前进入候选状态。
+- `WRC-0.4.0-R1` 已获所有者确认，§11 目标模式文本已另行提交；阶段 0 已完成，阶段 A 已解锁，B–E 尚未开始。
+- 生效合同复用 History、Diagnostic Export、SourceIndex、Graph v2 和 Image Trash 的既有边界，但不把它们误报成项目快照、作品导出、多视图或健康审计。
+- 已确认四项：DOCX 单格式；snapshot 不删除新增文件且只恢复 Markdown；Graph 四个共享证据视图；alt/caption 与已保留素材清理默认不纳入必做。
+- 新增 `docs/EVIDENCE-DELIVERY-V1-CONTRACT.md`，冻结 Snapshot allowlist/容量/私有存储、创建和删除三态事务、比较与全有或全无的 Markdown 选择性恢复、八分量 delivery authority、五类引用健康、Citation shared 单一权威、DOCX 子集/OOXML/安全保存、Graph 四投影、本地 operation owner 和 Pages 14.4（7043.0.93）真实渲染基线。
+- 阶段 0 首轮只读合同审计保留为 P0=0、P1=10、P2=3：P1 覆盖启动状态、Snapshot/schema/事务、恢复、delivery authority、DOCX、OOXML、健康/Citation、Graph 和本地长任务边界；已写回冻结合同，待新的独立复审确认。P2 保留当前文档 dirty worktree、Electron 沙箱 SIGABRT/获批环境版本探针差异，以及 0.3.0 大型 harness/quick-open 历史首红。
+- 阶段 0 当前运行基线（产品源码、测试、脚本与 `v0/package.json` 零修改）：完整 `npm test` 退出码 0；沙箱内首次 `npm run verify` 在 `verify-v0-dom-sanitizer.js` 以 `Electron exited null` 红灯退出，原命令在获批 GUI 环境退出码 0，首红保留且不归因于产品代码。获批环境 `WRITCRAFT_E2E_FORCE=1 npm run e2e:electron` 连续两次在前 6 个阶段通过后，于“普通 Markdown 可见回收区列表”等待处同点红灯，并同时报告 watcher unavailable/`HOME_SNAPSHOT_TIMEOUT`；这是可复现的当前大型 harness 基线，不能宣称 38/38 全绿，也不在文档阶段修改产品。独立真实 Main/IPC watcher 专项 3/3 通过，证明确定性 watcher 边界可启动。
+- Computer Use 已从 Pages 的真实 About 窗口读取 `Pages 14.4 (7043.0.93)`；WritCraft 使用单独临时 profile 启动并被系统注册为运行应用，但读取其 AX app state 连续返回 Computer Use server timeout `-10005`。该隔离进程与仅由本轮创建的临时 profile 已清理；自动化真实 Electron 证据与 Computer Use 工具超时分别记录，后者列为阶段 0 环境 P2，不能冒充 App UI 通过。
+- 健康 marker 复用现有 Main `consistency-engine` 的 `【待补来源】`、`[待补来源]`、`[citation needed]`、`<!-- citation-needed -->` 四种语法；阶段 B 只把既有 `evidence_gap` 适配为 `missing_source`，不创建第二套扫描器或 marker parser。
+- 阶段 0 最终稿首轮独立复审保留为 P0=0、P1=7、P2=3，明确阻止进入阶段 A。P1 为 `.markdown` 兼容、digest preimage、完整嵌套/事务/public schema、私有 stage/quarantine 原子所有权、五类 health binding/reason/severity、既有 Unicode citation/URL 兼容，以及 Markdown/图片 parser/预算权威；现已逐项写回合同，等待同一复审员定点复核。P2 为沙箱 DOM Electron 环境红灯、完整 Electron harness 连续同点红灯和 WritCraft Computer Use AX `-10005`；另把恶意同 UID 进程主动篡改 `0700` 私有 snapshot 存储明确列为 V1 主机账户攻陷残余，不再宣称由随机名或事后 stat 关闭。
+- 第二轮定点复核保留为 P0=0、P1=5、P2=4：P1 指向 bundle/digest payload/数值上限仍非 exact、public Diff 与逐边界分页请求矛盾、Graph→Source binding 和 fragment fixture、真正图片 decoder、DOCX 直接创建 final/错误假设保存面板返回父 fd。现已冻结 bundle golden bytes 与字段上限、operation-specific request、同 graph identity 的 source binding table、ImageIO 强制 decode worker，以及 Main-only save path→可信 filesystem-root traversal→同目录 hidden stage→`RENAME_EXCL`→final reconciliation；待第三轮独立复核。P2 四项保持不变。
+- 第三轮定点复核保留为 P0=0、P1=5、P2=4：剩余 P1 为 source/bundle object digest 双语义、Graph binding digest 未定域、public 标题标签与正文例外文案、list/delete/artifact capability 签发链、ImageIO 最大合法资源闭包和任意目标保存的持久化 binding/reconciliation。现已拆为 `sourceObjectIdentityDigest`/`bundleObjectDigest`，冻结 binding digest 域，明确 heading/label 为有界 metadata，补齐 list/delete preflight/artifact public envelope，收敛 DOCX 到 40 图并以双 worker/1 GiB/100 秒闭合，以及新增 private save target binding、stage/expected-final/published identities 与重启三态算法；待第四轮独立复核。
+- 第四轮定点复核保留为 P0=0、P1=3、P2=4：P1 为 bundle/save identity 摘要仍缺 exact preimage、capability `selectionDigest` 未按 kind 冻结、ImageIO 误写成不存在的独立 snapshot object fd。现已补齐 bundle object framing、save volume/parent/stage/published identity exact payload，按 compare/restore/delete/export/artifact 冻结 selection payload，并将图片读取改为 verified bundle fd + exact entry offset/length/digest 的 `pread`；save recovery 的“只匹配 stage”也改为 cleanup + final 不存在重检 + 目录 fsync 后才发布 `UNCOMMITTED`。待第五轮独立复核。
+- 第五轮定点复核保留为 P0=0、P1=2、P2=4：仅余 Graph source `bindingId` 是否等于完整 digest、entry digest 字段名笔误，以及 macOS `fsid_t` 有符号编码。现已明确 `bindingId =` 3.1.4 完整 `sha256:` digest、统一 `entryBindingDigest`，并把 `fsid0/fsid1` 冻结为 int32 原值的有符号十进制字符串。
+- 第六轮定点复核最终为 **P0=0、P1=0、P2=4**，确认阶段 0 可以退出、阶段 A 可以开始。四项 P2 为：沙箱 DOM Electron 红灯/获批 GUI `verify` 绿灯的环境差异；完整 Electron harness 两次同点红灯；WritCraft Computer Use AX `-10005`；恶意同 UID 主动篡改私有 snapshot store 的主机账户攻陷残余。完整签收见 [`docs/0.4.0-STAGE-0-INDEPENDENT-REVIEW.md`](../docs/0.4.0-STAGE-0-INDEPENDENT-REVIEW.md)。
+- 草案首轮独立复审保留首红：P0=0、P1=6、P2=4，指出 PRD 发布状态、D1→R1 顺序、图片恢复边界、snapshot 事务、统一 delivery authority、DOCX 真实渲染，以及 focused evidence、诊断导出隔离、citation 权威和 Graph 连续性缺口；均已写回草案。
+- 第二位独立复审首轮为 P0=0、P1=1、P2=2，发现当前项目图片漂移与 exact-snapshot 导出语义冲突，以及 snapshot 删除事务和 `deliveryAuthority` 字段歧义；修订后由该复审员定点复核为 P0=0、P1=0、P2=0。该结论证明审阅稿可被批准为 R1，但不代表阶段 0 已完成或实现已启动。
+- 路线图确认后的旧文档治理独立复审保留首红 P0=0、P1=1、P2=0：根 `AGENTS.md` 仍可从 0.2.0 阶段 0 派工。现已校准当前 Preview、冻结反向依赖与 Project Plan 清理事实，并加入 `WRC-0.4.0-R1` 等待目标模式门禁；定点复核最终 P0=0、P1=0、P2=0。
+
+### 0.3.0 发布前保留证据（已冻结）
+
+- 统一任务条已完成基础 Renderer 接入；Chat/Navigation/Chapter/Research/Graph/Changes/图片作者路径和入口取消、Chat 硬超时已在真实作者副本通过；阶段 E 独立复审和公开 Preview 发布均已完成。
 - Navigation 单入口的真实生成、局部 Diff、退出审阅零写入和取消已通过；Chat/Chapter/Research/普通 Changes/Graph/图片的作者路径、迟到结果隔离和零写入也已逐项验收。
 - `@` 来源/实体候选已有 Main 目录和 request-bound ID 合同；真实项目候选、Main IPC 的 revision 漂移、foreign project identity、TTL 过期及 Chat 恢复 UI 已由 focused Electron 1/1 验证，五入口作者路径均使用同一 Context Manifest v2。
 - `edit.md` 编译器已有跨入口实现；真实作者已对照 Chat/Navigation/Research/Chapter/Changes 的统一 revision、预算、遗漏/截断语义，并通过 Navigation/Chapter/Research/Changes 的旧结果丢弃；compile-invalid 不再回退发送原文。
@@ -104,14 +125,14 @@
 - 真实旅程发现并修复 P1：从首页打开最近文件时正文已经切换，但大纲仍描述旧文件。现在 Home 打开动作必须等待目标文件大纲刷新，再恢复正文定位；Computer Use 复验确认目标标题出现、旧大纲消失，返回首页后继续位置和 pending=0 正确。
 - 最新源码 `npm test` 与非沙箱完整 `npm run verify` 通过；待审 focused Electron 3/3 通过。Daily Workspace focused 复跑再次在“外部文件 watcher 大纲刷新等待”处红灯；该非固定 harness 时序问题已保留为 P2，未用重跑绿灯覆盖。确定性 watcher/owner 专项、真实作者 UI 旅程和此前 focused 证据均通过，未形成稳定产品回归。
 - 最终独立复审：P0=0、P1=0、P2=2，可进入候选。P2-1 为缺少“`refreshOutline` await 期间切项目”的 mutation-sensitive 专项，生产实现已有 refresh 后 owner 复核；P2-2 为通用 store 配置超过 10 项时 public projection 可能隐藏最旧映射，生产 Main 上限与 projection 同为 10，当前不可触发。两项均允许候选，未来触及对应代码或提高上限时必须先补合同和反例。
-- 所有者于 2026-08-03 完成唯一一次最短主观旅程并明确回复“验收通过”。至此工程门禁、真实作者客观旅程和作者主观体验均已关闭，0.2.0 候选验收完成。随后已授权并完成 GitHub main 推送、`v0.2.0` Tag、GitHub prerelease 及 App/ZIP 上传；npm 仍等待一次性验证码，未把 npm 候选误报为公开版本。
+- 所有者于 2026-08-03 完成唯一一次最短主观旅程并明确回复“验收通过”。至此工程门禁、真实作者客观旅程和作者主观体验均已关闭，0.2.0 候选验收完成。随后已授权并完成 GitHub main 推送、`v0.2.0` Tag、GitHub prerelease 及 App/ZIP 上传；当时的 npm OTP 门禁是历史现场，0.2.0 不再单独发布，也没有待执行 OTP 动作。
 
 ### 0.2.0 发布执行记录（2026-08-03）
 
 - 所有者已明确授权：执行 npm `preview`、GitHub 推送、`v0.2.0` Tag/Release，并上传 App/ZIP 产物。
 - 发布前自动门禁：`npm test`、非沙箱 `npm run verify`、`npm run release:verify`、`npm audit --omit=dev` 均通过；npm tarball dry-run 为 `writ-craft-0.2.0.tgz`，140 个文件，683,229 bytes。
 - 本地 macOS 产物：`v0/release/WritCraft-darwin-arm64.zip`；当前为 ad-hoc 本地签名、未公证，不宣称 Apple Developer ID 分发能力。
-- 本节在 npm/GitHub 动作完成后补录 registry shasum、dist-tag、发布提交、Tag、Release URL、ZIP SHA-256 和最终时间；在补录前不得把候选写成已公开。
+- 本节是 0.2.0 发布现场的历史记录；其能力已随 0.3.0 Preview 交付，不再等待 registry/dist-tag/提交补录，也不得从本节派发任何外部发布动作。
 
 ### 0.2.0 阶段 E 当前事实（2026-08-03）
 
@@ -177,7 +198,7 @@
 ### 已分流的历史 P2
 
 - Navigation/AI metrics 仍沿用部分历史 `plan/*` 字段：安排到 `0.3.0` 透明 AI 协作统一迁移；旧持久化事件保持可读。
-- 图片 alt/caption 可编辑性与已保留素材清理：进入 `0.4.0` 媒体/交付候选池；不得在 0.2.0 重开 Image Trash。
+- 图片 alt/caption 独立编辑与已保留素材清理：0.4.0 当前明确排除，除非生效路线图另行批准；不得从本历史项重开 Image Trash。
 - Research 准确率、图片价值样本和 10 名作者内测：属于 `1.0.0` Go/No-Go 证据，不是 0.2.0 功能门禁。
 - Developer ID、签名、公证和 Gatekeeper：仅在未来选择独立 App 分发时启动。
 - 同 UID 0700 reserve 微窗口及已记录 filesystem residual：属于明确接受的威胁模型残余，不得伪装成未完成 TODO。
@@ -211,9 +232,10 @@
 
 ## 6. 候选交接与下一动作
 
-1. 0.3.0 阶段 0–E 的当前证据已闭合；保留 P2 首红，不以定向绿灯覆盖大型 Electron harness 或 quick-open 首红。
-2. 任何后续生产修改都必须重新评估受影响的真实作者证据和独立复审，不得把本候选证据自动延伸到新源码。
-3. npm 版本、dist-tag、Tag/GitHub Release、推送或 App/ZIP 分发均属于新的外部动作，必须由所有者另行明确授权。
+1. 阶段 0 已完成并签收；进入阶段 A 前先核对现有 History、watcher、项目树、原生 helper、capability 与 recovery 实现，禁止重复造扫描器或恢复系统。
+2. 按冻结合同分层建立 Main snapshot service/handler、窄 IPC、私有存储、比较、Markdown 选择性恢复和安全删除权威；先闭合 failure/state matrix 与最小可运行 checkpoint，再扩展 UI。
+3. 阶段 A 必须重新完成相关专项、`npm test`、`npm run verify`、真实 Electron/Computer Use、独立复审和活动文档/Nowledge Mem 同步；阶段 0 与 0.3.0 证据只作兼容基线。
+4. npm 版本、dist-tag、Tag/GitHub Release、远端 push 或 App/ZIP 分发均属于新的外部动作，必须由所有者另行明确授权。
 
 ## 7. 本轮文档治理结果
 
@@ -221,6 +243,7 @@
 - `docs/INDEX.md` 成为文档选择入口；`docs/ARCHITECTURE.md` 接替 Phase A 中仍有效的工程边界。
 - 0.1.2 作者验收、图片合同、首次使用指南、PRD、正式路线图和 `AGENTS.md` 的过时状态已校准或列入同批校准。
 - 0.3.0 候选收口已同步 `docs/ROADMAP.md`、`docs/ROADMAP-0.3.0.md`、PRD、README、阶段 E 独立复审记录和 Nowledge Mem。
+- 0.4.0 已获批为 `WRC-0.4.0-R1`；阶段 0 合同/基线冻结已由独立复审以 P0=0、P1=0、P2=4 签收，当前派工入口已切换到阶段 A。旧路线图、冻结合同和历史材料的派工权已在 `docs/INDEX.md` 明确撤销。
 - `raw/` 与 `deliverables/` 只作研究/历史输入，不得派发当前任务。
 
 ## 8. 续作纪律

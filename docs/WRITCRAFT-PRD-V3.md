@@ -6,7 +6,7 @@
 > 适用范围：V0 起的桌面写作 IDE  
 > 优先级：本文定义产品契约；`docs/ROADMAP.md` 定义唯一版本顺序与当前目标范围；工程事实以源码和 `v0/DEVELOPMENT-STATUS.md` 为准，具体实现以对应技术规格/合同为准。
 
-> **实现状态注记（2026-08-05，RM-1.2 / 0.0CR）**：本文仍是产品权威规格；0.1.2 已冻结并公开到 npm `preview` 与 GitHub prerelease；`latest` 仍为 0.1.0。0.2.0 已完成候选验收，GitHub/App 候选状态单独记录，npm registry 公开状态不以历史文档推断。当前开发目标为获批准的 0.3.0 透明 AI 协作；阶段 0–D 已形成实现与回归证据，阶段 E 的真实作者隔离副本、受影响入口、零写入和独立复审已通过，P0=0、P1=0、P2=3，0.3.0 当前为候选状态，正式发布仍需另行授权。
+> **实现状态注记（2026-08-06，RM-1.3）**：本文仍是产品权威规格；0.3.0 透明 AI 协作已完成阶段 0–E、真实作者隔离副本和独立复审（P0=0、P1=0、P2=3），并发布为 npm `preview:0.3.0` 与 GitHub `v0.3.0` prerelease；`latest` 仍为 0.1.0，未分发新的 App/ZIP，也不宣称稳定版。0.4.0“证据与交付闭环”路线图 `WRC-0.4.0-R1` 已获批准；阶段 0 合同/基线冻结已由独立复审以 P0=0、P1=0、P2=4 签收，当前进入阶段 A。阶段 0 未修改产品实现，当前代码版本仍为 0.3.0。
 
 > **完成定义**：任何“V0 完成”声明必须同时满足 §10.1–§10.4、全量自动回归、真实 Electron E2E 和独立复审。局部 suite 通过、本地 ad-hoc App 或历史 ZIP 均不能单独构成完成证据。
 
@@ -52,7 +52,9 @@ Project
 ├── Relation[]
 ├── TimelineEvent[]
 ├── ConsistencyIssue[]
-└── ChangeSet[]
+├── ChangeSet[]
+├── ProjectSnapshot[]
+└── DeliveryManifest[]
 ```
 
 - **Project**：一个完整写作项目及其根目录。
@@ -63,6 +65,8 @@ Project
 - **Entity / Relation / TimelineEvent**：从正文和 `edit.md` 中抽取、经用户确认或编辑的语义对象。
 - **ConsistencyIssue**：带证据和状态的不一致、遗漏、偏离或证据问题。
 - **ChangeSet**：一次单文件或多文件 AI 建议的审查单元。
+- **ProjectSnapshot**：作者显式创建、有限容量、只读且可比较的本地恢复点；不是云/异盘备份，只恢复作者选择的 Markdown。
+- **DeliveryManifest**：绑定 exact snapshot、Graph identity 与 SourceIndex revision 的离线交付预检；作者通过后才能生成 DOCX。
 
 ## 3. 项目生命周期
 
@@ -192,7 +196,7 @@ Front Matter 中仅 `schema` 为系统必填字段；其他正文栏目允许为
 
 ### 5.4 AI 面板
 
-- **Chat**：围绕当前作用域问答。`@file`、`@folder`、`@section`、`@entity` 和 `@source` 自动补全属于路线图 `0.3.0`；当前源码已有第一切片，但必须以 0.3.0 的 request-bound、revision 绑定和真实作者验收为准；
+- **Chat**：围绕当前作用域问答。`@file`、`@folder`、`@section`、`@entity` 和 `@source` 自动补全已在 0.3.0 以 request-bound、revision 绑定和真实作者路径完成验收；后续只作为冻结兼容边界回归；
 - **导航**：空项目比较 2–3 个结构方案；已有稿件提供 1–3 个有证据的下一步建议。它可跳过，不是写作门槛，也不展示项目管理式任务图。
 - **Changes**：集中审查单文件或跨文件建议，逐文件查看 Diff、接受或拒绝。
 - **Context**：展示本次请求的上下文清单、估算规模、截断或检索原因。
@@ -347,6 +351,7 @@ Issue 类型首批支持：
 - 点击问题展示冲突双方；“建议修复”只创建 Diff，不直接修改原文。
 - 用户可以合并别名、确认或否定抽取结果、编辑属性；确认结果作为后续抽取约束。
 - 图谱数据属于派生数据，删除或重建图谱不得修改正文。
+- 0.4.0 在同一 `writcraft.graph/v2` 上提供关系图、时间线、实体表和论点—证据表；四视图共享筛选、纠错、Issue、evidence 与返回位置，切换视图不重建 Graph 或调用 AI。
 
 ## 8. 用户控制、隐私与故障安全
 
@@ -371,6 +376,7 @@ Issue 类型首批支持：
 - Main 的 V0 远端 allowlist 仅为文本 `api.minimaxi.com/anthropic/v1/{models,messages}` 与图片 `api.minimaxi.com/v1/image_generation`，不得接受 Renderer 提交 URL、主机、Key 或输出路径。
 - 网络请求必须有请求/响应字节上限、贯穿响应体读取的 deadline、项目 owner abort、禁止重定向和写操作自动重试；远端 body、Prompt、正文、Key 与未知异常不得进入日志或用户错误。
 - 所有 AI 请求必须绑定可信 sender、origin project instance 和 mutation generation；项目切换、正文/结构提交或外部权威文件变化后必须中止在途请求并拒绝发布陈旧结果。
+- Snapshot、引用健康预检和 DOCX 编译完全离线；作品导出与脱敏 Diagnostic Export 使用独立权限、schema、token、IPC 和界面。
 
 ### 8.3 保存与冲突
 
@@ -422,6 +428,14 @@ Issue 类型首批支持：
 
 0.1.2 已用包含 `edit.md`、五个以上章节和来源材料的真实作者隔离副本完成项目定义、文件写作、段落 Diff、统一任务、图片受影响路径、一致性检查与重启恢复，并发布到 npm `preview` / GitHub prerelease。图片与长文的更多价值样本、Research 准确率和 10 名作者内测仍是 `1.0.0` Go/No-Go 证据，不是未关闭的 0.1.2 功能或发布门禁。独立 App 的签名/公证/Gatekeeper 属于未来可选路线。
 
+### 10.5 0.4.0 证据与交付闭环
+
+1. Snapshot 创建不改公开项目文件；比较后只恢复作者选择的 Markdown，不删除快照后新增文件，也不通过 History 恢复图片。
+2. 交付预检绑定一个不可变 snapshot，只报告 `missing_source`、`stale_locator`、`duplicate_source`、`single_evidence`、`broken_footnote` 五类可证明引用问题，不判断观点真伪或补写来源。
+3. DOCX 完全离线，经过 OOXML package/schema 校验、原生 no-clobber 保存和真实 Pages 打开检查；文件存在本身不是成功证据。
+4. Graph 四视图显示相同 identity、筛选、纠错和 evidence；任何正文修复仍进入明确 Diff 并由作者确认。
+5. 详细安全、容量、事务、失败和渲染口径由 `docs/EVIDENCE-DELIVERY-V1-CONTRACT.md` 冻结；完成仍需真实作者隔离副本、全量回归、真实 Electron/Computer Use 与独立复审。
+
 ## 11. 文档治理
 
 - 本文定义“做什么、为什么做、用户如何验收”。
@@ -430,5 +444,5 @@ Issue 类型首批支持：
 - 真实 API、真实作者、隐私指标和人工旅程的 0.1.2 证据已归档到 `docs/archive/acceptance/AUTHOR-ACCEPTANCE-V1-CONTRACT.md`；后续版本按路线图另立必要验收合同。
 - `deliverables/` 已整体归档，只用于追溯早期调研、价值叙事和计划，不得派发当前任务；归档边界见 `deliverables/README.md`。
 - `v0/DEVELOPMENT-STATUS.md` 只记录已验证事实、当前风险与下一步，不得把计划写成已完成。
-- 文档读取优先级固定为：当次源码与可复现命令结果 → `v0/DEVELOPMENT-STATUS.md`（当前事实）→ 对应 `docs/*-CONTRACT.md`（验收边界）→ 本文（产品契约）→ `docs/ROADMAP.md`（版本顺序与范围）。它们职责不同，不用一个文件覆盖另一个；历史路线图、PDCA 和调研交付不得作为当前指令。
+- 文档按职责路由：当次源码与可复现命令结果回答工程事实，`v0/DEVELOPMENT-STATUS.md` 记录当前执行事实，对应 `docs/*-CONTRACT.md` 定义验收边界，本文定义长期产品契约；只有 `docs/ROADMAP.md` 决定当前版本顺序、范围和非目标。历史路线图、PDCA 和调研交付不得作为当前指令。
 - 任何重大需求变化需先更新本文，再更新实施计划、测试和状态；任何已完成实现、独立复审或全量验证，必须在同一工作批次更新状态台账和受影响的合同/README/路线图。未同步文档不得作为下一轮技术决策依据。

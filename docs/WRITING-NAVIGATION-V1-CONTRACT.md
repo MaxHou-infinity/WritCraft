@@ -1,6 +1,6 @@
 # WritCraft 写作导航 v1 产品与工程合同
 
-> 状态：`RM-1.2 / writ-craft@0.1.2` 导航生成合同；后续动作由 `UNIFIED-WRITING-TASK-V1-CONTRACT.md` 取代
+> 状态：**冻结兼容合同**；历史 `RM-1.2 / writ-craft@0.1.2` 导航生成边界保留，后续动作由 `UNIFIED-WRITING-TASK-V1-CONTRACT.md` 取代，不得恢复旧旅程或派发 0.4.0 任务
 > 生效日期：2026-08-01
 > 取代：面向用户的 `writcraft.plan/v2` 里程碑、任务和依赖图
 > 实现进度：结构规划和建议生成的既有证据保留。0.0CM 真实作者验收否定了固定 Research/Changes 双动作和跨页面交接；不得再从本文派发该旧旅程。0.0CO 已签收同一建议卡内的统一写作任务：每张 Navigation 建议只绑定一个同文件 canonical evidence，模型只选择有限 `editIntent`，Main 映射为可直接执行的局部动作并以私有 `rangeId` 承担正文 authority；真实作者已完成正文内 Diff、接受与 Safe Undo。

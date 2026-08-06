@@ -1,6 +1,6 @@
 # Graph Extended Acceptance v1 Contract
 
-> Status: **product contract, performance revalidation, and Graph resilience fully signed as of 2026-07-26; the `0.1.2` Unicode-path `INVALID_CACHE` implementation and user-understandable rebuild/recovery terminal were independently signed on 2026-07-30**. The 0.1.2 batch proved the author-project root cause on an isolated diagnostic copy, kept the original project unchanged, and added a real-Electron compatibility-distinct path pair. This signed module is outside the current RM-1.2 unified-task batch. Project-wide current totals live only in `v0/DEVELOPMENT-STATUS.md`.
+> Status: **frozen compatibility contract**. Product contract, performance revalidation, and Graph resilience were fully signed as of 2026-07-26; the `0.1.2` Unicode-path `INVALID_CACHE` implementation and user-understandable rebuild/recovery terminal were independently signed on 2026-07-30. The 0.1.2 batch proved the author-project root cause on an isolated diagnostic copy, kept the original project unchanged, and added a real-Electron compatibility-distinct path pair. 0.4.0 may extend presentation only through `WRC-0.4.0-R1`; this file cannot dispatch a separate Graph, index, or old milestone. Project-wide current totals live only in `v0/DEVELOPMENT-STATUS.md`.
 > Graph schema: `writcraft.graph/v2`
 
 ## 1. Product truth and write boundary

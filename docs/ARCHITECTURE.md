@@ -4,7 +4,7 @@
 
 ## 1. 进程与权限
 
-- **Main 是唯一权威**：负责项目根、文件读写、revision、watcher、索引、网络、能力 token、ChangeSet、History 和恢复事务。
+- **Main 是唯一权威**：负责项目根、文件读写、revision、watcher、索引、网络、能力 token、ChangeSet、History、Snapshot、交付产物和恢复/保存事务。
 - **Preload 是窄桥**：只暴露明确、可验证、可取消的 IPC；不得透传任意路径、URL、Key、文件内容或 Main 对象。
 - **Renderer 只表达用户意图**：展示权威快照并提交 opaque ID、范围和决定；不得访问 Node、直接联网或把 DOM/缓存当成磁盘真相。
 - **依赖只能向权威方向收敛**：Main 禁止引用 Renderer。Main 与 Renderer 都需要的无副作用解析/定位逻辑放入 `src/shared/`，由两端共用并做行为等价测试；共享模块不得取得文件、网络或 Electron 权限。
@@ -16,6 +16,7 @@
 - 所有项目相对路径必须通过既有路径合同；禁止绝对路径、父级逃逸、符号链接/硬链接混淆和 Unicode 身份改写。
 - watcher/flush 必须在 Main 中收敛外部变化。无法证明最新状态时 fail closed，不以等待时间推断权威。
 - 项目切换、同项目重开、Renderer 销毁和迟到结果必须隔离；旧项目结果不能改变新项目的文件或 UI。
+- 0.4.0 Snapshot 从 trusted project-root fd 与一次完整 barrier 建立；allowlist、摘要和复制字节来自同一权威扫描。Snapshot 私有存储不是项目公开内容，也不能被称为备份。
 
 ## 3. 异步所有权
 
@@ -30,10 +31,12 @@
 - 文件与 History 事务必须区分 proven uncommitted、proven committed 和 unknown；unknown 不能按失败清理。
 - Safe Undo、冲突检测、recovery marker、目录 fsync 与 authoritative reload 是写入链的一部分，不是可选补丁。
 - 提交后 UI 必须发布 Main 返回的 authoritative terminal truth；可选刷新失败不能掩盖已提交事实。
+- Snapshot 创建/删除、Markdown 选择性恢复和 DOCX no-clobber 保存分别持久化独立三态事务；不同业务可以复用原生安全原语，但不得复用 token、schema、receipt 或 recovery marker。
 
 ## 5. 本地索引和工作区
 
 - 文件树、全文搜索、Graph、标题索引和 0.2.0 工作区聚合应复用 Main 权威快照，不建立互相竞争的扫描器。
+- 0.4.0 delivery authority 绑定同一不可变 snapshot、Graph manifest 与 SourceIndex revision；Graph 四视图只投影同一个 `writcraft.graph/v2`，预检不得从当前项目重新拼接第二套扫描结果。
 - workspace 持久化只保存有界 UI 状态；恢复前校验项目、路径和 schema。文件消失或 revision 漂移时安全降级。
 - 待审 ChangeSet 当前是进程内能力；未建立独立持久化事务前，不得向用户承诺重启后恢复。
 
@@ -43,6 +46,7 @@
 - Key 只进入用户数据安全存储，不写项目、日志、截图、诊断或 Nowledge Mem。
 - 真实作者项目只能使用所有者指定的隔离副本。证据默认只保存时间、稳定错误、数量、耗时、revision/hash 和决定等内容无关字段。
 - 真实稿截图、录屏和正文片段不得进入 Git、测试日志或记忆；只有 fixture 或明确授权且脱敏的材料可留存。
+- DOCX 作品导出完全离线，并与 Diagnostic Export 的 schema、IPC、token、界面和内容 allowlist 隔离。Renderer 不提交正文、绝对路径或输出路径；Main 打开原生保存对话框。
 
 ## 7. 代码与测试要求
 

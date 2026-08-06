@@ -1,6 +1,6 @@
 # Research → Changes v1 Contract
 
-> Status: **historical signed technical capability / advanced standalone workflow**. As of RM-1.2 checkpoint 0.0CM, this is no longer the default Writing Navigation journey. `UNIFIED-WRITING-TASK-V1-CONTRACT.md` owns the public suggestion-to-Diff path. The product-chain and committed-warning evidence below remains valid for internal reuse; it must not be used to require ordinary authors to classify claims, select the same target again, or manually transfer Research into Changes.
+> Status: **frozen historical technical capability / advanced standalone workflow**. Since the historical RM-1.2 checkpoint 0.0CM, this is no longer the default Writing Navigation journey. `UNIFIED-WRITING-TASK-V1-CONTRACT.md` owns the public suggestion-to-Diff path. The product-chain and committed-warning evidence below remains valid for compatibility only; it must not dispatch a 0.4.0 task or require ordinary authors to classify claims, select the same target again, or manually transfer Research into Changes.
 > Schema: `writcraft.research-handoff/v1`
 
 ## 1. Product journey

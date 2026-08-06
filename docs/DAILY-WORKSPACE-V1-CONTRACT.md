@@ -2,7 +2,7 @@
 
 > 合同版本：`writcraft.daily-workspace/v1`  
 > 对应产品版本：`0.2.0`  
-> 状态：候选验收完成；GitHub prerelease/App ZIP 已发布，npm preview 等待 OTP（2026-08-04）
+> 状态：**0.2.0 日常工作区已完成并冻结，其能力已随 0.3.0 Preview 交付。历史 npm OTP/候选描述不再是当前开放项；本合同只在 0.4.0 触及工作区、定位或性能边界时约束兼容回归。**
 
 本合同定义 0.2.0 项目首页、当前章节大纲、`⌘P` 快速打开和可恢复导航的共同数据、定位、状态与失败边界。它不新增 AI 调用、正文写入权限、跨重启 Diff 或章节完成度判断。
 
@@ -263,10 +263,10 @@ returnStack = [{
 
 ## 9. 实施顺序与退出条件
 
-1. 阶段 B：共享 inventory/title index、project-home snapshot、public pending summary 与 list/resolve locator 窄桥。
+1. 阶段 B（已关闭）：共享 inventory/title index、project-home snapshot、public pending summary 与 list/resolve locator 窄桥。
 2. 阶段 C（已关闭）：大纲与 `⌘P` 最小纵切，共用索引和 locator；外部刷新、窄窗口、真实 IME 与 300 文件专项通过。
 3. 阶段 D（已关闭）：项目首页与所有卡片深跳转；pending review 使用无 capability hydration。
 4. 阶段 E（已关闭）：workspace/v2、returnStack、close flush、性能、真实 zoom 和降级体验。
-5. 阶段 F（已关闭）：pending 动态矩阵、Computer Use 真实作者客观旅程、完整回归、候选复审和所有者一次最短主观体验均已完成；P0=0、P1=0。0.2.0 候选验收完成；发布授权已完成，GitHub prerelease/App ZIP 已发布，npm preview 等待 OTP。
+5. 阶段 F（已关闭）：pending 动态矩阵、Computer Use 真实作者客观旅程、完整回归、候选复审和所有者一次最短主观体验均已完成；P0=0、P1=0。0.2.0 工作区合同现已冻结，其能力随 0.3.0 Preview 交付；原 npm OTP 等待是历史发布现场，不是当前开放项。
 
-阶段 A 退出要求：本合同与路线图/状态账本一致；独立复审 P0/P1=0；不存在未定义的数据来源、卡片动作、失败终态、locator 或性能计时口径。阶段 A 不制作假数据 UI。
+历史阶段 A 退出要求已满足：本合同与路线图/状态账本一致；独立复审 P0/P1=0；不存在未定义的数据来源、卡片动作、失败终态、locator 或性能计时口径。该条件不得作为当前 0.4.0 派工入口。
