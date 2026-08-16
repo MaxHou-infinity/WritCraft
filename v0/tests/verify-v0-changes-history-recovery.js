@@ -11,6 +11,7 @@ const reviewService = require('../src/main/changeset-review-service');
 const historyService = require('../src/main/change-history-service');
 const {
   RECOVERY_RELATIVE_PATH,
+  MAX_MARKER_BYTES,
   createChangesHistoryReconciliationService,
 } = require('../src/main/changes-history-reconciliation-service');
 const {
@@ -433,8 +434,8 @@ test('History compare-and-swap refuses a foreign state introduced during recover
           raceInjected = true;
           const expected = options.expectedState;
           historyService.saveHistory(rootPath, {
-            ...expected.history,
-            updatedAt: new Date(Date.parse(expected.history.updatedAt) + 1000).toISOString(),
+            schema: historyService.HISTORY_SCHEMA,
+            entries: [],
           }, { expectedState: expected });
         }
         return historyService.restoreHistoryState(rootPath, targetState, options);
@@ -771,7 +772,6 @@ test('History directory fsync failures throw and failed delete restores the prio
       exists: false,
       history: {
         schema: historyService.HISTORY_SCHEMA,
-        updatedAt: new Date().toISOString(),
         entries: [],
       },
     }, { expectedState: committed }), /delete fsync failed/);
@@ -793,7 +793,7 @@ test('corrupt and oversized markers fail closed without reading unbounded input'
       if (kind === 'corrupt') fs.writeFileSync(markerPath(item.project.rootPath), '{bad json');
       else {
         const fd = fs.openSync(markerPath(item.project.rootPath), 'w');
-        fs.ftruncateSync(fd, (96 * 1024 * 1024) + 1);
+        fs.ftruncateSync(fd, MAX_MARKER_BYTES + 1);
         fs.closeSync(fd);
       }
       const reconciliation = createChangesHistoryReconciliationService({ projectService });

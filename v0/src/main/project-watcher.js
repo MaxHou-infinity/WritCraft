@@ -518,12 +518,21 @@ function createProjectWatcher(rootPath, onChange, options = {}) {
     const changes = coalesceChanges(pending);
     pending = [];
     if (!changes.length) return 0;
-    onChange({
-      schema: EVENT_SCHEMA,
-      reason: 'filesystem',
-      changes,
-      emittedAt: new Date().toISOString(),
-    });
+    try {
+      onChange({
+        schema: EVENT_SCHEMA,
+        reason: 'filesystem',
+        changes,
+        emittedAt: new Date().toISOString(),
+      });
+    } catch (error) {
+      // A throwing listener must never crash Main from a timer callback.
+      // Isolate the failure and report it through the optional observer;
+      // the watcher keeps polling and will emit again on the next change.
+      if (typeof options.onChangeError === 'function') {
+        try { options.onChangeError(error); } catch (_) {}
+      }
+    }
     return changes.length;
   }
 

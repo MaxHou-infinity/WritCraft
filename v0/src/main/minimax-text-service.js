@@ -222,8 +222,13 @@ async function requestJson({ endpoint, method, headers, body, fetchImpl, timeout
       redirect: 'error',
       cache: 'no-store',
     }), controller.signal);
+    if (!response.ok) {
+      // Classify by status first: a malformed, oversized or non-JSON error
+      // body must never override AUTH_FAILED / RATE_LIMITED / SERVICE_UNAVAILABLE.
+      try { await response?.body?.cancel?.(); } catch (_) {}
+      return failure(httpError(response.status));
+    }
     const payload = await readBoundedJson(response, controller.signal);
-    if (!response.ok) return failure(httpError(response.status));
     return { ok: true, payload };
   } catch (error) {
     if (controller.signal.aborted || error?.code === 'TEXT_TIMEOUT') {

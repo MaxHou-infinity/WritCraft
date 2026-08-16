@@ -1,4 +1,6 @@
 #!/usr/bin/env node
+'use strict';
+
 const assert = require('assert');
 const citation = require('../src/renderer/citation-formatter');
 let pass = 0;

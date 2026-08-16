@@ -3,6 +3,8 @@
 // 诚实说明：这只是文件存在性 + JSON 合法性 + 关键字符串包含的 verify
 // **没有真跑 `npm install` 或 `electron`**（那需要主人手跑）
 
+'use strict';
+
 const fs = require('fs');
 const path = require('path');
 

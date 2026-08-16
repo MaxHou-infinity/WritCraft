@@ -240,7 +240,10 @@ function createAiTaskStateService(options = {}) {
     }, cancelAfterMs);
     task.timeoutTimer = setTimer(() => {
       if (task.status !== 'running') return;
-      settle(task, 'timed_out', 'timed_out', 'TIMEOUT', 'AI 任务超过 60 秒，已自动停止；没有写入项目文件');
+      const timeoutLabel = timeoutMs >= 1000
+        ? `${Math.round(timeoutMs / 1000)} 秒`
+        : `${timeoutMs} 毫秒`;
+      settle(task, 'timed_out', 'timed_out', 'TIMEOUT', `AI 任务超过 ${timeoutLabel}，已自动停止；没有写入项目文件`);
     }, timeoutMs);
     emit(task);
     const handle = {

@@ -175,6 +175,9 @@ function loadMetrics(rootPath) {
   if (!location.exists) return emptyDocument();
   const stat = fs.statSync(location.file);
   if (stat.size > MAX_METRICS_BYTES) fail('METRICS_TOO_LARGE', 'AI 指标文件超过安全上限');
+  if (process.platform !== 'win32' && (stat.mode & 0o077) !== 0) {
+    fail('INSECURE_METRICS_PERMISSIONS', 'AI 指标文件权限不安全，请删除该文件后重试');
+  }
   let raw;
   try { raw = JSON.parse(fs.readFileSync(location.file, 'utf8')); }
   catch (_) { fail('METRICS_CORRUPT', 'AI 指标文件损坏，已阻止覆盖'); }

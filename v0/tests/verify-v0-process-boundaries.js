@@ -71,6 +71,7 @@ test('Renderer loads the exact shared UMD modules shipped to npm', () => {
   const html = fs.readFileSync(path.join(root, 'src', 'renderer', 'index.html'), 'utf8');
   assert(html.includes('<script src="../shared/context-selection.js"></script>'));
   assert(html.includes('<script src="../shared/block-anchor.js"></script>'));
+  assert(html.includes('<script src="../shared/marked.umd.js"></script>'));
   const files = require(path.join(root, 'package.json')).files;
   assert(files.includes('src/shared/**/*.js'));
 });

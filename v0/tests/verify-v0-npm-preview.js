@@ -95,17 +95,22 @@ test('uses a narrow publish allowlist that excludes tests, releases and secrets'
   }
 });
 
-test('ships the complete runtime and four executable universal helper artifacts', () => {
+test('ships the complete runtime and all executable universal helper artifacts', () => {
   for (const relative of [
     'src/main/main.js',
     'src/main/preload.js',
     'src/shared/block-anchor.js',
     'src/shared/context-selection.js',
+    'src/shared/marked.umd.js',
+    'src/shared/snapshot-image-tokenizer.js',
     'src/renderer/index.html',
     'src/main/native/author-copy-helper',
     'src/main/native/writing-structure-helper',
     'src/main/native/project-hash-helper',
     'src/main/native/markdown-trash-helper',
+    'src/main/native/snapshot-storage-helper',
+    'src/main/native/changes-history-artifact-helper',
+    'src/main/native/delivery-image-decode-helper',
   ]) {
     const target = path.join(root, ...relative.split('/'));
     const stat = fs.lstatSync(target);
@@ -252,10 +257,16 @@ test('actual npm tarball has the shrinkwrap, notices, safe paths and executable 
     'src/main/native/writing-structure-helper',
     'src/main/native/project-hash-helper',
     'src/main/native/markdown-trash-helper',
+    'src/main/native/snapshot-storage-helper',
+    'src/main/native/changes-history-artifact-helper',
+    'src/main/native/delivery-image-decode-helper',
     'src/shared/block-anchor.js',
     'src/shared/context-selection.js',
+    'src/shared/marked.umd.js',
+    'src/shared/snapshot-image-tokenizer.js',
     'src/renderer/index.html',
   ]) assert(files.has(required), `tarball missing ${required}`);
+  assert(!files.has('src/renderer/marked.umd.js'), 'tarball contains retired renderer marked copy');
   for (const file of files.values()) {
     assert(!/(^|\/)(?:tests|fixtures|release|checkpoints)(?:\/|$)/.test(file.path), file.path);
     assert(!/(^|\/)\.env(?:\.|$)/.test(file.path), file.path);
@@ -276,6 +287,9 @@ test('actual npm tarball has the shrinkwrap, notices, safe paths and executable 
     'src/main/native/writing-structure-helper',
     'src/main/native/project-hash-helper',
     'src/main/native/markdown-trash-helper',
+    'src/main/native/snapshot-storage-helper',
+    'src/main/native/changes-history-artifact-helper',
+    'src/main/native/delivery-image-decode-helper',
   ]) assert.strictEqual(files.get(executable).mode, 0o755, executable);
   const executablePaths = new Set([
     'bin/writcraft.js',
@@ -283,6 +297,9 @@ test('actual npm tarball has the shrinkwrap, notices, safe paths and executable 
     'src/main/native/writing-structure-helper',
     'src/main/native/project-hash-helper',
     'src/main/native/markdown-trash-helper',
+    'src/main/native/snapshot-storage-helper',
+    'src/main/native/changes-history-artifact-helper',
+    'src/main/native/delivery-image-decode-helper',
   ]);
   for (const file of files.values()) {
     if (!executablePaths.has(file.path)) {

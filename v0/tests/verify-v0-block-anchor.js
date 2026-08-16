@@ -1,4 +1,6 @@
 #!/usr/bin/env node
+'use strict';
+
 const assert = require('assert');
 const anchor = require('../src/shared/block-anchor');
 let pass = 0;

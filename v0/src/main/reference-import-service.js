@@ -312,6 +312,12 @@ async function importReference(rootPath, sourcePath, options = {}) {
     await removeOwnedFile(assetDestination, assetOwnership);
     await removeOwnedFile(sidecarTemporary, sidecarOwnership);
     await removeOwnedFile(assetTemporary, assetOwnership);
+    if (error?.code === 'EEXIST') {
+      // A concurrent import won the stable path between the pre-check and the
+      // commit; surface the same public code as the pre-check instead of
+      // leaking a raw fs error (whose message may contain the path).
+      fail('REFERENCE_EXISTS', '相同来源已导入，未覆盖现有附件或 sidecar');
+    }
     throw error;
   }
   await removeOwnedFile(sidecarTemporary, sidecarOwnership);

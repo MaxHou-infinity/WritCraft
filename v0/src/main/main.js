@@ -6,6 +6,8 @@
 // 端点: https://api.minimaxi.com/anthropic/v1/messages
 // 模型: MiniMax-M3 / MiniMax-M2.7 / MiniMax-M2.7-highspeed
 
+'use strict';
+
 const { app, BrowserWindow, ipcMain, dialog, nativeImage } = require('electron');
 const path = require('path');
 const crypto = require('crypto');
@@ -16,6 +18,7 @@ const projectWatcher = require('./project-watcher');
 const watcherInvalidationPolicy = require('./watcher-invalidation-policy');
 const projectWatcherHealthService = require('./project-watcher-health');
 const projectWatcherFlushHandlerService = require('./project-watcher-flush-handler');
+const snapshotWatcherBarrierService = require('./snapshot-watcher-barrier');
 const projectSearchService = require('./project-search-service');
 const changeSetService = require('./changeset-service');
 const changeSetReviewService = require('./changeset-review-service');
@@ -23,6 +26,11 @@ const pendingChangeSetStoreService = require('./pending-changeset-store');
 const changeHistoryService = require('./change-history-service');
 const changesHistoryReconciliationService = require('./changes-history-reconciliation-service');
 const changesHistoryTransactionService = require('./changes-history-transaction');
+const changesHistoryArtifactLifecycleService = require('./changes-history-artifact-lifecycle');
+const changesHistoryMarkerLifecycleService = require('./changes-history-marker-lifecycle');
+const publicMarkdownNativeLifecycleService = require('./public-markdown-native-lifecycle');
+const changesHistoryMarkerJournalNativeLifecycleService =
+  require('./changes-history-marker-journal-native-lifecycle');
 const changesHistoryHandlerService = require('./changes-history-handler');
 const chapterProposalService = require('./chapter-proposal-service');
 const projectOnboardingV2Service = require('./project-onboarding-v2-service');
@@ -82,6 +90,12 @@ const projectHomeSnapshotService = require('./project-home-snapshot-service');
 const workspaceLocationService = require('./workspace-location-service');
 const dailyWorkspaceHandlerService = require('./daily-workspace-handler');
 const dailyWorkspaceDataRunner = require('./daily-workspace-data-runner');
+const snapshotStorageWorkerService = require('./snapshot-storage-worker');
+const snapshotBundleService = require('./snapshot-bundle');
+const deliveryCapabilityStoreService = require('./delivery-capability-store');
+const deliveryPreflightMainAdapterService = require('./delivery-preflight-main-adapter');
+const deliveryEvidenceSchema = require('./evidence-delivery-schema');
+const deliveryImageDecodeService = require('./delivery-image-decode-service');
 
 // Establish one identity-independent profile before Main reads userData. The
 // deterministic GUI E2E keeps its explicitly supplied disposable profile;
@@ -97,6 +111,10 @@ const isNpmPreview = !app.isPackaged && process.env.WRITCRAFT_NPM_PREVIEW === '1
 const npmPreviewProfile = isNpmPreview &&
   typeof process.env.WRITCRAFT_NPM_PREVIEW_PROFILE === 'string'
   ? process.env.WRITCRAFT_NPM_PREVIEW_PROFILE
+  : null;
+const deliveryImageHelperPath = path.join(__dirname, 'native', 'delivery-image-decode-helper');
+const deliveryImageDecoder = fs.existsSync(deliveryImageHelperPath)
+  ? deliveryImageDecodeService.createDeliveryImageDecoder({ helperPath: deliveryImageHelperPath })
   : null;
 userDataService.configureUserData(app, {
   isolatedTestDirectory: e2eUserDataArgument ? e2eUserDataArgument.slice('--user-data-dir='.length) : null,
@@ -138,6 +156,7 @@ const aiTaskState = aiTaskStateService.createAiTaskStateService({
 const projectWatcherHealth = projectWatcherHealthService.createProjectWatcherHealth();
 const diagnosticRecorder = diagnosticExportService.createDiagnosticRecorder();
 const diagnosticPreviewStore = diagnosticExportService.createDiagnosticPreviewStore();
+const deliveryCapabilityStore = deliveryCapabilityStoreService.createDeliveryCapabilityStore();
 const imageReviewService = imageReviewServiceModule.createImageReviewService();
 const imageTrashService = imageTrashServiceModule.createImageTrashService();
 const activeImageGenerations = new Set();
@@ -167,6 +186,10 @@ const markdownTrashHandler = markdownTrashHandlerModule.createMarkdownTrashHandl
 });
 let projectMutationGeneration = 0;
 let rendererNavigationEpoch = 0;
+// Delivery capabilities have their own owner generation. It is deliberately
+// separate from mutation/navigation counters so a capability cannot be
+// reconstructed by treating an unrelated generation as its owner identity.
+let deliveryOwnerGeneration = 0;
 let internalMutationEpoch = 0;
 let dailyWorkspaceGraphGeneration = 0;
 let dailyWorkspaceSourceGeneration = 0;
@@ -316,10 +339,40 @@ const onboardingBatchCoordinator = onboardingBatchService.createOnboardingBatchS
   capabilityStore: onboardingCapabilityStore,
   bindingValidator: validateOnboardingBatchBinding,
 });
+const changesHistoryArtifactLifecycle =
+  changesHistoryArtifactLifecycleService.createChangesHistoryArtifactLifecycle();
+const changesHistoryMarkerLifecycle =
+  changesHistoryMarkerLifecycleService.createChangesHistoryMarkerLifecycle();
+const publicMarkdownNativeLifecycle =
+  publicMarkdownNativeLifecycleService.createPublicMarkdownNativeLifecycle();
+const changesHistoryMarkerJournalLifecycle =
+  changesHistoryMarkerJournalNativeLifecycleService
+    .createChangesHistoryMarkerJournalNativeLifecycle();
+const snapshotRestorePublicMarkdownLifecycle = Object.freeze({
+  schema: 'writcraft.snapshot-restore-public-markdown-lifecycle/v1',
+  forProject(rootPath) {
+    const scoped = publicMarkdownNativeLifecycle.forProject(rootPath);
+    return Object.freeze({
+      create: scoped.create,
+      createMissingJournal: scoped.createMissingJournal,
+      reconcile: scoped.reconcile,
+      verifyCreate: scoped.verifyCreate,
+      finalizeCreate: scoped.finalizeCreate,
+      reconcileFinalize: scoped.reconcileFinalize,
+      cleanupCreate: scoped.cleanupCreate,
+      reconcileCreateCleanup: scoped.reconcileCreateCleanup,
+      ackCreateCleanup: scoped.ackCreateCleanup,
+    });
+  },
+});
 const changesHistoryTransaction = changesHistoryTransactionService.createChangesHistoryTransaction({
   projectService,
   historyService: changeHistoryService,
   reviewService: changeSetReviewService,
+  exactArtifactLifecycle: changesHistoryArtifactLifecycle,
+  exactMarkerLifecycle: changesHistoryMarkerLifecycle,
+  publicMarkdownLifecycle: snapshotRestorePublicMarkdownLifecycle,
+  markerJournalLifecycle: changesHistoryMarkerJournalLifecycle,
 });
 const writingStructureTransaction =
   writingStructureTransactionService.createWritingStructureTransactionService();
@@ -819,6 +872,7 @@ function advanceRendererNavigationEpoch() {
     });
   }
   rendererNavigationEpoch += 1;
+  deliveryOwnerGeneration += 1;
   if (currentProject) onboardingAdmission.invalidateProject(currentProject);
 }
 
@@ -1109,14 +1163,55 @@ function endInternalMutation(token, project) {
   if (active !== token) return;
   internalMutationLeaseByRoot.delete(token.rootPath);
   internalMutationDepthByRoot.delete(token.rootPath);
-  const pending = deferredWatcherPayloadsByRoot.get(token.rootPath) || [];
-  deferredWatcherPayloadsByRoot.delete(token.rootPath);
+  const pending = takeDeferredWatcherPayloads(token.rootPath);
   for (const item of pending) {
     // Deferral avoids publishing half-written state, but does not prove an
     // event came from Main. Filename-less payloads therefore remain fail-closed.
     publishWatcherPayload(project, item);
   }
 }
+
+function takeDeferredWatcherPayloads(rootPath) {
+  const pending = deferredWatcherPayloadsByRoot.get(rootPath) || [];
+  deferredWatcherPayloadsByRoot.delete(rootPath);
+  return pending;
+}
+
+function drainSnapshotDeferredWatcherPayloads(project, token) {
+  if (!token || token.rootPath !== project.rootPath ||
+      internalMutationLeaseByRoot.get(project.rootPath) !== token) {
+    throw new projectService.ProjectServiceError(
+      'SNAPSHOT_LEASE_STALE',
+      'Snapshot watcher lease is stale'
+    );
+  }
+  const pending = deferredWatcherPayloadsByRoot.get(project.rootPath) || [];
+  for (let index = 0; index < pending.length; index += 1) {
+    try {
+      publishWatcherPayload(project, pending[index]);
+    } catch (error) {
+      // A failed payload is still authority-bearing. Keep it and every later
+      // wave queued so a retry cannot freeze a generation that skipped it.
+      deferredWatcherPayloadsByRoot.set(project.rootPath, pending.slice(index));
+      throw error;
+    }
+  }
+  deferredWatcherPayloadsByRoot.delete(project.rootPath);
+  return pending.length;
+}
+
+const snapshotWatcherBarrierAdapter =
+  snapshotWatcherBarrierService.createSnapshotWatcherBarrierAdapter({
+    getCurrentProject: () => currentProject,
+    getCurrentWatcher: () => currentProjectWatcher,
+    getMutationGeneration: () => projectMutationGeneration,
+    assertWatcherAvailable: assertProjectWatcherAvailable,
+    markWatcherDegraded: project => projectWatcherHealth.markDegraded(project),
+    beginMutation: beginInternalMutation,
+    endMutation: endInternalMutation,
+    getActiveLease: rootPath => internalMutationLeaseByRoot.get(rootPath) || null,
+    drainDeferredWatcherPayloads: drainSnapshotDeferredWatcherPayloads,
+  });
 
 async function runAiRequest(projectInstanceId, task, externalSignal = null, metadata = {}) {
   if (currentProject && projectInstanceId === currentProject.instanceId) {
@@ -1247,6 +1342,15 @@ function projectCallLLM(projectInstanceId) {
   };
 }
 
+function watcherListenerError(error) {
+  // A listener failure must not crash Main; record it so the failure surface
+  // exists in diagnostics instead of disappearing silently.
+  try { diagnosticRecorder.record('watcher', 'WATCHER_LISTENER_FAILED'); } catch (_) {}
+  if (error instanceof Error && /^[A-Z][A-Z0-9_]{0,63}$/.test(error.message || '')) {
+    try { diagnosticRecorder.record('watcher', error.message); } catch (_) {}
+  }
+}
+
 function startProjectWatcher(project) {
   try {
     // A real-Main/IPC regression harness uses this unpackaged, double-gated
@@ -1262,7 +1366,7 @@ function startProjectWatcher(project) {
         return;
       }
       publishWatcherPayload(project, payload);
-    });
+    }, { onChangeError: watcherListenerError });
     currentProjectWatcher = watcher;
     projectWatcherHealth.clear(project);
     return watcher;
@@ -1335,6 +1439,7 @@ function setCurrentProject(project) {
   pendingChangeSets.bindPublicReviewProject(project.instanceId, project.rootPath);
   if (changedProject) {
     projectMutationGeneration += 1;
+    deliveryOwnerGeneration += 1;
     workspaceSaveGeneration = 0;
     dailyWorkspaceGraphGeneration += 1;
     dailyWorkspaceGraphCache = null;
@@ -1431,6 +1536,7 @@ function finalizeOrdinaryChanges({
     residualChangeSet ? residualCapability : null
   );
   if (residualChangeSet) {
+    residualMetadata.projectInstanceId = project.instanceId;
     pendingChangeSets.putWithCapability(
       residualCapability,
       residualChangeSet,
@@ -1935,6 +2041,55 @@ function captureDiagnosticBinding(event) {
   };
 }
 
+function captureDeliveryBinding(event) {
+  return {
+    ...captureDiagnosticBinding(event),
+    ownerGeneration: deliveryOwnerGeneration,
+  };
+}
+
+function sameDeliveryBinding(left, right) {
+  return left && right && left.webContentsId === right.webContentsId &&
+    left.projectInstanceId === right.projectInstanceId &&
+    left.ownerGeneration === right.ownerGeneration &&
+    left.mutationGeneration === right.mutationGeneration &&
+    left.navigationEpoch === right.navigationEpoch;
+}
+
+const DELIVERY_IPC_ERROR_MESSAGES = Object.freeze({
+  SNAPSHOT_BUSY: 'snapshot 当前不可用',
+  SNAPSHOT_BARRIER_FAILED: 'snapshot barrier 未完成',
+  SNAPSHOT_BUDGET_EXCEEDED: 'snapshot 超出预算',
+  SNAPSHOT_CAPACITY_EXCEEDED: 'snapshot 超出容量',
+  SNAPSHOT_STALE: 'snapshot 已过期',
+  SNAPSHOT_CONFLICT: 'snapshot 存在冲突',
+  SNAPSHOT_OUTCOME_UNKNOWN: 'snapshot 结果未知',
+  DELIVERY_STALE: '交付预检已过期',
+  DELIVERY_PARTIAL: '交付预检不完整',
+  DELIVERY_BLOCKED: '交付预检被阻断',
+  DOCX_BUILD_FAILED: 'DOCX 构建失败',
+  DOCX_INVALID_PACKAGE: 'DOCX 包无效',
+  EXPORT_TARGET_EXISTS: '导出目标已存在',
+  EXPORT_CANCELED: '导出已取消',
+  EXPORT_OUTCOME_UNKNOWN: '导出结果未知',
+  LOCAL_OPERATION_TIMEOUT: '本地操作超时',
+});
+
+function deliveryIpcFailure(error, fallbackCode = 'DELIVERY_BLOCKED') {
+  const stableCode = typeof error?.code === 'string' &&
+    Object.prototype.hasOwnProperty.call(DELIVERY_IPC_ERROR_MESSAGES, error.code)
+    ? error.code
+    : null;
+  const code = stableCode || (error?.code === 'PROJECT_CHANGED' ||
+    error?.code === 'SNAPSHOT_ROOT_CHANGED' ||
+    error?.code === 'SNAPSHOT_IDENTITY_CHANGED' ||
+    error?.code === 'SNAPSHOT_STALE'
+    ? 'DELIVERY_STALE'
+    : (error?.code === 'DELIVERY_STALE' ? 'DELIVERY_STALE' :
+      (error?.code === 'DELIVERY_PARTIAL' ? 'DELIVERY_PARTIAL' : fallbackCode)));
+  return { ok: false, error: code, message: DELIVERY_IPC_ERROR_MESSAGES[code] };
+}
+
 // Key 只来自应用 userData 配置或启动环境。Main 不读取项目/仓库根
 // .env，避免把写作项目中的文件误当作应用秘密配置。
 function resolveActiveApiKey() {
@@ -1968,6 +2123,147 @@ const diagnosticExportHandler = diagnosticExportHandlerService.createDiagnosticE
   }),
 });
 
+async function readCurrentCommittedSnapshot(projectInstanceId, snapshotId) {
+  const project = requireCurrentProject();
+  if (project.instanceId !== projectInstanceId) {
+    throw new projectService.ProjectServiceError('PROJECT_CHANGED', '已提交 snapshot 不属于当前项目');
+  }
+  let worker = null;
+  let bundleFd = null;
+  let disposed = false;
+  let keepBundleFd = false;
+  try {
+    worker = snapshotStorageWorkerService.createSnapshotStorageWorkerForRoot(project.rootPath);
+    await worker.ready();
+    const loaded = await worker.readCommittedSnapshot({ snapshotId });
+    if (!currentProject || currentProject.instanceId !== project.instanceId ||
+        currentProject.rootPath !== project.rootPath ||
+        loaded.manifest.projectInstanceId !== projectInstanceId ||
+        loaded.manifest.snapshotId !== snapshotId) {
+      throw new projectService.ProjectServiceError('PROJECT_CHANGED', 'snapshot authority 已漂移');
+    }
+    const finalName = `bundle-${crypto.createHash('sha256').update(snapshotId, 'utf8').digest('hex')}.wcsb`;
+    const bundlePath = path.join(project.rootPath, '.writcraft', 'snapshots', 'v1', 'bundles', finalName);
+    const flags = fs.constants.O_RDONLY | (fs.constants.O_NOFOLLOW || 0);
+    bundleFd = fs.openSync(bundlePath, flags);
+    const held = fs.fstatSync(bundleFd, { bigint: true });
+    const statBig = value => typeof value === 'bigint' ? value : BigInt(value);
+    const heldSize = statBig(held.size);
+    const heldNlink = statBig(held.nlink);
+    const heldMode = statBig(held.mode) & 0o777n;
+    if (!held.isFile?.() || Number(heldSize) !== Number(loaded.size) || heldNlink !== 1n || heldMode !== 0o600n) {
+      throw new projectService.ProjectServiceError('SNAPSHOT_STALE', 'snapshot bundle identity 无效');
+    }
+    const heldIdentity = Object.freeze({ dev: statBig(held.dev), ino: statBig(held.ino), size: heldSize, nlink: heldNlink, mode: heldMode });
+    const sameHeldPath = () => {
+      if (disposed || bundleFd === null) return false;
+      try {
+        const current = fs.fstatSync(bundleFd, { bigint: true });
+        const atPath = fs.lstatSync(bundlePath, { bigint: true });
+        return statBig(current.dev) === heldIdentity.dev && statBig(current.ino) === heldIdentity.ino &&
+          statBig(current.size) === heldIdentity.size && statBig(current.nlink) === heldIdentity.nlink &&
+          (statBig(current.mode) & 0o777n) === heldIdentity.mode &&
+          statBig(atPath.dev) === heldIdentity.dev && statBig(atPath.ino) === heldIdentity.ino;
+      } catch (_) { return false; }
+    };
+    const disposeSnapshot = () => {
+      if (disposed) return;
+      disposed = true;
+      if (bundleFd !== null) {
+        try { fs.closeSync(bundleFd); } catch (_) {}
+        bundleFd = null;
+      }
+    };
+    const decodeImageEntry = ({ binding, headerBytes, contentSha256, mimeType }) => {
+      if (!sameHeldPath() || !currentProject || currentProject.instanceId !== projectInstanceId) {
+        const error = new projectService.ProjectServiceError('SNAPSHOT_STALE', 'snapshot bundle identity 已漂移');
+        throw error;
+      }
+      if (!deliveryImageDecoder || typeof deliveryImageDecoder.decodeEntry !== 'function') {
+        const error = new projectService.ProjectServiceError('DELIVERY_BLOCKED', 'ImageIO entry decoder 不可用');
+        throw error;
+      }
+      const result = deliveryImageDecoder.decodeEntry({ fd: bundleFd, binding, headerBytes, contentSha256, mimeType });
+      if (!sameHeldPath()) {
+        const error = new projectService.ProjectServiceError('SNAPSHOT_STALE', 'snapshot bundle identity 在解码后漂移');
+        throw error;
+      }
+      return result;
+    };
+    keepBundleFd = true;
+    return Object.freeze({ ...loaded, decodeImageEntry, disposeSnapshot });
+  } finally {
+    if (worker) await worker.close();
+    if (bundleFd !== null && !keepBundleFd) {
+      try { fs.closeSync(bundleFd); } catch (_) {}
+    }
+  }
+}
+
+// Delivery preflight reads one committed immutable bundle through the native
+// snapshot worker, then derives Graph/SourceIndex from those bytes only. The
+// worker is closed before the handler exposes the result; no live-root index
+// or graph cache is consulted on this path.
+const deliveryPreflightMainAdapter = deliveryPreflightMainAdapterService.createDeliveryPreflightMainAdapter({
+  assertTrustedSender,
+  captureBinding: captureDeliveryBinding,
+  settleAuthority: async ({ request }) => {
+    const project = requireCurrentProject();
+    if (project.instanceId !== request.projectInstanceId) {
+      const error = new projectService.ProjectServiceError('PROJECT_CHANGED', '项目已切换，请重新发起交付预检');
+      throw error;
+    }
+    await settleProjectReadAuthority(project, {
+      watcherUnavailable: '项目文件监控无法完成交付预检一致性扫描，请重新打开项目',
+      mutationInProgress: '项目文件正在提交，请稍后重新发起交付预检',
+      projectChanged: '项目状态已变化，请重新发起交付预检',
+    });
+  },
+  readCommittedBundle: async request => {
+    const loaded = await readCurrentCommittedSnapshot(request.projectInstanceId, request.snapshotId);
+    return snapshotBundleService.createBundle(
+      loaded.manifest,
+      loaded.entries.map(entry => ({ fileId: entry.fileId, content: Buffer.from(entry.content) }))
+    ).bundle;
+  },
+  readCorrectionArtifact: async request => {
+    const project = requireCurrentProject();
+    if (project.instanceId !== request.projectInstanceId) {
+      const error = new projectService.ProjectServiceError('PROJECT_CHANGED', '项目已切换，请重新发起交付预检');
+      throw error;
+    }
+    let loaded;
+    try { loaded = graphCorrectionService.loadCorrections(project.rootPath); }
+    catch (_) {
+      const error = new projectService.ProjectServiceError('SNAPSHOT_STALE', '图谱纠错状态不可用');
+      throw error;
+    }
+    if (!loaded || loaded.persistenceBlocked === true) {
+      const error = new projectService.ProjectServiceError('SNAPSHOT_STALE', '图谱纠错状态不可用');
+      throw error;
+    }
+    // A missing correction file is a stable empty artifact.  The legacy
+    // loader stamps an in-memory empty document with `now`, which would make
+    // the provider's before/after digest check look like a concurrent edit.
+    const document = loaded.reason === 'MISSING'
+      ? Object.freeze({ ...loaded.document, updatedAt: '1970-01-01T00:00:00.000Z' })
+      : loaded.document;
+    return Object.freeze({
+      document,
+      digest: deliveryEvidenceSchema.digestObject('writcraft.graph-corrections/v1', document),
+    });
+  },
+  decodeImage(bytes, mimeType) {
+    if (typeof deliveryImageDecoder !== 'function') {
+      const error = new Error('ImageIO delivery decoder is not built');
+      error.code = 'IMAGE_DECODE_FAILED';
+      throw error;
+    }
+    return deliveryImageDecoder(bytes, mimeType);
+  },
+  capabilityStore: deliveryCapabilityStore,
+});
+
 // IPC 桥接（V0 Day 1 占位）
 ipcMain.handle('writcraft:detect-key-type', (event, key) => {
   assertTrustedSender(event);
@@ -1993,6 +2289,118 @@ ipcMain.handle('writcraft:diagnostics:export', async (event, request) => {
     return await diagnosticExportHandler.exportPreview(event, request);
   } catch (error) {
     return projectFailure(error);
+  }
+});
+
+ipcMain.handle('writcraft:project:delivery-preflight', async (event, projectInstanceId, request) => {
+  try {
+    // Authenticate before touching any Renderer-owned request property. The
+    // handler performs the descriptor-safe exact request validation and binds
+    // the request project to Main's current project.
+    assertTrustedSender(event);
+    if (typeof projectInstanceId !== 'string') {
+      return { ok: false, error: 'DELIVERY_BLOCKED', message: '交付预检请求无效' };
+    }
+    const result = await deliveryPreflightMainAdapter.preflight(event, request);
+    return { ok: true, preflight: result.public };
+  } catch (error) {
+    return deliveryIpcFailure(error);
+  }
+});
+
+ipcMain.handle('writcraft:project:list-delivery-snapshots', async (event, projectInstanceId) => {
+  let initialBinding = null;
+  try {
+    assertTrustedSender(event);
+    initialBinding = captureDeliveryBinding(event);
+    const project = requireCurrentProject();
+    if (project.instanceId !== projectInstanceId ||
+        initialBinding.projectInstanceId !== projectInstanceId ||
+        project.instanceId !== initialBinding.projectInstanceId) {
+      return { ok: false, error: 'DELIVERY_STALE', message: '项目状态已变化，请重新刷新 snapshot' };
+    }
+    let worker = null;
+    try {
+      worker = snapshotStorageWorkerService.createSnapshotStorageWorkerForRoot(project.rootPath);
+      await worker.ready();
+      if (!sameDeliveryBinding(initialBinding, captureDeliveryBinding(event))) {
+        return { ok: false, error: 'DELIVERY_STALE', message: '项目状态已变化，请重新刷新 snapshot' };
+      }
+      const listed = await worker.listCommitted();
+      if (!sameDeliveryBinding(initialBinding, captureDeliveryBinding(event))) {
+        return { ok: false, error: 'DELIVERY_STALE', message: '项目状态已变化，请重新刷新 snapshot' };
+      }
+      const items = [];
+      let unavailableCount = listed.unavailableCount;
+      for (const item of listed.items) {
+        try {
+          const loaded = await worker.readCommittedSnapshot({ snapshotId: item.snapshotId });
+          if (!sameDeliveryBinding(initialBinding, captureDeliveryBinding(event))) {
+            return { ok: false, error: 'DELIVERY_STALE', message: '项目状态已变化，请重新刷新 snapshot' };
+          }
+          const files = loaded.manifest.files || [];
+          items.push({
+            snapshotId: item.snapshotId,
+            createdAt: loaded.manifest.createdAt,
+            status: 'committed',
+            markdownCount: files.filter(file => file.kind === 'markdown').length,
+            imageCount: files.filter(file => file.kind === 'image').length,
+            totalBytes: item.size,
+            snapshotManifestDigest: item.snapshotManifestDigest,
+          });
+        } catch (_) {
+          if (!sameDeliveryBinding(initialBinding, captureDeliveryBinding(event))) {
+            return { ok: false, error: 'DELIVERY_STALE', message: '项目状态已变化，请重新刷新 snapshot' };
+          }
+          unavailableCount += 1;
+        }
+      }
+      if (!sameDeliveryBinding(initialBinding, captureDeliveryBinding(event))) {
+        return { ok: false, error: 'DELIVERY_STALE', message: '项目状态已变化，请重新刷新 snapshot' };
+      }
+      const usedPrivateBytes = items.reduce((total, item) => total + item.totalBytes, 0);
+      return {
+        ok: true,
+        list: {
+          schema: 'writcraft.snapshot-list/v1', projectInstanceId,
+          items, unavailableCount,
+          capacity: {
+            maxSnapshots: 256,
+            maxPrivateBytes: snapshotStorageWorkerService.MAX_STAGE_BYTES,
+            usedSnapshots: items.length,
+            usedPrivateBytes,
+          },
+        },
+      };
+    } finally {
+      if (worker) await worker.close();
+    }
+  } catch (error) {
+    return deliveryIpcFailure(error);
+  }
+});
+
+ipcMain.handle('writcraft:project:list-delivery-snapshot-files', async (event, projectInstanceId, snapshotId) => {
+  let loaded = null;
+  try {
+    assertTrustedSender(event);
+    const initialBinding = captureDeliveryBinding(event);
+    loaded = await readCurrentCommittedSnapshot(projectInstanceId, snapshotId);
+    if (!sameDeliveryBinding(initialBinding, captureDeliveryBinding(event))) {
+      return { ok: false, error: 'DELIVERY_STALE', message: '项目状态已变化，请重新刷新 snapshot' };
+    }
+    return {
+      ok: true,
+      files: loaded.manifest.files.map(file => ({
+        fileId: file.fileId, displayPath: file.path, kind: file.kind,
+        revision: file.revision, byteLength: file.byteLength, sha256: file.sha256,
+      })),
+      snapshotManifestDigest: loaded.manifest.snapshotManifestDigest,
+    };
+  } catch (error) {
+    return deliveryIpcFailure(error);
+  } finally {
+    try { loaded?.disposeSnapshot?.(); } catch (_) {}
   }
 });
 
@@ -2035,6 +2443,9 @@ ipcMain.handle('writcraft:check-api', async event => {
     fetchImpl: electronAiFixture?.textFetch,
     checkModels: minimaxTextService.checkModels,
     defaultModel: minimaxTextService.DEFAULT_MODEL,
+    // A handshake probe must not block the renderer for the full 90s request
+    // timeout; bound it explicitly so a dead endpoint fails fast.
+    checkModelsTimeoutMs: 15_000,
   });
 });
 
@@ -2098,6 +2509,10 @@ function reviewMetadata(changeSet, options = {}) {
 
 function cacheReviewedChangeSet(changeSet, project, options = {}) {
   const metadata = reviewMetadata(changeSet, options);
+  // Bind the capability to the exact project instance: the same root directory
+  // may be opened as a different instance later, and a review from instance A
+  // must never be applicable under instance B.
+  metadata.projectInstanceId = project.instanceId;
   const capability = options.capability || pendingChangeSets.allocateCapability();
   const review = changeSetReviewService.createReview(changeSet, {
     reviewId: capability,
@@ -2509,7 +2924,10 @@ ipcMain.handle('writcraft:chat', async (event, projectInstanceId, userMessage, p
     });
   } catch (error) {
     if (conversationLease) chatConversationStore.finish(conversationLease);
-    throw error;
+    // runAiRequest already settled the task handle (timeout/abort/stale) and
+    // re-threw; return a bounded failure instead of rejecting the invoke so
+    // the chat channel keeps the same {ok:false} contract as every other IPC.
+    return projectFailure(error);
   }
   if (!isAiProjectOriginCurrent(origin)) {
     if (conversationLease) chatConversationStore.finish(conversationLease);
@@ -2521,6 +2939,10 @@ ipcMain.handle('writcraft:chat', async (event, projectInstanceId, userMessage, p
       try {
         conversation = chatConversationStore.commit(conversationLease, result.text);
       } catch (error) {
+        // A failed commit (e.g. empty assistant text) leaves the pending
+        // lease open; release it here so the session is not left dangling
+        // until the next begin() call.
+        chatConversationStore.finish(conversationLease);
         return chatConversationFailure(error);
       }
     } else {
@@ -3536,7 +3958,9 @@ ipcMain.handle('writcraft:project:apply-changes', async (event, projectInstanceI
       ? descriptor.value
       : '';
     const pending = pendingChangeSets.get(changeSetId);
-    if (pending?.rootPath === project.rootPath && pending.researchDependencies) {
+    if (pending?.rootPath === project.rootPath &&
+        (pending.projectInstanceId === null || pending.projectInstanceId === project.instanceId) &&
+        pending.researchDependencies) {
       assertInlineRewriteMutationAvailable(project);
       return researchApplyTransaction.apply({
         project,

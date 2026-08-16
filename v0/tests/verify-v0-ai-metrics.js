@@ -127,11 +127,25 @@ test('损坏、旧 schema、未知持久化字段和超大文件全部拒绝覆�
   for (const [body, code] of cases) {
     const directory = root();
     try {
-      fs.writeFileSync(metricsPath(directory), body);
+      // 0o600 so the oversized/corrupt cases reach their intended checks
+      // instead of tripping the insecure-permissions guard first.
+      fs.writeFileSync(metricsPath(directory), body, { mode: 0o600 });
       expectCode(code, () => metrics.appendEvent(directory, event()));
       assert.equal(fs.readFileSync(metricsPath(directory), 'utf8'), body);
     } finally { fs.rmSync(directory, { recursive: true, force: true }); }
   }
+});
+
+test('metrics.json 权限不安全时拒绝读取，防止同 UID 篡改聚合指标', () => {
+  const directory = root();
+  try {
+    fs.writeFileSync(metricsPath(directory), JSON.stringify({
+      schema: metrics.METRICS_SCHEMA,
+      updatedAt: new Date().toISOString(),
+      events: [],
+    }), { mode: 0o644 });
+    expectCode('INSECURE_METRICS_PERMISSIONS', () => metrics.loadMetrics(directory));
+  } finally { fs.rmSync(directory, { recursive: true, force: true }); }
 });
 
 test('metrics.json 符号链接会阻止读取和写入且不触碰外部目标', () => {

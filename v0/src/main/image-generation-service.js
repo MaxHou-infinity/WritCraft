@@ -10,6 +10,7 @@ const MAX_PROMPT_CHARS = 1500;
 const MAX_IMAGE_BYTES = 8 * 1024 * 1024;
 const MAX_RESPONSE_CHARS = Math.ceil(MAX_IMAGE_BYTES * 4 / 3) + 64 * 1024;
 const REQUEST_TIMEOUT_MS = 90_000;
+const KEY_RE = /^sk-(cp|api)-[A-Za-z0-9_-]{8,240}$/i;
 const ASPECT_RATIOS = Object.freeze(['1:1', '16:9', '4:3', '3:2', '2:3', '3:4', '9:16', '21:9']);
 const ASPECT_RATIO_SET = new Set(ASPECT_RATIOS);
 const ASPECT_RATIO_DIMENSIONS = Object.freeze({
@@ -57,7 +58,9 @@ function validateAspectRatio(value) {
 }
 
 function validateApiKey(value) {
-  if (typeof value !== 'string' || !value.trim() || value.length > 512 || /[\u0000-\u001f\u007f]/.test(value)) {
+  // Same format whitelist as the text service / key config store; a key that
+  // never matches the provider shape is rejected before any network call.
+  if (typeof value !== 'string' || !KEY_RE.test(value.trim())) {
     fail('NO_KEY', '请先在应用设置中配置 MiniMax Key');
   }
   return value.trim();
@@ -298,6 +301,13 @@ async function responsePayload(response, signal) {
   if (Number.isFinite(contentLength) && contentLength > MAX_RESPONSE_CHARS) {
     fail('IMAGE_RESPONSE_TOO_LARGE', '图片服务响应超过大小上限');
   }
+  if (!response.ok) {
+    // Classify by status before reading the body: a malformed/oversized error
+    // body must never override AUTH_FAILED / RATE_LIMITED / SERVICE_UNAVAILABLE.
+    const failure = imageHttpFailure(response.status);
+    try { await response?.body?.cancel?.(); } catch (_) {}
+    fail(failure.code, failure.message);
+  }
   let text;
   try {
     if (typeof response.body?.getReader === 'function') {
@@ -329,10 +339,6 @@ async function responsePayload(response, signal) {
   }
   if (typeof text !== 'string' || text.length > MAX_RESPONSE_CHARS) {
     fail('IMAGE_RESPONSE_TOO_LARGE', '图片服务响应超过大小上限');
-  }
-  if (!response.ok) {
-    const failure = imageHttpFailure(response.status);
-    fail(failure.code, failure.message);
   }
   let payload;
   try { payload = JSON.parse(text); } catch (_) { fail('INVALID_API_RESPONSE', '图片服务返回了无效 JSON'); }
@@ -388,7 +394,12 @@ async function generateAndSaveImage(options = {}) {
       }
       throw error;
     }
-    if (controller.signal.aborted) fail('IMAGE_TIMEOUT', '图片生成超时，请稍后重试');
+    if (controller.signal.aborted) {
+      // An external cancel (project switch) aborts the same controller as the
+      // timeout; report it truthfully instead of mislabeling it as a timeout.
+      if (externalSignal?.aborted) fail('IMAGE_ABORTED', '图片生成已因项目状态变化而取消');
+      fail('IMAGE_TIMEOUT', '图片生成超时，请稍后重试');
+    }
     fail('IMAGE_REQUEST_FAILED', '图片服务连接失败，请稍后重试');
   } finally {
     clearTimeout(timeout);

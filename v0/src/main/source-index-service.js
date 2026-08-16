@@ -4,8 +4,11 @@
 // reads only project-relative Markdown through ProjectService's guarded API.
 // The returned index is derived data and can always be rebuilt from the files.
 
+'use strict';
+
 const path = require('path');
 const crypto = require('crypto');
+const citationIdentity = require('../shared/citation-identity');
 const projectService = require('./project-service');
 
 const INDEX_SCHEMA = 'writcraft.sources/v1';
@@ -64,14 +67,7 @@ function parseFrontMatter(content) {
 }
 
 function safeHttpUrl(raw) {
-  if (typeof raw !== 'string' || !raw.trim()) return null;
-  try {
-    const parsed = new URL(raw.trim());
-    if ((parsed.protocol !== 'https:' && parsed.protocol !== 'http:') || parsed.username || parsed.password) return null;
-    return parsed.href;
-  } catch (_) {
-    return null;
-  }
+  return citationIdentity.safeHttpUrl(raw);
 }
 
 function titleFromContent(content, metadata, fallback) {

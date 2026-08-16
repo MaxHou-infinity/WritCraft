@@ -2,6 +2,8 @@
 // WritCraft V0 · Day 3 verify
 // 静态层: IPC 暴露 + ⌘K/⌘L 监听 + UI 元素 + M3 真实验证
 
+'use strict';
+
 const fs = require('fs');
 const path = require('path');
 

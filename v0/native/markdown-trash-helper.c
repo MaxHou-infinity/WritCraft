@@ -22,6 +22,7 @@
 #define MAX_LINE_BYTES (3 * 1024 * 1024)
 #define MAX_MANIFEST_BYTES (1024 * 1024)
 #define MAX_COMPONENTS 128
+#define MAX_LEAF_BYTES 256
 #define CHUNK_BYTES 1024
 #define JOURNAL_PREFIX ".writcraft-md-restore-"
 #define ABSENT_MANIFEST_DIGEST "0000000000000000000000000000000000000000000000000000000000000000"
@@ -509,7 +510,9 @@ static bool parse_journal(const unsigned char *bytes, size_t length, Journal *jo
   memset(journal, 0, sizeof(*journal));
   journal->state = fields[0][0];
   journal->operation = fields[1][0];
-  if (strlen(fields[2]) >= sizeof(journal->source_hex) || strlen(fields[3]) >= sizeof(journal->target_hex)) return false;
+  if (strlen(fields[2]) >= sizeof(journal->source_hex) || strlen(fields[3]) >= sizeof(journal->target_hex) ||
+      strlen(fields[10]) >= sizeof(journal->qsource) || strlen(fields[11]) >= sizeof(journal->qmanifest) ||
+      strlen(fields[12]) >= sizeof(journal->newmanifest)) return false;
   strcpy(journal->source_hex, fields[2]); strcpy(journal->target_hex, fields[3]);
   strcpy(journal->digest, fields[4]); strcpy(journal->m0, fields[8]); strcpy(journal->m1, fields[9]);
   strcpy(journal->qsource, fields[10]); strcpy(journal->qmanifest, fields[11]); strcpy(journal->newmanifest, fields[12]);
@@ -555,7 +558,7 @@ static bool journal_committed(int root_fd, int trash_fd, const Journal *journal)
   char leaf[256]; int parent = journal->operation == 'T' ? dup(trash_fd) :
     open_relative_parent(root_fd, (char *)target, leaf);
   if (journal->operation == 'T') {
-    if (!safe_component((char *)target)) return false;
+    if (!safe_component((char *)target) || target_length >= sizeof(leaf)) return false;
     strcpy(leaf, (char *)target);
   }
   if (parent < 0 || !same_bound_directory(parent, &journal->target_parent)) { if (parent >= 0) close(parent); return false; }
@@ -657,7 +660,7 @@ static bool journal_source_parent(int root_fd, int trash_fd, const Journal *jour
   if (!hex_decode(journal->source_hex, source, sizeof(source) - 1, &length) || memchr(source, '\0', length)) return false;
   source[length] = '\0';
   if (journal->operation == 'R') {
-    if (!safe_component((char *)source)) return false;
+    if (!safe_component((char *)source) || length >= MAX_LEAF_BYTES) return false;
     *parent_out = dup(trash_fd); strcpy(leaf, (char *)source); return *parent_out >= 0 && same_bound_directory(*parent_out, &journal->source_parent);
   }
   *parent_out = open_relative_parent(root_fd, (char *)source, leaf); return *parent_out >= 0 && same_bound_directory(*parent_out, &journal->source_parent);
@@ -668,7 +671,7 @@ static bool journal_target_parent(int root_fd, int trash_fd, const Journal *jour
   if (!hex_decode(journal->target_hex, target, sizeof(target) - 1, &length) || memchr(target, '\0', length)) return false;
   target[length] = '\0';
   if (journal->operation == 'T') {
-    if (!safe_component((char *)target)) return false;
+    if (!safe_component((char *)target) || length >= MAX_LEAF_BYTES) return false;
     *parent_out = dup(trash_fd); strcpy(leaf, (char *)target); return *parent_out >= 0 && same_bound_directory(*parent_out, &journal->target_parent);
   }
   *parent_out = open_relative_parent(root_fd, (char *)target, leaf); return *parent_out >= 0 && same_bound_directory(*parent_out, &journal->target_parent);

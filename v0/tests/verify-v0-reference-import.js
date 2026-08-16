@@ -346,6 +346,8 @@ async function run() {
       let concurrentSidecarPath = null;
       // Simulate: another process creates a valid sidecar after this call's
       // existence pre-check, so this call's atomicWrite hits EEXIST (link fails).
+      // The raw fs EEXIST must be normalized to the public REFERENCE_EXISTS
+      // code instead of leaking through as an opaque PROJECT_OPERATION_FAILED.
       await assert.rejects(() => importReference(root, source, {
         atomicWrite: async destination => {
           concurrentSidecarPath = destination;
@@ -354,7 +356,7 @@ async function run() {
           error.code = 'EEXIST';
           throw error;
         },
-      }), error => error && error.code === 'EEXIST');
+      }), error => error && error.code === 'REFERENCE_EXISTS');
       // Ownership rule: this call never wrote the sidecar, so cleanup must not
       // delete the concurrent process's file.
       assert(concurrentSidecarPath, 'atomicWrite stub was not invoked');

@@ -3,6 +3,8 @@
 // Day 2 验收: 加载 → 输入 → 字符计数实时更新
 // 当前产品固定使用原生 contenteditable，不携带未使用的 TipTap 运行依赖。
 
+'use strict';
+
 const fs = require('fs');
 const path = require('path');
 

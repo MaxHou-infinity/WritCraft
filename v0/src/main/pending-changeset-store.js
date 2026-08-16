@@ -336,6 +336,12 @@ function createPendingChangeSetStore(options = {}) {
     if (!changeSet || typeof changeSet.id !== 'string' || typeof rootPath !== 'string' || !rootPath) {
       fail('INVALID_PENDING_CHANGESET', '待审阅 ChangeSet 无效');
     }
+    const projectInstanceId = metadata.projectInstanceId === undefined || metadata.projectInstanceId === null
+      ? null
+      : String(metadata.projectInstanceId);
+    if (projectInstanceId !== null && !PROJECT_INSTANCE_ID_RE.test(projectInstanceId)) {
+      fail('INVALID_PENDING_CHANGESET', '待审阅 ChangeSet 项目实例标识无效');
+    }
     const issueDependencies = normalizeIssueDependencies(metadata.issueDependencies);
     const researchDependencies = normalizeResearchDependencies(metadata.researchDependencies, capability, rootPath);
     if (researchDependencies && researchDependencies.expiresAt <= clock()) {
@@ -347,6 +353,7 @@ function createPendingChangeSetStore(options = {}) {
     records.set(capability, Object.freeze({
       changeSet,
       rootPath,
+      projectInstanceId,
       projectDependencies: normalizeProjectDependencies(metadata.projectDependencies),
       issueDependencies,
       researchDependencies,

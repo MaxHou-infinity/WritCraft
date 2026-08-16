@@ -1,4 +1,6 @@
 // Project-wide filename and Markdown body search.
+'use strict';
+
 (function () {
   const bridge = window.writCraft?.project;
   const input = document.getElementById('project-search-input');

@@ -17,11 +17,12 @@ const {
 } = require('./verify-v0-electron-e2e');
 
 const KEY = `sk-cp-${'E2e_-'.repeat(18)}`;
+const FORCE = process.env.WRITCRAFT_E2E_FORCE === '1' || process.env.CI === 'true';
 
 async function run() {
   const skipped = skipReason();
-  if (skipped) {
-    console.log(`SKIP: ${skipped}`);
+  if (skipped && !FORCE) {
+    console.log(`⏭ SKIP: ${skipped}. Set WRITCRAFT_E2E_FORCE=1 to require launch.`);
     return;
   }
   const scratch = fs.realpathSync(fs.mkdtempSync(path.join(os.tmpdir(), 'writcraft-api-key-restart-')));

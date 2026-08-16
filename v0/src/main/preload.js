@@ -4,6 +4,8 @@
 //
 // Day 3: 暴露 ⌘K 改写 + ⌘L 全局对话（IPC 路由到 main 进程 → MiniMax M3）
 
+'use strict';
+
 const { contextBridge, ipcRenderer } = require('electron');
 
 const WATCHER_FLUSH_RESULT_SCHEMA = 'writcraft.watcher-flush-result/v1';
@@ -289,6 +291,12 @@ contextBridge.exposeInMainWorld('writCraft', {
         operationId,
       }),
     buildGraph: (projectInstanceId) => ipcRenderer.invoke('writcraft:project:build-graph', projectInstanceId),
+    deliveryPreflight: (projectInstanceId, request) =>
+      ipcRenderer.invoke('writcraft:project:delivery-preflight', projectInstanceId, request),
+    listDeliverySnapshots: (projectInstanceId) =>
+      ipcRenderer.invoke('writcraft:project:list-delivery-snapshots', projectInstanceId),
+    listDeliverySnapshotFiles: (projectInstanceId, snapshotId) =>
+      ipcRenderer.invoke('writcraft:project:list-delivery-snapshot-files', projectInstanceId, snapshotId),
     applyGraphCorrection: (projectInstanceId, command) => ipcRenderer.invoke('writcraft:project:apply-graph-correction', projectInstanceId, command),
     setIssueStatus: (projectInstanceId, issueId, status) => ipcRenderer.invoke('writcraft:project:set-issue-status', projectInstanceId, issueId, status),
     importReference: (projectInstanceId) => ipcRenderer.invoke('writcraft:project:import-reference', projectInstanceId),

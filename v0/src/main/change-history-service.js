@@ -4,16 +4,26 @@ const crypto = require('crypto');
 const fs = require('fs');
 const path = require('path');
 const changeSetService = require('./changeset-service');
+const evidenceDeliverySchema = require('./evidence-delivery-schema');
 
 const LEGACY_HISTORY_SCHEMA = 'writcraft.changes/v1';
 const PREVIOUS_HISTORY_SCHEMA = 'writcraft.changes/v2';
-const HISTORY_SCHEMA = 'writcraft.changes/v3';
+const PREVIOUS_V3_HISTORY_SCHEMA = 'writcraft.changes/v3';
+const HISTORY_SCHEMA = 'writcraft.changes/v4';
+const TERMINAL_HISTORY_STATE_SCHEMA =
+  'writcraft.changes-history-terminal-history-state/v1';
 const HISTORY_RELATIVE_PATH = '.writcraft/changes.json';
 const MAX_HISTORY_ENTRIES = 100;
-const MAX_HISTORY_BYTES = 32 * 1024 * 1024;
+const MAX_HISTORY_BYTES = 192 * 1024 * 1024;
 const MAX_PROVENANCE_BYTES = 16 * 1024;
+const MAX_SNAPSHOT_PROVENANCE_BYTES = 64 * 1024;
+const MAX_SNAPSHOT_UNDO_HISTORY_TEMPLATE_BYTES = 32 * 1024 * 1024;
 const RESEARCH_PROVENANCE_SCHEMA = 'writcraft.research-handoff/v1';
 const INLINE_REWRITE_PROVENANCE_SCHEMA = 'writcraft.inline-rewrite/v1';
+const SNAPSHOT_RESTORE_PROVENANCE_SCHEMA = 'writcraft.snapshot-restore-history/v1';
+const SNAPSHOT_RESTORE_HISTORY_TEMPLATE_SCHEMA = 'writcraft.snapshot-restore-history-template/v1';
+const SNAPSHOT_RESTORE_UNDO_HISTORY_TEMPLATE_SCHEMA =
+  'writcraft.snapshot-restore-undo-history-template/v1';
 const REVISION_RE = /^[a-f0-9]{64}$/;
 const ENTRY_ID_RE = /^change_[0-9a-f]{8}-[0-9a-f]{4}-4[0-9a-f]{3}-[89ab][0-9a-f]{3}-[0-9a-f]{12}$/;
 const CHANGESET_ID_RE = /^cs_[a-f0-9]{24}$/;
@@ -99,8 +109,33 @@ function exactKeys(value, expectedKeys, field) {
   }
 }
 
+function exactDataRecord(value, expectedKeys, field) {
+  if (!value || typeof value !== 'object' || Array.isArray(value) ||
+      Object.getPrototypeOf(value) !== Object.prototype) {
+    fail('INVALID_HISTORY', `${field} 无效`);
+  }
+  const keys = Reflect.ownKeys(value);
+  const expected = [...expectedKeys].sort();
+  if (keys.length !== expected.length || keys.some(key => typeof key !== 'string') ||
+      keys.map(String).sort().some((key, index) => key !== expected[index])) {
+    fail('INVALID_HISTORY', `${field} 包含未知或缺失字段`);
+  }
+  const descriptors = Object.getOwnPropertyDescriptors(value);
+  const record = {};
+  for (const key of expectedKeys) {
+    const descriptor = descriptors[key];
+    if (!descriptor || descriptor.enumerable !== true || !Object.hasOwn(descriptor, 'value') ||
+        Object.hasOwn(descriptor, 'get') || Object.hasOwn(descriptor, 'set')) {
+      fail('INVALID_HISTORY', `${field}.${key} 必须是普通数据字段`);
+    }
+    record[key] = descriptor.value;
+  }
+  return record;
+}
+
 function boundedString(value, field, minimum, maximum) {
-  if (typeof value !== 'string' || value.length < minimum || value.length > maximum) {
+  if (typeof value !== 'string' || value.length < minimum || value.length > maximum ||
+      /[\u0000-\u001f]/u.test(value) || evidenceDeliverySchema.hasUnpairedSurrogate(value)) {
     fail('INVALID_HISTORY', `${field} 无效`);
   }
   return value;
@@ -332,11 +367,26 @@ function validateProvenance(raw, field = 'provenance') {
     clone = validateResearchProvenance(strictClone);
   } else if (strictClone.schema === INLINE_REWRITE_PROVENANCE_SCHEMA || strictClone.kind === 'inline_rewrite') {
     clone = validateInlineRewriteProvenance(strictClone);
+  } else if (strictClone.schema === SNAPSHOT_RESTORE_PROVENANCE_SCHEMA) {
+    try {
+      evidenceDeliverySchema.assertSnapshotRestoreHistoryProvenance(
+        strictClone,
+        strictClone.selectedIds?.length
+      );
+    } catch (error) {
+      if (error instanceof evidenceDeliverySchema.EvidenceDeliverySchemaError) {
+        fail('INVALID_HISTORY', `${field} snapshot restore provenance 无效`);
+      }
+      throw error;
+    }
   }
   let serialized;
   try { serialized = JSON.stringify(clone); } catch (_) { fail('INVALID_HISTORY', `${field} 不可序列化`); }
-  if (Buffer.byteLength(serialized, 'utf8') > MAX_PROVENANCE_BYTES) {
-    fail('INVALID_HISTORY', `${field} 不能超过 ${MAX_PROVENANCE_BYTES} 字节`);
+  const maxBytes = clone?.schema === SNAPSHOT_RESTORE_PROVENANCE_SCHEMA
+    ? MAX_SNAPSHOT_PROVENANCE_BYTES
+    : MAX_PROVENANCE_BYTES;
+  if (Buffer.byteLength(serialized, 'utf8') > maxBytes) {
+    fail('INVALID_HISTORY', `${field} 不能超过 ${maxBytes} 字节`);
   }
   return clone;
 }
@@ -424,7 +474,7 @@ function integrityFor(record) {
   return sha256(JSON.stringify(recordPayload(record)));
 }
 
-function validateFileState(state, field) {
+function validateLegacyFileState(state, field) {
   if (!state || typeof state !== 'object' || typeof state.content !== 'string') {
     fail('INVALID_HISTORY', `${field} 回滚正文无效`);
   }
@@ -440,6 +490,86 @@ function validateFileState(state, field) {
   return normalized;
 }
 
+function v4FileStateFromContent(content, expectedRevision = sha256(content)) {
+  const contentHash = sha256(content);
+  if (expectedRevision !== contentHash) fail('INVALID_HISTORY', 'v4 文件 revision 与正文不一致');
+  return {
+    exists: true,
+    revision: expectedRevision,
+    contentHash,
+    byteLength: Buffer.byteLength(content, 'utf8'),
+    encoding: 'utf8',
+    data: content,
+  };
+}
+
+function validateV4FileState(state, field, options = {}) {
+  exactKeys(state, ['exists', 'revision', 'contentHash', 'byteLength', 'encoding', 'data'], field);
+  if (state.exists === false) {
+    if (state.revision !== null || state.contentHash !== null || state.byteLength !== 0 ||
+        state.encoding !== null || state.data !== null) {
+      fail('INVALID_HISTORY', `${field} 缺失状态无效`);
+    }
+    return {
+      exists: false,
+      revision: null,
+      contentHash: null,
+      byteLength: 0,
+      encoding: null,
+      data: null,
+    };
+  }
+  if (state.exists !== true || !['utf8', 'base64'].includes(state.encoding)) {
+    fail('INVALID_HISTORY', `${field} 存在状态或 encoding 无效`);
+  }
+  if (options.snapshotRestore === true && state.encoding !== 'base64') {
+    fail('INVALID_HISTORY', `${field} snapshot restore 必须使用 base64`);
+  }
+  let content;
+  if (state.encoding === 'base64') {
+    try {
+      evidenceDeliverySchema.assertSnapshotRestoreHistoryState(state, field);
+      content = Buffer.from(state.data, 'base64').toString('utf8');
+    } catch (error) {
+      if (error instanceof evidenceDeliverySchema.EvidenceDeliverySchemaError) {
+        fail('INVALID_HISTORY', `${field} base64 raw bytes 无效`);
+      }
+      throw error;
+    }
+  } else {
+    if (typeof state.data !== 'string' || Buffer.byteLength(state.data, 'utf8') !== state.byteLength) {
+      fail('INVALID_HISTORY', `${field} utf8 data/byteLength 无效`);
+    }
+    const actual = sha256(state.data);
+    if (revision(state.revision, `${field}.revision`) !== actual ||
+        revision(state.contentHash, `${field}.contentHash`) !== actual) {
+      fail('INVALID_HISTORY', `${field} utf8 data/hash 无效`);
+    }
+    content = state.data;
+  }
+  return {
+    exists: true,
+    revision: state.revision,
+    contentHash: state.contentHash,
+    byteLength: state.byteLength,
+    encoding: state.encoding,
+    data: state.data,
+    content,
+  };
+}
+
+function persistedV4State(state) {
+  const { content: _content, ...persisted } = state;
+  return persisted;
+}
+
+function stateContent(state) {
+  if (state.exists === false) return null;
+  if (typeof state.content === 'string') return state.content;
+  if (state.encoding === 'base64') return Buffer.from(state.data, 'base64').toString('utf8');
+  return state.data;
+}
+
 function validateApplicationRecord(raw, schema = HISTORY_SCHEMA) {
   if (!raw || typeof raw !== 'object' || !ENTRY_ID_RE.test(raw.id || '')) {
     fail('INVALID_HISTORY', '历史记录身份无效');
@@ -447,22 +577,97 @@ function validateApplicationRecord(raw, schema = HISTORY_SCHEMA) {
   if (!['applied', 'undone'].includes(raw.status) || !Array.isArray(raw.files) || !raw.files.length) {
     fail('INVALID_HISTORY', '历史记录状态或文件列表无效');
   }
+  const snapshotRestore = schema === HISTORY_SCHEMA &&
+    raw.provenance?.schema === SNAPSHOT_RESTORE_PROVENANCE_SCHEMA;
+  const legacyOrdinaryV4 = schema === HISTORY_SCHEMA && !snapshotRestore &&
+    raw.files.every(file => file && typeof file === 'object' && !Array.isArray(file) &&
+      Object.getPrototypeOf(file) === Object.prototype &&
+      !Object.hasOwn(file, 'ancestorIdentityDigest'));
+  if (schema === HISTORY_SCHEMA) {
+    const expectedKeys = [
+      'id', 'kind', 'changeSetId', 'status', 'appliedAt', 'files', 'provenance', 'integrity',
+      ...(raw.review !== undefined ? ['review'] : []),
+      ...(raw.undoneAt !== undefined ? ['undoneAt'] : []),
+    ];
+    exactKeys(raw, expectedKeys, 'v4 application entry');
+    if (snapshotRestore && (raw.review !== undefined ||
+        (raw.status === 'applied' && raw.undoneAt !== undefined) ||
+        (raw.status === 'undone' && raw.undoneAt === undefined))) {
+      fail('INVALID_HISTORY', 'snapshot restore entry status/undoneAt 无效');
+    }
+  }
   const seen = new Set();
   const files = raw.files.map(file => {
     if (!file || typeof file !== 'object') fail('INVALID_HISTORY', '历史文件记录无效');
-    const filePath = publicMarkdownPath(file.path);
+    const fileData = schema === HISTORY_SCHEMA
+      ? (() => {
+        const cloned = exactDataRecord(file, [
+        'path', 'summary', 'before', 'after', 'createdIdentityDigest', 'ancestorIdentityDigest',
+        ].filter(key => !legacyOrdinaryV4 || key !== 'ancestorIdentityDigest'), 'v4 file');
+        return legacyOrdinaryV4 ? { ...cloned, ancestorIdentityDigest: null } : cloned;
+      })()
+      : file;
+    const filePath = publicMarkdownPath(fileData.path);
     if (seen.has(filePath)) fail('INVALID_HISTORY', '历史记录包含重复文件');
     seen.add(filePath);
+    if (schema === HISTORY_SCHEMA) {
+      if (snapshotRestore) {
+        if (!SHA256_RE.test(fileData.ancestorIdentityDigest || '')) {
+          fail('INVALID_HISTORY', `${filePath} snapshot restore 缺少 ancestorIdentityDigest`);
+        }
+        try {
+          evidenceDeliverySchema.assertSnapshotRestoreHistoryFile({
+            path: fileData.path,
+            summary: fileData.summary,
+            before: fileData.before,
+            after: fileData.after,
+            createdIdentityDigest: fileData.createdIdentityDigest,
+          }, `${filePath} snapshot restore file`);
+        } catch (error) {
+          if (error instanceof evidenceDeliverySchema.EvidenceDeliverySchemaError) {
+            fail('INVALID_HISTORY', `${filePath} snapshot restore file 无效`);
+          }
+          throw error;
+        }
+      } else if (fileData.createdIdentityDigest !== null || fileData.ancestorIdentityDigest !== null) {
+        fail('INVALID_HISTORY', `${filePath} 普通 Changes identity digests 必须为 null`);
+      }
+      const before = validateV4FileState(fileData.before, `${filePath}.before`, { snapshotRestore });
+      const after = validateV4FileState(fileData.after, `${filePath}.after`, { snapshotRestore });
+      if (!after.exists) fail('INVALID_HISTORY', `${filePath}.after 必须存在`);
+      return {
+        path: filePath,
+        summary: snapshotRestore
+          ? fileData.summary
+          : boundedString(fileData.summary, `${filePath}.summary`, 0, 500),
+        before: persistedV4State(before),
+        after: persistedV4State(after),
+        createdIdentityDigest: fileData.createdIdentityDigest,
+        ancestorIdentityDigest: fileData.ancestorIdentityDigest,
+      };
+    }
+    const before = validateLegacyFileState(file.before, `${filePath}.before`);
+    const after = validateLegacyFileState(file.after, `${filePath}.after`);
     const result = {
       path: filePath,
       summary: typeof file.summary === 'string' ? file.summary.slice(0, 500) : '',
-      before: validateFileState(file.before, `${filePath}.before`),
-      after: validateFileState(file.after, `${filePath}.after`),
+      before,
+      after,
     };
     if (file.undoRevision !== undefined) result.undoRevision = revision(file.undoRevision, `${filePath}.undoRevision`);
     return result;
   });
-  const record = {
+  const provenanceRequired = [PREVIOUS_V3_HISTORY_SCHEMA, HISTORY_SCHEMA].includes(schema);
+  const provenance = provenanceRequired
+    ? (() => {
+      if (!Object.hasOwn(raw, 'provenance')) fail('INVALID_HISTORY', '历史记录缺少 provenance');
+      return validateProvenance(raw.provenance);
+    })()
+    : null;
+  if (snapshotRestore && provenance.selectedIds.length !== files.length) {
+    fail('INVALID_HISTORY', 'snapshot restore provenance 与 files 数量不一致');
+  }
+  const baseRecord = {
     id: raw.id,
     kind: 'application',
     changeSetId: changeSetId(raw.changeSetId),
@@ -470,24 +675,63 @@ function validateApplicationRecord(raw, schema = HISTORY_SCHEMA) {
     appliedAt: timestamp(raw.appliedAt, 'appliedAt'),
     files,
     ...(raw.review !== undefined ? { review: validateReviewAudit(raw.review) } : {}),
-    provenance: schema === HISTORY_SCHEMA
-      ? (() => {
-        if (!Object.hasOwn(raw, 'provenance')) fail('INVALID_HISTORY', '历史记录缺少 provenance');
-        return validateProvenance(raw.provenance);
-      })()
-      : null,
+    provenance,
     ...(raw.undoneAt !== undefined ? { undoneAt: timestamp(raw.undoneAt, 'undoneAt') } : {}),
   };
-  if (record.status === 'undone' && !record.undoneAt) fail('INVALID_HISTORY', '已撤销记录缺少时间');
+  if (baseRecord.status === 'undone' && !baseRecord.undoneAt) fail('INVALID_HISTORY', '已撤销记录缺少时间');
   const integrityPayload = schema === LEGACY_HISTORY_SCHEMA ? (() => {
-    const { kind: _kind, review: _review, provenance: _provenance, ...v1 } = record;
+    const { kind: _kind, review: _review, provenance: _provenance, ...v1 } = baseRecord;
     return v1;
   })() : schema === PREVIOUS_HISTORY_SCHEMA ? (() => {
-    const { provenance: _provenance, ...v2 } = record;
+    const { provenance: _provenance, ...v2 } = baseRecord;
     return v2;
-  })() : record;
+  })() : legacyOrdinaryV4 ? {
+    ...baseRecord,
+    files: baseRecord.files.map(file => {
+      const { ancestorIdentityDigest: _ancestorIdentityDigest, ...legacyFile } = file;
+      return legacyFile;
+    }),
+  } : baseRecord;
   if (raw.integrity !== integrityFor(integrityPayload)) fail('INVALID_HISTORY', '历史记录完整性校验失败');
-  return schema === HISTORY_SCHEMA ? { ...record, integrity: raw.integrity } : withIntegrity(record);
+  if (schema === HISTORY_SCHEMA) {
+    const record = legacyOrdinaryV4
+      ? withIntegrity(baseRecord)
+      : { ...baseRecord, integrity: raw.integrity };
+    if (snapshotRestore) {
+      const evidenceFiles = record.files.map(file => ({
+        path: file.path,
+        summary: file.summary,
+        before: file.before,
+        after: file.after,
+        createdIdentityDigest: file.createdIdentityDigest,
+      }));
+      const evidenceRecord = { ...record, files: evidenceFiles };
+      try { evidenceDeliverySchema.assertSnapshotRestoreHistoryBudget(evidenceFiles, evidenceRecord); } catch (error) {
+        if (error instanceof evidenceDeliverySchema.EvidenceDeliverySchemaError) {
+          fail('INVALID_HISTORY', 'snapshot restore History 预算或结构无效');
+        }
+        throw error;
+      }
+      const proof = { schema: HISTORY_SCHEMA, entries: [record] };
+      if (evidenceDeliverySchema.canonicalJsonByteLength(proof) >
+          evidenceDeliverySchema.SNAPSHOT_RESTORE_HISTORY_LIMITS.maxCanonicalRecordBytes) {
+        fail('INVALID_HISTORY', 'snapshot restore History canonical record 超过安全上限');
+      }
+    }
+    return record;
+  }
+  const migrated = {
+    ...baseRecord,
+    files: baseRecord.files.map(file => ({
+      path: file.path,
+      summary: file.summary,
+      before: v4FileStateFromContent(file.before.content, file.before.revision),
+      after: v4FileStateFromContent(file.after.content, file.after.revision),
+      createdIdentityDigest: null,
+      ancestorIdentityDigest: null,
+    })),
+  };
+  return withIntegrity(migrated);
 }
 
 function validateReviewRecord(raw, schema = HISTORY_SCHEMA) {
@@ -499,6 +743,13 @@ function validateReviewRecord(raw, schema = HISTORY_SCHEMA) {
   if (review.acceptedHunkIds.length || !review.rejectedHunkIds.length) {
     fail('INVALID_HISTORY', '仅拒绝审阅历史的决策无效');
   }
+  if (schema === HISTORY_SCHEMA) {
+    exactKeys(raw, [
+      'id', 'kind', 'changeSetId', 'status', 'reviewedAt', 'files',
+      'review', 'provenance', 'integrity',
+    ], 'v4 review entry');
+  }
+  const provenanceRequired = [PREVIOUS_V3_HISTORY_SCHEMA, HISTORY_SCHEMA].includes(schema);
   const record = {
     id: raw.id,
     kind: 'review',
@@ -507,7 +758,7 @@ function validateReviewRecord(raw, schema = HISTORY_SCHEMA) {
     reviewedAt: timestamp(raw.reviewedAt, 'reviewedAt'),
     files: [],
     review,
-    provenance: schema === HISTORY_SCHEMA
+    provenance: provenanceRequired
       ? (() => {
         if (!Object.hasOwn(raw, 'provenance')) fail('INVALID_HISTORY', '历史记录缺少 provenance');
         return validateProvenance(raw.provenance);
@@ -530,25 +781,55 @@ function validateRecord(raw, schema = HISTORY_SCHEMA) {
 }
 
 function emptyHistory() {
-  return { schema: HISTORY_SCHEMA, updatedAt: new Date().toISOString(), entries: [] };
+  return { schema: HISTORY_SCHEMA, entries: [] };
 }
 
 function validateHistory(raw) {
   if (!raw || typeof raw !== 'object' ||
-      ![HISTORY_SCHEMA, PREVIOUS_HISTORY_SCHEMA, LEGACY_HISTORY_SCHEMA].includes(raw.schema) || !Array.isArray(raw.entries) ||
+      ![HISTORY_SCHEMA, PREVIOUS_V3_HISTORY_SCHEMA, PREVIOUS_HISTORY_SCHEMA, LEGACY_HISTORY_SCHEMA].includes(raw.schema) ||
+      !Array.isArray(raw.entries) ||
       raw.entries.length > MAX_HISTORY_ENTRIES) {
     fail('INVALID_HISTORY', 'Changes 历史 schema 或结构无效');
   }
+  if (raw.schema === HISTORY_SCHEMA) {
+    exactKeys(raw, ['schema', 'entries'], 'changes/v4 document');
+  } else {
+    exactKeys(raw, ['schema', 'updatedAt', 'entries'], 'legacy changes document');
+    timestamp(raw.updatedAt, 'updatedAt');
+  }
   const seen = new Set();
-  const entries = raw.entries.map(entry => {
+  const validateEntry = entry => {
     const valid = raw.schema === LEGACY_HISTORY_SCHEMA
       ? validateApplicationRecord(entry, LEGACY_HISTORY_SCHEMA)
       : validateRecord(entry, raw.schema);
     if (seen.has(valid.id)) fail('INVALID_HISTORY', 'Changes 历史 ID 重复');
     seen.add(valid.id);
     return valid;
-  });
-  return { schema: HISTORY_SCHEMA, updatedAt: timestamp(raw.updatedAt, 'updatedAt'), entries };
+  };
+  let entries;
+  if (raw.schema === HISTORY_SCHEMA && raw.entries.length) {
+    entries = raw.entries.map(validateEntry);
+    const normalized = { schema: HISTORY_SCHEMA, entries };
+    try {
+      evidenceDeliverySchema.assertChangesV4DocumentEnvelope(normalized, entry => {
+        validateRecord(entry, HISTORY_SCHEMA);
+        return true;
+      });
+    } catch (error) {
+      if (error instanceof evidenceDeliverySchema.EvidenceDeliverySchemaError) {
+        fail(error.code === 'CHANGES_V4_BUDGET_EXCEEDED' ? 'HISTORY_TOO_LARGE' : 'INVALID_HISTORY',
+          'changes/v4 document envelope 无效');
+      }
+      throw error;
+    }
+  } else {
+    entries = raw.entries.map(validateEntry);
+    if (raw.schema === HISTORY_SCHEMA &&
+        evidenceDeliverySchema.canonicalJsonByteLength(raw) > MAX_HISTORY_BYTES) {
+      fail('HISTORY_TOO_LARGE', 'Changes 历史超过安全上限');
+    }
+  }
+  return { schema: HISTORY_SCHEMA, entries };
 }
 
 function loadHistory(rootPath) {
@@ -582,6 +863,24 @@ function validateHistoryState(state, field = 'historyState') {
   return { exists: state.exists, history };
 }
 
+function digestHistoryState(rawState) {
+  const state = exactDataRecord(
+    rawState,
+    ['exists', 'history'],
+    'terminalHistoryState'
+  );
+  const valid = validateHistoryState(state, 'terminalHistoryState');
+  const historyDigest = evidenceDeliverySchema.digestObject(
+    HISTORY_SCHEMA,
+    valid.history
+  );
+  return evidenceDeliverySchema.digestObject(TERMINAL_HISTORY_STATE_SCHEMA, {
+    schema: TERMINAL_HISTORY_STATE_SCHEMA,
+    exists: valid.exists,
+    historyDigest,
+  });
+}
+
 function sameHistoryState(left, right) {
   return left.exists === right.exists &&
     (!left.exists || JSON.stringify(left.history) === JSON.stringify(right.history));
@@ -610,8 +909,13 @@ function saveHistory(rootPath, history, options = {}) {
   const location = historyLocation(rootPath, true);
   atomicWrite(location.file, serialized, {
     beforeRename: expectedState === undefined
-      ? undefined
-      : () => assertExpectedHistoryState(rootPath, expectedState),
+      ? options.beforeRenameAuthority
+      : () => {
+        assertExpectedHistoryState(rootPath, expectedState);
+        if (typeof options.beforeRenameAuthority === 'function') {
+          options.beforeRenameAuthority();
+        }
+      },
   });
   return valid;
 }
@@ -620,7 +924,10 @@ function restoreHistoryState(rootPath, state, options = {}) {
   const target = validateHistoryState(state);
   const expectedState = options.expectedState;
   if (expectedState !== undefined) assertExpectedHistoryState(rootPath, expectedState);
-  if (target.exists) return saveHistory(rootPath, target.history, { expectedState });
+  if (target.exists) return saveHistory(rootPath, target.history, {
+    expectedState,
+    beforeRenameAuthority: options.beforeRenameAuthority,
+  });
   const location = historyLocation(rootPath, false);
   if (!location.exists) {
     // A recovery retry may be proving a prior deletion whose directory fsync
@@ -660,7 +967,7 @@ function withIntegrity(record) {
 function appendBounded(history, record) {
   let entries = [...history.entries, withIntegrity(record)];
   if (entries.length > MAX_HISTORY_ENTRIES) entries = entries.slice(entries.length - MAX_HISTORY_ENTRIES);
-  let candidate = { schema: HISTORY_SCHEMA, updatedAt: new Date().toISOString(), entries };
+  let candidate = { schema: HISTORY_SCHEMA, entries };
   while (entries.length > 1) {
     try {
       serializedHistory(candidate);
@@ -668,7 +975,7 @@ function appendBounded(history, record) {
     } catch (error) {
       if (!(error instanceof ChangeHistoryError) || error.code !== 'HISTORY_TOO_LARGE') throw error;
       entries = entries.slice(1);
-      candidate = { ...candidate, entries };
+      candidate = { schema: HISTORY_SCHEMA, entries };
     }
   }
   serializedHistory(candidate);
@@ -681,7 +988,7 @@ function rollbackWrites(projectService, rootPath, written, targetField) {
   for (const item of [...written].reverse()) {
     try {
       const target = item.file[targetField];
-      const result = projectService.atomicWriteFile(rootPath, item.file.path, target.content, item.revision);
+      const result = projectService.atomicWriteFile(rootPath, item.file.path, stateContent(target), item.revision);
       rolledBack.push({ path: item.file.path, revision: result.revision });
     } catch (error) {
       rollbackFailed.push({ path: item.file.path, error });
@@ -709,18 +1016,16 @@ function prepareApplication(rootPath, changeSet, options = {}) {
       path: change.path,
       summary: change.summary,
       before: {
-        revision: change.expectedRevision,
-        contentHash: sha256(change.before),
-        content: change.before,
+        ...v4FileStateFromContent(change.before, change.expectedRevision),
       },
       after: {
         // ProjectService revisions are SHA-256 content hashes, so the final
         // revision is known before applying and history capacity can be
         // checked without touching manuscript files.
-        revision: sha256(change.after),
-        contentHash: sha256(change.after),
-        content: change.after,
+        ...v4FileStateFromContent(change.after),
       },
+      createdIdentityDigest: null,
+      ancestorIdentityDigest: null,
     })),
     ...(review ? { review } : {}),
     provenance,
@@ -732,14 +1037,472 @@ function prepareApplication(rootPath, changeSet, options = {}) {
     kind: 'apply',
     files: record.files.map(file => ({
       path: file.path,
-      before: { revision: file.before.revision, content: file.before.content },
-      after: { revision: file.after.revision, content: file.after.content },
+      before: { revision: file.before.revision, content: stateContent(file.before) },
+      after: { revision: file.after.revision, content: stateContent(file.after) },
     })),
     changeSet: validChangeSet,
     baseHistoryState,
     preparedHistoryState: { exists: true, history: nextHistory },
     record: withIntegrity(record),
   };
+}
+
+function prepareSnapshotRestoreHistory(rootPath, files, provenance, options = {}) {
+  const baseHistoryState = loadHistoryState(rootPath);
+  const history = baseHistoryState.history;
+  if (!Array.isArray(files)) fail('INVALID_HISTORY', 'snapshot restore History files 无效');
+  const sealedFiles = files.map((file, index) => exactDataRecord(file, [
+    'path', 'summary', 'before', 'after', 'createdIdentityDigest', 'ancestorIdentityDigest',
+  ], `snapshot restore History files[${index}]`));
+  const record = {
+    id: options.id || `change_${crypto.randomUUID()}`,
+    kind: 'application',
+    changeSetId: options.changeSetId || `cs_${crypto.randomBytes(12).toString('hex')}`,
+    status: 'applied',
+    appliedAt: options.appliedAt || new Date().toISOString(),
+    files: sealedFiles,
+    provenance,
+  };
+  const validRecord = validateApplicationRecord(withIntegrity(record), HISTORY_SCHEMA);
+  const nextHistory = appendBounded(history, recordPayload(validRecord));
+  serializedHistory(nextHistory);
+  return {
+    kind: 'snapshot_restore',
+    files: validRecord.files,
+    baseHistoryState,
+    preparedHistoryState: { exists: true, history: nextHistory },
+    record: validRecord,
+  };
+}
+
+function validateSnapshotRestoreHistoryTemplate(raw) {
+  exactKeys(raw, [
+    'schema', 'id', 'changeSetId', 'appliedAt', 'files', 'provenance',
+  ], 'snapshot restore History template');
+  if (raw.schema !== SNAPSHOT_RESTORE_HISTORY_TEMPLATE_SCHEMA ||
+      !ENTRY_ID_RE.test(raw.id || '') || !CHANGESET_ID_RE.test(raw.changeSetId || '') ||
+      !Array.isArray(raw.files) || !raw.files.length || raw.files.length > 300) {
+    fail('INVALID_HISTORY', 'snapshot restore History template identity invalid');
+  }
+  timestamp(raw.appliedAt, 'appliedAt');
+  const placeholder = `sha256:${'0'.repeat(64)}`;
+  const normalizedFiles = raw.files.map((file, index) => {
+    const fileData = exactDataRecord(file, [
+      'path', 'summary', 'before', 'after', 'createdIdentityDigest', 'ancestorIdentityDigest',
+    ], `snapshot restore History template files[${index}]`);
+    if (fileData.createdIdentityDigest !== null) {
+      fail('INVALID_HISTORY', 'snapshot restore History template identity must be null');
+    }
+    if (!SHA256_RE.test(fileData.ancestorIdentityDigest || '')) {
+      fail('INVALID_HISTORY', 'snapshot restore History template ancestor identity invalid');
+    }
+    const candidate = {
+      path: fileData.path,
+      summary: fileData.summary,
+      before: fileData.before,
+      after: fileData.after,
+      createdIdentityDigest: fileData.before?.exists === false ? placeholder : null,
+    };
+    try {
+      evidenceDeliverySchema.assertSnapshotRestoreHistoryFile(
+        candidate,
+        `snapshot restore History template files[${index}]`
+      );
+    } catch (error) {
+      if (error instanceof evidenceDeliverySchema.EvidenceDeliverySchemaError) {
+        fail('INVALID_HISTORY', 'snapshot restore History template file invalid');
+      }
+      throw error;
+    }
+    return {
+      path: publicMarkdownPath(candidate.path),
+      summary: candidate.summary,
+      before: persistedV4State(validateV4FileState(
+        candidate.before,
+        `snapshot restore History template files[${index}].before`,
+        { snapshotRestore: true }
+      )),
+      after: persistedV4State(validateV4FileState(
+        candidate.after,
+        `snapshot restore History template files[${index}].after`,
+        { snapshotRestore: true }
+      )),
+      createdIdentityDigest: candidate.createdIdentityDigest,
+      ancestorIdentityDigest: fileData.ancestorIdentityDigest,
+    };
+  });
+  const normalizedProvenance = validateProvenance(raw.provenance);
+  const provisional = withIntegrity({
+    id: raw.id,
+    kind: 'application',
+    changeSetId: raw.changeSetId,
+    status: 'applied',
+    appliedAt: raw.appliedAt,
+    files: normalizedFiles,
+    provenance: normalizedProvenance,
+  });
+  const valid = validateApplicationRecord(provisional, HISTORY_SCHEMA);
+  return Object.freeze({
+    schema: SNAPSHOT_RESTORE_HISTORY_TEMPLATE_SCHEMA,
+    id: valid.id,
+    changeSetId: valid.changeSetId,
+    appliedAt: valid.appliedAt,
+    files: Object.freeze(valid.files.map(file => Object.freeze({
+      ...file,
+      createdIdentityDigest: null,
+    }))),
+    provenance: valid.provenance,
+  });
+}
+
+function prepareSnapshotRestoreHistoryTemplate(rootPath, files, provenance, options = {}) {
+  const baseHistoryState = loadHistoryState(rootPath);
+  const template = validateSnapshotRestoreHistoryTemplate({
+    schema: SNAPSHOT_RESTORE_HISTORY_TEMPLATE_SCHEMA,
+    id: options.id || `change_${crypto.randomUUID()}`,
+    changeSetId: options.changeSetId || `cs_${crypto.randomBytes(12).toString('hex')}`,
+    appliedAt: options.appliedAt || new Date().toISOString(),
+    files,
+    provenance,
+  });
+  return Object.freeze({
+    kind: 'snapshot_restore_template',
+    files: template.files,
+    baseHistoryState,
+    historyTemplate: template,
+    historyTemplateDigest: evidenceDeliverySchema.digestObject(
+      SNAPSHOT_RESTORE_HISTORY_TEMPLATE_SCHEMA,
+      template
+    ),
+  });
+}
+
+function materializeSnapshotRestoreHistoryTemplate(baseHistoryState, rawTemplate, rawIdentities) {
+  const template = validateSnapshotRestoreHistoryTemplate(rawTemplate);
+  if (!baseHistoryState || typeof baseHistoryState.exists !== 'boolean') {
+    fail('INVALID_HISTORY', 'snapshot restore template base History invalid');
+  }
+  const baseHistory = validateHistory(baseHistoryState.history);
+  if (!baseHistoryState.exists && baseHistory.entries.length) {
+    fail('INVALID_HISTORY', 'absent template base History cannot contain entries');
+  }
+  if (!Array.isArray(rawIdentities) || Object.getPrototypeOf(rawIdentities) !== Array.prototype) {
+    fail('INVALID_HISTORY', 'created identities invalid');
+  }
+  const arrayDescriptors = Object.getOwnPropertyDescriptors(rawIdentities);
+  const identityCount = arrayDescriptors.length?.value;
+  if (!Number.isSafeInteger(identityCount) || identityCount < 0 || identityCount > 300 ||
+      Reflect.ownKeys(rawIdentities).length !== identityCount + 1) {
+    fail('INVALID_HISTORY', 'created identities must be a dense plain array');
+  }
+  const identities = new Map();
+  for (let index = 0; index < identityCount; index += 1) {
+    const arrayDescriptor = arrayDescriptors[String(index)];
+    if (!arrayDescriptor || arrayDescriptor.enumerable !== true ||
+        !Object.hasOwn(arrayDescriptor, 'value') || Object.hasOwn(arrayDescriptor, 'get') ||
+        Object.hasOwn(arrayDescriptor, 'set')) {
+      fail('INVALID_HISTORY', 'created identities must be dense plain data');
+    }
+    const item = arrayDescriptor.value;
+    if (!item || typeof item !== 'object' || Array.isArray(item) ||
+        Object.getPrototypeOf(item) !== Object.prototype) {
+      fail('INVALID_HISTORY', 'created identity must be a plain record');
+    }
+    const itemKeys = Reflect.ownKeys(item);
+    if (itemKeys.length !== 2 || itemKeys.some(key => typeof key !== 'string') ||
+        !itemKeys.includes('path') || !itemKeys.includes('createdIdentityDigest')) {
+      fail('INVALID_HISTORY', 'created identity fields invalid');
+    }
+    const itemDescriptors = Object.getOwnPropertyDescriptors(item);
+    const readData = key => {
+      const descriptor = itemDescriptors[key];
+      if (!descriptor || descriptor.enumerable !== true ||
+          !Object.hasOwn(descriptor, 'value') || Object.hasOwn(descriptor, 'get') ||
+          Object.hasOwn(descriptor, 'set')) {
+        fail('INVALID_HISTORY', `created identity.${key} must be plain data`);
+      }
+      return descriptor.value;
+    };
+    const filePath = publicMarkdownPath(readData('path'));
+    const createdIdentityDigest = readData('createdIdentityDigest');
+    if (!SHA256_RE.test(createdIdentityDigest || '') || identities.has(filePath)) {
+      fail('INVALID_HISTORY', 'created identity invalid or duplicate');
+    }
+    identities.set(filePath, createdIdentityDigest);
+  }
+  const files = template.files.map(file => {
+    const creates = file.before.exists === false;
+    const createdIdentityDigest = identities.get(file.path) || null;
+    if (creates !== (createdIdentityDigest !== null)) {
+      fail('INVALID_HISTORY', 'created identity set does not match missing leaves');
+    }
+    return { ...file, createdIdentityDigest };
+  });
+  if (identities.size !== files.filter(file => file.before.exists === false).length) {
+    fail('INVALID_HISTORY', 'created identity set contains foreign path');
+  }
+  const validRecord = validateApplicationRecord(withIntegrity({
+    id: template.id,
+    kind: 'application',
+    changeSetId: template.changeSetId,
+    status: 'applied',
+    appliedAt: template.appliedAt,
+    files,
+    provenance: template.provenance,
+  }), HISTORY_SCHEMA);
+  const nextHistory = appendBounded(baseHistory, recordPayload(validRecord));
+  serializedHistory(nextHistory);
+  return Object.freeze({
+    kind: 'snapshot_restore',
+    files: validRecord.files,
+    baseHistoryState: { exists: baseHistoryState.exists, history: baseHistory },
+    preparedHistoryState: { exists: true, history: nextHistory },
+    record: validRecord,
+  });
+}
+
+function exactDenseArrayValues(value, field, maximum = 300) {
+  if (!Array.isArray(value) || Object.getPrototypeOf(value) !== Array.prototype) {
+    fail('INVALID_HISTORY', `${field} 必须是稠密普通数组`);
+  }
+  const descriptors = Object.getOwnPropertyDescriptors(value);
+  const length = descriptors.length?.value;
+  if (!Number.isSafeInteger(length) || length < 1 || length > maximum ||
+      Reflect.ownKeys(value).length !== length + 1) {
+    fail('INVALID_HISTORY', `${field} 数量或结构无效`);
+  }
+  return Array.from({ length }, (_, index) => {
+    const descriptor = descriptors[String(index)];
+    if (!descriptor || descriptor.enumerable !== true ||
+        !Object.hasOwn(descriptor, 'value') || Object.hasOwn(descriptor, 'get') ||
+        Object.hasOwn(descriptor, 'set')) {
+      fail('INVALID_HISTORY', `${field}[${index}] 必须是普通数据项`);
+    }
+    return descriptor.value;
+  });
+}
+
+function exactSnapshotState(value, field) {
+  if (!value || typeof value !== 'object' || Array.isArray(value) ||
+      Object.getPrototypeOf(value) !== Object.prototype) {
+    fail('INVALID_HISTORY', `${field} 无效`);
+  }
+  const existsDescriptor = Object.getOwnPropertyDescriptor(value, 'exists');
+  if (!existsDescriptor || !Object.hasOwn(existsDescriptor, 'value')) {
+    fail('INVALID_HISTORY', `${field}.exists 必须是普通数据字段`);
+  }
+  return exactDataRecord(value, existsDescriptor.value === true
+    ? ['exists', 'revision', 'contentHash', 'byteLength', 'encoding', 'data']
+    : ['exists', 'revision', 'contentHash', 'byteLength', 'encoding', 'data'], field);
+}
+
+function rawHistoryAuthority(rawBytes, expectedExists = true) {
+  if (!Buffer.isBuffer(rawBytes) || rawBytes.length > MAX_HISTORY_BYTES ||
+      (!expectedExists && rawBytes.length !== 0)) {
+    fail('INVALID_HISTORY', 'raw base History authority invalid');
+  }
+  let history;
+  if (expectedExists) {
+    try { history = validateHistory(JSON.parse(rawBytes.toString('utf8'))); }
+    catch (error) {
+      if (error instanceof ChangeHistoryError) throw error;
+      fail('INVALID_HISTORY', 'raw base History is invalid');
+    }
+  } else {
+    history = emptyHistory();
+  }
+  return Object.freeze({
+    exists: expectedExists,
+    history,
+    digest: sha256(Buffer.concat([Buffer.from([expectedExists ? 1 : 0]), rawBytes])),
+  });
+}
+
+function validateSnapshotRestoreUndoHistoryTemplate(raw) {
+  const value = exactDataRecord(raw, [
+    'schema', 'id', 'changeSetId', 'status', 'appliedAt', 'undoneAt',
+    'files', 'provenance', 'baseHistoryState',
+  ], 'snapshot restore undo History template');
+  if (value.schema !== SNAPSHOT_RESTORE_UNDO_HISTORY_TEMPLATE_SCHEMA ||
+      value.status !== 'undone' || !ENTRY_ID_RE.test(value.id || '') ||
+      !CHANGESET_ID_RE.test(value.changeSetId || '')) {
+    fail('INVALID_HISTORY', 'snapshot restore undo History template identity invalid');
+  }
+  timestamp(value.appliedAt, 'appliedAt');
+  timestamp(value.undoneAt, 'undoneAt');
+  const baseHistoryState = exactDataRecord(
+    value.baseHistoryState,
+    ['exists', 'digest'],
+    'snapshot restore undo History template.baseHistoryState'
+  );
+  if (baseHistoryState.exists !== true || !REVISION_RE.test(baseHistoryState.digest || '')) {
+    fail('INVALID_HISTORY', 'snapshot restore undo base History binding invalid');
+  }
+  const files = exactDenseArrayValues(value.files, 'snapshot restore undo History template.files')
+    .map((rawFile, index) => {
+      const file = exactDataRecord(rawFile, [
+        'path', 'summary', 'before', 'after', 'createdIdentityDigest',
+        'ancestorIdentityDigest',
+      ], `snapshot restore undo History template.files[${index}]`);
+      const before = exactSnapshotState(
+        file.before,
+        `snapshot restore undo History template.files[${index}].before`
+      );
+      const after = exactSnapshotState(
+        file.after,
+        `snapshot restore undo History template.files[${index}].after`
+      );
+      const snapshotFile = {
+        path: file.path,
+        summary: file.summary,
+        before,
+        after,
+        createdIdentityDigest: file.createdIdentityDigest,
+      };
+      try {
+        evidenceDeliverySchema.assertSnapshotRestoreHistoryFile(
+          snapshotFile,
+          `snapshot restore undo History template.files[${index}]`
+        );
+      } catch (error) {
+        if (error instanceof evidenceDeliverySchema.EvidenceDeliverySchemaError) {
+          fail('INVALID_HISTORY', 'snapshot restore undo History template file invalid');
+        }
+        throw error;
+      }
+      if (!SHA256_RE.test(file.ancestorIdentityDigest || '')) {
+        fail('INVALID_HISTORY', 'snapshot restore undo ancestor identity invalid');
+      }
+      return {
+        path: publicMarkdownPath(file.path),
+        summary: file.summary,
+        before: persistedV4State(validateV4FileState(before, `undo template.files[${index}].before`, {
+          snapshotRestore: true,
+        })),
+        after: persistedV4State(validateV4FileState(after, `undo template.files[${index}].after`, {
+          snapshotRestore: true,
+        })),
+        createdIdentityDigest: file.createdIdentityDigest,
+        ancestorIdentityDigest: file.ancestorIdentityDigest,
+      };
+    });
+  const provenance = validateProvenance(value.provenance);
+  const valid = validateApplicationRecord(withIntegrity({
+    id: value.id,
+    kind: 'application',
+    changeSetId: value.changeSetId,
+    status: 'undone',
+    appliedAt: value.appliedAt,
+    files,
+    provenance,
+    undoneAt: value.undoneAt,
+  }), HISTORY_SCHEMA);
+  const template = Object.freeze({
+    schema: SNAPSHOT_RESTORE_UNDO_HISTORY_TEMPLATE_SCHEMA,
+    id: valid.id,
+    changeSetId: valid.changeSetId,
+    status: 'undone',
+    appliedAt: valid.appliedAt,
+    undoneAt: valid.undoneAt,
+    files: Object.freeze(valid.files.map(file => Object.freeze({ ...file }))),
+    provenance: valid.provenance,
+    baseHistoryState: Object.freeze({ ...baseHistoryState }),
+  });
+  if (evidenceDeliverySchema.canonicalJsonByteLength(template) >
+      MAX_SNAPSHOT_UNDO_HISTORY_TEMPLATE_BYTES) {
+    fail('INVALID_HISTORY', 'snapshot restore undo History template exceeds preparedDelta budget');
+  }
+  return template;
+}
+
+function materializeSnapshotRestoreUndoHistoryTemplate(rawBaseHistoryBytes, rawTemplate) {
+  const template = validateSnapshotRestoreUndoHistoryTemplate(rawTemplate);
+  const base = rawHistoryAuthority(rawBaseHistoryBytes, template.baseHistoryState.exists);
+  if (base.digest !== template.baseHistoryState.digest) {
+    fail('INVALID_HISTORY', 'snapshot restore undo raw base History drifted');
+  }
+  const index = base.history.entries.findIndex(entry => entry.id === template.id);
+  const entry = base.history.entries[index];
+  if (!entry || entry.kind !== 'application' || entry.status !== 'applied' ||
+      entry.changeSetId !== template.changeSetId || entry.appliedAt !== template.appliedAt ||
+      evidenceDeliverySchema.canonicalJson(entry.files) !==
+        evidenceDeliverySchema.canonicalJson(template.files) ||
+      evidenceDeliverySchema.canonicalJson(entry.provenance) !==
+        evidenceDeliverySchema.canonicalJson(template.provenance)) {
+    fail('INVALID_HISTORY', 'snapshot restore undo template does not match base record');
+  }
+  const record = validateApplicationRecord(withIntegrity({
+    ...recordPayload(entry),
+    status: 'undone',
+    undoneAt: template.undoneAt,
+  }), HISTORY_SCHEMA);
+  const preparedHistory = {
+    schema: HISTORY_SCHEMA,
+    entries: base.history.entries.map((item, itemIndex) =>
+      itemIndex === index ? record : item),
+  };
+  const serialized = serializedHistory(preparedHistory);
+  const bytes = Buffer.from(serialized.serialized, 'utf8');
+  const digest = sha256(Buffer.concat([Buffer.from([1]), bytes]));
+  return Object.freeze({
+    kind: 'snapshot_restore_undo_history',
+    entryId: record.id,
+    record,
+    baseHistoryState: Object.freeze({ exists: true, history: base.history }),
+    preparedHistoryState: Object.freeze({ exists: true, history: serialized.valid }),
+    preparedHistoryBytes: bytes,
+    preparedHistoryDigest: digest,
+  });
+}
+
+function prepareSnapshotRestoreUndoHistory(rootPath, entryId, options = {}) {
+  if (typeof entryId !== 'string' || !ENTRY_ID_RE.test(entryId)) {
+    fail('INVALID_HISTORY_ID', '撤销记录 ID 无效');
+  }
+  const location = historyLocation(rootPath, false);
+  if (!location.exists) fail('HISTORY_NOT_FOUND', '找不到这条 Changes 历史');
+  const rawBaseHistoryBytes = fs.readFileSync(location.file);
+  const rawBase = rawHistoryAuthority(rawBaseHistoryBytes, true);
+  const baseHistoryState = { exists: true, history: rawBase.history };
+  const history = rawBase.history;
+  const index = history.entries.findIndex(entry => entry.id === entryId);
+  if (index === -1) fail('HISTORY_NOT_FOUND', '找不到这条 Changes 历史');
+  const entry = history.entries[index];
+  if (entry.kind !== 'application' ||
+      entry.provenance?.schema !== SNAPSHOT_RESTORE_PROVENANCE_SCHEMA) {
+    fail('HISTORY_NOT_UNDOABLE', '这不是 Snapshot 恢复记录');
+  }
+  if (entry.status !== 'applied') fail('HISTORY_ALREADY_UNDONE', '这条修改已经撤销');
+  const undoneAt = options.undoneAt || new Date().toISOString();
+  timestamp(undoneAt, 'undoneAt');
+  const historyTemplate = validateSnapshotRestoreUndoHistoryTemplate({
+    schema: SNAPSHOT_RESTORE_UNDO_HISTORY_TEMPLATE_SCHEMA,
+    id: entry.id,
+    changeSetId: entry.changeSetId,
+    status: 'undone',
+    appliedAt: entry.appliedAt,
+    undoneAt,
+    files: entry.files,
+    provenance: entry.provenance,
+    baseHistoryState: { exists: true, digest: rawBase.digest },
+  });
+  const materialized = materializeSnapshotRestoreUndoHistoryTemplate(
+    rawBaseHistoryBytes,
+    historyTemplate
+  );
+  return Object.freeze({
+    kind: 'snapshot_restore_undo_history',
+    entryId,
+    record: materialized.record,
+    baseHistoryState,
+    preparedHistoryState: materialized.preparedHistoryState,
+    historyTemplate,
+    historyTemplateDigest: evidenceDeliverySchema.digestObject(
+      SNAPSHOT_RESTORE_UNDO_HISTORY_TEMPLATE_SCHEMA,
+      historyTemplate
+    ),
+    preparedHistoryDigest: materialized.preparedHistoryDigest,
+  });
 }
 
 function executePreparedApplication(projectService, rootPath, prepared, options = {}) {
@@ -805,6 +1568,7 @@ function publicRecord(record) {
       afterRevision: file.after.revision,
       afterHash: file.after.contentHash,
       ...(file.undoRevision ? { undoRevision: file.undoRevision } : {}),
+      ...(record.status === 'undone' ? { undoRevision: file.before.revision } : {}),
     })),
   };
 }
@@ -870,6 +1634,9 @@ function prepareUndo(projectService, rootPath, entryId) {
   const entry = history.entries[index];
   if (entry.kind !== 'application') fail('HISTORY_NOT_UNDOABLE', '审阅决定不包含可撤销的正文修改');
   if (entry.status !== 'applied') fail('HISTORY_ALREADY_UNDONE', '这条修改已经撤销');
+  if (entry.provenance?.schema === SNAPSHOT_RESTORE_PROVENANCE_SCHEMA) {
+    fail('SNAPSHOT_RESTORE_UNDO_REQUIRED', 'Snapshot 恢复必须通过专用安全撤销事务');
+  }
 
   const snapshots = [];
   for (const file of entry.files) {
@@ -884,19 +1651,17 @@ function prepareUndo(projectService, rootPath, entryId) {
   }
   const reverse = changeSetService.createChangeSet(snapshots, entry.files.map(file => ({
     path: file.path,
-    after: file.before.content,
+    after: stateContent(file.before),
     summary: `撤销：${file.summary || file.path}`,
   })));
-  const undoRevisionByPath = new Map(entry.files.map(file => [file.path, file.before.revision]));
   const updated = {
     ...entry,
     status: 'undone',
     undoneAt: new Date().toISOString(),
-    files: entry.files.map(file => ({ ...file, undoRevision: undoRevisionByPath.get(file.path) })),
+    files: entry.files.map(file => ({ ...file })),
   };
   const preparedHistory = {
     ...history,
-    updatedAt: new Date().toISOString(),
     entries: history.entries.map((item, itemIndex) =>
       itemIndex === index ? withIntegrity(recordPayload(updated)) : item),
   };
@@ -905,8 +1670,8 @@ function prepareUndo(projectService, rootPath, entryId) {
     kind: 'undo',
     files: entry.files.map(file => ({
       path: file.path,
-      before: { revision: file.after.revision, content: file.after.content },
-      after: { revision: file.before.revision, content: file.before.content },
+      before: { revision: file.after.revision, content: stateContent(file.after) },
+      after: { revision: file.before.revision, content: stateContent(file.before) },
     })),
     changeSet: reverse,
     baseHistoryState,
@@ -919,14 +1684,10 @@ function executePreparedUndo(projectService, rootPath, prepared, options = {}) {
   const result = changeSetService.applyAll(projectService, rootPath, prepared.changeSet);
   if (!result.ok) return result;
 
-  const undoByPath = new Map(result.applied.map(file => [file.path, file.revision]));
   const history = prepared.preparedHistoryState.history;
   const index = history.entries.findIndex(entry => entry.id === prepared.entryId);
   const entry = history.entries[index];
-  const updated = withIntegrity(recordPayload({
-    ...entry,
-    files: entry.files.map(file => ({ ...file, undoRevision: undoByPath.get(file.path) })),
-  }));
+  const updated = withIntegrity(recordPayload({ ...entry }));
   history.entries[index] = updated;
   try {
     if (typeof options.saveHistory === 'function') {
@@ -939,7 +1700,7 @@ function executePreparedUndo(projectService, rootPath, prepared, options = {}) {
   } catch (error) {
     // Restore the applied content if marking the audit record as undone cannot
     // be committed. This preserves agreement between disk and history.
-    const written = updated.files.map(file => ({ file, revision: file.undoRevision }));
+    const written = updated.files.map(file => ({ file, revision: file.before.revision }));
     const rollback = rollbackWrites(projectService, rootPath, written, 'after');
     return {
       ok: false,
@@ -965,16 +1726,23 @@ function undoChange(projectService, rootPath, entryId, options = {}) {
 module.exports = {
   LEGACY_HISTORY_SCHEMA,
   PREVIOUS_HISTORY_SCHEMA,
+  PREVIOUS_V3_HISTORY_SCHEMA,
   HISTORY_SCHEMA,
+  TERMINAL_HISTORY_STATE_SCHEMA,
   HISTORY_RELATIVE_PATH,
   MAX_HISTORY_ENTRIES,
   MAX_HISTORY_BYTES,
   MAX_PROVENANCE_BYTES,
+  MAX_SNAPSHOT_UNDO_HISTORY_TEMPLATE_BYTES,
   RESEARCH_PROVENANCE_SCHEMA,
   INLINE_REWRITE_PROVENANCE_SCHEMA,
+  SNAPSHOT_RESTORE_PROVENANCE_SCHEMA,
+  SNAPSHOT_RESTORE_HISTORY_TEMPLATE_SCHEMA,
+  SNAPSHOT_RESTORE_UNDO_HISTORY_TEMPLATE_SCHEMA,
   ChangeHistoryError,
   validateProvenance,
   validateHistory,
+  digestHistoryState,
   loadHistory,
   loadHistoryState,
   saveHistory,
@@ -982,6 +1750,13 @@ module.exports = {
   listHistory,
   applyAndRecord,
   prepareApplication,
+  prepareSnapshotRestoreHistory,
+  validateSnapshotRestoreHistoryTemplate,
+  prepareSnapshotRestoreHistoryTemplate,
+  materializeSnapshotRestoreHistoryTemplate,
+  validateSnapshotRestoreUndoHistoryTemplate,
+  materializeSnapshotRestoreUndoHistoryTemplate,
+  prepareSnapshotRestoreUndoHistory,
   executePreparedApplication,
   recordReviewDecision,
   prepareReviewDecision,

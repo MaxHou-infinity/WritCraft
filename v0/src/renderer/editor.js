@@ -1,6 +1,8 @@
 // WritCraft V0 · Day 5
 // contenteditable + anchored inline Diff + ⌘L chat + local draft recovery
 
+'use strict';
+
 (function () {
   const STATUS_EL = document.getElementById('tip-tap-status');
   const COUNTER_EL = document.getElementById('char-count');

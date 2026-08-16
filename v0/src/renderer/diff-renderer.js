@@ -2,6 +2,8 @@
 // 用 word-level diff 显示 AI 修改/删除/新增
 // 依赖: diff.min.js (window.diff) 全局挂载
 
+'use strict';
+
 (function () {
   /**
    * 渲染 word-level diff HTML

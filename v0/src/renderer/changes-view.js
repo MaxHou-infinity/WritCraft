@@ -1,5 +1,7 @@
 // WritCraft V0 · Cross-file ChangeSet review panel
 
+'use strict';
+
 (function () {
   const bridge = window.writCraft && window.writCraft.project;
   const workArea = document.getElementById('work-area');

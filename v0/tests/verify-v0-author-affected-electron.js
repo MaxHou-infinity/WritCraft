@@ -26,6 +26,7 @@ const AUTHOR_SOURCE = process.env.WRITCRAFT_E2E_AUTHOR_PROJECT;
 const AUTHOR_TARGET = 'chapters/author-e2e.md';
 const CHAPTER_TARGET = fixture.CHAT_CURRENT_PATH;
 const AUTHOR_SOURCE_FILE = 'references/author-evidence.md';
+const FORCE = process.env.WRITCRAFT_E2E_FORCE === '1' || process.env.CI === 'true';
 
 async function waitForLog(logRef, marker, description, timeoutMs = 25_000) {
   const deadline = Date.now() + timeoutMs;
@@ -182,8 +183,8 @@ async function undoLatest(client, description) {
 
 async function run() {
   const unavailable = skipReason();
-  if (unavailable) {
-    console.log(`SKIP: ${unavailable}`);
+  if (unavailable && !FORCE) {
+    console.log(`⏭ SKIP: ${unavailable}. Set WRITCRAFT_E2E_FORCE=1 to require launch.`);
     return;
   }
   if (!AUTHOR_SOURCE) {

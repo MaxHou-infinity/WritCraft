@@ -8,6 +8,8 @@ const path = require('path');
 const ATTESTATION_SCHEMA = 'writcraft.native-helper-build/v1';
 const ARCHITECTURES = Object.freeze(['arm64', 'x86_64']);
 const MINIMUM_SYSTEM_VERSION = '11.0';
+const APP_VERSION = require('../package.json').version;
+const APP_VERSION_DEFINE = `-DWRITCRAFT_APP_VERSION=\"${APP_VERSION}\"`;
 const SIGNING_RECIPE = Object.freeze({
   executable: 'codesign',
   arguments: Object.freeze(['--force', '--sign', '-', '<output>']),
@@ -17,13 +19,16 @@ const BUILD_RECIPE = Object.freeze({
   compiler: 'xcrun',
   arguments: Object.freeze([
     '--sdk', 'macosx', 'clang', '-std=c11', '-Wall', '-Wextra', '-Werror', '-Os',
+    APP_VERSION_DEFINE,
     `-mmacosx-version-min=${MINIMUM_SYSTEM_VERSION}`,
+    '-framework', 'ImageIO', '-framework', 'CoreGraphics', '-framework', 'CoreFoundation', '-lz',
     '-arch', 'arm64', '-arch', 'x86_64', '<source>', '-o', '<output>',
   ]),
   signing: SIGNING_RECIPE,
 });
 const ATTESTATION_KEYS = Object.freeze([
-  'schema', 'sourceSha256', 'binarySha256', 'recipeSha256', 'architectures', 'minimumSystemVersion',
+  'schema', 'sourceSha256', 'binarySha256', 'recipeSha256', 'architectures',
+  'minimumSystemVersion', 'appVersion',
 ]);
 const NATIVE_HELPERS = Object.freeze({
   authorCopy: Object.freeze({
@@ -41,6 +46,22 @@ const NATIVE_HELPERS = Object.freeze({
   markdownTrash: Object.freeze({
     sourceName: 'markdown-trash-helper.c',
     outputName: 'markdown-trash-helper',
+  }),
+  snapshotStorage: Object.freeze({
+    sourceName: 'snapshot-storage-helper.c',
+    outputName: 'snapshot-storage-helper',
+  }),
+  changesHistoryArtifact: Object.freeze({
+    sourceName: 'changes-history-artifact-helper.c',
+    outputName: 'changes-history-artifact-helper',
+  }),
+  publicMarkdownCreate: Object.freeze({
+    sourceName: 'public-markdown-create-helper.c',
+    outputName: 'public-markdown-create-helper',
+  }),
+  deliveryImageDecode: Object.freeze({
+    sourceName: 'delivery-image-decode-helper.c',
+    outputName: 'delivery-image-decode-helper',
   }),
 });
 
@@ -68,6 +89,7 @@ function createNativeHelperAttestation({ source, output, fileSystem = fs }) {
     recipeSha256: recipeSha256(),
     architectures: Object.freeze([...ARCHITECTURES]),
     minimumSystemVersion: MINIMUM_SYSTEM_VERSION,
+    appVersion: APP_VERSION,
   });
 }
 
@@ -80,7 +102,8 @@ function assertAttestationShape(attestation) {
       !Array.isArray(attestation.architectures) ||
       attestation.architectures.length !== ARCHITECTURES.length ||
       attestation.architectures.some((architecture, index) => architecture !== ARCHITECTURES[index]) ||
-      attestation.minimumSystemVersion !== MINIMUM_SYSTEM_VERSION) {
+      attestation.minimumSystemVersion !== MINIMUM_SYSTEM_VERSION ||
+      attestation.appVersion !== APP_VERSION) {
     throw new Error('NATIVE_HELPER_BUILD_ATTESTATION_INVALID');
   }
 }
@@ -99,6 +122,7 @@ function assertNativeHelperAttestation(attestation, { source, output, fileSystem
     recipeSha256: attestation.recipeSha256,
     architectures: Object.freeze([...attestation.architectures]),
     minimumSystemVersion: attestation.minimumSystemVersion,
+    appVersion: attestation.appVersion,
   });
 }
 
@@ -127,7 +151,9 @@ function buildNativeHelper(options = {}) {
   fileSystem.mkdirSync(outputDirectory, { recursive: true });
   execFileSync('xcrun', [
     '--sdk', 'macosx', 'clang', '-std=c11', '-Wall', '-Wextra', '-Werror', '-Os',
+    APP_VERSION_DEFINE,
     `-mmacosx-version-min=${MINIMUM_SYSTEM_VERSION}`,
+    '-framework', 'ImageIO', '-framework', 'CoreGraphics', '-framework', 'CoreFoundation', '-lz',
     '-arch', 'arm64', '-arch', 'x86_64', source, '-o', output,
   ], { stdio: 'inherit' });
   fileSystem.chmodSync(output, 0o755);
@@ -167,6 +193,8 @@ module.exports = Object.freeze({
   ATTESTATION_KEYS,
   ARCHITECTURES,
   MINIMUM_SYSTEM_VERSION,
+  APP_VERSION,
+  APP_VERSION_DEFINE,
   NATIVE_HELPERS,
   BUILD_RECIPE,
   recipeSha256,

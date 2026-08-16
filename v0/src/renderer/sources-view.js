@@ -1,4 +1,6 @@
 // Local source and citation index view.
+'use strict';
+
 (function () {
   const bridge = window.writCraft?.project;
   const list = document.getElementById('source-index-list');
@@ -10,6 +12,13 @@
   const researchRun = document.getElementById('source-research-run');
   const researchCount = document.getElementById('source-research-count');
   const researchResults = document.getElementById('source-research-results');
+  const deliveryStatus = document.getElementById('delivery-preflight-status');
+  const deliverySnapshotSelect = document.getElementById('delivery-snapshot-select');
+  const deliverySnapshotRefresh = document.getElementById('delivery-snapshot-refresh');
+  const deliverySnapshotFiles = document.getElementById('delivery-snapshot-files');
+  const deliveryWarningDecision = document.getElementById('delivery-warning-decision');
+  const deliveryRun = document.getElementById('delivery-preflight-run');
+  const deliveryResult = document.getElementById('delivery-preflight-result');
   let active = false;
   let indexLoading = false;
   let importing = false;
@@ -22,6 +31,13 @@
   let navigationHandoff = null;
   let navigationSourceReturn = null;
   let latestResearchContextManifest = null;
+  let deliveryLoading = false;
+  let deliveryFilesLoading = false;
+  let deliveryFilesRequestOwner = 0;
+  let deliveryRequestSequence = 0;
+  let deliverySnapshots = [];
+  let deliveryFiles = [];
+  let deliveryCapabilityId = null;
 
   function exactKeys(value, keys) {
     if (!value || typeof value !== 'object' || Array.isArray(value)) return false;
@@ -81,6 +97,214 @@
       researchRun.textContent = navigationHandoff ? '使用所选来源继续处理' : '研究所选来源';
       researchRun.disabled = researching || !hasQuestion || selectedSourceIds.length === 0;
     }
+  }
+
+  function setDeliveryStatus(text, error = false) {
+    if (!deliveryStatus) return;
+    deliveryStatus.textContent = text;
+    deliveryStatus.style.color = error ? '#a3473e' : '';
+  }
+
+  function selectedDeliveryFiles() {
+    if (!deliverySnapshotFiles) return [];
+    return [...deliverySnapshotFiles.querySelectorAll('input[data-delivery-file-id]:checked')]
+      .map(input => input.dataset.deliveryFileId)
+      .filter(Boolean);
+  }
+
+  function syncDeliveryControls() {
+    const hasSnapshot = Boolean(deliverySnapshotSelect?.value);
+    const selected = selectedDeliveryFiles();
+    if (deliveryRun) deliveryRun.disabled = deliveryLoading || deliveryFilesLoading || !hasSnapshot || selected.length === 0;
+  }
+
+  function renderDeliveryFiles() {
+    if (!deliverySnapshotFiles) return;
+    deliverySnapshotFiles.replaceChildren();
+    const markdown = deliveryFiles.filter(file => file.kind === 'markdown' && file.displayPath !== 'edit.md');
+    if (!markdown.length) {
+      const empty = document.createElement('div');
+      empty.className = 'tree-empty';
+      empty.textContent = '此 snapshot 没有可交付 Markdown。';
+      deliverySnapshotFiles.appendChild(empty);
+      syncDeliveryControls();
+      return;
+    }
+    for (const file of markdown) {
+      const label = document.createElement('label');
+      label.className = 'delivery-file-choice';
+      const input = document.createElement('input');
+      input.type = 'checkbox';
+      input.dataset.deliveryFileId = file.fileId;
+      input.addEventListener('change', syncDeliveryControls);
+      const text = document.createElement('span');
+      text.textContent = file.displayPath;
+      label.append(input, text);
+      deliverySnapshotFiles.appendChild(label);
+    }
+    syncDeliveryControls();
+  }
+
+  async function loadDeliveryFiles(snapshotId, projectInstanceId, requestId) {
+    if (!snapshotId || !bridge?.listDeliverySnapshotFiles) return;
+    deliveryFilesLoading = true;
+    deliveryFilesRequestOwner = requestId;
+    syncDeliveryControls();
+    setDeliveryStatus('正在读取 snapshot 文件清单…');
+    let result;
+    try { result = await bridge.listDeliverySnapshotFiles(projectInstanceId, snapshotId); }
+    catch (error) { result = { ok: false, message: error?.message || 'snapshot 文件清单不可用' }; }
+    if (requestId !== deliveryRequestSequence) {
+      // A newer snapshot-list/file-list request owns the loading state.  Do
+      // not clear that newer request's spinner from this stale response.
+      if (deliveryFilesRequestOwner === requestId) {
+        deliveryFilesLoading = false;
+        deliveryFilesRequestOwner = 0;
+        syncDeliveryControls();
+      }
+      return;
+    }
+    if (projectInstanceId !== window.__workspace?.state?.project?.instanceId) {
+      deliveryFilesLoading = false;
+      deliveryFilesRequestOwner = 0;
+      syncDeliveryControls();
+      return;
+    }
+    deliveryFilesLoading = false;
+    deliveryFilesRequestOwner = 0;
+    if (!result?.ok || !Array.isArray(result.files)) {
+      deliveryFiles = [];
+      renderDeliveryFiles();
+      setDeliveryStatus(result?.message || result?.error || 'snapshot 文件清单不可用', true);
+      return;
+    }
+    deliveryFiles = result.files;
+    renderDeliveryFiles();
+    setDeliveryStatus('选择要预检的 Markdown 文件');
+  }
+
+  async function loadDeliverySnapshots() {
+    if (deliveryLoading || !window.__workspace?.state?.project || !bridge?.listDeliverySnapshots) return;
+    const projectInstanceId = window.__workspace.state.project.instanceId;
+    const requestId = ++deliveryRequestSequence;
+    deliveryLoading = true;
+    // A snapshot-list refresh supersedes any in-flight file-list request; do
+    // not leave the old loading owner disabling the new selection controls.
+    deliveryFilesLoading = false;
+    deliveryFilesRequestOwner = 0;
+    deliveryCapabilityId = null;
+    syncDeliveryControls();
+    setDeliveryStatus('正在读取已提交 snapshot…');
+    let result;
+    try { result = await bridge.listDeliverySnapshots(projectInstanceId); }
+    catch (error) { result = { ok: false, message: error?.message || 'snapshot 列表不可用' }; }
+    if (requestId !== deliveryRequestSequence) return;
+    if (projectInstanceId !== window.__workspace?.state?.project?.instanceId) {
+      deliveryLoading = false;
+      deliveryFilesLoading = false;
+      syncDeliveryControls();
+      return;
+    }
+    deliveryLoading = false;
+    if (!result?.ok || !Array.isArray(result.list?.items)) {
+      deliverySnapshots = [];
+      deliverySnapshotSelect?.replaceChildren(new Option('没有可用 snapshot', ''));
+      deliveryFiles = [];
+      renderDeliveryFiles();
+      setDeliveryStatus(result?.message || result?.error || 'snapshot 列表不可用', true);
+      return;
+    }
+    deliverySnapshots = result.list.items;
+    if (deliverySnapshotSelect) {
+      deliverySnapshotSelect.replaceChildren(new Option(
+        deliverySnapshots.length ? '选择 snapshot' : '没有可用 snapshot', ''
+      ));
+      for (const item of deliverySnapshots) {
+        const option = new Option(
+          `${item.snapshotId} · ${item.markdownCount} 篇 · ${item.totalBytes} B`,
+          item.snapshotId
+        );
+        deliverySnapshotSelect.appendChild(option);
+      }
+    }
+    deliveryFiles = [];
+    renderDeliveryFiles();
+    setDeliveryStatus(deliverySnapshots.length ? '选择一个 snapshot 开始预检' : '没有可用 snapshot');
+  }
+
+  async function selectDeliverySnapshot() {
+    const projectInstanceId = window.__workspace?.state?.project?.instanceId;
+    const snapshotId = deliverySnapshotSelect?.value || '';
+    const requestId = ++deliveryRequestSequence;
+    deliveryCapabilityId = null;
+    if (!projectInstanceId || !snapshotId) {
+      deliveryFilesLoading = false;
+      deliveryFilesRequestOwner = 0;
+      deliveryFiles = [];
+      renderDeliveryFiles();
+      setDeliveryStatus('选择一个已提交 snapshot');
+      return;
+    }
+    await loadDeliveryFiles(snapshotId, projectInstanceId, requestId);
+  }
+
+  function renderDeliveryResult(preflight) {
+    if (!deliveryResult) return;
+    deliveryResult.replaceChildren();
+    deliveryResult.classList.remove('is-error');
+    if (!preflight) return;
+    const summary = document.createElement('div');
+    summary.textContent = preflight.canExport
+      ? '预检通过：当前 snapshot 与所选文件可用于离线导出。'
+      : `预检阻断：${(preflight.blockers || []).length} 个阻断，${(preflight.warnings || []).length} 个警告。`;
+    deliveryResult.appendChild(summary);
+    if (Array.isArray(preflight.health?.items)) {
+      for (const item of preflight.health.items.slice(0, 12)) {
+        const line = document.createElement('div');
+        line.textContent = `${item.severity === 'blocker' ? '阻断' : '警告'}：${item.reasonCode} · ${item.subjectLabel}`;
+        deliveryResult.appendChild(line);
+      }
+    }
+  }
+
+  async function runDeliveryPreflight() {
+    if (deliveryLoading || deliveryFilesLoading || !bridge?.deliveryPreflight) return;
+    const projectInstanceId = window.__workspace?.state?.project?.instanceId;
+    const snapshotId = deliverySnapshotSelect?.value || '';
+    const selected = selectedDeliveryFiles();
+    if (!projectInstanceId || !snapshotId || !selected.length) return;
+    const requestId = ++deliveryRequestSequence;
+    deliveryLoading = true;
+    deliveryCapabilityId = null;
+    syncDeliveryControls();
+    setDeliveryStatus('正在执行只读交付预检…');
+    if (deliveryResult) deliveryResult.replaceChildren();
+    let result;
+    try {
+      result = await bridge.deliveryPreflight(projectInstanceId, {
+        schema: 'writcraft.delivery-preflight-request/v1',
+        projectInstanceId,
+        snapshotId,
+        orderedFiles: selected.map((fileId, index) => ({ fileId, pageBreakBefore: index > 0 })),
+        warningDecision: deliveryWarningDecision?.value || 'REVIEW_ONLY',
+      });
+    } catch (error) { result = { ok: false, message: error?.message || '交付预检不可用' }; }
+    if (requestId !== deliveryRequestSequence || projectInstanceId !== window.__workspace?.state?.project?.instanceId) return;
+    deliveryLoading = false;
+    syncDeliveryControls();
+    if (!result?.ok || !result.preflight) {
+      deliveryCapabilityId = null;
+      renderDeliveryResult(null);
+      if (deliveryResult) {
+        deliveryResult.classList.add('is-error');
+        deliveryResult.textContent = result?.message || result?.error || '交付预检失败';
+      }
+      setDeliveryStatus('交付预检未完成', true);
+      return;
+    }
+    deliveryCapabilityId = result.preflight.exportCapabilityId || null;
+    renderDeliveryResult(result.preflight);
+    setDeliveryStatus(result.preflight.canExport ? '交付预检通过' : '交付预检被阻断', !result.preflight.canExport);
   }
 
   function clearResearchResults() {
@@ -600,10 +824,14 @@
   function open() {
     active = true;
     refresh();
+    void loadDeliverySnapshots();
   }
 
   importButton?.addEventListener('click', importReference);
   refreshButton?.addEventListener('click', refresh);
+  deliverySnapshotRefresh?.addEventListener('click', loadDeliverySnapshots);
+  deliverySnapshotSelect?.addEventListener('change', selectDeliverySnapshot);
+  deliveryRun?.addEventListener('click', runDeliveryPreflight);
   researchQuestion?.addEventListener('input', syncResearchControls);
   researchRun?.addEventListener('click', runResearch);
   document.addEventListener('writcraft:tree-changed', () => { if (active) refresh(); });
@@ -619,12 +847,24 @@
     navigationHandoff = null;
     navigationSourceReturn = null;
     researching = false;
+    deliveryRequestSequence += 1;
+    deliveryLoading = false;
+    deliveryFilesLoading = false;
+    deliveryFilesRequestOwner = 0;
+    deliverySnapshots = [];
+    deliveryFiles = [];
+    deliveryCapabilityId = null;
+    deliverySnapshotSelect?.replaceChildren(new Option('没有可用 snapshot', ''));
+    renderDeliveryFiles();
+    if (deliveryResult) deliveryResult.replaceChildren();
+    setDeliveryStatus('选择一个已提交 snapshot');
     clearResearchResults();
     syncResearchControls();
     if (active) refresh();
   });
   document.addEventListener('writcraft:sidebar-view-changed', event => {
     active = event.detail === 'sources';
+    if (active) void loadDeliverySnapshots();
   });
 
   window.__sourcesView = {

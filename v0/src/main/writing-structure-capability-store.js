@@ -7,6 +7,7 @@ const {
 } = require('./writing-structure-service');
 
 const DEFAULT_TTL_MS = 10 * 60 * 1000;
+const DEFAULT_MAX_ENTRIES = 64;
 const CAPABILITY_ID_RE = /^wsc_[a-f0-9]{32}$/;
 const PROJECT_INSTANCE_ID_RE = /^instance_[a-f0-9]{24}$/;
 const NAVIGATION_ID_RE = /^nav_[a-f0-9]{32}$/;
@@ -94,6 +95,9 @@ function createWritingStructureCapabilityStore(options = {}) {
   const ttlMs = Number.isSafeInteger(options.ttlMs) && options.ttlMs > 0
     ? Math.min(options.ttlMs, DEFAULT_TTL_MS)
     : DEFAULT_TTL_MS;
+  const maxEntries = Number.isSafeInteger(options.maxEntries) && options.maxEntries > 0
+    ? Math.min(options.maxEntries, DEFAULT_MAX_ENTRIES)
+    : DEFAULT_MAX_ENTRIES;
   const records = new Map();
   // A consumed/expired token is never reissued during this store lifetime.
   // Otherwise a delayed replay could accidentally address a later capability
@@ -126,6 +130,15 @@ function createWritingStructureCapabilityStore(options = {}) {
       createdAt,
       expiresAt,
     }));
+    // Bound live records: a prepared record carries the full preview, so an
+    // unbounded TTL window would accumulate memory without limit. Evict the
+    // oldest record; consumed/expired tokens stay in issuedIds so a delayed
+    // replay can never address a later capability.
+    while (records.size > maxEntries) {
+      const oldest = records.keys().next().value;
+      if (oldest === undefined) break;
+      records.delete(oldest);
+    }
     return Object.freeze({
       capabilityId,
       expiresAt,

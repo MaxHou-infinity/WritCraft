@@ -275,6 +275,17 @@
     #source-research-run:disabled { opacity: .48; cursor: default; }
     #source-research-results { max-height: 42%; overflow: auto; border-bottom: 1px solid var(--line); padding: 6px 7px; background: #f8f4ed; }
     #source-research-results[hidden] { display: none; }
+    .delivery-preflight-panel { padding: 9px 10px 10px; border-bottom: 1px solid var(--line); background: rgba(244,239,229,.72); }
+    .delivery-preflight-controls { display: flex; align-items: center; gap: 6px; margin-top: 7px; }
+    .delivery-preflight-controls select { min-width: 0; flex: 1; border: 1px solid #d2c9bc; border-radius: 4px; padding: 4px 5px; background: #fffdf9; color: var(--ink); font-size: 9px; }
+    .delivery-preflight-controls button { flex: 0 0 auto; border: 1px solid var(--theme); border-radius: 4px; padding: 4px 7px; background: var(--theme); color: #fff; cursor: pointer; font-size: 9px; }
+    .delivery-preflight-controls button:disabled { opacity: .48; cursor: default; }
+    .delivery-snapshot-files { max-height: 116px; overflow: auto; margin-top: 6px; border: 1px solid #e0d7ca; border-radius: 4px; background: rgba(255,255,255,.54); }
+    .delivery-file-choice { display: flex; align-items: center; gap: 6px; padding: 4px 6px; color: var(--ink-soft); font-size: 9px; }
+    .delivery-file-choice + .delivery-file-choice { border-top: 1px solid #eee8df; }
+    .delivery-file-choice input { accent-color: var(--theme); }
+    .delivery-preflight-result { margin-top: 7px; color: var(--ink-soft); font-size: 9px; line-height: 1.45; }
+    .delivery-preflight-result.is-error { color: #a3473e; }
     .research-state { padding: 10px 7px; color: var(--ink-soft); font-size: 9px; line-height: 1.55; }
     .research-state.is-warning { margin: 4px 0 6px; border-left: 2px solid #b7834f; background: #fff8ec; color: #76522f; }
     .research-card { margin: 4px 0; padding: 9px; border: 1px solid #ddd2c3; border-radius: 6px; background: #fffdf8; }
@@ -1098,6 +1109,19 @@
       <section class="sidebar-view" id="sidebar-sources-view" hidden>
         <div class="explorer-label"><span>来源与证据</span><span>REFERENCES</span></div>
         <div class="source-toolbar"><span id="source-index-status">等待建立本地来源索引</span><div class="source-toolbar-actions"><select id="source-citation-style" aria-label="脚注格式"><option value="apa7">APA7</option><option value="mla9">MLA9</option><option value="chicago17">Chicago17</option></select><button id="source-import" type="button">导入</button><button id="source-index-refresh" type="button">刷新</button></div></div>
+        <section class="delivery-preflight-panel" aria-label="交付预检">
+          <div class="source-research-head"><strong>交付预检</strong><span id="delivery-preflight-status" role="status" aria-live="polite">选择一个已提交 snapshot</span></div>
+          <div class="delivery-preflight-controls">
+            <select id="delivery-snapshot-select" aria-label="已提交 snapshot"><option value="">没有可用 snapshot</option></select>
+            <button id="delivery-snapshot-refresh" type="button">刷新 snapshot</button>
+          </div>
+          <div id="delivery-snapshot-files" class="delivery-snapshot-files"><div class="tree-empty">刷新后显示可交付 Markdown。</div></div>
+          <div class="delivery-preflight-controls">
+            <select id="delivery-warning-decision" aria-label="预检警告处理"><option value="REVIEW_ONLY">只查看警告</option><option value="CONTINUE_WITH_WARNINGS">继续并允许警告</option></select>
+            <button id="delivery-preflight-run" type="button" disabled>运行交付预检</button>
+          </div>
+          <div id="delivery-preflight-result" class="delivery-preflight-result" aria-live="polite"></div>
+        </section>
         <div class="source-research-compose">
           <div class="source-research-head"><strong>本地证据 Research</strong><span id="source-research-count" aria-live="polite">0 / 8</span></div>
           <textarea id="source-research-question" maxlength="4000" placeholder="例如：这些资料能支持文章中的哪些关键主张？"></textarea>
@@ -1356,7 +1380,7 @@
 
   <script src="diff.min.js"></script>
   <script src="diff-renderer.js"></script>
-  <script src="marked.umd.js"></script>
+  <script src="../shared/marked.umd.js"></script>
   <script src="rewrite-state.js"></script>
   <script src="html-sanitizer.js"></script>
   <script src="legacy-draft.js"></script>

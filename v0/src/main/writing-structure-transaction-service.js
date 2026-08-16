@@ -21,6 +21,9 @@ const TARGET_NAME = 'chapters';
 const MAX_MARKER_BYTES = 64 * 1024;
 const MAX_HELPER_BYTES = 8 * 1024;
 const MAX_RECEIPT_BYTES = 512;
+// Cap helper execution: a hung native helper must not freeze the main
+// process forever (all other spawnSync helper sites already bound a timeout).
+const HELPER_TIMEOUT_MS = 10 * 1000;
 const NO_FOLLOW = typeof fs.constants.O_NOFOLLOW === 'number'
   ? fs.constants.O_NOFOLLOW
   : 0;
@@ -380,6 +383,7 @@ function createWritingStructureTransactionService(options = {}) {
       input: JSON.stringify(request),
       encoding: 'utf8',
       maxBuffer: MAX_HELPER_BYTES,
+      timeout: HELPER_TIMEOUT_MS,
       stdio,
     });
     return { execution, report: parseHelper(execution, kind) };

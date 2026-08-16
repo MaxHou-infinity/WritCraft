@@ -1,5 +1,7 @@
 // WritCraft V0 · Project workspace controller
 
+'use strict';
+
 (function () {
   const bridge = window.writCraft && window.writCraft.project;
   const rewriteBridge = window.writCraft;
@@ -991,6 +993,10 @@
   async function relocateFile(sourcePath, targetPath, method, label) {
     if (!state.project || !bridge?.[method] || sourcePath === 'edit.md') return false;
     if (!targetPath || targetPath === sourcePath) return false;
+    if (!isPublicMarkdownPath(targetPath)) {
+      showError('目标必须是项目内的普通 Markdown 路径');
+      return false;
+    }
     if (!(await persistCurrent(true))) return false;
     closeFileMenus();
     setSaveState(`正在${label}…`, 'saving');
@@ -2766,6 +2772,10 @@
     if (!(await persistCurrent(true))) return;
     const normalized = path.trim().replace(/\\/g, '/');
     const markdownPath = /\.(?:md|markdown)$/i.test(normalized) ? normalized : `${normalized}.md`;
+    if (!isPublicMarkdownPath(markdownPath)) {
+      showError('文件名必须是项目内的普通 Markdown 路径');
+      return;
+    }
     let result;
     try {
       result = normalizeResult(await bridge.createFile(markdownPath));

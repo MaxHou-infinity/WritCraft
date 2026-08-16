@@ -158,7 +158,8 @@ function createChangesHistoryHandler(options = {}) {
       const descriptor = Object.getOwnPropertyDescriptor(decision || {}, 'changeSetId');
       changeSetId = descriptor && Object.hasOwn(descriptor, 'value') ? descriptor.value : null;
       pending = pendingChangeSets.get(changeSetId);
-      if (!pending || pending.rootPath !== project.rootPath) {
+      if (!pending || pending.rootPath !== project.rootPath ||
+          (pending.projectInstanceId !== null && pending.projectInstanceId !== project.instanceId)) {
         fail('CHANGESET_NOT_FOUND', '待审阅修改不属于当前项目，请重新生成');
       }
       if (pending.researchDependencies) {

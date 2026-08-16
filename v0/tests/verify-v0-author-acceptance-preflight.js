@@ -1033,7 +1033,11 @@ test('quarantines an owned cleanup entry before a foreign stable-path arrival', 
       const name = path.basename(String(target));
       if (!injected && name.startsWith('.writcraft-author-cleanup-')) {
         injected = true;
-        fs.writeFileSync(path.join(process.cwd(), 'foreign-at-stable-name.txt'), 'FOREIGN');
+        // Place the foreign file at a stable path inside the destination tree
+        // derived from the entry being cleaned, instead of relying on
+        // process.cwd() (which the service may chdir away from). This keeps
+        // the injection inside scratch and cannot pollute the caller cwd.
+        fs.writeFileSync(path.join(path.dirname(path.resolve(String(target))), 'foreign-at-stable-name.txt'), 'FOREIGN');
       }
       return originalUnlink.call(fs, target);
     };

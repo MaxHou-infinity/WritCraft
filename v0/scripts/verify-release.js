@@ -20,14 +20,20 @@ const packagedHelper = path.join(app, 'Contents', 'Helpers', 'author-copy-helper
 const packagedWritingStructureHelper = path.join(app, 'Contents', 'Helpers', 'writing-structure-helper');
 const packagedProjectHashHelper = path.join(app, 'Contents', 'Helpers', 'project-hash-helper');
 const packagedMarkdownTrashHelper = path.join(app, 'Contents', 'Helpers', 'markdown-trash-helper');
+const packagedChangesHistoryArtifactHelper = path.join(app, 'Contents', 'Helpers', 'changes-history-artifact-helper');
+const packagedDeliveryImageDecodeHelper = path.join(app, 'Contents', 'Helpers', 'delivery-image-decode-helper');
 const builtHelper = path.join(root, 'src', 'main', 'native', 'author-copy-helper');
 const builtWritingStructureHelper = path.join(root, 'src', 'main', 'native', 'writing-structure-helper');
 const builtProjectHashHelper = path.join(root, 'src', 'main', 'native', 'project-hash-helper');
 const builtMarkdownTrashHelper = path.join(root, 'src', 'main', 'native', 'markdown-trash-helper');
+const builtChangesHistoryArtifactHelper = path.join(root, 'src', 'main', 'native', 'changes-history-artifact-helper');
+const builtDeliveryImageDecodeHelper = path.join(root, 'src', 'main', 'native', 'delivery-image-decode-helper');
 const helperSource = path.join(root, 'native', 'author-copy-helper.c');
 const writingStructureHelperSource = path.join(root, 'native', 'writing-structure-helper.c');
 const projectHashHelperSource = path.join(root, 'native', 'project-hash-helper.c');
 const markdownTrashHelperSource = path.join(root, 'native', 'markdown-trash-helper.c');
+const changesHistoryArtifactHelperSource = path.join(root, 'native', 'changes-history-artifact-helper.c');
+const deliveryImageDecodeHelperSource = path.join(root, 'native', 'delivery-image-decode-helper.c');
 const sourcePackage = JSON.parse(fs.readFileSync(path.join(root, 'package.json'), 'utf8'));
 const PRODUCT_NAME = '笔触 · WritCraft';
 const info = JSON.parse(fs.readFileSync(path.join(outputRoot, 'build-info.json'), 'utf8'));
@@ -75,7 +81,7 @@ function assertReleaseInfo() {
   assert.strictEqual(info.notarized, false);
   assert(exactKeys(
     info.nativeHelperBuilds,
-    ['authorCopy', 'writingStructure', 'projectHash', 'markdownTrash']
+    ['authorCopy', 'writingStructure', 'projectHash', 'markdownTrash', 'changesHistoryArtifact', 'deliveryImageDecode']
   ));
   nativeHelperBuildService.assertNativeHelperAttestation(info.nativeHelperBuilds.authorCopy, {
     source: helperSource,
@@ -93,6 +99,14 @@ function assertReleaseInfo() {
     source: markdownTrashHelperSource,
     output: builtMarkdownTrashHelper,
   });
+  nativeHelperBuildService.assertNativeHelperAttestation(info.nativeHelperBuilds.changesHistoryArtifact, {
+    source: changesHistoryArtifactHelperSource,
+    output: builtChangesHistoryArtifactHelper,
+  });
+  nativeHelperBuildService.assertNativeHelperAttestation(info.nativeHelperBuilds.deliveryImageDecode, {
+    source: deliveryImageDecodeHelperSource,
+    output: builtDeliveryImageDecodeHelper,
+  });
   assertArtifactHelperBinding(info.nativeHelperBuilds.authorCopy, packagedHelper);
   assertArtifactHelperBinding(
     info.nativeHelperBuilds.writingStructure,
@@ -100,6 +114,11 @@ function assertReleaseInfo() {
   );
   assertArtifactHelperBinding(info.nativeHelperBuilds.projectHash, packagedProjectHashHelper);
   assertArtifactHelperBinding(info.nativeHelperBuilds.markdownTrash, packagedMarkdownTrashHelper);
+  assertArtifactHelperBinding(
+    info.nativeHelperBuilds.changesHistoryArtifact,
+    packagedChangesHistoryArtifactHelper
+  );
+  assertArtifactHelperBinding(info.nativeHelperBuilds.deliveryImageDecode, packagedDeliveryImageDecodeHelper);
 }
 
 function assertArtifactHelperBinding(attestation, target) {
@@ -384,6 +403,8 @@ console.log('\nWritCraft packaged release verification');
     execFileSync('codesign', ['--verify', '--strict', packagedWritingStructureHelper], { stdio: 'pipe' });
     execFileSync('codesign', ['--verify', '--strict', packagedProjectHashHelper], { stdio: 'pipe' });
     execFileSync('codesign', ['--verify', '--strict', packagedMarkdownTrashHelper], { stdio: 'pipe' });
+    execFileSync('codesign', ['--verify', '--strict', packagedChangesHistoryArtifactHelper], { stdio: 'pipe' });
+    execFileSync('codesign', ['--verify', '--strict', packagedDeliveryImageDecodeHelper], { stdio: 'pipe' });
     const temporary = fs.mkdtempSync(path.join(os.tmpdir(), 'writcraft-release-zip-'));
     try {
       execFileSync('unzip', ['-q', zip, '-d', temporary], { stdio: 'pipe' });
@@ -412,11 +433,25 @@ console.log('\nWritCraft packaged release verification');
         'Helpers',
         'markdown-trash-helper'
       );
+      const extractedChangesHistoryArtifactHelper = path.join(
+        extractedApp,
+        'Contents',
+        'Helpers',
+        'changes-history-artifact-helper'
+      );
+      const extractedDeliveryImageDecodeHelper = path.join(
+        extractedApp,
+        'Contents',
+        'Helpers',
+        'delivery-image-decode-helper'
+      );
       execFileSync('codesign', ['--verify', '--deep', '--strict', extractedApp], { stdio: 'pipe' });
       execFileSync('codesign', ['--verify', '--strict', extractedHelper], { stdio: 'pipe' });
       execFileSync('codesign', ['--verify', '--strict', extractedWritingStructureHelper], { stdio: 'pipe' });
       execFileSync('codesign', ['--verify', '--strict', extractedProjectHashHelper], { stdio: 'pipe' });
       execFileSync('codesign', ['--verify', '--strict', extractedMarkdownTrashHelper], { stdio: 'pipe' });
+      execFileSync('codesign', ['--verify', '--strict', extractedChangesHistoryArtifactHelper], { stdio: 'pipe' });
+      execFileSync('codesign', ['--verify', '--strict', extractedDeliveryImageDecodeHelper], { stdio: 'pipe' });
       assertArtifactHelperBinding(info.nativeHelperBuilds.authorCopy, extractedHelper);
       assertArtifactHelperBinding(
         info.nativeHelperBuilds.writingStructure,
@@ -424,11 +459,17 @@ console.log('\nWritCraft packaged release verification');
       );
       assertArtifactHelperBinding(info.nativeHelperBuilds.projectHash, extractedProjectHashHelper);
       assertArtifactHelperBinding(info.nativeHelperBuilds.markdownTrash, extractedMarkdownTrashHelper);
+      assertArtifactHelperBinding(
+        info.nativeHelperBuilds.changesHistoryArtifact,
+        extractedChangesHistoryArtifactHelper
+      );
+      assertArtifactHelperBinding(info.nativeHelperBuilds.deliveryImageDecode, extractedDeliveryImageDecodeHelper);
       assertTreeEqual(app, extractedApp);
       verifyMinimumSystemVersion(extractedApp, extractedHelper);
       verifyMinimumSystemVersion(extractedApp, extractedWritingStructureHelper);
       verifyMinimumSystemVersion(extractedApp, extractedProjectHashHelper);
       verifyMinimumSystemVersion(extractedApp, extractedMarkdownTrashHelper);
+      verifyMinimumSystemVersion(extractedApp, extractedChangesHistoryArtifactHelper);
       exercisePackagedHelper(extractedHelper, path.join(temporary, 'transaction'));
       exerciseWritingStructureHelper(
         extractedWritingStructureHelper,
@@ -454,6 +495,7 @@ console.log('\nWritCraft packaged release verification');
     sourceFiles.delete('main/native/writing-structure-helper');
     sourceFiles.delete('main/native/project-hash-helper');
     sourceFiles.delete('main/native/markdown-trash-helper');
+    sourceFiles.delete('main/native/changes-history-artifact-helper');
     assert.deepStrictEqual(filesUnder(path.join(packagedRoot, 'src'), '', options), sourceFiles);
     assert.strictEqual(fs.existsSync(
       path.join(packagedRoot, 'src', 'main', 'native', 'author-copy-helper')
@@ -466,6 +508,9 @@ console.log('\nWritCraft packaged release verification');
     ), false);
     assert.strictEqual(fs.existsSync(
       path.join(packagedRoot, 'src', 'main', 'native', 'markdown-trash-helper')
+    ), false);
+    assert.strictEqual(fs.existsSync(
+      path.join(packagedRoot, 'src', 'main', 'native', 'changes-history-artifact-helper')
     ), false);
   });
 

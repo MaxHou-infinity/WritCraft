@@ -1,3 +1,5 @@
+'use strict';
+
 (function (root, factory) {
   const api = factory();
   if (typeof module === 'object' && module.exports) module.exports = api;

@@ -1,4 +1,6 @@
 #!/usr/bin/env node
+'use strict';
+
 const assert = require('assert');
 const crypto = require('crypto');
 const fs = require('fs');

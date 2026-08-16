@@ -1,5 +1,7 @@
 // WritCraft V0 · Day 5 rewrite state helpers
 // Kept DOM-free so the rewrite contract can be tested with plain Node.js.
+'use strict';
+
 (function (root, factory) {
   const api = factory();
   if (typeof module === 'object' && module.exports) module.exports = api;

@@ -210,25 +210,32 @@ function deterministicBytes() {
     assert.strictEqual(second.signal.aborted, true);
   });
 
-  await test('concurrent replay terminates the single-use action', async () => {
+  await test('concurrent replay is rejected without killing the in-flight lease', async () => {
     const store = storeModule.createWritingNavigationStore({ randomBytes: deterministicBytes() });
     const result = store.install(binding({ record: await record(6, 'changes') }));
     const actionId = result.suggestions[0].actionId;
-    const first = store.acquireAction(actionBinding({ actionId }));
+    const firstAttempt = actionBinding({ actionId });
+    const first = store.acquireAction(firstAttempt);
     assert.strictEqual(store.assertLeaseCurrent(binding({ leaseId: first.leaseId })).action, 'changes');
     assert.throws(
       () => store.acquireAction(actionBinding({ actionId })),
       error => error.code === 'ACTION_REPLAYED'
     );
+    // The duplicate acquire must not abort the original lease: the renderer
+    // may retry after a lost response, and killing the in-flight operation
+    // would silently cancel a legitimate write with no recovery path.
+    assert.strictEqual(first.signal.aborted, false);
+    assert.strictEqual(store.assertLeaseCurrent(binding({ leaseId: first.leaseId })).action, 'changes');
+    assert.deepStrictEqual(store.cancelAction(binding({ actionId, attemptId: firstAttempt.attemptId })), {
+      actionId,
+      cancelled: true,
+    });
     assert.strictEqual(first.signal.aborted, true);
-    assert.throws(
-      () => store.assertLeaseCurrent(binding({ leaseId: first.leaseId })),
-      error => error.code === 'LEASE_NOT_FOUND'
-    );
-    assert.throws(
-      () => store.acquireAction(actionBinding({ actionId })),
-      error => error.code === 'ACTION_NOT_FOUND'
-    );
+    // Cancelling releases the lease but keeps the action re-acquirable:
+    // the renderer may retry the same action on a fresh attempt.
+    const retry = store.acquireAction(actionBinding({ actionId }));
+    assert.strictEqual(retry.signal.aborted, false);
+    assert.strictEqual(store.assertLeaseCurrent(binding({ leaseId: retry.leaseId })).action, 'changes');
   });
 
   await test('foreign owner or project cannot observe or destroy another action', async () => {

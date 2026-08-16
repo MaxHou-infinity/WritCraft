@@ -4,6 +4,8 @@
 // can be exercised with ordinary Node tests. Renderer code never supplies a
 // project root; main.js owns the active root and only accepts relative paths.
 
+'use strict';
+
 const fs = require('fs');
 const path = require('path');
 const crypto = require('crypto');

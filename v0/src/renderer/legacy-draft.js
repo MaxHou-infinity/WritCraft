@@ -1,4 +1,6 @@
 // Legacy single-document draft inspection and conservative HTML → Markdown.
+'use strict';
+
 (function (root, factory) {
   const api = factory();
   if (typeof module === 'object' && module.exports) module.exports = api;

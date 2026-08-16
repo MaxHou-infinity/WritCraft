@@ -249,7 +249,7 @@ function createResearchApplyTransaction(options) {
             residualReviewId,
             residualChangeSet,
             project.rootPath,
-            { ...residualMetadata, researchDependencies }
+            { ...residualMetadata, researchDependencies, projectInstanceId: project.instanceId }
           );
           const tree = applied.length ? projectService.listTree(project.rootPath) : null;
           researchHandoffStore.finishApply(applyLease.cardId, applyLease.leaseId, {

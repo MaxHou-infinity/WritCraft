@@ -43,7 +43,11 @@ async function runApiHandshake(options = {}) {
   let result;
   try {
     result = typeof checkModels === 'function'
-      ? await checkModels({ apiKey: options.apiKey, fetchImpl: options.fetchImpl })
+      ? await checkModels({
+        apiKey: options.apiKey,
+        fetchImpl: options.fetchImpl,
+        timeoutMs: options.checkModelsTimeoutMs,
+      })
       : { ok: false, error: 'SERVICE_UNAVAILABLE' };
   } catch (_) {
     result = { ok: false, error: 'REQUEST_FAILED' };

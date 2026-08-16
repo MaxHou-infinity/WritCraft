@@ -340,7 +340,10 @@ function createWritingNavigationStore(options = {}) {
       fail('STALE_NAVIGATION', '写作导航已因项目状态变化失效');
     }
     if (action.leaseId) {
-      terminateAction(raw.actionId);
+      // A duplicate acquire (e.g. the renderer retrying after a lost response)
+      // must NOT abort the in-flight operation: killing the lease would cancel
+      // a legitimate model call/write with no recovery path. Reject the replay
+      // and let the original lease run to its settlement.
       fail('ACTION_REPLAYED', '写作导航动作已在处理中');
     }
     const suggestion = entry.record.result.suggestions.find(
@@ -440,7 +443,6 @@ function createWritingNavigationStore(options = {}) {
     if (!reviewBlocked && !retryable) {
       action.terminated = true;
     }
-    if (raw.outcome === 'stale') action.terminated = true;
     return Object.freeze({
       actionId: lease.actionId,
       action: action.action,

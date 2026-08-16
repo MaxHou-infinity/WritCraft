@@ -22,6 +22,8 @@ const {
   waitForValue,
 } = require('./verify-v0-electron-e2e');
 
+const FORCE = process.env.WRITCRAFT_E2E_FORCE === '1' || process.env.CI === 'true';
+
 function buildProject(parentPath, name) {
   const project = longformFixture.buildLongformProject({ parentPath, projectService, name });
   projectService.createMarkdownFile(project.rootPath, fixture.CHAT_CURRENT_PATH, [

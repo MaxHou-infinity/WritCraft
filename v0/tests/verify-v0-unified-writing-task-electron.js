@@ -22,6 +22,8 @@ const {
   waitForValue,
 } = require('./verify-v0-electron-e2e');
 
+const FORCE = process.env.WRITCRAFT_E2E_FORCE === '1' || process.env.CI === 'true';
+
 function snapshotMarkdownFiles(rootPath) {
   const paths = [];
   const visit = nodes => {
@@ -36,8 +38,8 @@ function snapshotMarkdownFiles(rootPath) {
 
 async function run() {
   const unavailable = skipReason();
-  if (unavailable) {
-    console.log(`SKIP: ${unavailable}`);
+  if (unavailable && !FORCE) {
+    console.log(`⏭ SKIP: ${unavailable}. Set WRITCRAFT_E2E_FORCE=1 to require launch.`);
     return;
   }
 

@@ -1,0 +1,467 @@
+{
+  "schemaVersion": "writcraft.test-gates/v1",
+  "targetVersion": "0.4.0",
+  "expectedTestCount": 51,
+  "legacyBaseline": "tests/0.4.0-legacy-test-baseline.json",
+  "tests": [
+    {
+      "test": "tests/verify-v0-changes-history-artifact-lifecycle.js",
+      "stage": "A",
+      "lane": "changes-history",
+      "evidenceKind": "native-lifecycle",
+      "requiredInCurrentGate": true,
+      "completionEligible": false,
+      "requiresGui": false
+    },
+    {
+      "test": "tests/verify-v0-changes-history-journal-ordinary-write.js",
+      "stage": "A",
+      "lane": "changes-history",
+      "evidenceKind": "service-integration",
+      "requiredInCurrentGate": true,
+      "completionEligible": false,
+      "requiresGui": false
+    },
+    {
+      "test": "tests/verify-v0-changes-history-journal-reconciliation-read.js",
+      "stage": "A",
+      "lane": "changes-history",
+      "evidenceKind": "recovery-integration",
+      "requiredInCurrentGate": true,
+      "completionEligible": false,
+      "requiresGui": false
+    },
+    {
+      "test": "tests/verify-v0-changes-history-marker-journal-native-lifecycle.js",
+      "stage": "A",
+      "lane": "changes-history",
+      "evidenceKind": "native-lifecycle",
+      "requiredInCurrentGate": true,
+      "completionEligible": false,
+      "requiresGui": false
+    },
+    {
+      "test": "tests/verify-v0-changes-history-marker-journal-native-schema.js",
+      "stage": "A",
+      "lane": "changes-history",
+      "evidenceKind": "native-schema",
+      "requiredInCurrentGate": true,
+      "completionEligible": false,
+      "requiresGui": false
+    },
+    {
+      "test": "tests/verify-v0-changes-history-marker-journal-schema.js",
+      "stage": "A",
+      "lane": "changes-history",
+      "evidenceKind": "schema",
+      "requiredInCurrentGate": true,
+      "completionEligible": false,
+      "requiresGui": false
+    },
+    {
+      "test": "tests/verify-v0-changes-history-marker-journal.js",
+      "stage": "A",
+      "lane": "changes-history",
+      "evidenceKind": "service-integration",
+      "requiredInCurrentGate": true,
+      "completionEligible": false,
+      "requiresGui": false
+    },
+    {
+      "test": "tests/verify-v0-changes-history-marker-lifecycle-schema.js",
+      "stage": "A",
+      "lane": "changes-history",
+      "evidenceKind": "schema",
+      "requiredInCurrentGate": true,
+      "completionEligible": false,
+      "requiresGui": false
+    },
+    {
+      "test": "tests/verify-v0-changes-history-marker-lifecycle.js",
+      "stage": "A",
+      "lane": "changes-history",
+      "evidenceKind": "service-integration",
+      "requiredInCurrentGate": true,
+      "completionEligible": false,
+      "requiresGui": false
+    },
+    {
+      "test": "tests/verify-v0-changes-history-production-wiring.js",
+      "stage": "A",
+      "lane": "main-service",
+      "evidenceKind": "production-wiring",
+      "requiredInCurrentGate": true,
+      "completionEligible": false,
+      "requiresGui": false
+    },
+    {
+      "test": "tests/verify-v0-changes-history-real-finalize-restart.js",
+      "stage": "A",
+      "lane": "changes-history",
+      "evidenceKind": "native-recovery-integration",
+      "requiredInCurrentGate": true,
+      "completionEligible": false,
+      "requiresGui": false
+    },
+    {
+      "test": "tests/verify-v0-local-operation-service.js",
+      "stage": "A",
+      "lane": "main-service",
+      "evidenceKind": "service-integration",
+      "requiredInCurrentGate": true,
+      "completionEligible": false,
+      "requiresGui": false
+    },
+    {
+      "test": "tests/verify-v0-public-markdown-journal-marker-binding.js",
+      "stage": "A",
+      "lane": "public-markdown-native",
+      "evidenceKind": "authority-binding",
+      "requiredInCurrentGate": true,
+      "completionEligible": false,
+      "requiresGui": false
+    },
+    {
+      "test": "tests/verify-v0-public-markdown-native-create-journal-lifecycle.js",
+      "stage": "A",
+      "lane": "public-markdown-native",
+      "evidenceKind": "native-lifecycle",
+      "requiredInCurrentGate": true,
+      "completionEligible": false,
+      "requiresGui": false
+    },
+    {
+      "test": "tests/verify-v0-public-markdown-native-lifecycle.js",
+      "stage": "A",
+      "lane": "public-markdown-native",
+      "evidenceKind": "native-lifecycle",
+      "requiredInCurrentGate": true,
+      "completionEligible": false,
+      "requiresGui": false
+    },
+    {
+      "test": "tests/verify-v0-public-markdown-native-rollback-create-lifecycle.js",
+      "stage": "A",
+      "lane": "public-markdown-native",
+      "evidenceKind": "native-lifecycle",
+      "requiredInCurrentGate": true,
+      "completionEligible": false,
+      "requiresGui": false
+    },
+    {
+      "test": "tests/verify-v0-public-markdown-native-rollback-create-schema.js",
+      "stage": "A",
+      "lane": "public-markdown-native",
+      "evidenceKind": "native-schema",
+      "requiredInCurrentGate": true,
+      "completionEligible": false,
+      "requiresGui": false
+    },
+    {
+      "test": "tests/verify-v0-public-markdown-native-schema.js",
+      "stage": "A",
+      "lane": "public-markdown-native",
+      "evidenceKind": "native-schema",
+      "requiredInCurrentGate": true,
+      "completionEligible": false,
+      "requiresGui": false
+    },
+    {
+      "test": "tests/verify-v0-public-markdown-native-undo-lifecycle.js",
+      "stage": "A",
+      "lane": "public-markdown-native",
+      "evidenceKind": "native-lifecycle",
+      "requiredInCurrentGate": true,
+      "completionEligible": false,
+      "requiresGui": false
+    },
+    {
+      "test": "tests/verify-v0-public-markdown-native-undo-schema.js",
+      "stage": "A",
+      "lane": "public-markdown-native",
+      "evidenceKind": "native-schema",
+      "requiredInCurrentGate": true,
+      "completionEligible": false,
+      "requiresGui": false
+    },
+    {
+      "test": "tests/verify-v0-shared-marked.js",
+      "stage": "A",
+      "lane": "shared-parser",
+      "evidenceKind": "parser-parity",
+      "requiredInCurrentGate": false,
+      "completionEligible": false,
+      "requiresGui": false
+    },
+    {
+      "test": "tests/verify-v0-snapshot-bundle.js",
+      "stage": "A",
+      "lane": "snapshot-storage",
+      "evidenceKind": "bundle-schema",
+      "requiredInCurrentGate": true,
+      "completionEligible": false,
+      "requiresGui": false
+    },
+    {
+      "test": "tests/verify-v0-snapshot-capability-store.js",
+      "stage": "A",
+      "lane": "snapshot-service",
+      "evidenceKind": "capability-store",
+      "requiredInCurrentGate": true,
+      "completionEligible": false,
+      "requiresGui": false
+    },
+    {
+      "test": "tests/verify-v0-snapshot-compare-service.js",
+      "stage": "A",
+      "lane": "snapshot-service",
+      "evidenceKind": "service-integration",
+      "requiredInCurrentGate": true,
+      "completionEligible": false,
+      "requiresGui": false
+    },
+    {
+      "test": "tests/verify-v0-snapshot-delete-service.js",
+      "stage": "A",
+      "lane": "snapshot-service",
+      "evidenceKind": "service-integration",
+      "requiredInCurrentGate": true,
+      "completionEligible": false,
+      "requiresGui": false
+    },
+    {
+      "test": "tests/verify-v0-snapshot-delete-storage.js",
+      "stage": "A",
+      "lane": "snapshot-storage",
+      "evidenceKind": "storage-integration",
+      "requiredInCurrentGate": true,
+      "completionEligible": false,
+      "requiresGui": false
+    },
+    {
+      "test": "tests/verify-v0-snapshot-existing-restore-native-schema.js",
+      "stage": "A",
+      "lane": "snapshot-transaction",
+      "evidenceKind": "native-schema",
+      "requiredInCurrentGate": true,
+      "completionEligible": false,
+      "requiresGui": false
+    },
+    {
+      "test": "tests/verify-v0-snapshot-existing-journal-binding-schema.js",
+      "stage": "A",
+      "lane": "snapshot-transaction",
+      "evidenceKind": "native-schema",
+      "requiredInCurrentGate": true,
+      "completionEligible": false,
+      "requiresGui": false
+    },
+    {
+      "test": "tests/verify-v0-snapshot-image-tokenizer.js",
+      "stage": "A",
+      "lane": "shared-parser",
+      "evidenceKind": "parser-integration",
+      "requiredInCurrentGate": false,
+      "completionEligible": false,
+      "requiresGui": false
+    },
+    {
+      "test": "tests/verify-v0-snapshot-public-markdown-phase-schema.js",
+      "stage": "A",
+      "lane": "snapshot-transaction",
+      "evidenceKind": "schema",
+      "requiredInCurrentGate": true,
+      "completionEligible": false,
+      "requiresGui": false
+    },
+    {
+      "test": "tests/verify-v0-snapshot-public-markdown-transaction-phase.js",
+      "stage": "A",
+      "lane": "snapshot-transaction",
+      "evidenceKind": "transaction-integration",
+      "requiredInCurrentGate": true,
+      "completionEligible": false,
+      "requiresGui": false
+    },
+    {
+      "test": "tests/verify-v0-snapshot-public-markdown-undo-finalization-schema.js",
+      "stage": "A",
+      "lane": "snapshot-transaction",
+      "evidenceKind": "schema",
+      "requiredInCurrentGate": true,
+      "completionEligible": false,
+      "requiresGui": false
+    },
+    {
+      "test": "tests/verify-v0-snapshot-public-markdown-undo-settlement-schema.js",
+      "stage": "A",
+      "lane": "snapshot-transaction",
+      "evidenceKind": "schema",
+      "requiredInCurrentGate": true,
+      "completionEligible": false,
+      "requiresGui": false
+    },
+    {
+      "test": "tests/verify-v0-snapshot-restore-recovery.js",
+      "stage": "A",
+      "lane": "snapshot-recovery",
+      "evidenceKind": "recovery-integration",
+      "requiredInCurrentGate": true,
+      "completionEligible": false,
+      "requiresGui": false
+    },
+    {
+      "test": "tests/verify-v0-snapshot-restore-service.js",
+      "stage": "A",
+      "lane": "snapshot-service",
+      "evidenceKind": "service-integration",
+      "requiredInCurrentGate": true,
+      "completionEligible": false,
+      "requiresGui": false
+    },
+    {
+      "test": "tests/verify-v0-snapshot-service-create.js",
+      "stage": "A",
+      "lane": "snapshot-service",
+      "evidenceKind": "service-integration",
+      "requiredInCurrentGate": true,
+      "completionEligible": false,
+      "requiresGui": false
+    },
+    {
+      "test": "tests/verify-v0-snapshot-storage-helper.js",
+      "stage": "A",
+      "lane": "snapshot-storage",
+      "evidenceKind": "native-helper",
+      "requiredInCurrentGate": true,
+      "completionEligible": false,
+      "requiresGui": false
+    },
+    {
+      "test": "tests/verify-v0-snapshot-storage-worker.js",
+      "stage": "A",
+      "lane": "snapshot-storage",
+      "evidenceKind": "worker-integration",
+      "requiredInCurrentGate": true,
+      "completionEligible": false,
+      "requiresGui": false
+    },
+    {
+      "test": "tests/verify-v0-snapshot-undo-history-template.js",
+      "stage": "A",
+      "lane": "snapshot-recovery",
+      "evidenceKind": "schema",
+      "requiredInCurrentGate": true,
+      "completionEligible": false,
+      "requiresGui": false
+    },
+    {
+      "test": "tests/verify-v0-snapshot-watcher-barrier.js",
+      "stage": "A",
+      "lane": "watcher-barrier",
+      "evidenceKind": "authority-barrier",
+      "requiredInCurrentGate": true,
+      "completionEligible": false,
+      "requiresGui": false
+    },
+    {
+      "test": "tests/verify-v0-snapshot-worker-destroy-latch.js",
+      "stage": "A",
+      "lane": "snapshot-storage",
+      "evidenceKind": "worker-lifecycle",
+      "requiredInCurrentGate": true,
+      "completionEligible": false,
+      "requiresGui": false
+    },
+    {
+      "test": "tests/verify-v0-delivery-capability-store.js",
+      "stage": "B",
+      "lane": "delivery-main",
+      "evidenceKind": "capability-store",
+      "requiredInCurrentGate": false,
+      "completionEligible": false,
+      "requiresGui": false
+    },
+    {
+      "test": "tests/verify-v0-delivery-image-decode-service.js",
+      "stage": "B",
+      "lane": "delivery-native-image",
+      "evidenceKind": "native-integration",
+      "requiredInCurrentGate": false,
+      "completionEligible": false,
+      "requiresGui": false
+    },
+    {
+      "test": "tests/verify-v0-delivery-preflight-electron.js",
+      "stage": "B",
+      "lane": "delivery-electron",
+      "evidenceKind": "electron-e2e",
+      "requiredInCurrentGate": false,
+      "completionEligible": false,
+      "requiresGui": true
+    },
+    {
+      "test": "tests/verify-v0-delivery-preflight-handler.js",
+      "stage": "B",
+      "lane": "delivery-main-ipc",
+      "evidenceKind": "handler-integration",
+      "requiredInCurrentGate": false,
+      "completionEligible": false,
+      "requiresGui": false
+    },
+    {
+      "test": "tests/verify-v0-delivery-preflight-ipc-boundary.js",
+      "stage": "B",
+      "lane": "delivery-main-ipc",
+      "evidenceKind": "ipc-boundary",
+      "requiredInCurrentGate": false,
+      "completionEligible": false,
+      "requiresGui": false
+    },
+    {
+      "test": "tests/verify-v0-delivery-preflight-main-adapter.js",
+      "stage": "B",
+      "lane": "delivery-main",
+      "evidenceKind": "production-adapter",
+      "requiredInCurrentGate": false,
+      "completionEligible": false,
+      "requiresGui": false
+    },
+    {
+      "test": "tests/verify-v0-delivery-preflight-schema.js",
+      "stage": "B",
+      "lane": "delivery-contract",
+      "evidenceKind": "schema",
+      "requiredInCurrentGate": false,
+      "completionEligible": false,
+      "requiresGui": false
+    },
+    {
+      "test": "tests/verify-v0-delivery-preflight-service.js",
+      "stage": "B",
+      "lane": "delivery-main",
+      "evidenceKind": "service-integration",
+      "requiredInCurrentGate": false,
+      "completionEligible": false,
+      "requiresGui": false
+    },
+    {
+      "test": "tests/verify-v0-delivery-provider-adapter.js",
+      "stage": "B",
+      "lane": "delivery-main",
+      "evidenceKind": "provider-adapter",
+      "requiredInCurrentGate": false,
+      "completionEligible": false,
+      "requiresGui": false
+    },
+    {
+      "test": "tests/verify-v0-evidence-delivery-schema.js",
+      "stage": "B",
+      "lane": "delivery-contract",
+      "evidenceKind": "schema",
+      "requiredInCurrentGate": false,
+      "completionEligible": false,
+      "requiresGui": false
+    }
+  ]
+}

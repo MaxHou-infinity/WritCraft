@@ -1,6 +1,8 @@
 // 4 重 verify 已在前几轮覆盖。Day 4 验收是主人的视觉测试。
 // 此脚本只验 Day 4 新增文件的静态层。
 
+'use strict';
+
 const fs = require('fs');
 const path = require('path');
 
@@ -40,7 +42,9 @@ check('editor.js 文件作用域显示路径与字符数', edJs.includes('📄 �
 check('editor.js 选区作用域显示精确选区与相邻段落', edJs.includes('🎯 选区') && edJs.includes('相邻段落'));
 
 // 4.4 Markdown 渲染
-check('marked.umd.js 在 renderer 目录', fs.existsSync(path.join(V0, 'src/renderer/marked.umd.js')));
+check('marked.umd.js 是 shared 唯一字节源',
+  fs.existsSync(path.join(V0, 'src/shared/marked.umd.js')) &&
+  !fs.existsSync(path.join(V0, 'src/renderer/marked.umd.js')));
 check('marked 浏览器 bundle 有第三方许可且不重复进入运行依赖', (() => {
   const p = JSON.parse(fs.readFileSync(path.join(V0, 'package.json'), 'utf-8'));
   const notices = fs.readFileSync(path.join(V0, 'THIRD_PARTY_NOTICES.md'), 'utf-8');
@@ -55,7 +59,7 @@ check('editor.js 用户消息 useMarkdown=false', edJs.includes('useMarkdown: fa
 
 // 第三方库真存在 + 体积合理
 const diffPath = path.join(V0, 'src/renderer/diff.min.js');
-const markedPath = path.join(V0, 'src/renderer/marked.umd.js');
+const markedPath = path.join(V0, 'src/shared/marked.umd.js');
 check('diff.min.js 体积 30-50KB', (() => {
   const s = fs.statSync(diffPath).size;
   return s > 30000 && s < 50000;

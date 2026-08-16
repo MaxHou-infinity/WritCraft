@@ -1,6 +1,8 @@
 // WritCraft renderer HTML sanitizer.
 // The editor accepts HTML only from its own legacy recovery payload and from
 // locally rendered Markdown. Keep one DOM implementation for both paths.
+'use strict';
+
 (function (root, factory) {
   const api = factory();
   if (typeof module === 'object' && module.exports) module.exports = api;
