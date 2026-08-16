@@ -12,6 +12,8 @@ const lifecycle = require('../src/main/public-markdown-native-lifecycle');
 const evidence = require('../src/main/evidence-delivery-schema');
 const phaseSchema = require('../src/main/snapshot-public-markdown-phase-schema');
 const existingSchema = require('../src/main/snapshot-existing-restore-native-schema');
+const journal = require('../src/main/changes-history-marker-journal-schema');
+const existingJournalBinding = require('../src/main/snapshot-existing-journal-binding-schema');
 const schema = require('../src/main/public-markdown-native-schema');
 
 const scratch = fs.mkdtempSync(path.join(os.tmpdir(), 'writcraft-native-rollback-create-lifecycle-'));
@@ -181,13 +183,88 @@ function mixedFixture(helperPath) {
     controlRecordIdentity: createControlIdentity,
     receiptRecordIdentity: createReceiptIdentity,
   };
-  const markerBytes = Buffer.from('{"phase":"CREATED_RECEIPT"}\n');
-  const markerPath = path.join(recoveryPath, 'changes-history-transaction.json');
-  writePrivate(markerPath, markerBytes);
   const historyBytes = Buffer.from('{"schema":"writcraft.changes/v4","entries":[]}\n');
   const historyPath = path.join(privatePath, 'changes.json');
   writePrivate(historyPath, historyBytes);
   const baseHistoryDigest = sha(Buffer.concat([Buffer.from([1]), historyBytes]));
+  // WRCCHRJ2 single-authority journal: the held marker IS the journal file.
+  const markerPayload = {
+    schema: 'writcraft.changes-history-recovery/v1',
+    operationId,
+    projectId: 'rollback-create-mixed',
+    kind: 'snapshot_restore',
+    state: 'applying',
+    outcome: null,
+    files: [{
+      path: 'existing.md',
+      beforeRevision: sha(before).slice('sha256:'.length),
+      afterRevision: sha(after).slice('sha256:'.length),
+    }],
+    baseHistoryState: { exists: true, digest: sha(historyBytes).slice('sha256:'.length) },
+    preparedHistoryState: { exists: true, digest: '4'.repeat(64) },
+    publicMarkdownPhase: created,
+    recoveryWritePending: false,
+    createdAt: '2026-08-09T01:00:00.000Z',
+    updatedAt: '2026-08-09T01:00:01.000Z',
+  };
+  const marker = {
+    ...markerPayload,
+    integrity: crypto.createHash('sha256')
+      .update(JSON.stringify(markerPayload), 'utf8').digest('hex'),
+  };
+  const journalValue = {
+    schema: journal.SCHEMAS.VALUE,
+    journalId: `chrj_${'b'.repeat(48)}`,
+    generation: '0',
+    previousValueDigest: null,
+    state: 'ACTIVE',
+    projectId: 'rollback-create-mixed',
+    activeOperationId: operationId,
+    activeKind: 'snapshot_restore',
+    activeMarker: marker,
+    activeMarkerDigest: journal.activeMarkerDigest(marker),
+    nativePublication: null,
+    existingTerminalPublication: null,
+    terminalCleanup: null,
+    terminalCleanupDigest: null,
+    valueDigest: null,
+  };
+  journalValue.valueDigest = journal.valueDigest(journalValue);
+  const journalFrame = journal.encodeSlotFrame(journalValue, 'A');
+  const markerPath = path.join(recoveryPath, 'changes-history-transaction.json');
+  writePrivate(markerPath, journalFrame);
+  const journalFileBytes = fs.readFileSync(markerPath);
+  const journalCanonicalMarker = Buffer.from(evidence.canonicalJson(marker), 'utf8');
+  const journalPayloadOffset = journalFrame.indexOf(0x0a) + 1;
+  const journalPayload = journalFrame.subarray(journalPayloadOffset);
+  const journalActiveMarkerOffset = journalFrame.indexOf(
+    journalCanonicalMarker,
+    journalPayloadOffset
+  );
+  if (journalPayloadOffset < 1 || journalActiveMarkerOffset < journalPayloadOffset) {
+    throw new Error('fixture journal marker slice is unavailable');
+  }
+  const journalMarkerBinding = existingJournalBinding.buildExistingJournalBinding({
+    schema: existingJournalBinding.SCHEMA,
+    journalBasename: existingJournalBinding.JOURNAL_BASENAME,
+    journalMagic: existingJournalBinding.JOURNAL_MAGIC,
+    journalFileIdentity: objectIdentity(markerPath, sha(journalFileBytes)),
+    rootIdentityDigest: rootIdentityDigest(rootPath),
+    recoveryDirectoryIdentityDigest: rootIdentityDigest(recoveryPath),
+    activeSlot: 'A',
+    head: journal.expectedHead(journalValue),
+    previousValueDigest: null,
+    frameByteLength: journalFrame.length,
+    frameSha256: sha(journalFrame),
+    payloadOffset: journalPayloadOffset,
+    payloadByteLength: journalPayload.length,
+    payloadSha256: sha(journalPayload),
+    activeMarkerOffset: journalActiveMarkerOffset,
+    activeMarkerByteLength: journalCanonicalMarker.length,
+    activeMarkerDigest: journal.activeMarkerDigest(marker),
+    activeMarkerCanonicalSha256: sha(journalCanonicalMarker),
+    bindingDigest: null,
+  });
   const existingStat = fs.statSync(existingPath, { bigint: true });
   const beforeLeafIdentity = existingSchema.digestExistingLeafIdentity(
     existingSchema.buildExistingLeafIdentity({
@@ -207,17 +284,20 @@ function mixedFixture(helperPath) {
   const markerAuthority = {
     schema: existingSchema.SCHEMAS.MARKER_AUTHORITY,
     operationId,
-    markerDigest: sha(markerBytes),
+    markerDigest: journalMarkerBinding.activeMarkerDigest,
     artifactDigest,
     artifactIdentityDigest,
     artifactByteLength: artifactBytes.length,
     baseHistoryDigest,
     baseHistoryByteLength: historyBytes.length,
+    baseHistoryExists: true,
+    baseHistoryContentDigest: sha(historyBytes),
+    historyParentIdentityDigest: rootIdentityDigest(privatePath),
   };
   const existingRequest = {
     schema: existingSchema.SCHEMAS.REQUEST,
     operationId,
-    markerDigest: markerAuthority.markerDigest,
+    markerDigest: journalMarkerBinding.activeMarkerDigest,
     artifactDigest,
     artifactIdentityDigest,
     artifactByteLength: artifactBytes.length,
@@ -225,6 +305,10 @@ function mixedFixture(helperPath) {
     selectionDigest: phaseSchema.digestSelection(parent),
     baseHistoryDigest,
     baseHistoryByteLength: historyBytes.length,
+    baseHistoryExists: true,
+    baseHistoryContentDigest: sha(historyBytes),
+    historyParentIdentityDigest: rootIdentityDigest(privatePath),
+    journalMarkerBinding,
     items: [{
       selectedId: 'existing_one', path: 'existing.md',
       beforeRevision: sha(before).slice(7), afterRevision: sha(after).slice(7),
@@ -264,7 +348,7 @@ function mixedFixture(helperPath) {
     expectedRecoveryIdentityDigest: rootIdentityDigest(recoveryPath),
   };
   const held = schema.buildRollbackCreateHeldBinding(
-    markerBytes.length, objectIdentity(markerPath, sha(markerBytes)),
+    journalFrame.length, objectIdentity(markerPath, sha(journalFileBytes)),
     rootIdentityDigest(privatePath), true, sha(historyBytes),
     objectIdentity(historyPath, sha(historyBytes)), existingAuthority
   );
@@ -284,7 +368,7 @@ function mixedFixture(helperPath) {
   };
   return {
     authority, fds, createdPath, existingPath, rootPath, privatePath, recoveryPath,
-    artifactPath, markerPath, historyPath, markerBytes, historyBytes, createdBytes, before,
+    artifactPath, markerPath, historyPath, journalFrame, historyBytes, createdBytes, before,
     scoped: lifecycle.createPublicMarkdownNativeTransport({ helperPath }).forProject(rootPath),
   };
 }

@@ -6,6 +6,7 @@ const crypto = require('crypto');
 const evidence = require('../src/main/evidence-delivery-schema');
 const phaseSchema = require('../src/main/snapshot-public-markdown-phase-schema');
 const existingSchema = require('../src/main/snapshot-existing-restore-native-schema');
+const existingJournalBinding = require('../src/main/snapshot-existing-journal-binding-schema');
 const schema = require('../src/main/public-markdown-native-schema');
 
 const digest = value => `sha256:${String(value).repeat(64)}`;
@@ -40,6 +41,43 @@ function heldIdentity(byteLength, contentSha256, seed) {
     ctimeNs: String(4000000000 + seed),
     contentSha256,
   };
+}
+
+// WRCCHRJ2 single-authority journal binding carried on the EXISTING sub-request.
+// Synthetic but descriptor-exact: journalFileIdentity.contentSha256 is the held
+// journal whole-content sha the rollback request binds as journalMarkerDigest.
+function journalBinding() {
+  return existingJournalBinding.buildExistingJournalBinding({
+    schema: existingJournalBinding.SCHEMA,
+    journalBasename: existingJournalBinding.JOURNAL_BASENAME,
+    journalMagic: existingJournalBinding.JOURNAL_MAGIC,
+    journalFileIdentity: {
+      schema: evidence.SCHEMAS.OBJECT_IDENTITY,
+      dev: '700', ino: '7000', uid: 501, mode: 0o600, nlink: 1,
+      size: '4096', mtimeNs: '5000000000', ctimeNs: '6000000000',
+      contentSha256: digest('d'),
+    },
+    rootIdentityDigest: digest('1'),
+    recoveryDirectoryIdentityDigest: digest('2'),
+    activeSlot: 'A',
+    head: {
+      schema: existingJournalBinding.HEAD_SCHEMA,
+      journalId: `chrj_${'d'.repeat(48)}`,
+      generation: '0',
+      valueDigest: digest('e'),
+    },
+    previousValueDigest: null,
+    frameByteLength: 2048,
+    frameSha256: digest('c'),
+    payloadOffset: 100,
+    payloadByteLength: 1948,
+    payloadSha256: digest('b'),
+    activeMarkerOffset: 100,
+    activeMarkerByteLength: 100,
+    activeMarkerDigest: digest('9'),
+    activeMarkerCanonicalSha256: digest('a'),
+    bindingDigest: null,
+  });
 }
 
 function rootBind() {
@@ -161,6 +199,9 @@ function existingAuthority(authority, created, nativeCreateRequest, baseHistoryE
       ? digest('a')
       : evidence.sha256(Buffer.from([0])),
     baseHistoryByteLength: baseHistoryExists ? 4096 : 0,
+    baseHistoryExists,
+    baseHistoryContentDigest: baseHistoryExists ? digest('e') : null,
+    historyParentIdentityDigest: digest('f'),
   };
   const nativeRequest = {
     schema: existingSchema.SCHEMAS.REQUEST,
@@ -173,6 +214,10 @@ function existingAuthority(authority, created, nativeCreateRequest, baseHistoryE
     selectionDigest: created.selectionDigest,
     baseHistoryDigest: marker.baseHistoryDigest,
     baseHistoryByteLength: marker.baseHistoryByteLength,
+    baseHistoryExists,
+    baseHistoryContentDigest: marker.baseHistoryContentDigest,
+    historyParentIdentityDigest: marker.historyParentIdentityDigest,
+    journalMarkerBinding: journalBinding(),
     items: [{
       selectedId: 'existing:0',
       path: existingSelection.path,
@@ -233,8 +278,8 @@ function fixture(missingCount = 1, baseHistoryExists = true, pathFactory = null)
     baseHistoryExists
   );
   const held = schema.buildRollbackCreateHeldBinding(
-    8192,
-    heldIdentity(8192, existing.bound.request.markerDigest, 1),
+    4096,
+    heldIdentity(4096, digest('d'), 1),
     digest('f'),
     baseHistoryExists,
     baseHistoryExists ? digest('e') : null,
@@ -331,7 +376,7 @@ function independentlyRebuildRollbackWireAuthority(qWire, aWire) {
   const header = qLines[0];
   const existing = qLines.filter(fields => fields[0] === 'E');
   const missing = qLines.filter(fields => fields[0] === 'I');
-  assert.strictEqual(header.length, 29);
+  assert.strictEqual(header.length, 30);
   assert.strictEqual(existing.length, Number(header[27]));
   assert.strictEqual(missing.length, Number(header[28]));
   assert.strictEqual(qLines.length, 1 + existing.length + missing.length);
@@ -454,14 +499,14 @@ function independentlyRebuildRollbackWireAuthority(qWire, aWire) {
   assert.strictEqual(evidence.digestObject(phaseSchema.SCHEMA, created), header[13]);
   const aHeader = aLines[0];
   const tokens = aLines.filter(fields => fields[0] === 'T');
-  assert.strictEqual(aHeader.length, 43);
-  assert.deepStrictEqual(aHeader.slice(2, 29), header.slice(2));
+  assert.strictEqual(aHeader.length, 44);
+  assert.deepStrictEqual(aHeader.slice(2, 30), header.slice(2));
   assert.deepStrictEqual(
     aLines.filter(fields => ['E', 'I'].includes(fields[0])),
     qLines.filter(fields => ['E', 'I'].includes(fields[0]))
   );
-  assert.strictEqual(tokens.length, Number(aHeader[42]));
-  assert.ok(Date.parse(decodeHexUtf8(aHeader[32])) >= Date.parse(created.updatedAt));
+  assert.strictEqual(tokens.length, Number(aHeader[43]));
+  assert.ok(Date.parse(decodeHexUtf8(aHeader[33])) >= Date.parse(created.updatedAt));
   const rolledBack = {
     ...created,
     phase: 'ROLLED_BACK',
@@ -470,11 +515,11 @@ function independentlyRebuildRollbackWireAuthority(qWire, aWire) {
       quarantineReceiptDigest: tokens[index][9],
     })),
     existingReceiptSetDigest: aHeader[20],
-    rollbackReceiptDigest: aHeader[30],
-    updatedAt: decodeHexUtf8(aHeader[32]),
+    rollbackReceiptDigest: aHeader[31],
+    updatedAt: decodeHexUtf8(aHeader[33]),
   };
   phaseSchema.assertPhaseRecord(rolledBack, selection);
-  assert.strictEqual(evidence.digestObject(phaseSchema.SCHEMA, rolledBack), aHeader[31]);
+  assert.strictEqual(evidence.digestObject(phaseSchema.SCHEMA, rolledBack), aHeader[32]);
   return { selection, precreate, create, created, rolledBack };
 }
 
@@ -807,31 +852,31 @@ test('deterministic names/digests are frozen in the CREATE_ROLLBACK domain', () 
   const value = fixture();
   assert.strictEqual(
     schema.rollbackCreateRequestDigest(value.bound),
-    'sha256:86bf6a7b127225be82d80a94ec796fbc3a22d67fad0acda356207d1221ea6daa'
+    'sha256:d58c74d16de1e02a28b8499eca404e598bcd23193967568993a74f5696f4a039'
   );
   assert.strictEqual(
     schema.rollbackCreateRecordNames(value.bound, 0).controlBasename,
-    '.changes-history-native-rollback-create-control.577dfaecaabb0ae15e43ef682dd2dcf1e9a084e897c42e55a87ccd03a9b3c37d'
+    '.changes-history-native-rollback-create-control.e1a899ea57f9321fbe03789ab10e3dc6fb8f4f873af69147225dfa49e6794047'
   );
   assert.strictEqual(
     value.qControls[0].controlDigest,
-    'sha256:5c90c357a81241659b30371b4768071764897d3d637248304d1bfa87f91e4036'
+    'sha256:dfae4e6f1f006793896b07b8dcad7b6643c0cd43fefeb8f54c094004e443548b'
   );
   assert.strictEqual(
     value.qReceipts[0].receiptDigest,
-    'sha256:bd1d6243cd1e6b5a6059aeb63ebf1d8dff6980aef5f43d02ede3df88e2d57f55'
+    'sha256:bc315254d4a1737cefa52702422bd65a71cab04a1a9005e65fd735ae1a935aa3'
   );
   assert.strictEqual(
     schema.rollbackCreateReceiptSetDigest(value.settle, value.bound),
-    'sha256:bc7fa34380ae63b3c8088ef34a87fa1bb95a756187b5cf7a8e38b65f006b869a'
+    'sha256:e14115693e50789700f3ac9ccc2d96830d019cee11fb4891cc7b9b9191717114'
   );
   assert.strictEqual(
     schema.rollbackCreateFinalRecordName(value.settle, value.bound),
-    '.changes-history-native-rollback-create-final.7ca3fd2aeb0ee2e523fc83b0c45355d3bf51b8aab831abf4191f3e4607c23117'
+    '.changes-history-native-rollback-create-final.ff2987144537178fff958d59c31ee1c4a11ab8cf847ea74561e498fad8f36954'
   );
   assert.strictEqual(
     value.finalRecord.finalRecordDigest,
-    'sha256:b1ea91f3c7dc0cde7f6be82bd63c3aa949f97412f691289a0ebc8a10498f4763'
+    'sha256:6ae7055a905ebf8d990be05f31e1f43229f6a8414a1b19e71253a523aacb9381'
   );
 });
 
@@ -1036,11 +1081,11 @@ test('maximum COMMITTED Q/R response has an independent frozen 512 KiB envelope'
   })), [
     {
       bytes: 274527,
-      sha256: '5d3dfdb9b90913752e60b2e1b5e60c52650a6f29b5e9856fe86434bce8f9d771',
+      sha256: 'fd9420c1b1e340ab0760df9bb1d6d6469039d3ab770c985f7f247d3bee2309ca',
     },
     {
       bytes: 274527,
-      sha256: 'b37ab96604047a31c5c052a5737372fb057c312740aa4c1a3aeed71085f05189',
+      sha256: '4ca26df61122802da60aa1b69704207de437a55187295247b607cc14d1bb5b41',
     },
   ]);
   const overflow = Buffer.alloc(schema.LIMITS.maxRollbackCreateResponseBytes + 1, 0x61);
@@ -1107,24 +1152,24 @@ test('maximum Unicode 1E+299I authority freezes every Q/R/D/A wire budget', () =
     sha256: crypto.createHash('sha256').update(Buffer.from(wire, 'utf8')).digest('hex'),
   })), [
     {
-      bytes: 2703237,
+      bytes: 2703309,
       maxLine: 9452,
-      sha256: 'f8d98d92fa3017dda4f09e4e627b0d81b2fc47dc960175f8846d13b6140b9cc4',
+      sha256: '9e109d1c535b64564fd79cb542d84dda7e83e9d0941f67cf060d20721aa7a25e',
     },
     {
-      bytes: 2703237,
+      bytes: 2703309,
       maxLine: 9452,
-      sha256: 'c278ead7648054fcfe660fe3a2a3edc014dfbee227255eb8731310663eaf68ea',
+      sha256: '698b39388681f15706ff5ee1e86f90a3502c69a08b9d269333f2fc16efebea84',
     },
     {
-      bytes: 2977912,
+      bytes: 2977984,
       maxLine: 9452,
-      sha256: '5f98f23017472f8ef182a02913c08dea371052b540a9572f1fddd56760685d95',
+      sha256: '3772400ea432ee3942b0df0a472ad524244620bfa19221004b9486ce960132c4',
     },
     {
-      bytes: 2978333,
+      bytes: 2978405,
       maxLine: 9452,
-      sha256: 'a14705e5d43379140c426abfb008fe6c2f3d096740670b6fe4c03d53ddde8ec5',
+      sha256: '859702567f140fd066caec96eb20cc8de41526fc97a3ecc3c34c9e9dd430f924',
     },
   ]);
   assert.throws(

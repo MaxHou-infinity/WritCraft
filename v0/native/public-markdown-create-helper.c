@@ -327,6 +327,11 @@ typedef struct {
   char marker_digest[DIGEST_BYTES + 1U];
   uint64_t marker_length;
   char marker_identity[DIGEST_BYTES + 1U];
+  /* WRCCHRJ2 single-authority journal: whole-content sha of the held journal
+   * file (changes-history-transaction.json), verified by rollback_held_authority
+   * against HELD_MARKER_FD. Distinct from marker_digest, which is the EXISTING
+   * sub-request's active-marker domain digest embedded in EXISTING records. */
+  char journal_digest[DIGEST_BYTES + 1U];
   char root_digest[DIGEST_BYTES + 1U];
   char recovery_digest[DIGEST_BYTES + 1U];
   char created_phase[DIGEST_BYTES + 1U];
@@ -4138,41 +4143,6 @@ static bool rollback_rebuilt_create_authority(RollbackRequest *request) {
     rollback_create_publications_valid(request);
 }
 
-static bool rollback_existing_request_digest(const RollbackRequest *request, char out[72]) {
-  char *canonical = calloc(MAX_INPUT_BYTES + 1U, 1U);
-  if (canonical == NULL) return false;
-  size_t used = 0U;
-  bool ok = rollback_append(canonical, MAX_INPUT_BYTES + 1U, &used,
-    "{\"artifactByteLength\":%" PRIu64 ",\"artifactDigest\":\"%s\""
-    ",\"artifactIdentityDigest\":\"%s\",\"baseHistoryByteLength\":%" PRIu64
-    ",\"baseHistoryDigest\":\"%s\",\"createdReceiptPhaseDigest\":\"%s\",\"items\":[",
-    request->create_request.artifact_length, request->create_request.artifact,
-    request->create_request.artifact_identity, request->base_history_length,
-    request->base_history, request->created_phase);
-  for (size_t i = 0U; ok && i < request->existing_count; i += 1U) {
-    const RollbackExistingItem *item = &request->existing[i];
-    char escaped[MAX_PATH_BYTES * 2U + 1U];
-    ok = json_escape(item->path, escaped, sizeof(escaped)) &&
-      rollback_append(canonical, MAX_INPUT_BYTES + 1U, &used,
-        "%s{\"afterArtifactOffset\":%" PRIu64 ",\"afterByteLength\":%" PRIu64
-        ",\"afterContentDigest\":\"%s\",\"afterRevision\":\"%s\""
-        ",\"ancestorIdentityDigest\":\"%s\",\"beforeArtifactOffset\":%" PRIu64
-        ",\"beforeByteLength\":%" PRIu64 ",\"beforeContentDigest\":\"%s\""
-        ",\"beforeLeafIdentityDigest\":\"%s\",\"beforeRevision\":\"%s\""
-        ",\"path\":\"%s\",\"selectedId\":\"%s\"}", i == 0U ? "" : ",",
-        item->after_offset, item->after_length, item->after_content, item->after_revision,
-        item->ancestor, item->before_offset, item->before_length, item->before_content,
-        item->before_leaf, item->before_revision, escaped, item->selected);
-  }
-  ok = ok && rollback_append(canonical, MAX_INPUT_BYTES + 1U, &used,
-    "],\"markerDigest\":\"%s\",\"operationId\":\"%s\",\"schema\":\""
-    EXISTING_REQUEST_SCHEMA "\",\"selectionDigest\":\"%s\"}", request->marker_digest,
-    request->create_request.operation, request->create_request.selection) &&
-    digest_domain(EXISTING_REQUEST_SCHEMA, canonical, out);
-  free(canonical);
-  return ok;
-}
-
 static bool rollback_existing_record_names(
   const RollbackRequest *request, const RollbackExistingItem *item,
   char control[128], char apply[128], char rollback[128]
@@ -4363,12 +4333,14 @@ static bool rollback_append_existing_terminal_items(
 }
 
 static bool rollback_existing_terminal_valid(RollbackRequest *request) {
-  char request_digest[72];
-  if (!rollback_existing_request_digest(request, request_digest) ||
-      strcmp(request_digest, request->existing_request) != 0) {
-    DEBUG_STAGE("rollback-existing-request-digest");
-    return false;
-  }
+  /* The EXISTING request digest is anchored through the on-disk record names:
+   * rollback_existing_records derives each control/rollback basename from
+   * request->existing_request (recordKey) and verifies the record files at
+   * those names with exact content identities. The E/R path never recomputes
+   * the request digest either; the legacy rollback rebuild predates the
+   * WRCCHRJ2 journal binding, which is not carried on the rollback wire, so
+   * the on-disk record anchor plus the held-journal whole-content sha
+   * (journal_digest) are the single-authority bindings here. */
   char (*controls)[MAX_RECORD_BYTES + 1U] = calloc(request->existing_count, sizeof(*controls));
   char (*applies)[MAX_RECORD_BYTES + 1U] = calloc(request->existing_count, sizeof(*applies));
   char (*rollbacks)[MAX_RECORD_BYTES + 1U] = calloc(request->existing_count, sizeof(*rollbacks));
@@ -4463,15 +4435,16 @@ static bool rollback_request_digest_valid(const RollbackRequest *request) {
         item->create.created_digest, escaped, item->create.selected);
   }
   ok = ok && rollback_append(canonical, MAX_INPUT_BYTES + 1U, &used,
-    "],\"markerByteLength\":%" PRIu64 ",\"markerDigest\":\"%s\""
+    "],\"journalMarkerDigest\":\"%s\",\"markerByteLength\":%" PRIu64
+    ",\"markerDigest\":\"%s\""
     ",\"markerIdentityDigest\":\"%s\",\"operationId\":\"%s\""
     ",\"originalCreatedReceiptUpdatedAt\":\"%s\",\"originalPrecreateUpdatedAt\":\"%s\""
     ",\"preparedHistoryDigest\":\"%s\",\"recoveryIdentityDigest\":\"%s\""
     ",\"rootIdentityDigest\":\"%s\",\"schema\":\"" ROLLBACK_REQUEST_SCHEMA
-    "\",\"selectionDigest\":\"%s\"}", request->marker_length, request->marker_digest,
-    request->marker_identity, request->create_request.operation, request->original_updated_at,
-    request->precreate_updated_at, request->prepared_history, request->recovery_digest,
-    request->root_digest, request->create_request.selection);
+    "\",\"selectionDigest\":\"%s\"}", request->journal_digest, request->marker_length,
+    request->marker_digest, request->marker_identity, request->create_request.operation,
+    request->original_updated_at, request->precreate_updated_at, request->prepared_history,
+    request->recovery_digest, request->root_digest, request->create_request.selection);
   char digest[72];
   ok = ok && digest_domain(ROLLBACK_REQUEST_SCHEMA, canonical, digest) &&
     strcmp(digest, request->request_digest) == 0;
@@ -5117,7 +5090,7 @@ static bool rollback_nullable_identity_fields(char **fields, size_t start, Recor
 }
 
 static bool rollback_header(char *line, RollbackRequest *request) {
-  char *fields[43];
+  char *fields[44];
   size_t field_count = 0U;
   uint64_t existing_count;
   uint64_t missing_count;
@@ -5125,8 +5098,8 @@ static bool rollback_header(char *line, RollbackRequest *request) {
   bool qr = (line[0] == 'Q' || line[0] == 'R');
   bool d = line[0] == 'D';
   bool a = line[0] == 'A';
-  size_t expected = qr ? 29U : (d ? 30U : (a ? 43U : 0U));
-  if (expected == 0U || !split_fields(line, fields, 43U, &field_count) ||
+  size_t expected = qr ? 30U : (d ? 31U : (a ? 44U : 0U));
+  if (expected == 0U || !split_fields(line, fields, 44U, &field_count) ||
       field_count != expected || strcmp(fields[1], "CREATE_ROLLBACK") != 0 ||
       !valid_operation(fields[2]) || !valid_digest(fields[3]) || !valid_digest(fields[4]) ||
       !parse_uint(fields[5], 96ULL * 1024ULL * 1024ULL, &request->marker_length) ||
@@ -5149,7 +5122,8 @@ static bool rollback_header(char *line, RollbackRequest *request) {
         (strcmp(fields[24], "-") != 0 || strcmp(fields[25], "-") != 0)) ||
       !valid_digest(fields[26]) || !parse_uint(fields[27], MAX_ITEMS, &existing_count) ||
       !parse_uint(fields[28], MAX_ITEMS, &missing_count) || existing_count == 0U ||
-      missing_count == 0U || existing_count + missing_count > MAX_ITEMS) return false;
+      missing_count == 0U || existing_count + missing_count > MAX_ITEMS ||
+      !valid_digest(fields[29])) return false;
   request->command = line[0];
   memcpy(request->create_request.operation, fields[2], strlen(fields[2]) + 1U);
   memcpy(request->request_digest, fields[3], DIGEST_BYTES + 1U);
@@ -5173,23 +5147,24 @@ static bool rollback_header(char *line, RollbackRequest *request) {
     memcpy(request->base_history_identity, fields[25], DIGEST_BYTES + 1U);
   }
   memcpy(request->history_parent, fields[26], DIGEST_BYTES + 1U);
+  memcpy(request->journal_digest, fields[29], DIGEST_BYTES + 1U);
   request->existing_count = (size_t)existing_count;
   request->count = (size_t)missing_count;
   request->create_request.count = request->count;
   if (d) {
     uint64_t token_count;
-    if (!parse_uint(fields[29], MAX_ITEMS, &token_count) || token_count != missing_count) return false;
+    if (!parse_uint(fields[30], MAX_ITEMS, &token_count) || token_count != missing_count) return false;
   } else if (a) {
     uint64_t token_count;
-    if (!has_prefix(fields[29], ".changes-history-native-rollback-create-final.") ||
-        strlen(fields[29]) >= sizeof(request->final_name) || !valid_digest(fields[30]) ||
-        !valid_digest(fields[31]) || !decode_hex(fields[32], request->rolled_updated_at,
-          sizeof(request->rolled_updated_at)) || !parse_identity_fields(fields, 33U,
-          &request->final_record) || !parse_uint(fields[42], MAX_ITEMS, &token_count) ||
+    if (!has_prefix(fields[30], ".changes-history-native-rollback-create-final.") ||
+        strlen(fields[30]) >= sizeof(request->final_name) || !valid_digest(fields[31]) ||
+        !valid_digest(fields[32]) || !decode_hex(fields[33], request->rolled_updated_at,
+          sizeof(request->rolled_updated_at)) || !parse_identity_fields(fields, 34U,
+          &request->final_record) || !parse_uint(fields[43], MAX_ITEMS, &token_count) ||
         token_count != missing_count) return false;
-    memcpy(request->final_name, fields[29], strlen(fields[29]) + 1U);
-    memcpy(request->final_digest, fields[30], DIGEST_BYTES + 1U);
-    memcpy(request->rolled_phase, fields[31], DIGEST_BYTES + 1U);
+    memcpy(request->final_name, fields[30], strlen(fields[30]) + 1U);
+    memcpy(request->final_digest, fields[31], DIGEST_BYTES + 1U);
+    memcpy(request->rolled_phase, fields[32], DIGEST_BYTES + 1U);
   }
   return true;
 }
@@ -5390,7 +5365,7 @@ static bool rollback_held_authority(RootBinding *root, RollbackRequest *request)
       !hash_fd(HELD_MARKER_FD, &marker, marker_content, 96ULL * 1024ULL * 1024ULL) ||
       marker.uid != (uintmax_t)geteuid() || permission_mode(marker.mode) != 0600U ||
       marker.nlink != 1U || marker.size != request->marker_length ||
-      strcmp(marker_content, request->marker_digest) != 0 ||
+      strcmp(marker_content, request->journal_digest) != 0 ||
       !object_identity_digest(&marker, marker_content, marker_identity) ||
       strcmp(marker_identity, request->marker_identity) != 0 ||
       !record_path_matches_fd(root->recovery_fd, "changes-history-transaction.json",

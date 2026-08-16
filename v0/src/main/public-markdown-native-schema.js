@@ -321,7 +321,7 @@ const KEYS = Object.freeze({
     'existingRequestDigest', 'markerByteLength', 'markerIdentityDigest',
     'historyParentIdentityDigest', 'baseHistoryDigest', 'baseHistoryByteLength',
     'baseHistoryExists', 'baseHistoryContentDigest', 'baseHistoryIdentityDigest',
-    'items',
+    'journalMarkerDigest', 'items',
   ]),
   ROLLBACK_CREATE_ITEM: Object.freeze([
     'selectedId', 'path', 'artifactOffset', 'byteLength', 'contentDigest',
@@ -3725,9 +3725,14 @@ function buildRollbackCreateHeldBinding(
     1,
     LIMITS.maxMarkerBytes
   );
+  // WRCCHRJ2 single-authority journal: the held marker IS the journal file.
+  // Its whole-content sha must equal the journal file identity the EXISTING
+  // sub-request binds, not the active-marker domain digest.
+  const journalContentSha256 =
+    existingAuthority.request.journalMarkerBinding.journalFileIdentity.contentSha256;
   if (markerIdentity.mode !== 0o600 || markerIdentity.nlink !== 1 ||
       markerIdentity.size !== String(markerLength) ||
-      markerIdentity.contentSha256 !== existingAuthority.request.markerDigest) {
+      markerIdentity.contentSha256 !== journalContentSha256) {
     fail('rollback-create held marker identity is foreign');
   }
   const parentDigest = digest(
@@ -3934,10 +3939,19 @@ function buildRollbackCreateRequest(
     rawHeldBinding
   );
   const existingRequest = context.existingAuthority.request;
+  // WRCCHRJ2 single-authority journal. Two distinct marker digests:
+  // - markerDigest stays the EXISTING sub-request's active-marker domain digest
+  //   (the native rebuilds the EXISTING records/terminal with it);
+  // - journalMarkerDigest is the whole-content sha of the held journal file,
+  //   which the native rollback_held_authority recomputes over HELD_MARKER_FD
+  //   (the changes-history-transaction.json descriptor).
+  const journalMarkerDigest =
+    existingRequest.journalMarkerBinding.journalFileIdentity.contentSha256;
   return immutable({
     schema: SCHEMAS.ROLLBACK_CREATE_REQUEST,
     operationId: context.createdReceiptPhase.operationId,
     markerDigest: existingRequest.markerDigest,
+    journalMarkerDigest,
     artifactDigest: context.createRequest.artifactDigest,
     artifactIdentityDigest: context.createRequest.artifactIdentityDigest,
     artifactByteLength: context.createRequest.artifactByteLength,
@@ -4634,6 +4648,7 @@ function rollbackCreateAuthorityHeaderFields(rawAuthority) {
     request.baseHistoryIdentityDigest || '-', request.historyParentIdentityDigest,
     String(authority.existingAuthority.request.items.length),
     String(request.items.length),
+    request.journalMarkerDigest,
   ];
 }
 
