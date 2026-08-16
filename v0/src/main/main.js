@@ -3466,6 +3466,14 @@ ipcMain.handle('writcraft:project:read', async (event, relPath) => {
   try {
     assertTrustedSender(event);
     const project = requireCurrentProject();
+    // Same read authority posture as trash/navigation/daily-workspace reads:
+    // a single file read is atomic, but settling the watcher first keeps the
+    // reader from observing a half-committed tree during a mutation.
+    await settleProjectReadAuthority(project, {
+      watcherUnavailable: '项目文件监控不可用，请稍后重试',
+      mutationInProgress: '项目正在写入，请稍后重试',
+      projectChanged: '项目状态已变化，请重新打开文件',
+    });
     const file = projectService.readFileWithRevision(project.rootPath, relPath);
     return { ok: true, path: relPath, ...file };
   } catch (error) {

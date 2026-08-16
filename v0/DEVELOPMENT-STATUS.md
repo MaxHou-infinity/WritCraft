@@ -1,7 +1,7 @@
 # 笔触 · WritCraft 当前开发状态
 
-> 最后更新：2026-08-13
-> 当前公开/代码版本：`writ-craft@0.3.0`（npm `preview`）
+> 最后更新：2026-08-16
+> 当前公开/代码版本：`writ-craft@0.3.1`（npm `preview`）
 > 下一目标：`0.4.0` 证据与交付闭环（`WRC-0.4.0-R1`）
 > 当前 checkpoint：**Stage A / A1b mixed EXISTING + `ROLLBACK_CREATE` 开发中**
 > 当前结论：**P0=0；A1b 仍 NO-GO；A1c、A2、Stage B 重签与 Stage C/D/E 继续冻结**
@@ -50,3 +50,16 @@ A1b 只在同一 production mixed 旅程同时证明以下事实后签收：
 **完成 A1b 生产纵切并一次性签收 A1b；不再创建 pure-schema/字段/线协议微 review。**
 
 A1b 签收前，A1c Safe Undo、A2 App 接线、Stage A 总门禁、A→B 重签、Stage C/D/E、candidate、push/tag/release/publish/distribution 均冻结。
+
+## 6. 门禁执行清单（无 CI 时的显式步骤）
+
+0.4 主战场（marker/journal、snapshot、public-markdown native）的 39 个 Stage-A 组件测试
+**不在** `npm test` / `npm run verify` 默认链内（注册门禁强制排除），无 CI 时必须显式执行：
+
+- `npm run verify:syntax` — 全仓 `node --check`（394 个文件）
+- `npm run verify:0.4:registration` — 测试清册 220/220 零漂移
+- `npm run verify:0.4:current-components` — Stage A 组件 + Stage B Node preflight
+- `npm test` / `npm run verify` — 默认 Node 行为套件（收尾共享 `verify:post-common`）
+
+CI（`.github/workflows/verify.yml`）已按同一顺序编排：registration → syntax →
+current-components → test → `npm audit --omit=dev`。
