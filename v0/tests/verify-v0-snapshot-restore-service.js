@@ -321,8 +321,11 @@ function realMissingTransactionFixture(calls) {
   };
   const publicMarkdownLifecycle = {
     create() {},
-    finalizeCreate() {},
+    createMissingJournal() {},
     reconcile() {},
+    verifyCreate() {},
+    finalizeCreate() {},
+    reconcileFinalize() {},
   };
   return createChangesHistoryTransaction({
     projectService: { atomicWriteFile() {} },
