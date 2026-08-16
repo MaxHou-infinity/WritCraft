@@ -371,6 +371,16 @@ const snapshotRestorePublicMarkdownLifecycle = Object.freeze({
     });
   },
 });
+const snapshotRestoreExistingRestoreLifecycle = Object.freeze({
+  schema: 'writcraft.snapshot-restore-existing-restore-lifecycle/v1',
+  forProject(rootPath) {
+    const scoped = publicMarkdownNativeLifecycle.forProject(rootPath);
+    // Formal EXISTING restore uses the native existingRestore scope
+    // (execute/reconcile/verify/finalize/reconcileFinalize/ack) as its
+    // single WRCCHRJ2 authority; no legacy markerFd path is involved.
+    return scoped.existingRestore;
+  },
+});
 const changesHistoryTransaction = changesHistoryTransactionService.createChangesHistoryTransaction({
   projectService,
   historyService: changeHistoryService,
@@ -378,6 +388,7 @@ const changesHistoryTransaction = changesHistoryTransactionService.createChanges
   exactArtifactLifecycle: changesHistoryArtifactLifecycle,
   exactMarkerLifecycle: changesHistoryMarkerLifecycle,
   publicMarkdownLifecycle: snapshotRestorePublicMarkdownLifecycle,
+  existingRestoreLifecycle: snapshotRestoreExistingRestoreLifecycle,
   markerJournalLifecycle: changesHistoryMarkerJournalLifecycle,
 });
 const writingStructureTransaction =

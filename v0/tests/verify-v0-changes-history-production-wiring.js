@@ -66,6 +66,10 @@ assert.match(
 );
 assert.match(
   wiring,
+  /existingRestoreLifecycle: snapshotRestoreExistingRestoreLifecycle/u
+);
+assert.match(
+  wiring,
   /markerJournalLifecycle: changesHistoryMarkerJournalLifecycle/u
 );
 assert.match(
