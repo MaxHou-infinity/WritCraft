@@ -39,6 +39,11 @@ coverage/
 tmp/
 **/tmp/
 
+# Packaged artifacts (never commit tarballs/zips/app bundles)
+*.tgz
+*.zip
+*.app
+
 # Logs and temporary files
 *.log
 npm-debug.log*
@@ -49,3 +54,6 @@ pnpm-debug.log*
 # Local agent runtime state
 .omc/
 .codex/
+
+# Backup artifacts from file-sync mishaps (keep only one source of truth in raw/)
+raw/_back/
