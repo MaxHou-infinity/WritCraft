@@ -164,7 +164,7 @@
       }
       return;
     }
-    if (projectInstanceId !== window.__workspace?.state?.project?.instanceId) {
+    if (projectInstanceId !== window.__workspace?.readState()?.project?.instanceId) {
       deliveryFilesLoading = false;
       deliveryFilesRequestOwner = 0;
       syncDeliveryControls();
@@ -184,8 +184,8 @@
   }
 
   async function loadDeliverySnapshots() {
-    if (deliveryLoading || !window.__workspace?.state?.project || !bridge?.listDeliverySnapshots) return;
-    const projectInstanceId = window.__workspace.state.project.instanceId;
+    if (deliveryLoading || !window.__workspace?.readState()?.project || !bridge?.listDeliverySnapshots) return;
+    const projectInstanceId = window.__workspace.readState().project.instanceId;
     const requestId = ++deliveryRequestSequence;
     deliveryLoading = true;
     // A snapshot-list refresh supersedes any in-flight file-list request; do
@@ -199,7 +199,7 @@
     try { result = await bridge.listDeliverySnapshots(projectInstanceId); }
     catch (error) { result = { ok: false, message: error?.message || 'snapshot 列表不可用' }; }
     if (requestId !== deliveryRequestSequence) return;
-    if (projectInstanceId !== window.__workspace?.state?.project?.instanceId) {
+    if (projectInstanceId !== window.__workspace?.readState()?.project?.instanceId) {
       deliveryLoading = false;
       deliveryFilesLoading = false;
       syncDeliveryControls();
@@ -233,7 +233,7 @@
   }
 
   async function selectDeliverySnapshot() {
-    const projectInstanceId = window.__workspace?.state?.project?.instanceId;
+    const projectInstanceId = window.__workspace?.readState()?.project?.instanceId;
     const snapshotId = deliverySnapshotSelect?.value || '';
     const requestId = ++deliveryRequestSequence;
     deliveryCapabilityId = null;
@@ -269,7 +269,7 @@
 
   async function runDeliveryPreflight() {
     if (deliveryLoading || deliveryFilesLoading || !bridge?.deliveryPreflight) return;
-    const projectInstanceId = window.__workspace?.state?.project?.instanceId;
+    const projectInstanceId = window.__workspace?.readState()?.project?.instanceId;
     const snapshotId = deliverySnapshotSelect?.value || '';
     const selected = selectedDeliveryFiles();
     if (!projectInstanceId || !snapshotId || !selected.length) return;
@@ -289,7 +289,7 @@
         warningDecision: deliveryWarningDecision?.value || 'REVIEW_ONLY',
       });
     } catch (error) { result = { ok: false, message: error?.message || '交付预检不可用' }; }
-    if (requestId !== deliveryRequestSequence || projectInstanceId !== window.__workspace?.state?.project?.instanceId) return;
+    if (requestId !== deliveryRequestSequence || projectInstanceId !== window.__workspace?.readState()?.project?.instanceId) return;
     deliveryLoading = false;
     syncDeliveryControls();
     if (!result?.ok || !result.preflight) {
@@ -329,7 +329,7 @@
     const pathObserved = new Promise(resolve => { resolvePath = resolve; });
     const observePath = () => {
       if (observationStopped) return;
-      if (window.__workspace?.state?.currentPath === filePath) {
+      if (window.__workspace?.readState()?.currentPath === filePath) {
         resolvePath(true);
         return;
       }
@@ -359,7 +359,7 @@
   }
 
   async function resolveResearchCard(card) {
-    const projectInstanceId = window.__workspace?.state?.project?.instanceId;
+    const projectInstanceId = window.__workspace?.readState()?.project?.instanceId;
     const handoff = card?.handoff;
     if (!projectInstanceId || !bridge?.resolveResearchCard ||
         handoff?.schema !== 'writcraft.research-handoff/v1' || typeof handoff.cardId !== 'string') {
@@ -367,7 +367,7 @@
     }
     // Identifier-only: Main reconstructs the canonical source, quote and locator.
     const result = await bridge.resolveResearchCard(projectInstanceId, handoff.cardId);
-    if (projectInstanceId !== window.__workspace?.state?.project?.instanceId) return { ok: false, message: '项目已切换' };
+    if (projectInstanceId !== window.__workspace?.readState()?.project?.instanceId) return { ok: false, message: '项目已切换' };
     return result;
   }
 
@@ -487,7 +487,7 @@
       let recordedVerdict = null;
       let judgmentInFlight = false;
       let judgmentSequence = 0;
-      const cardProjectInstanceId = window.__workspace?.state?.project?.instanceId || '';
+      const cardProjectInstanceId = window.__workspace?.readState()?.project?.instanceId || '';
       const cardRenderSequence = researchRequestSequence;
       async function resolve() {
         let resolution;
@@ -570,7 +570,7 @@
           result = { ok: false, message: '作者判断暂时无法保存' };
         }
         if (sequence !== judgmentSequence || cardRenderSequence !== researchRequestSequence ||
-            cardProjectInstanceId !== window.__workspace?.state?.project?.instanceId) return;
+            cardProjectInstanceId !== window.__workspace?.readState()?.project?.instanceId) return;
         judgmentInFlight = false;
         const handoffAvailable = result?.ok === true && result?.recorded === true &&
           result?.handoffAvailable === true && result?.evidenceChanged === false;
@@ -714,7 +714,7 @@
     const question = researchQuestion?.value.trim() || '';
     if (!question || !selectedSourceIds.length) return;
     const requestId = ++researchRequestSequence;
-    const projectInstanceId = window.__workspace?.state?.project?.instanceId;
+    const projectInstanceId = window.__workspace?.readState()?.project?.instanceId;
     const sourceIds = [...selectedSourceIds];
     if (navigationHandoff && typeof navigationSourceReturn === 'function') {
       const resume = navigationSourceReturn;
@@ -731,11 +731,11 @@
     let result;
     try {
       await window.__changesView?.cancelResearchForRerun?.();
-      if (requestId !== researchRequestSequence || projectInstanceId !== window.__workspace?.state?.project?.instanceId) return;
+      if (requestId !== researchRequestSequence || projectInstanceId !== window.__workspace?.readState()?.project?.instanceId) return;
       result = await bridge.research(projectInstanceId, question, sourceIds);
     }
     catch (error) { result = { ok: false, message: error.message }; }
-    if (requestId !== researchRequestSequence || projectInstanceId !== window.__workspace?.state?.project?.instanceId) return;
+    if (requestId !== researchRequestSequence || projectInstanceId !== window.__workspace?.readState()?.project?.instanceId) return;
     researching = false;
     syncResearchControls();
     if (!result?.ok) {
@@ -764,20 +764,20 @@
 
   async function refresh() {
     if (indexLoading || !active) return;
-    if (!window.__workspace?.state?.project) {
+    if (!window.__workspace?.readState()?.project) {
       empty('请先创建或打开一个项目。');
       setStatus('没有打开的项目', true);
       return;
     }
     const requestId = ++indexRequestSequence;
-    const projectInstanceId = window.__workspace.state.project.instanceId;
+    const projectInstanceId = window.__workspace.readState().project.instanceId;
     indexLoading = true;
     refreshButton.disabled = true;
     setStatus('正在建立本地来源索引…');
     let result;
     try { result = await bridge.buildSourceIndex(projectInstanceId); }
     catch (error) { result = { ok: false, message: error.message }; }
-    if (requestId !== indexRequestSequence || projectInstanceId !== window.__workspace?.state?.project?.instanceId) return;
+    if (requestId !== indexRequestSequence || projectInstanceId !== window.__workspace?.readState()?.project?.instanceId) return;
     indexLoading = false;
     refreshButton.disabled = false;
     if (!result?.ok) {
@@ -790,12 +790,12 @@
 
   async function importReference() {
     if (importing) return;
-    if (!window.__workspace?.state?.project) {
+    if (!window.__workspace?.readState()?.project) {
       setStatus('请先创建或打开一个项目', true);
       return;
     }
     const requestId = ++importRequestSequence;
-    const projectInstanceId = window.__workspace.state.project.instanceId;
+    const projectInstanceId = window.__workspace.readState().project.instanceId;
     importing = true;
     refreshButton.disabled = true;
     importButton.disabled = true;
@@ -803,7 +803,7 @@
     let result;
     try { result = await bridge.importReference(projectInstanceId); }
     catch (error) { result = { ok: false, message: error.message }; }
-    if (requestId !== importRequestSequence || projectInstanceId !== window.__workspace?.state?.project?.instanceId) return;
+    if (requestId !== importRequestSequence || projectInstanceId !== window.__workspace?.readState()?.project?.instanceId) return;
     importing = false;
     refreshButton.disabled = false;
     importButton.disabled = false;
@@ -817,7 +817,7 @@
     }
     render(result.index);
     await window.__workspace?.refreshTree?.();
-    if (requestId !== importRequestSequence || projectInstanceId !== window.__workspace?.state?.project?.instanceId) return;
+    if (requestId !== importRequestSequence || projectInstanceId !== window.__workspace?.readState()?.project?.instanceId) return;
     setStatus(`已导入：${result.reference?.title || result.reference?.sidecarPath || '来源附件'}`);
   }
 

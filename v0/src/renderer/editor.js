@@ -147,8 +147,8 @@
   }
 
   async function prepareAIRequestGuard() {
-    if (!window.__workspace?.state?.project) return null;
-    const neededFlush = Boolean(window.__workspace.state.dirty || window.__workspace.state.savePromise);
+    if (!window.__workspace?.readState()?.project) return null;
+    const neededFlush = Boolean(window.__workspace.readState().dirty || window.__workspace.readState().savePromise);
     const saved = await window.__workspace.persistCurrent?.(true);
     if (!saved || !window.__workspace.canUseAI?.()) return false;
     if (neededFlush) await window.__workspace.settleOwnWriteEcho?.();
@@ -157,7 +157,7 @@
 
   async function prepareChatRequestGuard(intent) {
     return window.__aiRequestGuard?.prepareChatIntent?.(intent, {
-      getState: () => window.__workspace?.state,
+      getState: () => window.__workspace?.readState?.(),
       getInteraction: currentChatInteraction,
       persist: () => window.__workspace?.persistCurrent?.(true),
       settle: () => window.__workspace?.settleOwnWriteEcho?.(),
@@ -668,7 +668,7 @@
     if (typeof original === 'string' && options.keepRendered !== true) {
       EDITOR_EL.textContent = original;
     }
-    const blocked = window.__workspace?.state?.inlineMutationBlocked === true;
+    const blocked = window.__workspace?.readState()?.inlineMutationBlocked === true;
     EDITOR_EL.contentEditable = blocked ? 'false' : 'true';
     EDITOR_EL.removeAttribute('aria-readonly');
     updateCount();
@@ -719,7 +719,7 @@
   }
 
   function freezeRewriteIntent(style, instruction) {
-    const workspaceState = window.__workspace?.state;
+    const workspaceState = window.__workspace?.readState?.();
     const selected = getEditorSelection();
     if (!workspaceState?.project || !selected) return null;
     const stableText = getStableText();
@@ -762,7 +762,7 @@
   }
 
   function rewriteCommandStillCurrent(command) {
-    const workspaceState = window.__workspace?.state;
+    const workspaceState = window.__workspace?.readState?.();
     if (!command || !workspaceState?.project || !command.range?.startContainer?.isConnected ||
         !command.range?.endContainer?.isConnected || !EDITOR_EL.contains(command.range.commonAncestorContainer)) return false;
     if (workspaceState.project.instanceId !== command.projectInstanceId ||
@@ -791,13 +791,13 @@
       REWRITE_COMMAND_INPUT.focus();
       return;
     }
-    if (!window.__workspace?.state?.project || activeRewrite || pendingRewrite || rewritePreparing) {
+    if (!window.__workspace?.readState()?.project || activeRewrite || pendingRewrite || rewritePreparing) {
       setStatus(activeRewrite || pendingRewrite || rewritePreparing
         ? '⚠️ 请先接受或拒绝当前校改'
         : '⚠️ ⌘K 校改只在写作项目中可用', true);
       return;
     }
-    const workspaceState = window.__workspace.state;
+    const workspaceState = window.__workspace.readState();
     const selected = getEditorSelection();
     const stableText = getStableText();
     const offsets = selected ? rangeOffsets(selected.range, stableText) : null;
@@ -883,7 +883,7 @@
   }
 
   function previewBindingCurrent(entry) {
-    const workspaceState = window.__workspace?.state;
+    const workspaceState = window.__workspace?.readState?.();
     const intent = entry?.binding?.intent;
     return Boolean(entry && intent && entry.wrapper?.isConnected && pendingRewrite === entry &&
       workspaceState?.project?.instanceId === intent.projectInstanceId && workspaceState.currentPath === intent.currentPath &&
@@ -938,7 +938,7 @@
   }
 
   function committedBindingCurrent(entry, revision) {
-    const workspaceState = window.__workspace?.state;
+    const workspaceState = window.__workspace?.readState?.();
     return Boolean(workspaceState?.project?.instanceId === entry.intent.projectInstanceId &&
       workspaceState.currentPath === entry.intent.currentPath && workspaceState.revision === revision);
   }
@@ -981,13 +981,13 @@
 
   async function runRewrite(entry) {
     const adapters = {
-      getState: () => window.__workspace?.state,
+      getState: () => window.__workspace?.readState?.(),
       getSelection: () => currentRewriteSelection(entry.frozen),
       getStyle: () => entry.style,
       getInstruction: () => entry.instruction,
       persist: async () => {
         const saved = await window.__workspace?.persistCurrent?.(true);
-        return { ok: saved === true, revision: window.__workspace?.state?.revision };
+        return { ok: saved === true, revision: window.__workspace?.readState()?.revision };
       },
       settleWatcher: () => window.__workspace?.settleOwnWriteEcho?.(),
     };
@@ -1021,7 +1021,7 @@
     }
     const selection = currentRewriteSelection(entry.frozen);
     const bindingCurrent = rewriteTransaction.preparedBindingMatches(
-      entry.binding, window.__workspace?.state, selection, entry.style, entry.instruction,
+      entry.binding, window.__workspace?.readState?.(), selection, entry.style, entry.instruction,
     );
     const review = rewriteTransaction.normalizeReviewResult(rawResult);
     if (!review || !bindingCurrent) {
@@ -1079,7 +1079,7 @@
   }
 
   async function beginRewrite(style, instruction) {
-    if (!window.__workspace?.state?.project) {
+    if (!window.__workspace?.readState()?.project) {
       setStatus('⚠️ ⌘K 校改只在写作项目中可用', true);
       return;
     }
@@ -1428,7 +1428,7 @@
   }
 
   async function startNewConversation() {
-    const projectInstanceId = window.__workspace?.state?.project?.instanceId || null;
+    const projectInstanceId = window.__workspace?.readState()?.project?.instanceId || null;
     if (!projectInstanceId || !window.writCraft?.chatConversation?.reset) {
       setStatus('⚠ 新对话服务未连接', true);
       return false;
@@ -1446,7 +1446,7 @@
       if (CHAT_NEW_CONVERSATION) CHAT_NEW_CONVERSATION.disabled = false;
     }
     if (requestToken !== chatRequestSequence ||
-        window.__workspace?.state?.project?.instanceId !== projectInstanceId) return false;
+        window.__workspace?.readState()?.project?.instanceId !== projectInstanceId) return false;
     if (!result?.ok) {
       appendChatMsg('ai', `新对话未能建立：${result?.message || result?.error || '未知错误'}`, false);
       return false;
@@ -1526,7 +1526,7 @@
     const requestToken = ++chatRequestSequence;
     window.__workspace?.supersedeChatRequest?.(requestToken);
     clearPreflightContextChips();
-    const projectInstanceId = window.__workspace?.state?.project?.instanceId || null;
+    const projectInstanceId = window.__workspace?.readState()?.project?.instanceId || null;
     if (projectInstanceId) {
       if (!window.writCraft?.chatConversation?.cancelPending) {
         appendChatMsg('ai', '对话会话服务未连接', false);
@@ -1539,13 +1539,13 @@
         canceled = { ok: false, message: error.message };
       }
       if (requestToken !== chatRequestSequence ||
-          window.__workspace?.state?.project?.instanceId !== projectInstanceId) return;
+          window.__workspace?.readState()?.project?.instanceId !== projectInstanceId) return;
       if (!canceled?.ok) {
         appendChatMsg('ai', `对话请求未能建立：${canceled?.message || canceled?.error || '未知错误'}`, false);
         return;
       }
     }
-    if (window.__workspace?.state?.project && !window.__workspace?.canUseAI?.()) {
+    if (window.__workspace?.readState()?.project && !window.__workspace?.canUseAI?.()) {
       appendChatMsg('ai', '项目 Prompt 缺失或当前文件存在磁盘冲突。请先恢复 edit.md 或处理冲突，再继续对话。', false);
       return;
     }
@@ -1555,7 +1555,7 @@
     }
     let contextRequest = null;
     let chatIntent = null;
-    if (window.__workspace?.state?.project) {
+    if (window.__workspace?.readState()?.project) {
       try {
         // Freeze the original A intent before persistence or watcher settling
         // can yield. This exact request is the only one allowed to reach Main.
@@ -1635,7 +1635,7 @@
     const standaloneDocumentContext = cachedEditorSelection
       ? `[用户选中的段落]\n${cachedEditorSelection.text}`
       : `[用户当前全文]\n${getStableText().slice(0, 12000)}`;
-    const context = window.__workspace?.state?.project
+    const context = window.__workspace?.readState()?.project
       ? ''
       : [projectContext, standaloneDocumentContext].filter(Boolean).join('\n\n');
     // A stale preflight must never advance to the model call. This is the

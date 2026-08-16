@@ -81,7 +81,7 @@ test('插入 Markdown 前后都经过现有项目保存门', () => {
 
 test('项目切换时通过 instanceId 和 sequence 丢弃旧图像结果', () => {
   assert.match(view, /requestSequence/);
-  assert.match(view, /projectInstanceId !== window\.__workspace\?\.state\?\.project\?\.instanceId/);
+  assert.match(view, /projectInstanceId !== window\.__workspace\?\.readState\(\)\?\.project\?\.instanceId/);
   assert.match(view, /writcraft:project-entered/);
   assert.match(view, /clearResult\(\)/);
   assert.match(view, /window\.__imageGenerationView = Object\.freeze\(\{ discardPending, refreshTrash \}\)/);

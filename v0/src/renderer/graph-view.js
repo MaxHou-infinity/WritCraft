@@ -122,7 +122,7 @@
       window.WritCraftGraphFilters?.evidenceIsStale?.(
         evidence,
         window.__workspace?.getCurrentPath?.(),
-        window.__workspace?.state?.revision
+        window.__workspace?.readState()?.revision
       )
     );
   }
@@ -154,10 +154,10 @@
     if (correctionBusy || !graph?.correctionState?.graphIdentity) return false;
     correctionBusy = true;
     const correctionId = ++correctionSequence;
-    const projectInstanceId = window.__workspace?.state?.project?.instanceId;
+    const projectInstanceId = window.__workspace?.readState()?.project?.instanceId;
     const originSequence = refreshSequence;
     const requestIsCurrent = () => originSequence === refreshSequence &&
-      projectInstanceId === window.__workspace?.state?.project?.instanceId;
+      projectInstanceId === window.__workspace?.readState()?.project?.instanceId;
     if (feedback) feedback.textContent = '正在保存项目纠错约束…';
     summary.textContent = '正在保存项目纠错约束…';
     try {
@@ -419,7 +419,7 @@
         closeGraph();
         let start = evidence.start || 0;
         let end = evidence.end || start;
-        if (evidence.revision && evidence.revision !== window.__workspace?.state?.revision) {
+        if (evidence.revision && evidence.revision !== window.__workspace?.readState()?.revision) {
           const content = window.__editor?.getContent?.() || '';
           const quote = String(evidence.quote || '');
           const first = quote ? content.indexOf(quote) : -1;
@@ -589,7 +589,7 @@
         action.classList.toggle('is-current', (issue.status || 'open') === status);
         action.addEventListener('click', async event => {
           event.stopPropagation();
-          const result = await bridge?.setIssueStatus?.(window.__workspace?.state?.project?.instanceId, issue.id, status);
+          const result = await bridge?.setIssueStatus?.(window.__workspace?.readState()?.project?.instanceId, issue.id, status);
           if (!result?.ok) {
             summary.textContent = result?.message || result?.error || '问题状态保存失败';
             return;
@@ -857,11 +857,11 @@
   }
 
   async function refreshGraph() {
-    if (!window.__workspace?.state?.project) return;
-    const projectInstanceId = window.__workspace.state.project.instanceId;
+    if (!window.__workspace?.readState()?.project) return;
+    const projectInstanceId = window.__workspace.readState().project.instanceId;
     const requestId = ++refreshSequence;
     const requestIsCurrent = () => requestId === refreshSequence &&
-      projectInstanceId === window.__workspace?.state?.project?.instanceId;
+      projectInstanceId === window.__workspace?.readState()?.project?.instanceId;
     summary.textContent = '正在读取项目文件并建立证据关系…';
     try {
       const saved = await window.__workspace.persistCurrent(true);
@@ -950,7 +950,7 @@
     refreshSelectedDetail();
   });
   document.addEventListener('writcraft:graph-source-changed', event => {
-    if (!graph || event?.detail?.projectInstanceId !== window.__workspace?.state?.project?.instanceId) return;
+    if (!graph || event?.detail?.projectInstanceId !== window.__workspace?.readState()?.project?.instanceId) return;
     changedSourcePaths = new Set([
       ...changedSourcePaths,
       ...(Array.isArray(event.detail.paths) ? event.detail.paths : []),

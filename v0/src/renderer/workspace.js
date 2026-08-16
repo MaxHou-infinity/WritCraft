@@ -3,6 +3,15 @@
 'use strict';
 
 (function () {
+  // 纯路径/树辅助函数来自 workspace-helpers.js（加载顺序在 workspace.js 之前）。
+  const {
+    isPublicMarkdownPath,
+    fileName,
+    isMarkdown,
+    nodePath,
+    markdownPaths,
+    relativeAssetPath,
+  } = window.WritCraftWorkspaceHelpers;
   const bridge = window.writCraft && window.writCraft.project;
   const rewriteBridge = window.writCraft;
   const inlineRewriteTransaction = window.WritCraftInlineRewriteTransaction;
@@ -289,14 +298,6 @@
     return state.project ? `writcraft:recovery-manifest:${state.project.instanceId}` : '';
   }
 
-  function isPublicMarkdownPath(value) {
-    return typeof value === 'string'
-      && /\.(?:md|markdown)$/i.test(value)
-      && !value.startsWith('/')
-      && !value.includes('\\')
-      && value.split('/').every(part => part && part !== '.' && part !== '..' && !part.startsWith('.'));
-  }
-
   function loadRecoveryManifest() {
     const key = recoveryManifestKey();
     if (!key) return [];
@@ -373,10 +374,6 @@
       return null;
     }
     return { content: recovery.content, conflict: recovery.revision !== diskRevision };
-  }
-
-  function fileName(filePath) {
-    return filePath.split('/').filter(Boolean).pop() || filePath;
   }
 
   function getCursorOffset() {
@@ -654,23 +651,6 @@
     state.workspaceTimer = setTimeout(saveWorkspaceNow, 250);
   }
 
-  function isMarkdown(node) {
-    const path = node.path || node.relativePath || '';
-    return node.type === 'file' && /\.(?:md|markdown)$/i.test(path);
-  }
-
-  function nodePath(node) {
-    return node.path || node.relativePath || node.name || '';
-  }
-
-  function markdownPaths(nodes = state.tree, result = []) {
-    for (const node of nodes || []) {
-      if (isMarkdown(node)) result.push(nodePath(node));
-      if (node.children) markdownPaths(node.children, result);
-    }
-    return result;
-  }
-
   function supersedeChatRequest(requestToken) {
     if (!Number.isSafeInteger(requestToken) || requestToken < 1 || requestToken <= state.activeChatRequestToken) return false;
     state.activeChatRequestToken = requestToken;
@@ -758,14 +738,6 @@
     if (!result.ok) return result;
     const saved = await persistCurrent(true);
     return saved ? result : { ok: false, message: '脚注已进入恢复稿，但尚未写入磁盘' };
-  }
-
-  function relativeAssetPath(documentPath, assetPath) {
-    const from = String(documentPath || '').split('/').slice(0, -1);
-    const to = String(assetPath || '').split('/');
-    let common = 0;
-    while (common < from.length && common < to.length && from[common] === to[common]) common += 1;
-    return `${'../'.repeat(from.length - common)}${to.slice(common).join('/')}`;
   }
 
   async function insertGeneratedImage(image) {
@@ -2269,7 +2241,7 @@
     }
     await loadEditContext(owner);
     if (!isProjectEntryCurrent(entryGeneration, projectInstanceId)) return false;
-    let initialPath = state.projectPromptMissing ? markdownPaths()[0] || '' : 'edit.md';
+    let initialPath = state.projectPromptMissing ? markdownPaths(state.tree)[0] || '' : 'edit.md';
     if (bridge?.loadWorkspace) {
       let saved = null;
       try {
@@ -3329,7 +3301,10 @@
     reconcileChangesHistoryAfterMutation,
     reconcileChangesHistoryOnProjectEnter,
     resolveChangesHistoryRecovery,
+    // `state` 仅供本模块内部、单测播种与真实 App E2E harness 使用；生产
+    // renderer 模块一律通过 readState() 读取冻结快照，不得直接改写此对象。
     state,
+    readState: () => Object.freeze({ ...state }),
   };
   window.WritCraftWorkspace = workspaceApi;
   window.__workspace = workspaceApi;

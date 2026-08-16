@@ -107,7 +107,7 @@
 
   async function leaveIssueMode() {
     if (reviewCommitInFlight || !activeIssueRequest) return;
-    const projectInstanceId = window.__workspace?.state?.project?.instanceId || null;
+    const projectInstanceId = window.__workspace?.readState()?.project?.instanceId || null;
     const discardId = pending?.id || null;
     proposalTransactions?.invalidate();
     stopGenerationProgress();
@@ -263,7 +263,7 @@
     const stillOwned = () => typeof ownership.isCurrent !== 'function' || ownership.isCurrent();
     if (!stillOwned()) return { ok: false, canceled: true, message: '旧生成结果已取消' };
     const projectInstanceId = metric?.originProjectInstanceId ||
-      window.__workspace?.state?.project?.instanceId || null;
+      window.__workspace?.readState()?.project?.instanceId || null;
     const leakedCapability = typeof result?.changeSetId === 'string' && result.changeSetId
       ? result.changeSetId : null;
     const invalid = result?.noChanges !== true || result?.fileCount !== 0 ||
@@ -326,7 +326,7 @@
   }
 
   function recordChangeMetric(outcome, metric = pending?.metric) {
-    if (!metric?.operationId || !window.__workspace?.state?.project) return Promise.resolve(false);
+    if (!metric?.operationId || !window.__workspace?.readState()?.project) return Promise.resolve(false);
     const decision = ['accepted', 'rejected', 'discarded'].includes(outcome);
     if (decision && metric.decisionRecorded) return Promise.resolve(false);
     if (decision && metric.decisionPromise) return metric.decisionPromise;
@@ -369,7 +369,7 @@
       if (!bridge?.discardChanges) return false;
       if (!active.releasePromise) {
         const originProjectInstanceId = active.metric?.originProjectInstanceId ||
-          window.__workspace?.state?.project?.instanceId || null;
+          window.__workspace?.readState()?.project?.instanceId || null;
         const release = Promise.resolve()
           .then(() => bridge.discardChanges(originProjectInstanceId, active.id))
           .then(result => {
@@ -417,10 +417,10 @@
 
   async function loadMetrics() {
     const requestId = ++metricsRequestSequence;
-    const projectInstanceId = window.__workspace?.state?.project?.instanceId;
+    const projectInstanceId = window.__workspace?.readState()?.project?.instanceId;
     window.WritCraftAiMetricsView?.render?.(metricsHost, { status: 'loading' });
     const result = await window.WritCraftAiMetrics?.aggregate?.();
-    if (requestId !== metricsRequestSequence || projectInstanceId !== window.__workspace?.state?.project?.instanceId) return;
+    if (requestId !== metricsRequestSequence || projectInstanceId !== window.__workspace?.readState()?.project?.instanceId) return;
     window.WritCraftAiMetricsView?.render?.(metricsHost, result || { status: 'error' });
   }
 
@@ -689,7 +689,7 @@
   function refreshTargetPicker(reset = false) {
     const helper = window.WritCraftProjectChangesScope;
     if (!helper) return [];
-    availableTargetPaths = helper.availableTargetPaths(window.__workspace?.state?.tree || []);
+    availableTargetPaths = helper.availableTargetPaths(window.__workspace?.readState()?.tree || []);
     if (reset) {
       selectedTargetPaths = [];
       targetSelectionTouched = false;
@@ -748,7 +748,7 @@
     if (!helper) return [];
     if (reset) selectedContextPaths = [];
     availableContextPaths = helper.availableContextPaths(
-      window.__workspace?.state?.tree || [],
+      window.__workspace?.readState()?.tree || [],
       window.__workspace?.getCurrentPath?.() || ''
     );
     selectedContextPaths = helper.reconcileSelection(selectedContextPaths, availableContextPaths);
@@ -758,7 +758,7 @@
   }
 
   function openPanel() {
-    if (!window.__workspace?.state?.project) {
+    if (!window.__workspace?.readState()?.project) {
       const save = document.getElementById('save-state');
       if (save) save.textContent = '请先创建或打开写作项目';
       return false;
@@ -1080,7 +1080,7 @@
 
   async function replaceGeneratedReview(result, metric) {
     const previous = pending;
-    const originProjectInstanceId = metric?.originProjectInstanceId || window.__workspace?.state?.project?.instanceId || '';
+    const originProjectInstanceId = metric?.originProjectInstanceId || window.__workspace?.readState()?.project?.instanceId || '';
     const candidateReviewState = window.WritCraftChangesReviewState?.create?.(result.review);
     if (!candidateReviewState) {
       try { await bridge.discardChanges(originProjectInstanceId, result.changeSetId); } catch (_) {}
@@ -1195,7 +1195,7 @@
     const requested = selectedPaths instanceof Set ? selectedPaths : new Set(available);
     confirmationMode = {
       ...confirmation,
-      projectInstanceId: options.projectInstanceId || window.__workspace?.state?.project?.instanceId || null,
+      projectInstanceId: options.projectInstanceId || window.__workspace?.readState()?.project?.instanceId || null,
       editNoChanges: options.editNoChanges === true,
       metric: options.metric || null,
       selectedPaths: new Set([...requested].filter(filePath => available.has(filePath))),
@@ -1322,7 +1322,7 @@
   }
 
   async function loadHistory() {
-    if (!bridge?.listChangeHistory || !window.__workspace?.state?.project) return;
+    if (!bridge?.listChangeHistory || !window.__workspace?.readState()?.project) return;
     const result = await bridge.listChangeHistory();
     if (!result?.ok) return setStatus(result?.message || result?.error || '历史读取失败', true);
     renderHistory(result.history || []);
@@ -1334,7 +1334,7 @@
       `撤销这次对 ${entry.files.length} 个文件的修改？\n撤销前会再次检查所有文件版本。`;
     const accepted = await window.WritCraftDialogs.confirm(message);
     if (!accepted) return;
-    const projectInstanceId = window.__workspace?.state?.project?.instanceId || null;
+    const projectInstanceId = window.__workspace?.readState()?.project?.instanceId || null;
     const progressOwner = startGenerationProgress(
       '正在安全撤销',
       '笔触正在核对目标记录、磁盘版本和修改历史；不会调用 AI。',
@@ -1349,7 +1349,7 @@
     setBusy(true, 'general', progressOwner);
     setStatus('正在检查版本并安全撤销…');
     const ownsCurrentUndo = () => historyUndoOwner === undoOwner &&
-      window.__workspace?.state?.project?.instanceId === projectInstanceId;
+      window.__workspace?.readState()?.project?.instanceId === projectInstanceId;
     try {
       const saved = await window.__workspace.persistCurrent(true);
       if (!ownsCurrentUndo()) return;
@@ -1390,7 +1390,7 @@
       }));
     } finally {
       if (historyUndoOwner !== undoOwner) return;
-      const stillCurrentProject = window.__workspace?.state?.project?.instanceId === projectInstanceId;
+      const stillCurrentProject = window.__workspace?.readState()?.project?.instanceId === projectInstanceId;
       const undoProgressActive = generationProgressOwner === progressOwner &&
         panel?.dataset.generationState === 'active';
       historyUndoOwner = null;
@@ -1424,7 +1424,7 @@
     }
     const metric = {
       operationId: window.WritCraftAiMetrics?.createOperationId?.(),
-      originProjectInstanceId: window.__workspace?.state?.project?.instanceId || null,
+      originProjectInstanceId: window.__workspace?.readState()?.project?.instanceId || null,
       startedAt: Date.now(), scope: 'multi_file', beforeChars: 0, afterChars: 0,
     };
     const transaction = proposalTransactions?.begin('normal', metric.originProjectInstanceId);
@@ -1433,7 +1433,7 @@
     setStatus('范围已确认；正在读取权威快照并生成局部 Diff…');
     try {
       const saved = await window.__workspace.persistCurrent(true);
-      if (!proposalTransactions.isCurrent(transaction, window.__workspace?.state?.project?.instanceId || null, 'normal')) {
+      if (!proposalTransactions.isCurrent(transaction, window.__workspace?.readState()?.project?.instanceId || null, 'normal')) {
         return;
       }
       if (!saved) return setStatus('当前文件未能保存，已停止生成修改', true);
@@ -1443,7 +1443,7 @@
       const result = await bridge.proposeChanges(metric.originProjectInstanceId, request);
       const current = await proposalTransactions.settle(transaction, result, {
         mode: 'normal',
-        projectInstanceId: window.__workspace?.state?.project?.instanceId || null,
+        projectInstanceId: window.__workspace?.readState()?.project?.instanceId || null,
         discard: (originProjectInstanceId, changeSetId) => bridge.discardChanges?.(originProjectInstanceId, changeSetId),
       });
       if (!current) return;
@@ -1469,11 +1469,11 @@
       recordChangeMetric('generated', metric);
       setStatus(`${result.fileCount || 0} 个文件待审阅 · 可写范围已由 Main 绑定`);
     } catch (error) {
-      if (!proposalTransactions.isCurrent(transaction, window.__workspace?.state?.project?.instanceId || null, 'normal')) return;
+      if (!proposalTransactions.isCurrent(transaction, window.__workspace?.readState()?.project?.instanceId || null, 'normal')) return;
       recordChangeMetric('failed', metric);
       setStatus(`生成中断：${error.message}`, true);
     } finally {
-      if (proposalTransactions.finish(transaction, window.__workspace?.state?.project?.instanceId || null)) setBusy(false);
+      if (proposalTransactions.finish(transaction, window.__workspace?.readState()?.project?.instanceId || null)) setBusy(false);
     }
   }
 
@@ -1482,7 +1482,7 @@
       proposalTransactions?.isCurrent?.(session.transaction, session.projectInstanceId, 'research') &&
       window.WritCraftResearchHandoffTransaction?.bindingMatches?.(
         session.binding,
-        window.__workspace?.state,
+        window.__workspace?.readState?.(),
         selectedTargetPaths
       ));
   }
@@ -1530,7 +1530,7 @@
         owner.phase = 'ready';
         return setStatus('当前文件未能安全保存，Research 交接已停止', true);
       }
-      const binding = helper.captureBinding(window.__workspace?.state, request.targetPaths);
+      const binding = helper.captureBinding(window.__workspace?.readState?.(), request.targetPaths);
       session = { owner, transaction, projectInstanceId: owner.projectInstanceId, request, binding };
       if (!binding || !researchSessionCurrent(session)) {
         await disposeResearchResult(session, null);
@@ -1539,7 +1539,7 @@
       result = await bridge.handoffResearchCard(owner.projectInstanceId, request);
       const settled = await proposalTransactions.settle(transaction, result, {
         mode: 'research',
-        projectInstanceId: window.__workspace?.state?.project?.instanceId || null,
+        projectInstanceId: window.__workspace?.readState()?.project?.instanceId || null,
         discard: (originProjectInstanceId, changeSetId) => bridge.discardChanges?.(originProjectInstanceId, changeSetId),
       });
       if (!settled || !researchSessionCurrent(session)) {
@@ -1620,7 +1620,7 @@
     const contextPaths = refreshContextPicker();
     const metric = {
       operationId: window.WritCraftAiMetrics?.createOperationId?.(),
-      originProjectInstanceId: window.__workspace?.state?.project?.instanceId || null,
+      originProjectInstanceId: window.__workspace?.readState()?.project?.instanceId || null,
       startedAt: Date.now(), scope: 'file', beforeChars: 0, afterChars: 0,
     };
     const request = {
@@ -1635,7 +1635,7 @@
     if (!chapterSession) return setStatus('章节提案事务无效或已有待审阅 Changes', true);
     const transaction = chapterSession.transaction;
     const currentBinding = () => ({
-      projectInstanceId: window.__workspace?.state?.project?.instanceId || null,
+      projectInstanceId: window.__workspace?.readState()?.project?.instanceId || null,
       pendingReview: pending,
       request: {
         schema: request.schema,
@@ -1718,14 +1718,14 @@
       await replaceGeneratedChapterReview(result, metric, chapterSession, currentBinding, contextPaths);
       return;
     } catch (error) {
-      if (!proposalTransactions.isCurrent(transaction, window.__workspace?.state?.project?.instanceId || null, 'chapter')) return;
+      if (!proposalTransactions.isCurrent(transaction, window.__workspace?.readState()?.project?.instanceId || null, 'chapter')) return;
       recordChangeMetric('failed', metric);
       setStatus(`章节生成中断：${error.message}`, true);
     } finally {
       const finish = window.WritCraftChangesProposalTransaction.finishChapter(
         proposalTransactions,
         chapterSession,
-        window.__workspace?.state?.project?.instanceId || null
+        window.__workspace?.readState()?.project?.instanceId || null
       );
       if (finish.releaseBusy) {
         stopGenerationProgress(progressOwner);
@@ -1865,7 +1865,7 @@
       if (pending?.proposalKind === 'research_card' && activeResearchRequest &&
           !window.WritCraftResearchHandoffTransaction?.bindingMatches?.(
             activeResearchRequest.binding,
-            window.__workspace?.state,
+            window.__workspace?.readState?.(),
             activeResearchRequest.request?.targetPaths || []
           )) {
         const snapshot = snapshotResearchOwnership();
@@ -1873,7 +1873,7 @@
         await releaseResearchOwnership(snapshot, { discardCard: false });
         return setStatus('当前草稿与 Research 审阅绑定不一致，已阻止应用', true);
       }
-      const projectInstanceId = window.__workspace?.state?.project?.instanceId || null;
+      const projectInstanceId = window.__workspace?.readState()?.project?.instanceId || null;
       window.__workspace?.beginChangesHistoryMutation?.('正在应用并核对文件与修改历史…');
       let result = null;
       let mutationFailure = null;
@@ -1974,7 +1974,7 @@
         if (researchResidual && pending?.proposalKind === 'research_card' && activeResearchRequest === researchResidual) {
           researchResidual.changeSetId = pending.id;
           researchResidual.binding = window.WritCraftResearchHandoffTransaction?.captureBinding?.(
-            window.__workspace?.state,
+            window.__workspace?.readState?.(),
             researchResidual.request?.targetPaths || []
           );
           researchResidual.phase = 'review';
@@ -2156,10 +2156,10 @@
     }
     if (pending?.id && bridge?.discardChanges) {
       const activePending = pending;
-      const projectInstanceId = window.__workspace?.state?.project?.instanceId || null;
+      const projectInstanceId = window.__workspace?.readState()?.project?.instanceId || null;
       const discardOwner = ++pendingDiscardSequence;
       const discardCurrent = () => discardOwner === pendingDiscardSequence && pending === activePending &&
-        window.__workspace?.state?.project?.instanceId === projectInstanceId;
+        window.__workspace?.readState()?.project?.instanceId === projectInstanceId;
       if (pending.hydratedPublicReview) {
         const discarded = await window.writCraft?.project?.dailyWorkspace?.discardPendingReview?.(
           projectInstanceId,
@@ -2320,11 +2320,11 @@
     if (!reviewLocationId) return;
     const hydrationOwner = Object.freeze({
       sequence: ++pendingHydrationSequence,
-      projectInstanceId: window.__workspace?.state?.project?.instanceId || null,
+      projectInstanceId: window.__workspace?.readState()?.project?.instanceId || null,
       reviewLocationId,
     });
     const hydrationCurrent = () => hydrationOwner.sequence === pendingHydrationSequence &&
-      window.__workspace?.state?.project?.instanceId === hydrationOwner.projectInstanceId;
+      window.__workspace?.readState()?.project?.instanceId === hydrationOwner.projectInstanceId;
     if (pending && pending.publicReviewLocationId === reviewLocationId) {
       event.detail?.accept?.();
       open();
@@ -2492,7 +2492,7 @@
       ? options.onboardingAttempt : null;
     const metric = {
       operationId: onboardingAttempt?.operationId || window.WritCraftAiMetrics?.createOperationId?.(),
-      originProjectInstanceId: window.__workspace?.state?.project?.instanceId || null,
+      originProjectInstanceId: window.__workspace?.readState()?.project?.instanceId || null,
       action: result?.proposalKind === 'onboarding_v2' ? 'onboarding' : 'changeset',
       startedAt: Number.isSafeInteger(onboardingAttempt?.startedAt) ? onboardingAttempt.startedAt : Date.now(),
       scope: 'project', beforeChars: 0, afterChars: 0,
@@ -2540,7 +2540,7 @@
 
   async function openResearchCard(value) {
     const handoff = window.WritCraftResearchHandoffTransaction?.normalizeCardHandoff?.(value);
-    const projectInstanceId = window.__workspace?.state?.project?.instanceId || null;
+    const projectInstanceId = window.__workspace?.readState()?.project?.instanceId || null;
     if (!handoff || !projectInstanceId || !bridge?.resolveResearchCard) {
       return { ok: false, message: 'Research 证据卡请求无效或服务未连接' };
     }
@@ -2560,7 +2560,7 @@
     try { resolved = await bridge.resolveResearchCard(projectInstanceId, handoff.cardId); }
     catch (error) { return { ok: false, message: error.message }; }
     if (openSequence !== researchOpenSequence ||
-        projectInstanceId !== window.__workspace?.state?.project?.instanceId ||
+        projectInstanceId !== window.__workspace?.readState()?.project?.instanceId ||
         pending || confirmationMode || activeIssueRequest || activeResearchRequest) {
       return { ok: false, message: '项目已切换，证据卡未打开' };
     }
@@ -2624,7 +2624,7 @@
     if (!request || !proposalTransactions || !bridge?.handoffGraphIssue) {
       return { ok: false, message: '当前没有已绑定的星图问题' };
     }
-    const projectInstanceId = window.__workspace?.state?.project?.instanceId || null;
+    const projectInstanceId = window.__workspace?.readState()?.project?.instanceId || null;
     const transaction = proposalTransactions?.begin('issue', projectInstanceId);
     if (!transaction) return { ok: false, message: '图谱问题交接事务无效' };
     const metric = {
@@ -2636,7 +2636,7 @@
     setStatus('正在由 Main 重新核验问题、证据范围、只读来源与正文 revision…');
     try {
       const saved = await window.__workspace.persistCurrent(true);
-      if (!proposalTransactions.isCurrent(transaction, window.__workspace?.state?.project?.instanceId || null, 'issue')) {
+      if (!proposalTransactions.isCurrent(transaction, window.__workspace?.readState()?.project?.instanceId || null, 'issue')) {
         return { ok: true, canceled: true, message: '旧图谱问题交接已取消' };
       }
       if (!saved) {
@@ -2649,7 +2649,7 @@
       const result = await bridge.handoffGraphIssue(projectInstanceId, request);
       const current = await proposalTransactions.settle(transaction, result, {
         mode: 'issue',
-        projectInstanceId: window.__workspace?.state?.project?.instanceId || null,
+        projectInstanceId: window.__workspace?.readState()?.project?.instanceId || null,
         discard: (originProjectInstanceId, changeSetId) => bridge.discardChanges?.(originProjectInstanceId, changeSetId),
       });
       if (!current) return { ok: true, canceled: true, message: '旧图谱问题结果已丢弃' };
@@ -2680,7 +2680,7 @@
       setStatus(message);
       return { ok: true, message };
     } catch (error) {
-      if (!proposalTransactions.isCurrent(transaction, window.__workspace?.state?.project?.instanceId || null, 'issue')) {
+      if (!proposalTransactions.isCurrent(transaction, window.__workspace?.readState()?.project?.instanceId || null, 'issue')) {
         return { ok: true, canceled: true, message: '旧图谱问题交接已取消' };
       }
       recordChangeMetric('failed', metric);
@@ -2688,7 +2688,7 @@
       setStatus(message, true);
       return { ok: false, message };
     } finally {
-      if (proposalTransactions.finish(transaction, window.__workspace?.state?.project?.instanceId || null)) setBusy(false);
+      if (proposalTransactions.finish(transaction, window.__workspace?.readState()?.project?.instanceId || null)) setBusy(false);
     }
   }
 

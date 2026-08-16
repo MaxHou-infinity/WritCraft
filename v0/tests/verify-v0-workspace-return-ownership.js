@@ -57,6 +57,7 @@ async function verifyHomeOwner() {
   const mutations = [];
   const workspace = {
     state,
+    readState: () => Object.freeze({ ...workspace.state }),
     setWorkspaceView: value => mutations.push(`view:${value}`),
     openFile: async () => { mutations.push('open'); return true; },
     pushReturnLocation: () => mutations.push('push'),

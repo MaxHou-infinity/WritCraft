@@ -267,6 +267,7 @@ function loadChangesHarness(overrides = {}) {
   };
   const workspace = {
     state: { project: { instanceId: 'instance_aaaaaaaaaaaaaaaaaaaaaaaa' }, tree: [] },
+    readState: () => Object.freeze({ ...workspace.state }),
     persistCurrent: async (...args) => typeof overrides.persistCurrent === 'function'
       ? overrides.persistCurrent(...args) : overrides.persistCurrent === undefined ? true : overrides.persistCurrent,
     beginChangesHistoryMutation() {
@@ -526,7 +527,11 @@ function extractFunction(source, name) {
     const previousWorkspace = global.__workspace;
     const originalAnimationFrame = global.requestAnimationFrame;
     global.requestAnimationFrame = callback => callback();
-    global.__workspace = { state: { project: { instanceId: 'instance_metrics_author_evidence' } } };
+    const state = { project: { instanceId: 'instance_metrics_author_evidence' } };
+    global.__workspace = {
+      state,
+      readState: () => Object.freeze({ ...state }),
+    };
     global.WritCraftAiMetrics = {
       createOperationId: () => (++operation).toString(16).padStart(32, '0'),
       record: (originProjectInstanceId, event) => {

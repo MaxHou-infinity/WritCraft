@@ -26,7 +26,10 @@ async function check(label, fn) {
 function loadClient(overrides = {}) {
   const calls = [];
   const window = {
-    __workspace: { state: { project: { projectId: 'p1', instanceId: 'instance-1' } } },
+    __workspace: {
+      state: { project: { projectId: 'p1', instanceId: 'instance-1' } },
+      readState: () => Object.freeze({ ...window.__workspace.state }),
+    },
     writCraft: { project: {
       recordAiMetric: async (instanceId, metric) => { calls.push({ instanceId, metric }); return { ok: true }; },
       getAiMetricsAggregate: async instanceId => ({ ok: instanceId === 'instance-1', aggregate: { sampleSize: 3 } }),
@@ -139,6 +142,7 @@ function loadImageHarness({
   let generateCalls = 0;
   const workspace = {
     state: { project: { instanceId: 'instance-1' } },
+    readState: () => Object.freeze({ ...workspace.state }),
     insertGeneratedImage: async (...args) => {
       insertCalls += 1;
       insertArgs.push(args);
@@ -468,7 +472,7 @@ console.log('════════ WritCraft V0 · AI metrics renderer verify
     assert.match(editor, /originProjectInstanceId: frozen\.intent\.projectInstanceId/);
     assert.match(editor, /record\(entry\.originProjectInstanceId, \{/);
     assert.match(changes, /record\?\.\(metric\.originProjectInstanceId, \{/);
-    assert((changes.match(/originProjectInstanceId: window\.__workspace\?\.state\?\.project\?\.instanceId/g) || []).length >= 3);
+    assert((changes.match(/originProjectInstanceId: window\.__workspace\?\.readState\(\)\?\.project\?\.instanceId/g) || []).length >= 3);
     const navigationCapture = plan.indexOf('originProjectInstanceId: projectInstanceId');
     assert(navigationCapture >= 0 && navigationCapture < plan.indexOf('await window.__workspace.persistCurrent(true)'));
     assert.match(plan, /record\?\.\(metric\.originProjectInstanceId, \{/);

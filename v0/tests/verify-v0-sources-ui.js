@@ -85,7 +85,7 @@ test('Research hands only the opaque card capability to dedicated Changes and ne
 
 test('Research discards stale asynchronous cards after project switch', () => {
   assert.match(sourceView, /researchRequestSequence/);
-  assert.match(sourceView, /projectInstanceId !== window\.__workspace\?\.state\?\.project\?\.instanceId/);
+  assert.match(sourceView, /projectInstanceId !== window\.__workspace\?\.readState\(\)\?\.project\?\.instanceId/);
   assert.match(sourceView, /writcraft:project-entered/);
   assert.match(sourceView, /clearResearchResults\(\)/);
 });
@@ -94,7 +94,7 @@ test('index refresh and native import are both origin-instance and sequence gate
   assert.match(sourceView, /bridge\.buildSourceIndex\(projectInstanceId\)/);
   assert.match(sourceView, /indexRequestSequence/);
   assert.match(sourceView, /importRequestSequence/);
-  assert.match(sourceView, /projectInstanceId !== window\.__workspace\?\.state\?\.project\?\.instanceId/);
+  assert.match(sourceView, /projectInstanceId !== window\.__workspace\?\.readState\(\)\?\.project\?\.instanceId/);
 });
 
 test('Research source navigation resolves canonical evidence by card ID only', () => {
@@ -123,7 +123,7 @@ test('Research requires one persisted author match judgment before Changes', () 
 
 test('Research judgment is project and render-sequence gated and labels author judgment honestly', () => {
   assert.match(sourceView, /cardRenderSequence !== researchRequestSequence/);
-  assert.match(sourceView, /cardProjectInstanceId !== window\.__workspace\?\.state\?\.project\?\.instanceId/);
+  assert.match(sourceView, /cardProjectInstanceId !== window\.__workspace\?\.readState\(\)\?\.project\?\.instanceId/);
   assert.match(sourceView, /作者判断，不是事实核验/);
   assert.match(sourceView, /toChanges\.disabled = true/);
   assert.match(sourceView, /recordedButLocked/);

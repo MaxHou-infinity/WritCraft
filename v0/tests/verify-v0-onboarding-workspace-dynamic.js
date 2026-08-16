@@ -136,6 +136,11 @@ function harness() {
       removeItem(key) { local.delete(key); },
     },
   });
+  vm.runInContext(
+    fs.readFileSync(path.join(__dirname, '../src/renderer/workspace-helpers.js'), 'utf8'),
+    context,
+    { filename: 'workspace-helpers.js' }
+  );
   vm.runInContext(SOURCE, context, { filename: 'workspace.js' });
   // These tests exercise the onboarding draft owner, not the asynchronous
   // filesystem entry pipeline. Mark the fixture as already ready so the

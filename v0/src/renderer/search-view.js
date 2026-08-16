@@ -72,7 +72,7 @@
       setStatus('输入关键词，在全部 Markdown 中查找。');
       return;
     }
-    if (!window.__workspace?.state?.project) {
+    if (!window.__workspace?.readState()?.project) {
       empty('请先创建或打开一个项目。');
       setStatus('没有打开的项目', true);
       return;

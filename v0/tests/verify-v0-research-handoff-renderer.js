@@ -77,7 +77,7 @@ test('dedicated mode locks Claim Source Boundary and free-form controls', () => 
 
 test('handoff persists then captures and rechecks the complete editor binding', () => {
   assert.match(changes, /await window\.__workspace\.persistCurrent\(true\)/);
-  assert.match(changes, /captureBinding\(window\.__workspace\?\.state, request\.targetPaths\)/);
+  assert.match(changes, /captureBinding\(window\.__workspace\?\.readState\?\.\(\), request\.targetPaths\)/);
   assert.match(changes, /researchSessionCurrent\(session\)/);
   assert.match(changes, /const openSequence = \+\+researchOpenSequence/);
   assert.match(changes, /openSequence !== researchOpenSequence[\s\S]{0,220}pending \|\| confirmationMode \|\| activeIssueRequest \|\| activeResearchRequest/);

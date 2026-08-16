@@ -119,8 +119,9 @@ function harness(options = {}) {
   let confirm = options.confirm ?? true;
   const project = { instanceId: 'project-a' };
   const window = {
-    __workspace: { state: { project } },
+    __workspace: { state: { project }, readState: () => Object.freeze({ ...window.__workspace.state }) },
     confirm: () => confirm,
+    WritCraftDialogs: { confirm: async () => confirm, input: async () => null },
     writCraft: { project: {
       getImageTrash: async (...args) => {
         calls.list.push(args);
@@ -179,7 +180,7 @@ console.log('\nWritCraft image trash Renderer verification');
     assert.match(html, /id="image-trash-toggle"/);
     assert.match(html, /长期保留 · 不会自动删除/);
     assert.match(html, /id="image-trash-empty"[^>]+is-danger/);
-    assert.match(source, /window\.confirm\?\.\(/);
+    assert.match(source, /WritCraftDialogs\.confirm\(/);
     assert.match(source, /该操作无法撤销/);
     assert.doesNotMatch(source, /setTimeout\([^)]*(?:emptyImageTrash|restoreImageTrash)/s);
   });

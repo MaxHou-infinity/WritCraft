@@ -34,7 +34,7 @@
     narrowOutlineToggle?.setAttribute('aria-expanded', 'false');
   }
 
-  function project() { return window.__workspace?.state?.project || null; }
+  function project() { return window.__workspace?.readState()?.project || null; }
   function unwrap(response) { return response?.ok ? response.result : null; }
   function safeMessage(response, fallback) { return response?.message || response?.error || fallback; }
 
@@ -69,7 +69,7 @@
     }
     let target = resolved?.target;
     if (!target || target.action !== 'open_file') throw new Error('这个位置当前无法打开。');
-    const workspaceState = window.__workspace?.state;
+    const workspaceState = window.__workspace?.readState?.();
     if (target.filePath === window.__workspace?.getCurrentPath?.() &&
         (workspaceState?.dirty || workspaceState?.conflictRecovery || workspaceState?.externalDeleted)) {
       throw new Error('请先保存当前文稿或处理外部冲突，再定位标题。');
@@ -78,13 +78,13 @@
     const opened = await window.__workspace?.openFile?.(target.filePath, { pin: true });
     if (!isCurrent()) return false;
     if (opened === false) return false;
-    if (window.__workspace?.state?.revision !== target.revision) {
+    if (window.__workspace?.readState()?.revision !== target.revision) {
       response = await bridge.resolveLocation(active.instanceId, item.locationId);
       if (!isCurrent()) return false;
       if (!response?.ok) throw new Error(safeMessage(response, '文稿已变化，请重新选择位置。'));
       resolved = response.result;
       target = resolved?.target;
-      if (!target || target.action !== 'open_file' || target.revision !== window.__workspace?.state?.revision) {
+      if (!target || target.action !== 'open_file' || target.revision !== window.__workspace?.readState()?.revision) {
         throw new Error('文稿仍在变化，本次没有跳转。请稍后重试。');
       }
     }
@@ -106,7 +106,7 @@
   }
 
   function syncOutlineCurrent() {
-    const workspaceState = window.__workspace?.state;
+    const workspaceState = window.__workspace?.readState?.();
     if (!outlineState.items.length || outlineState.currentPath !== window.__workspace?.getCurrentPath?.()) return;
     const safe = !workspaceState?.dirty && !workspaceState?.conflictRecovery && !workspaceState?.externalDeleted &&
       workspaceState?.revision === outlineRevision;
@@ -119,7 +119,7 @@
       if (Number.isSafeInteger(offset) && row.dataset.outlineId === current) row.setAttribute('aria-current', 'location');
       else row.removeAttribute('aria-current');
     });
-    const stored = window.__workspace?.state?.views?.[outlineState.currentPath]?.activeOutlineId || null;
+    const stored = window.__workspace?.readState()?.views?.[outlineState.currentPath]?.activeOutlineId || null;
     if (stored !== current) persistOutlineState(current);
   }
 
@@ -205,7 +205,7 @@
     const active = project();
     const path = window.__workspace?.getCurrentPath?.() || '';
     collapsedOutlineIds.clear();
-    for (const id of window.__workspace?.state?.views?.[path]?.collapsedOutlineIds || []) {
+    for (const id of window.__workspace?.readState()?.views?.[path]?.collapsedOutlineIds || []) {
       collapsedOutlineIds.add(id);
     }
     State.bind(outlineState, active?.instanceId, path);
@@ -234,7 +234,7 @@
       collapsedOutlineIds.delete(id);
       outlineStateChanged = true;
     }
-    const savedActiveId = window.__workspace?.state?.views?.[path]?.activeOutlineId || null;
+    const savedActiveId = window.__workspace?.readState()?.views?.[path]?.activeOutlineId || null;
     if (savedActiveId && !validOutlineIds.has(savedActiveId)) outlineStateChanged = true;
     if (outlineStateChanged) {
       window.__workspace?.updateOutlineViewState?.(path, {

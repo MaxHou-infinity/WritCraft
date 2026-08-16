@@ -67,7 +67,7 @@ check('项目卡 NO_KEY 设置跳转按项目保留草稿并在成功或切项�
 });
 check('edit.md 被定义为项目启动上下文', () => {
   assert.ok(html.includes('每个 WritCraft 项目都从一个可见的 edit.md 开始'));
-  assert.ok(workspace.includes("state.projectPromptMissing ? markdownPaths()[0] || '' : 'edit.md'"));
+  assert.ok(workspace.includes("state.projectPromptMissing ? markdownPaths(state.tree)[0] || '' : 'edit.md'"));
   assert.ok(workspace.includes('await openFile(initialPath)'));
   assert.ok(workspace.includes("bridge.getContext"));
   assert.ok(workspace.includes('bridge?.createProjectPrompt'));

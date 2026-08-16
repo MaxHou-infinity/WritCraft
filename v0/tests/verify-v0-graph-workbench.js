@@ -137,7 +137,11 @@ check('project-entered resets every Graph control and the internal node filter t
   };
   const window = {
     writCraft: { project: {} },
-    __workspace: { state: { project: { instanceId: 'project-b' } }, getCurrentPath: () => 'new.md' },
+    __workspace: {
+      state: { project: { instanceId: 'project-b' } },
+      readState: () => Object.freeze({ project: { instanceId: 'project-b' } }),
+      getCurrentPath: () => 'new.md',
+    },
   };
   vm.runInNewContext(graph, { window, document, console, Map, Set }, { filename: 'graph-view.js' });
 
@@ -177,7 +181,7 @@ check('Graph listens for bounded project-scoped source changes and rerenders sta
 
 check('author correction ignores a late response after project or refresh ownership changes', () => {
   assert.match(graph, /async function applyCorrection[\s\S]*?originSequence = refreshSequence/);
-  assert.match(graph, /projectInstanceId === window\.__workspace\?\.state\?\.project\?\.instanceId/);
+  assert.match(graph, /projectInstanceId === window\.__workspace\?\.readState\(\)\?\.project\?\.instanceId/);
   assert.match(graph, /await bridge\?\.applyGraphCorrection[\s\S]*?if \(!requestIsCurrent\(\)\) return false/);
   assert.match(graph, /correctionId = \+\+correctionSequence[\s\S]*?if \(correctionId === correctionSequence\) correctionBusy = false/);
   assert.match(graph, /function resetForProject\(\)[\s\S]*?correctionSequence \+= 1[\s\S]*?correctionBusy = false/);

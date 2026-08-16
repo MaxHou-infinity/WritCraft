@@ -353,7 +353,7 @@
         }
         const attempt = {
           operationId: root.WritCraftAiMetrics?.createOperationId?.(),
-          originProjectInstanceId: root.__workspace?.state?.project?.instanceId || null,
+          originProjectInstanceId: root.__workspace?.readState()?.project?.instanceId || null,
           startedAt: Date.now(),
           retry: generationFailed,
         };

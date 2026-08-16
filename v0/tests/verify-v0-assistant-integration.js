@@ -98,8 +98,8 @@ check('项目和文件变化只用当前 workspace 权威状态更新导航', ()
     'writcraft:tree-changed',
     'writcraft:current-file-changed',
   ]) assert(integration.includes(event), event);
-  assert.match(integration, /workspace\?\.state\?\.project/);
-  assert.match(integration, /window\.__workspace\?\.state\?\.tree/);
+  assert.match(integration, /workspace\?\.readState\(\)\?\.project/);
+  assert.match(integration, /window\.__workspace\?\.readState\(\)\?\.tree/);
 });
 
 check('Chat 与 Changes 仍统一通过 Dock 切换', () => {

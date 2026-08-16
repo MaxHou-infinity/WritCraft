@@ -17,7 +17,7 @@
   let navigationSequence = 0;
   let origin = null;
 
-  function project() { return window.__workspace?.state?.project || null; }
+  function project() { return window.__workspace?.readState()?.project || null; }
   function beginNavigation() {
     const active = project();
     if (!active) throw new Error('请先打开项目');
@@ -40,7 +40,7 @@
       projectInstanceId: project()?.instanceId || null,
       path,
       caretOffset: window.__workspace?.getCursorOffset?.() || 0,
-      scrollTop: window.__workspace?.state?.views?.[path]?.scrollTop || 0,
+      scrollTop: window.__workspace?.readState()?.views?.[path]?.scrollTop || 0,
     } : null;
   }
 
@@ -123,14 +123,14 @@
     window.__workspace?.setWorkspaceView?.('explorer');
     let opened = await window.__workspace?.openFile?.(target.filePath, { pin: true });
     if (!owner.isCurrent() || opened === false) return;
-    if (window.__workspace?.state?.revision !== target.revision) {
+    if (window.__workspace?.readState()?.revision !== target.revision) {
       // A watcher may publish a newer revision between resolve and open. Re-resolve
       // exactly once through Main; never guess an offset from stale Renderer state.
       target = await resolveTarget(active, locator);
       if (!owner.isCurrent()) return;
       opened = await window.__workspace?.openFile?.(target.filePath, { pin: true });
       if (!owner.isCurrent() || opened === false) return;
-      if (window.__workspace?.state?.revision !== target.revision) {
+      if (window.__workspace?.readState()?.revision !== target.revision) {
         throw new Error('正文持续变化，暂时无法安全定位');
       }
     }

@@ -30,7 +30,7 @@
     : null;
   const contextAutocomplete = window.WritCraftContextAutocomplete?.mount(document, {
     listCandidates: (projectInstanceId, request) => bridge?.listContextCandidates?.(projectInstanceId, request),
-    getProjectInstanceId: () => window.__workspace?.state?.project?.instanceId || null,
+    getProjectInstanceId: () => window.__workspace?.readState()?.project?.instanceId || null,
     getCurrentFilePath: () => window.__workspace?.getCurrentPath?.() || null,
   });
 
@@ -86,7 +86,7 @@
       recordNavigationMetric('failed', metric);
       return { ok: false, error: 'REQUEST_ABORTED' };
     }
-    if (projectInstanceId !== window.__workspace?.state?.project?.instanceId) {
+    if (projectInstanceId !== window.__workspace?.readState()?.project?.instanceId) {
       recordNavigationMetric('failed', metric);
       return { ok: false, error: 'PROJECT_CHANGED' };
     }
@@ -146,7 +146,7 @@
       cancelledNavigationActions.delete(attemptId);
       return { ok: false, error: 'REQUEST_ABORTED' };
     }
-    if (projectInstanceId !== window.__workspace?.state?.project?.instanceId) {
+    if (projectInstanceId !== window.__workspace?.readState()?.project?.instanceId) {
       return { ok: false, error: 'PROJECT_CHANGED' };
     }
     onStage?.('checking_evidence');
@@ -162,7 +162,7 @@
     } finally {
       cancelledNavigationActions.delete(attemptId);
     }
-    if (projectInstanceId !== window.__workspace?.state?.project?.instanceId) {
+    if (projectInstanceId !== window.__workspace?.readState()?.project?.instanceId) {
       if (result?.kind === 'changes' && result.changeSetId) {
         try { await bridge.discardChanges?.(projectInstanceId, result.changeSetId); } catch (_) {}
       }
@@ -254,9 +254,9 @@
     workArea,
     dock: dockElement,
     beforeOpen() {
-      if (!window.__workspace?.state?.project || window.__workspace?.state?.projectReady !== true) {
+      if (!window.__workspace?.readState()?.project || window.__workspace?.readState()?.projectReady !== true) {
         const status = document.getElementById('save-state');
-        if (status) status.textContent = window.__workspace?.state?.project
+        if (status) status.textContent = window.__workspace?.readState()?.project
           ? '项目仍在安全打开中，请稍候'
           : '请先创建或打开写作项目';
         return false;
@@ -270,7 +270,7 @@
       document.getElementById('activity-changes')?.setAttribute('aria-pressed', String(mode === 'changes'));
       if (mode === 'navigation') {
         navigationController?.updateTree?.(
-          window.__workspace?.state?.tree || [],
+          window.__workspace?.readState()?.tree || [],
           window.__workspace?.getCurrentPath?.() || null
         );
       }
@@ -307,16 +307,16 @@
   document.addEventListener('writcraft:project-entering', clearEnteringProject);
   document.addEventListener('writcraft:project-entry-failed', clearEnteringProject);
   document.addEventListener('writcraft:project-entered', syncEnteredProject);
-  if (window.__workspace?.state?.projectReady === true) syncEnteredProject();
+  if (window.__workspace?.readState()?.projectReady === true) syncEnteredProject();
   document.addEventListener('writcraft:tree-changed', () => {
     navigationController?.updateTree?.(
-      window.__workspace?.state?.tree || [],
+      window.__workspace?.readState()?.tree || [],
       window.__workspace?.getCurrentPath?.() || null
     );
   });
   document.addEventListener('writcraft:current-file-changed', () => {
     navigationController?.updateTree?.(
-      window.__workspace?.state?.tree || [],
+      window.__workspace?.readState()?.tree || [],
       window.__workspace?.getCurrentPath?.() || null
     );
   });

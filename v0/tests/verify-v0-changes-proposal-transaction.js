@@ -509,7 +509,7 @@ async function run() {
     assert(view.includes('WritCraftChangesProposalTransaction.finishChapter('));
     assert(view.includes("if (pending) return setStatus('当前还有待审阅 Changes；请先应用或丢弃，再生成当前章节。', true)"));
     assert(view.includes('discard: (originProjectInstanceId, changeSetId) => bridge.discardChanges?.(originProjectInstanceId, changeSetId)'));
-    assert(view.includes('if (proposalTransactions.finish(transaction, window.__workspace?.state?.project?.instanceId || null)) setBusy(false)'));
+    assert(view.includes('if (proposalTransactions.finish(transaction, window.__workspace?.readState()?.project?.instanceId || null)) setBusy(false)'));
     assert(!view.includes('activePlanRequest'));
     assert(!view.includes('openPlanTask'));
     assert(view.includes("recordChangeMetric('discarded', previous?.metric)"));

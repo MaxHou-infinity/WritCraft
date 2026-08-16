@@ -80,6 +80,7 @@ function harness(bridge) {
     writCraft: { project: bridge },
     __workspace: {
       state: { project: { instanceId: 'A' } },
+      readState: () => Object.freeze({ ...window.__workspace.state }),
       setSidebarView() {},
       async refreshTree() { refreshTreeCalls += 1; },
       async openFile() { return true; },

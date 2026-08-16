@@ -51,7 +51,7 @@
   async function record(originProjectInstanceId, input) {
     const event = sanitizeEvent(input);
     const bridge = window.writCraft?.project;
-    const currentProjectInstanceId = window.__workspace?.state?.project?.instanceId;
+    const currentProjectInstanceId = window.__workspace?.readState()?.project?.instanceId;
     if (!originProjectInstanceId || currentProjectInstanceId !== originProjectInstanceId) return false;
     if (!event || !bridge?.recordAiMetric) return false;
     // A successful Onboarding generation already owns a live Main review
@@ -79,7 +79,7 @@
 
   async function aggregate() {
     const bridge = window.writCraft?.project;
-    const projectInstanceId = window.__workspace?.state?.project?.instanceId;
+    const projectInstanceId = window.__workspace?.readState()?.project?.instanceId;
     if (!bridge?.getAiMetricsAggregate || !projectInstanceId) return { status: 'unavailable' };
     try {
       const result = await bridge.getAiMetricsAggregate(projectInstanceId);
@@ -90,7 +90,7 @@
   }
 
   document.addEventListener('writcraft:project-entered', () => {
-    const current = window.__workspace?.state?.project?.instanceId || '';
+    const current = window.__workspace?.readState()?.project?.instanceId || '';
     for (const key of deferredOnboardingGenerated.keys()) {
       if (!key.startsWith(`${current}:`)) deferredOnboardingGenerated.delete(key);
     }

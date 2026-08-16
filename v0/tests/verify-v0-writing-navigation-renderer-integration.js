@@ -34,6 +34,7 @@ function createHarness(overrides = {}) {
   const projectA = { instanceId: 'instance_0123456789abcdef01234567' };
   const workspace = {
     state: { project: projectA, tree: [], currentPath: 'chapters/01.md' },
+    readState() { return Object.freeze({ ...this.state }); },
     getCurrentPath() { return this.state.currentPath; },
     canUseAI: () => true,
     persistCurrent: async () => true,

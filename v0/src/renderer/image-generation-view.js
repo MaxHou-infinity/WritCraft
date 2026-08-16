@@ -128,7 +128,7 @@
   }
 
   async function refreshTrash() {
-    const projectInstanceId = window.__workspace?.state?.project?.instanceId;
+    const projectInstanceId = window.__workspace?.readState()?.project?.instanceId;
     if (!projectInstanceId || !bridge?.getImageTrash || trashBusy) {
       if (!projectInstanceId) resetTrash();
       return false;
@@ -142,7 +142,7 @@
       result = { ok: false, message: error.message };
     }
     if (sequence !== trashSequence ||
-        projectInstanceId !== window.__workspace?.state?.project?.instanceId) return false;
+        projectInstanceId !== window.__workspace?.readState()?.project?.instanceId) return false;
     const safe = safeTrashResult(result);
     if (!safe) {
       trashOwner = null;
@@ -168,7 +168,7 @@
       result = { ok: false, message: error.message };
     }
     if (trashOwner !== owner ||
-        owner.projectInstanceId !== window.__workspace?.state?.project?.instanceId) {
+        owner.projectInstanceId !== window.__workspace?.readState()?.project?.instanceId) {
       trashBusy = false;
       return false;
     }
@@ -203,7 +203,7 @@
       result = { ok: false, message: error.message };
     }
     if (trashOwner !== owner ||
-        owner.projectInstanceId !== window.__workspace?.state?.project?.instanceId) {
+        owner.projectInstanceId !== window.__workspace?.readState()?.project?.instanceId) {
       trashBusy = false;
       return false;
     }
@@ -218,7 +218,7 @@
   }
 
   async function refreshReviewSummary() {
-    const projectInstanceId = window.__workspace?.state?.project?.instanceId;
+    const projectInstanceId = window.__workspace?.readState()?.project?.instanceId;
     if (!reviewSummary || !projectInstanceId || !bridge?.getImageReviewAggregate) return;
     const sequence = ++aggregateSequence;
     let result;
@@ -228,7 +228,7 @@
       return;
     }
     if (sequence !== aggregateSequence ||
-        projectInstanceId !== window.__workspace?.state?.project?.instanceId ||
+        projectInstanceId !== window.__workspace?.readState()?.project?.instanceId ||
         !result?.ok || !result.aggregate) return;
     const aggregate = result.aggregate;
     const total = Number.isSafeInteger(aggregate.sampleSize) ? aggregate.sampleSize : 0;
@@ -248,7 +248,7 @@
   function sync() {
     if (generate) {
       generate.disabled = loading || reviewBusy || Boolean(pendingOwner) ||
-        !prompt?.value.trim() || !window.__workspace?.state?.project;
+        !prompt?.value.trim() || !window.__workspace?.readState()?.project;
     }
   }
 
@@ -514,9 +514,9 @@
   async function run() {
     if (loading || reviewBusy || pendingOwner || !bridge?.generateImage) return;
     const value = prompt?.value.trim() || '';
-    if (!value || !window.__workspace?.state?.project) return;
+    if (!value || !window.__workspace?.readState()?.project) return;
     const requestId = ++requestSequence;
-    const projectInstanceId = window.__workspace.state.project.instanceId;
+    const projectInstanceId = window.__workspace.readState().project.instanceId;
     const metric = {
       operationId: window.WritCraftAiMetrics?.createOperationId?.(),
       originProjectInstanceId: projectInstanceId,
@@ -542,7 +542,7 @@
       result = { ok: false, message: error.message };
     }
     if (requestId !== requestSequence ||
-        projectInstanceId !== window.__workspace?.state?.project?.instanceId) return;
+        projectInstanceId !== window.__workspace?.readState()?.project?.instanceId) return;
     loading = false;
     sync();
     if (!result?.ok || !result.image || !result.review?.token) {

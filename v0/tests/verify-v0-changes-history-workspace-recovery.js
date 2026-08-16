@@ -185,6 +185,11 @@ function harness(options = {}) {
       removeItem(key) { local.delete(key); },
     },
   });
+  vm.runInContext(
+    fs.readFileSync(path.join(__dirname, '../src/renderer/workspace-helpers.js'), 'utf8'),
+    context,
+    { filename: 'workspace-helpers.js' }
+  );
   vm.runInContext(SOURCE, context, { filename: 'workspace.js' });
   const api = window.WritCraftWorkspace;
   api.state.project = { instanceId: 'project-1', name: '项目' };
