@@ -57,12 +57,16 @@ async function runApiHandshake(options = {}) {
     return { ok: false, reason: stableReason(result?.error), latencyMs };
   }
 
-  if (!Array.isArray(result.models)
-    || result.models.length > 256
-    || result.models.some(model => !isPublicModelId(model))) {
+  if (!Array.isArray(result.models) || result.models.length > 256) {
     return { ok: false, reason: 'INVALID_RESPONSE', latencyMs };
   }
-  const models = result.models.slice();
+  // Filter out non-public model names instead of failing the whole list:
+  // a newly released provider model name must not make the health check
+  // misreport a healthy key as invalid.
+  const models = result.models.filter(model => isPublicModelId(model));
+  if (!models.length) {
+    return { ok: false, reason: 'INVALID_RESPONSE', latencyMs };
+  }
   const defaultModelAvailable = typeof options.defaultModel === 'string'
     ? models.includes(options.defaultModel)
     : undefined;

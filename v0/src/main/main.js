@@ -228,7 +228,13 @@ pendingChangeSets = pendingChangeSetStoreService.createPendingChangeSetStore({
         rootPath: dependencies.rootPath,
         cardId: dependencies.cardId,
       });
-    } catch (_) {}
+    } catch (error) {
+      // The pending entry was already removed; a discard failure would leave
+      // the research card stuck in REVIEW with no pending record to address
+      // it. Record the failure so the inconsistency is observable instead of
+      // silently swallowed.
+      try { diagnosticRecorder.record('research', 'RESEARCH_DISCARD_ON_REMOVE_FAILED'); } catch (_) {}
+    }
   },
 });
 const dailyWorkspaceHome = projectHomeSnapshotService.createProjectHomeSnapshotService();
@@ -1502,8 +1508,12 @@ function validateOrdinaryChangesDependencies({ project, pending }) {
 }
 
 function terminateOrdinaryChangesAuthority({ changeSetId }) {
-  try { pendingChangeSets.delete(changeSetId, 'changes-history-terminal'); } catch (_) {}
-  try { invalidateOnboardingReview(changeSetId); } catch (_) {}
+  try { pendingChangeSets.delete(changeSetId, 'changes-history-terminal'); } catch (error) {
+    try { diagnosticRecorder.record('changes', 'PENDING_TERMINATE_FAILED'); } catch (_) {}
+  }
+  try { invalidateOnboardingReview(changeSetId); } catch (error) {
+    try { diagnosticRecorder.record('changes', 'ONBOARDING_REVIEW_INVALIDATE_FAILED'); } catch (_) {}
+  }
 }
 
 function finalizeOrdinaryChanges({

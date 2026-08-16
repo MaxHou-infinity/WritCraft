@@ -6,6 +6,14 @@ const TOOL_NAME = 'submit_unified_writing_task';
 const MAX_EDITS = 3;
 const MAX_RECOVERY_CHARS = 160;
 const MAX_TOOL_INPUT_BYTES = 20 * 1024;
+// Provider/model error codes that may surface publicly; anything else
+// collapses to LLM_FAILED so an unbounded provider string never becomes the
+// public error code (mirrors research-service.safeModelError).
+const SAFE_LLM_ERRORS = new Set([
+  'LLM_FAILED', 'NO_KEY', 'NO_TEXT_BLOCK', 'TIMEOUT', 'REQUEST_ABORTED',
+  'AUTH_FAILED', 'RATE_LIMITED', 'SERVICE_UNAVAILABLE', 'REQUEST_FAILED',
+  'INVALID_RESPONSE', 'RESPONSE_TOO_LARGE', 'API_FAILED',
+]);
 const SAFE_TEXT_PATTERN = '^(?!\\s)(?![\\s\\S]*\\s$)(?:[^\\u0000-\\u001f\\uD800-\\uDFFF]|[\\uD800-\\uDBFF][\\uDC00-\\uDFFF])+$';
 const SAFE_TEXT = /^(?:[^\u0000-\u001f\uD800-\uDFFF]|[\uD800-\uDBFF][\uDC00-\uDFFF])+$/u;
 const SAFE_MULTILINE = /^(?:[\t\n\r]|[^\u0000-\u001f\uD800-\uDFFF]|[\uD800-\uDBFF][\uDC00-\uDFFF])*$/u;
@@ -188,7 +196,8 @@ function parseResult(model, snapshots, ranges) {
     fail('MODEL_OUTPUT_TRUNCATED', '统一任务达到模型输出上限');
   }
   if (!model || model.ok !== true) {
-    fail(typeof model?.error === 'string' ? model.error : 'LLM_FAILED', '统一任务生成失败');
+    const code = typeof model?.error === 'string' ? model.error : 'LLM_FAILED';
+    fail(SAFE_LLM_ERRORS.has(code) ? code : 'LLM_FAILED', '统一任务生成失败');
   }
   if (model.stopReason !== 'tool_use' || model.toolUseBlockCount !== 1 ||
       !isPlainObject(model.toolUse) || model.toolUse.name !== TOOL_NAME ||

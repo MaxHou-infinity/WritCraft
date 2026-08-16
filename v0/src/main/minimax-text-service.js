@@ -175,6 +175,10 @@ async function readBoundedJson(response, signal) {
       }
       bytes = Buffer.concat(chunks, length);
     } else if (typeof response.text === 'function') {
+      // Fallback only for non-streaming fetch stubs: the streaming getReader
+      // path above is the bounded one. A stub body is trusted-bounded by the
+      // post-hoc check; real fetch implementations always expose getReader,
+      // so no unbounded real response can reach this branch.
       const text = await abortable(response.text(), signal);
       if (typeof text !== 'string' || Buffer.byteLength(text, 'utf8') > MAX_RESPONSE_BYTES) {
         throw Object.assign(new Error('oversized response'), { code: 'RESPONSE_TOO_LARGE' });

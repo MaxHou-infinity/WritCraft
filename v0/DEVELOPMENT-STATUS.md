@@ -13,7 +13,7 @@
 - A1b 状态/失败边界：`docs/0.4.0-A1B-EXISTING-STATE-MATRIX.md`。
 - 当前工程事实：源码与可复现测试优先于文档快照。
 - 2026-08-13 以前的完整轮次、测试数字与微 checkpoint 记录已逐字归档到
-  [`DEVELOPMENT-STATUS-THROUGH-2026-08-13.md`](DEVELOPMENT-STATUS-THROUGH-2026-08-13.md)。保留在 `v0/` 目录是为了维持历史文档原有的相对链接；它不拥有派工权。
+  [`docs/archive/development/DEVELOPMENT-STATUS-THROUGH-2026-08-13.md`](../docs/archive/development/DEVELOPMENT-STATUS-THROUGH-2026-08-13.md)。它是历史账本，不拥有派工权。
 
 ## 2. 已签收基线
 

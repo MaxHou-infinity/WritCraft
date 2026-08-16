@@ -51,6 +51,16 @@ check('HTML 以 CSS 变量定义克制主题色', html.includes('--theme:'));
 check('HTML 以 CSS 变量定义纸张背景', html.includes('--paper:'));
 check('HTML 保留 V0 产品阶段标识', html.includes('V0'));
 
+// 门禁链一致性：posttest/postverify 共享 verify:post-common，pretest 必须
+// 是 preverify 的子集（只允许 preverify 额外运行真实 API / 打包门禁）。
+check('posttest 委托给 verify:post-common', pkg.scripts.posttest === 'npm run verify:post-common');
+check('postverify 委托给 verify:post-common', pkg.scripts.postverify === 'npm run verify:post-common');
+const pretest = pkg.scripts.pretest || '';
+const preverify = pkg.scripts.preverify || '';
+check('pretest ⊆ preverify（默认链一致）',
+  pretest.split(' && ').every(segment => preverify.includes(segment)));
+check('verify:syntax 门禁已接入 pretest', pretest.includes('verify:syntax'));
+
 console.log(`\n通过 ${PASS} / 失败 ${FAIL}`);
 if (FAIL === 0) {
   console.log('\n✅ Day 1 verify 全过 — 文件结构 + 内容合法性 + 心流规范 全部 OK');

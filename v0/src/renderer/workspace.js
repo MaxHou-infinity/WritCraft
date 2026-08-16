@@ -3244,7 +3244,11 @@
         state.project.instanceId,
         workspaceSnapshot()
       );
-    } catch (_) {}
+    } catch (error) {
+      // The window is closing; the flush failure cannot be retried, but keep
+      // it observable in the renderer console instead of swallowing it.
+      console.error('workspace beforeunload flush failed', error);
+    }
   });
 
   editContextChip?.addEventListener('click', () => {

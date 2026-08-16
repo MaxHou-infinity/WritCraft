@@ -341,10 +341,19 @@ async function research({ projectService, rootPath, question, sourceIds, sourceI
     snapshots.map(promptSource).join('\n\n'),
   ].filter(item => item !== null).join('\n');
   const tools = researchTools(snapshots.map(source => source.id));
-  const model = await callLLM([{ role: 'user', content: prompt }], 'MiniMax-M3', 4096, {
+  const requestOptions = {
     tools,
     toolChoice: { type: 'tool', name: RESEARCH_TOOL_NAME },
-  });
+  };
+  // The project adapter (projectCallLLM) passes request options as the 4th
+  // argument; the raw provider callLLM reserves that slot for an AbortSignal.
+  // Guard so a mis-wired adapter fails loudly instead of silently dropping
+  // tools/toolChoice.
+  if (typeof requestOptions.aborted === 'boolean' &&
+      typeof requestOptions.addEventListener === 'function') {
+    fail('INVALID_LLM', 'Research 模型适配器签名错误：第 4 参应为 request options');
+  }
+  const model = await callLLM([{ role: 'user', content: prompt }], 'MiniMax-M3', 4096, requestOptions);
   if (!model || model.ok !== true) return { ok: false, error: safeModelError(model?.error), message: '本地证据研究生成失败' };
 
   const proposals = parseModelResult(model);

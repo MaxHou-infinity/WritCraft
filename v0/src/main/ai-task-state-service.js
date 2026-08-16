@@ -209,6 +209,14 @@ function createAiTaskStateService(options = {}) {
     const attempt = raw.attemptId === undefined || raw.attemptId === null
       ? randomId('ait_', randomBytes, occupiedIds)
       : safeId(raw.attemptId, 'attempt');
+    // A caller-supplied attemptId is single-flight: replaying the same
+    // attempt (e.g. after a lost response) must not silently create a second
+    // task with the same identity.
+    for (const existing of tasks.values()) {
+      if (existing.attemptId === attempt) {
+        fail('ATTEMPT_REPLAYED', 'AI 任务执行轮次已存在，请使用新的 attemptId');
+      }
+    }
     if (tasks.size >= MAX_TASKS && [...tasks.values()].every(task => task.status === 'running')) {
       fail('AI_TASK_LIMIT', '当前 AI 任务过多，请先完成或取消已有任务');
     }

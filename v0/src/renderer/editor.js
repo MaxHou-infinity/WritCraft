@@ -1865,7 +1865,6 @@
   setStatus('✅ 编辑器就绪 · 自动保存已开启');
   updateCount();
   EDITOR_EL.focus();
-  window.__editorEl = EDITOR_EL;
   window.__editor = {
     el: EDITOR_EL,
     triggerRewrite: beginRewrite,

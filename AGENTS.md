@@ -67,4 +67,6 @@ When shell search text contains Markdown backticks, `$()`, or substitution synta
 
 Use concise imperative commits, for example `fix(onboarding): preserve committed state`. Keep source, tests, and affected documentation in the same checkpoint commit. PRs explain user impact, authority/state-machine changes, tests run, and remaining risks; include screenshots for UI changes and never attach secrets or stale release artifacts.
 
+Commit type discipline: conventional types (`feat`, `fix`, `docs`, `refactor`, `chore`, `test`, `style`, `perf`) plus `release:` for publication/preview preparation. Do not commit WIP snapshots — every commit must be a self-consistent, reviewable state. The two LICENSE copies (`LICENSE` and `v0/LICENSE`) must stay byte-identical except for their contextually correct `THIRD_PARTY_NOTICES.md` path reference. Empty directories are not tracked by git; if a directory must exist, place a `.gitkeep` and document why.
+
 The public remote is `https://github.com/MaxHou-infinity/WritCraft.git`, with local `main` tracking `origin/main`. A local commit is not public until its exact commit is pushed and verified. Never rewrite public history, change repository visibility, publish a release, or push credentials/artifacts without explicit authorization.

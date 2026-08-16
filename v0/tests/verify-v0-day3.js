@@ -1,6 +1,10 @@
 #!/usr/bin/env node
 // WritCraft V0 · Day 3 verify
 // 静态层: IPC 暴露 + ⌘K/⌘L 监听 + UI 元素 + M3 真实验证
+//
+// NOTE: 本脚本的 §5 会调用真实 MiniMax API（需显式设置 WRITCRAFT_MINIMAX_KEY
+// 并消耗额度），因此它被刻意排除在 npm test / verify 默认链之外；静态 §1-§4
+// 由现代的 verify-v0-* 系列覆盖，本文件仅作为历史冒烟入口保留。
 
 'use strict';
 
@@ -37,9 +41,9 @@ async function main() {
 
   // 3. editor.js 键盘监听 + UI 控制
   const editorJs = fs.readFileSync(path.join(V0, 'src/renderer/editor.js'), 'utf-8');
-  check('editor.js: ⌘K 监听', editorJs.includes("e.key.toLowerCase() === 'k'"));
-  check('editor.js: ⌘L 监听', editorJs.includes("e.key.toLowerCase() === 'l'"));
-  check('editor.js: ESC 关闭', editorJs.includes("e.key === 'Escape'"));
+  check('editor.js: ⌘K 监听', editorJs.includes("event.key.toLowerCase() === 'k'"));
+  check('editor.js: ⌘L 监听', editorJs.includes("event.key.toLowerCase() === 'l'"));
+  check('editor.js: ESC 关闭', editorJs.includes("event.key === 'Escape'"));
   check('editor.js: getSelection 选中段', editorJs.includes('getSelection'));
   check('editor.js: doRewrite 调用 IPC', editorJs.includes('window.writCraft.rewrite'));
   check('editor.js: doChat 调用 IPC', editorJs.includes('window.writCraft.chat'));
@@ -47,11 +51,8 @@ async function main() {
 
   // 4. index.html UI 元素
   const html = fs.readFileSync(path.join(V0, 'src/renderer/index.html'), 'utf-8');
-  check('HTML: #rewrite-panel', html.includes('id="rewrite-panel"'));
-  check('HTML: #rewrite-loading', html.includes('id="rewrite-loading"'));
-  check('HTML: #rewrite-proposal', html.includes('id="rewrite-proposal"'));
-  check('HTML: #rewrite-accept', html.includes('id="rewrite-accept"'));
-  check('HTML: #rewrite-reject', html.includes('id="rewrite-reject"'));
+  check('HTML: #changes-panel', html.includes('id="changes-panel"'));
+  check('HTML: inline-rewrite-command-input', html.includes('inline-rewrite-command-input'));
   check('HTML: #chat-panel', html.includes('id="chat-panel"'));
   check('HTML: #chat-messages', html.includes('id="chat-messages"'));
   check('HTML: #chat-input', html.includes('id="chat-input"'));

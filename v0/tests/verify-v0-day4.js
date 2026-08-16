@@ -25,12 +25,12 @@ check('editor.js 含 Inline Diff 接受/拒绝操作', edJs.includes("makeButton
 check('HTML 含 .inline-diff-add 样式（绿色背景）', html.includes('.inline-diff-add'));
 check('HTML 含 .inline-diff-remove 样式（红色背景）', html.includes('.inline-diff-remove'));
 check('diff.min.js 在 renderer 目录', fs.existsSync(path.join(V0, 'src/renderer/diff.min.js')));
-check('diff-renderer.js 在 renderer 目录', fs.existsSync(path.join(V0, 'src/renderer/diff-renderer.js')));
-
-const diffJs = fs.readFileSync(path.join(V0, 'src/renderer/diff-renderer.js'), 'utf-8');
-check('diff-renderer.js 调用已加载的 Diff API', diffJs.includes('window.Diff || window.diff') && diffJs.includes('diffApi.diffWords'));
-check('diff-renderer.js 暴露 window.__diffRender', diffJs.includes('window.__diffRender'));
-check('diff-renderer.js 含 add/remove/eq 3 种类型', diffJs.includes("diff-add") && diffJs.includes("diff-remove") && diffJs.includes("diff-eq"));
+check('editor.js 直接使用已加载的 Diff API', edJs.includes('window.Diff || window.diff'));
+// diff-renderer.js was dead code (window.__diffRender had no readers); the
+// live diff rendering lives in editor.js. Assert the dead file is gone so a
+// future re-add must justify itself.
+check('死代码 diff-renderer.js 已移除', !fs.existsSync(path.join(V0, 'src/renderer/diff-renderer.js')));
+check('index.html 不再加载 diff-renderer.js', !html.includes('diff-renderer.js'));
 
 // 4.3 ⌘L 上下文标签
 check('HTML 含 #chat-context-label', html.includes('id="chat-context-label"'));
