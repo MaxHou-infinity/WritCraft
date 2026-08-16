@@ -840,13 +840,15 @@ function createSnapshotRestoreService(options = {}) {
       let directErrorCode = null;
       let directMatrixAnomaly = false;
 
-      // All-or-nothing mixed journey: the EXISTING E/R terminal is CAS-installed
-      // into the WRCCHRJ2 journal first (existingTerminalPublication), then the
-      // MISSING CREATE runs, then History is committed and the restore finalizes.
-      // A lost EXISTING response after the native E committed is rebuilt with a
-      // fresh native R before the MISSING side proceeds (no CREATE replay).
+      // All-or-nothing mixed journey: the MISSING CREATE first advances the
+      // marker to CREATED_RECEIPT, then the EXISTING E/R terminal is
+      // CAS-installed into the WRCCHRJ2 journal (existingTerminalPublication),
+      // then History is committed and the restore finalizes. A lost EXISTING
+      // response after the native E committed is rebuilt with a fresh native R
+      // before the History step (no CREATE/E replay).
       function runMixedJourney(preparedTransaction) {
         let marker = transaction.preparePublicMarkdownMarker(preparedTransaction);
+        marker = transaction.createMissingLeaves(preparedTransaction, marker);
         let reconciled = false;
         try {
           marker = transaction.commitExistingRestore(preparedTransaction, marker);
@@ -859,7 +861,6 @@ function createSnapshotRestoreService(options = {}) {
             throw existingError;
           }
         }
-        marker = transaction.createMissingLeaves(preparedTransaction, marker);
         marker = transaction.commitMissingRestoreHistory(preparedTransaction, marker);
         marker = transaction.finalizeMissingRestore(preparedTransaction, marker);
         const terminal = transaction.reconciliation.finish(
@@ -875,21 +876,22 @@ function createSnapshotRestoreService(options = {}) {
           preparedTransaction.projectId,
           marker.operationId
         );
-        const base = Object.freeze({
+        const applied = Object.freeze({
           ok: true,
+          operationId: terminal.operationId,
           outcome: 'applied',
           status: 'applied',
           affectedPaths: Object.freeze(terminal.files.map(file => file.path)),
           recoveryRequired: false,
-          responseRecovered: reconciled,
         });
         return reconciled
           ? Object.freeze({
-            ...base,
+            ...applied,
+            responseRecovered: true,
             residualUnavailable: false,
             confirmationUnavailable: true,
           })
-          : base;
+          : applied;
       }
 
       try {

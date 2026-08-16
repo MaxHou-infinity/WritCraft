@@ -577,6 +577,130 @@ test('complete missing selection uses the dedicated transaction without existing
   assert.deepStrictEqual(binding.selected.map(item => item.action), ['MISSING']);
 });
 
+// Mixed EXISTING+MISSING selection: the service orchestrates the all-or-nothing
+// public-Markdown journey (PRECREATE -> CREATE -> EXISTING E/R + journal CAS ->
+// History -> FINALIZED) through the transaction's exported phase methods.
+function mixedTransactionFixture(calls, options = {}) {
+  let marker = Object.freeze({ operationId: 'chr_restore_mixed_a', kind: 'snapshot_restore' });
+  const phaseValue = value => ({
+    operationId: 'chr_restore_mixed_a',
+    projectId: 'project-private-a',
+    kind: 'snapshot_restore',
+    state: 'applying',
+    outcome: value === 'FINALIZED' ? 'applied' : 'pending',
+    files: [
+      { path: 'chapters/a.md' },
+      { path: 'chapters/b.md' },
+    ],
+    publicMarkdownPhase: { phase: value },
+  });
+  const transaction = {
+    prepareSnapshotRestore(value) {
+      calls.push('prepare');
+      return Object.freeze({
+        kind: 'snapshot_restore',
+        rootPath: '/trusted/private/project-a',
+        projectId: 'project-private-a',
+        mixedRestoreMode: true,
+        historyEntryId: 'change_restore_mixed',
+        execute: value.execute,
+      });
+    },
+    execute() {
+      throw new Error('mixed must not run the generic transaction execute');
+    },
+    preparePublicMarkdownMarker() { calls.push('prepare-marker'); marker = phaseValue('PRECREATE'); return marker; },
+    createMissingLeaves() { calls.push('create-missing'); marker = phaseValue('CREATED_RECEIPT'); return marker; },
+    commitExistingRestore() {
+      calls.push('commit-existing');
+      if (options.loseExistingResponse) {
+        const error = new Error('EXISTING terminal is not durably committed');
+        error.code = 'CHANGES_MANUAL_RECOVERY_REQUIRED';
+        throw error;
+      }
+      marker = phaseValue('EXISTING_COMMITTED');
+      return marker;
+    },
+    reconcileExistingRestore() {
+      calls.push('reconcile-existing');
+      marker = phaseValue('EXISTING_COMMITTED');
+      return marker;
+    },
+    commitMissingRestoreHistory() { calls.push('commit-history'); marker = phaseValue('HISTORY_COMMITTED'); return marker; },
+    finalizeMissingRestore() { calls.push('finalize'); marker = phaseValue('FINALIZED'); return marker; },
+    reconciliation: {
+      finish() { calls.push('finish'); return { ...phaseValue('FINALIZED'), state: 'terminal' }; },
+      clear() { calls.push('clear'); },
+    },
+  };
+  return transaction;
+}
+
+test('mixed selection runs the all-or-nothing journey and commits both leaves', async () => {
+  const available = currentFile('selected_a', 'chapters/a.md', 'current A\n');
+  const missing = {
+    fileId: 'selected_b',
+    path: 'chapters/b.md',
+    state: 'missing',
+    byteLength: null,
+    sha256: null,
+    revision: null,
+    content: null,
+    ancestorIdentityDigest: ANCESTOR_DIGEST,
+    leafIdentityDigest: null,
+  };
+  const calls = [];
+  const state = fixture({
+    exactRestoreExecutor: () => { throw new Error('mixed must not run the existing-file executor'); },
+    readCurrentAuthority() { return currentAuthority([available, missing]); },
+    readSnapshotAuthority() { return snapshotAuthority([snapshotFile('selected_a'), snapshotFile('selected_b', 'chapters/b.md', 'snapshot B\n')]); },
+    capabilityStore: { consumeRestore(_owner, _request) { return multiConsumed([available, missing]); } },
+    transaction: mixedTransactionFixture(calls),
+  });
+  const result = await state.service.restore(owner(), request());
+  schema.assertSnapshotRestoreResult(result);
+  assert.strictEqual(result.task.terminalTruth, 'COMMITTED');
+  const order = calls.filter(call => typeof call === 'string');
+  const expected = [
+    'prepare', 'prepare-marker', 'create-missing', 'commit-existing',
+    'commit-history', 'finalize', 'finish', 'clear',
+  ];
+  assert.deepStrictEqual(order, expected);
+  assert.strictEqual(calls.filter(call => call === 'execute-native').length, 0);
+});
+
+test('lost EXISTING response during mixed journey reconciles with a fresh R and stays COMMITTED', async () => {
+  const available = currentFile('selected_a', 'chapters/a.md', 'current A\n');
+  const missing = {
+    fileId: 'selected_b',
+    path: 'chapters/b.md',
+    state: 'missing',
+    byteLength: null,
+    sha256: null,
+    revision: null,
+    content: null,
+    ancestorIdentityDigest: ANCESTOR_DIGEST,
+    leafIdentityDigest: null,
+  };
+  const calls = [];
+  const state = fixture({
+    exactRestoreExecutor: () => { throw new Error('mixed must not run the existing-file executor'); },
+    readCurrentAuthority() { return currentAuthority([available, missing]); },
+    readSnapshotAuthority() { return snapshotAuthority([snapshotFile('selected_a'), snapshotFile('selected_b', 'chapters/b.md', 'snapshot B\n')]); },
+    capabilityStore: { consumeRestore(_owner, _request) { return multiConsumed([available, missing]); } },
+    transaction: mixedTransactionFixture(calls, { loseExistingResponse: true }),
+  });
+  const result = await state.service.restore(owner(), request());
+  schema.assertSnapshotRestoreResult(result);
+  assert.strictEqual(result.task.terminalTruth, 'COMMITTED');
+  const order = calls.filter(call => typeof call === 'string');
+  const expected = [
+    'prepare', 'prepare-marker', 'create-missing', 'commit-existing',
+    'reconcile-existing', 'commit-history', 'finalize', 'finish', 'clear',
+  ];
+  assert.deepStrictEqual(order, expected);
+});
+
 test('service consumes and executes the real transaction sealed missing History template identity', async () => {
   const missing = {
     fileId: 'selected_a',
