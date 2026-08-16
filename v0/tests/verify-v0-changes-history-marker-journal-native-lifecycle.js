@@ -59,6 +59,7 @@ function initialValue() {
     activeMarker: null,
     activeMarkerDigest: null,
     nativePublication: null,
+    existingTerminalPublication: null,
     terminalCleanup: null,
     terminalCleanupDigest: null,
     valueDigest: null,

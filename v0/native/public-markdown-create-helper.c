@@ -5514,6 +5514,25 @@ typedef struct {
   bool base_history_exists;
   char base_history_content[DIGEST_BYTES + 1U];
   char history_parent[DIGEST_BYTES + 1U];
+  /* WRCCHRJ2 journal single-authority binding carried on the E/R wire. */
+  char binding_digest[DIGEST_BYTES + 1U];
+  char slot;
+  char journal_id[64];
+  uint64_t generation;
+  bool previous_is_null;
+  char previous_digest[DIGEST_BYTES + 1U];
+  char value_digest[DIGEST_BYTES + 1U];
+  uint64_t frame_byte_length;
+  char frame_sha256[DIGEST_BYTES + 1U];
+  uint64_t payload_offset;
+  uint64_t payload_byte_length;
+  char payload_sha256[DIGEST_BYTES + 1U];
+  uint64_t active_marker_offset;
+  uint64_t active_marker_byte_length;
+  char active_marker_digest[DIGEST_BYTES + 1U];
+  char active_marker_canonical_sha256[DIGEST_BYTES + 1U];
+  char root_identity[DIGEST_BYTES + 1U];
+  char recovery_identity[DIGEST_BYTES + 1U];
   size_t count;
   ExistingExecuteItem *items;
 } ExistingExecuteRequest;
@@ -5567,37 +5586,70 @@ static bool existing_execute_item_line(
 }
 
 static bool existing_execute_header(char *line, ExistingExecuteRequest *request) {
-  char *fields[16];
+  char *fields[34];
   size_t count = 0U;
   uint64_t item_count = 0U;
-  if (!split_fields(line, fields, 16U, &count) || count != 15U ||
+  uint64_t generation = 0U;
+  if (!split_fields(line, fields, 34U, &count) || count != 33U ||
       (strcmp(fields[0], "E") != 0 && strcmp(fields[0], "R") != 0) ||
       !valid_operation(fields[1]) ||
       !valid_digest(fields[2]) || !valid_digest(fields[3]) ||
-      !valid_digest(fields[4]) || !valid_digest(fields[5]) ||
-      !parse_uint(fields[6], MAX_ARTIFACT_BYTES, &request->artifact_length) ||
-      request->artifact_length == 0U || !valid_digest(fields[7]) ||
-      !valid_digest(fields[8]) || !valid_digest(fields[9]) ||
-      !parse_uint(fields[10], 192ULL * 1024ULL * 1024ULL, &request->base_history_length) ||
-      (strcmp(fields[11], "0") != 0 && strcmp(fields[11], "1") != 0) ||
-      (!strcmp(fields[11], "1") && !valid_digest(fields[12])) ||
-      (!strcmp(fields[11], "0") && strcmp(fields[12], "-") != 0) ||
-      !valid_digest(fields[13]) ||
-      !parse_uint(fields[14], MAX_ITEMS, &item_count) || item_count == 0U ||
-      (!strcmp(fields[11], "0") && request->base_history_length != 0U)) return false;
+      strcmp(fields[4], JOURNAL_BASENAME) != 0 || strcmp(fields[5], JOURNAL_MAGIC) != 0 ||
+      (strcmp(fields[6], "A") != 0 && strcmp(fields[6], "B") != 0) ||
+      !valid_journal_id(fields[7]) ||
+      !parse_uint(fields[8], UINT64_MAX, &generation) ||
+      (strcmp(fields[9], "-") != 0 && !valid_digest(fields[9])) ||
+      !valid_digest(fields[10]) ||
+      !parse_uint(fields[11], JOURNAL_SLOT_CAPACITY, &request->frame_byte_length) ||
+      request->frame_byte_length == 0U || !valid_digest(fields[12]) ||
+      !parse_uint(fields[13], JOURNAL_SLOT_CAPACITY, &request->payload_offset) ||
+      request->payload_offset == 0U ||
+      !parse_uint(fields[14], JOURNAL_MAX_VALUE_BYTES, &request->payload_byte_length) ||
+      request->payload_byte_length == 0U || !valid_digest(fields[15]) ||
+      !parse_uint(fields[16], JOURNAL_SLOT_CAPACITY, &request->active_marker_offset) ||
+      !parse_uint(fields[17], JOURNAL_MAX_VALUE_BYTES, &request->active_marker_byte_length) ||
+      request->active_marker_byte_length == 0U ||
+      !valid_digest(fields[18]) || !valid_digest(fields[19]) ||
+      !valid_digest(fields[20]) || !valid_digest(fields[21]) ||
+      !valid_digest(fields[22]) || !valid_digest(fields[23]) ||
+      !parse_uint(fields[24], MAX_ARTIFACT_BYTES, &request->artifact_length) ||
+      request->artifact_length == 0U || !valid_digest(fields[25]) ||
+      !valid_digest(fields[26]) || !valid_digest(fields[27]) ||
+      !parse_uint(fields[28], 192ULL * 1024ULL * 1024ULL, &request->base_history_length) ||
+      (strcmp(fields[29], "0") != 0 && strcmp(fields[29], "1") != 0) ||
+      (!strcmp(fields[29], "1") && !valid_digest(fields[30])) ||
+      (!strcmp(fields[29], "0") && strcmp(fields[30], "-") != 0) ||
+      !valid_digest(fields[31]) ||
+      !parse_uint(fields[32], MAX_ITEMS, &item_count) || item_count == 0U ||
+      (!strcmp(fields[29], "0") && request->base_history_length != 0U)) return false;
   request->items = calloc((size_t)item_count, sizeof(*request->items));
   if (request->items == NULL) return false;
   memcpy(request->operation, fields[1], sizeof(request->operation));
   memcpy(request->request_digest, fields[2], sizeof(request->request_digest));
-  memcpy(request->marker_digest, fields[3], sizeof(request->marker_digest));
-  memcpy(request->artifact, fields[4], sizeof(request->artifact));
-  memcpy(request->artifact_identity, fields[5], sizeof(request->artifact_identity));
-  memcpy(request->created_phase, fields[7], sizeof(request->created_phase));
-  memcpy(request->selection, fields[8], sizeof(request->selection));
-  memcpy(request->base_history, fields[9], sizeof(request->base_history));
-  request->base_history_exists = strcmp(fields[11], "1") == 0;
-  memcpy(request->base_history_content, fields[12], sizeof(request->base_history_content));
-  memcpy(request->history_parent, fields[13], sizeof(request->history_parent));
+  memcpy(request->binding_digest, fields[3], sizeof(request->binding_digest));
+  request->slot = fields[6][0];
+  memcpy(request->journal_id, fields[7], sizeof(request->journal_id));
+  request->generation = generation;
+  request->previous_is_null = strcmp(fields[9], "-") == 0;
+  if (!request->previous_is_null) {
+    memcpy(request->previous_digest, fields[9], sizeof(request->previous_digest));
+  }
+  memcpy(request->value_digest, fields[10], sizeof(request->value_digest));
+  memcpy(request->frame_sha256, fields[12], sizeof(request->frame_sha256));
+  memcpy(request->payload_sha256, fields[15], sizeof(request->payload_sha256));
+  memcpy(request->active_marker_digest, fields[18], sizeof(request->active_marker_digest));
+  memcpy(request->active_marker_canonical_sha256, fields[19],
+    sizeof(request->active_marker_canonical_sha256));
+  memcpy(request->root_identity, fields[20], sizeof(request->root_identity));
+  memcpy(request->recovery_identity, fields[21], sizeof(request->recovery_identity));
+  memcpy(request->artifact, fields[22], sizeof(request->artifact));
+  memcpy(request->artifact_identity, fields[23], sizeof(request->artifact_identity));
+  memcpy(request->created_phase, fields[25], sizeof(request->created_phase));
+  memcpy(request->selection, fields[26], sizeof(request->selection));
+  memcpy(request->base_history, fields[27], sizeof(request->base_history));
+  request->base_history_exists = strcmp(fields[29], "1") == 0;
+  memcpy(request->base_history_content, fields[30], sizeof(request->base_history_content));
+  memcpy(request->history_parent, fields[31], sizeof(request->history_parent));
   request->count = (size_t)item_count;
   return true;
 }
@@ -5699,16 +5751,129 @@ static bool existing_execute_history_before_exact(
     record_path_matches_fd(HELD_HISTORY_PARENT_FD, "changes.json", HELD_HISTORY_FD);
 }
 
-static bool existing_marker_valid(RootBinding *root, const ExistingExecuteRequest *request) {
-  Identity identity;
-  char content[72];
+static bool existing_journal_read_all(int fd, unsigned char *bytes, size_t length, off_t offset) {
+  size_t used = 0U;
+  while (used < length) {
+    ssize_t got = pread(fd, bytes + used, length - used, offset + (off_t)used);
+    if (got <= 0) return false;
+    used += (size_t)got;
+  }
+  return true;
+}
+
+static void existing_journal_marker_digest(
+  const unsigned char *bytes, size_t length, char out[72]
+) {
+  static const char domain[] = "writcraft-digest/v1";
+  static const char prefix[] = "{\"marker\":";
+  static const char suffix[] = ",\"schema\":\"" ACTIVE_MARKER_SCHEMA "\"}";
+  unsigned char zero = 0U;
+  unsigned char raw[CC_SHA256_DIGEST_LENGTH];
+  CC_SHA256_CTX context;
+  CC_SHA256_Init(&context);
+  CC_SHA256_Update(&context, domain, (CC_LONG)(sizeof(domain) - 1U));
+  CC_SHA256_Update(&context, &zero, 1U);
+  CC_SHA256_Update(&context, ACTIVE_MARKER_SCHEMA, (CC_LONG)strlen(ACTIVE_MARKER_SCHEMA));
+  CC_SHA256_Update(&context, &zero, 1U);
+  CC_SHA256_Update(&context, prefix, (CC_LONG)(sizeof(prefix) - 1U));
+  CC_SHA256_Update(&context, bytes, (CC_LONG)length);
+  CC_SHA256_Update(&context, suffix, (CC_LONG)(sizeof(suffix) - 1U));
+  CC_SHA256_Final(raw, &context);
+  memcpy(out, "sha256:", 7U);
+  digest_hex(raw, out + 7U);
+}
+
+static bool existing_journal_identities_valid(
+  RootBinding *root, const ExistingExecuteRequest *request
+) {
+  if (!open_recovery(root, false)) return false;
+  struct stat root_stat;
+  struct stat recovery_stat;
+  Identity root_identity;
+  Identity recovery_identity;
+  char root_digest[72];
+  char recovery_digest[72];
+  if (fstat(root->project_fd, &root_stat) != 0 ||
+      !identity_from_stat(&root_stat, &root_identity) ||
+      !root_identity_digest(&root_identity, root_digest) ||
+      strcmp(root_digest, request->root_identity) != 0) return false;
+  if (fstat(root->recovery_fd, &recovery_stat) != 0 ||
+      !identity_from_stat(&recovery_stat, &recovery_identity) ||
+      !root_identity_digest(&recovery_identity, recovery_digest) ||
+      strcmp(recovery_digest, request->recovery_identity) != 0) return false;
+  return true;
+}
+
+/* WRCCHRJ2 single-authority validation: the marker lives inside the journal
+ * frame, and the E/R request binds the journal's physical facts (frame bytes,
+ * payload, active-marker slice, root/recovery identity digests). */
+static bool existing_journal_marker_valid(RootBinding *root, const ExistingExecuteRequest *request) {
   struct stat stat_value;
-  return existing_fd_readonly(HELD_MARKER_FD) &&
-    fstat(HELD_MARKER_FD, &stat_value) == 0 && S_ISREG(stat_value.st_mode) &&
-    stat_value.st_uid == geteuid() && permission_mode((uintmax_t)stat_value.st_mode) == 0600U &&
-    stat_value.st_nlink == 1U && hash_fd(HELD_MARKER_FD, &identity, content, 96ULL * 1024ULL * 1024ULL) &&
-    strcmp(content, request->marker_digest) == 0 &&
-    record_path_matches_fd(root->recovery_fd, "changes-history-transaction.json", HELD_MARKER_FD);
+  if (!existing_fd_readonly(HELD_MARKER_FD) ||
+      fstat(HELD_MARKER_FD, &stat_value) == -1 || !S_ISREG(stat_value.st_mode) ||
+      stat_value.st_uid != (uintmax_t)geteuid() ||
+      permission_mode((uintmax_t)stat_value.st_mode) != 0600U || stat_value.st_nlink != 1U ||
+      !record_path_matches_fd(root->recovery_fd, JOURNAL_BASENAME, HELD_MARKER_FD)) return false;
+  off_t slot_offset = request->slot == 'B' ? (off_t)JOURNAL_SLOT_CAPACITY : 0;
+  unsigned char *frame = malloc((size_t)request->frame_byte_length);
+  bool valid = frame != NULL && existing_journal_read_all(
+    HELD_MARKER_FD, frame, (size_t)request->frame_byte_length, slot_offset
+  );
+  char observed[72];
+  if (valid) {
+    sha256_prefixed(frame, (size_t)request->frame_byte_length, observed);
+    valid = strcmp(observed, request->frame_sha256) == 0;
+  }
+  size_t newline = 0U;
+  while (valid && newline < request->frame_byte_length &&
+      newline < JOURNAL_MAX_HEADER_BYTES && frame[newline] != '\n') newline += 1U;
+  if (!valid || newline == 0U || newline >= request->frame_byte_length ||
+      newline >= JOURNAL_MAX_HEADER_BYTES) valid = false;
+  char header[JOURNAL_MAX_HEADER_BYTES + 1U];
+  char *fields[8];
+  size_t field_count = 0U;
+  uint64_t payload_length = 0U;
+  uint64_t parsed_generation = 0U;
+  if (valid) {
+    memcpy(header, frame, newline); header[newline] = '\0';
+    valid = split_fields(header, fields, 8U, &field_count) && field_count == 8U &&
+      strcmp(fields[0], JOURNAL_MAGIC) == 0 && fields[1][0] == request->slot &&
+      fields[1][1] == '\0' && strcmp(fields[2], request->journal_id) == 0 &&
+      parse_uint(fields[3], UINT64_MAX, &parsed_generation) &&
+      parsed_generation == request->generation &&
+      parse_uint(fields[4], JOURNAL_MAX_VALUE_BYTES, &payload_length) &&
+      payload_length == request->payload_byte_length &&
+      strcmp(fields[5], request->value_digest) == 0 &&
+      (strcmp(fields[6], "-") == 0) == request->previous_is_null &&
+      (request->previous_is_null || strcmp(fields[6], request->previous_digest) == 0) &&
+      strcmp(fields[7], request->payload_sha256) == 0 &&
+      request->frame_byte_length == newline + 1U + request->payload_byte_length;
+  }
+  const unsigned char *payload = frame + newline + 1U;
+  if (valid) {
+    sha256_prefixed(payload, (size_t)request->payload_byte_length, observed);
+    valid = strcmp(observed, request->payload_sha256) == 0 &&
+      payload[request->payload_byte_length - 1U] == '\n';
+  }
+  if (valid) {
+    if (request->active_marker_offset < newline + 1U ||
+        request->active_marker_offset + request->active_marker_byte_length >
+          request->frame_byte_length) {
+      valid = false;
+    } else {
+      const unsigned char *marker = frame + request->active_marker_offset;
+      sha256_prefixed(marker, (size_t)request->active_marker_byte_length, observed);
+      char marker_digest[72];
+      existing_journal_marker_digest(
+        marker, (size_t)request->active_marker_byte_length, marker_digest
+      );
+      valid = strcmp(observed, request->active_marker_canonical_sha256) == 0 &&
+        strcmp(marker_digest, request->active_marker_digest) == 0;
+    }
+  }
+  if (valid) valid = existing_journal_identities_valid(root, request);
+  free(frame);
+  return valid;
 }
 
 static bool existing_execute_nonpublic_authority_valid(
@@ -5725,13 +5890,13 @@ static bool existing_execute_nonpublic_authority_valid(
     artifact_name, sizeof(artifact_name), "changes-history-%s.bin", request->operation
   );
   bool valid = artifact_name_length > 0 && (size_t)artifact_name_length < sizeof(artifact_name) &&
-    strcmp(request->operation, "") != 0 && artifact_valid(&artifact_request) &&
-    record_path_matches_fd(root->recovery_fd, artifact_name, HELD_ARTIFACT_FD) &&
-    existing_marker_valid(root, request) && existing_fd_readonly(HELD_HISTORY_PARENT_FD) &&
+    strcmp(request->operation, "") != 0 && artifact_valid(&artifact_request);
+  valid = valid && record_path_matches_fd(root->recovery_fd, artifact_name, HELD_ARTIFACT_FD);
+  valid = valid && existing_journal_marker_valid(root, request) && existing_fd_readonly(HELD_HISTORY_PARENT_FD) &&
     existing_fd_readonly(HELD_HISTORY_FD) &&
-    rollback_path_is_fd(root->project_fd, ".writcraft", HELD_HISTORY_PARENT_FD, true) &&
-    existing_execute_history_before_exact(root, request) &&
-    open_recovery(root, false);
+    rollback_path_is_fd(root->project_fd, ".writcraft", HELD_HISTORY_PARENT_FD, true);
+  valid = valid && existing_execute_history_before_exact(root, request);
+  valid = valid && open_recovery(root, false);
   return valid;
 }
 
@@ -6100,7 +6265,7 @@ static bool existing_canonical_control_digest(
     item->after_offset, item->after_length, item->after_content, item->after_revision,
     item->ancestor, request->artifact, request->artifact_identity, request->base_history,
     item->before_offset, item->before_length, item->before_content, item->before_leaf,
-    item->before_revision, request->created_phase, request->marker_digest,
+    item->before_revision, request->created_phase, request->active_marker_digest,
     request->operation, escaped, item->selected, request->selection);
   return length > 0 && (size_t)length < sizeof(canonical) &&
     digest_domain(EXISTING_CONTROL_SCHEMA, canonical, out);
@@ -6170,7 +6335,7 @@ static bool existing_control_record_build(
   int length = snprintf(out, MAX_RECORD_BYTES + 1U,
     EXISTING_CONTROL_SCHEMA "\t%s\t%s\t%s\t%s\t%s\t%s\t%s\t%s\t%s\t%s\t%s"
     "\t%" PRIu64 "\t%" PRIu64 "\t%s\t%" PRIu64 "\t%" PRIu64 "\t%s\t%s\t%s\t%s\n",
-    request->operation, item->selected, path_hex, request->marker_digest,
+    request->operation, item->selected, path_hex, request->active_marker_digest,
     request->artifact, request->artifact_identity, request->created_phase,
     request->selection, request->base_history, item->before_revision, item->after_revision,
     item->before_offset, item->before_length, item->before_content, item->after_offset,
@@ -6245,7 +6410,7 @@ static bool existing_canonical_control_record(
   int length = snprintf(line, sizeof(line),
     "K\tCONTROL\t" EXISTING_CONTROL_SCHEMA "\t%s\t%s\t%s\t%s\t%s\t%s\t%s\t%s\t%s\t%s\t%s"
     "\t%" PRIu64 "\t%" PRIu64 "\t%s\t%" PRIu64 "\t%" PRIu64 "\t%s\t%s\t%s\t%s\n",
-    request->operation, item->selected, path_hex, request->marker_digest,
+    request->operation, item->selected, path_hex, request->active_marker_digest,
     request->artifact, request->artifact_identity, request->created_phase,
     request->selection, request->base_history, item->before_revision, item->after_revision,
     item->before_offset, item->before_length, item->before_content, item->after_offset,
@@ -6411,7 +6576,7 @@ static bool existing_canonical_terminal_parity(
       "],\"markerDigest\":\"%s\",\"operationId\":\"%s\","
       "\"receiptSetDigest\":\"%s\",\"recoveryFsyncComplete\":true,"
       "\"schema\":\"" EXISTING_TERMINAL_SCHEMA "\",\"selectionDigest\":\"%s\","
-      "\"state\":\"COMMITTED\"}", request->marker_digest, request->operation,
+      "\"state\":\"COMMITTED\"}", request->active_marker_digest, request->operation,
       receipt_set_digest, request->selection) ||
       !digest_domain(EXISTING_TERMINAL_SCHEMA, terminal, terminal_digest)) goto fail;
   length = snprintf(line, sizeof(line), "K\tTERMINAL\t%s\t%s\n", terminal_digest, terminal);
@@ -6419,7 +6584,7 @@ static bool existing_canonical_terminal_parity(
   size_t response_used = 0U;
   if (!rollback_append(response, MAX_EXISTING_OUTPUT_BYTES + 1U, &response_used,
       "P\tOK\nE\tRESULT\tCOMMITTED\t%s\t%s\t%s\t%s\t%s\t%s\t%s\t%s\t%s\t%zu\t-\n",
-      request->operation, request->request_digest, request->marker_digest, request->artifact,
+      request->operation, request->request_digest, request->active_marker_digest, request->artifact,
       request->created_phase, request->selection, request->base_history, receipt_set_digest,
       terminal_digest, request->count) ||
       !rollback_append(response, MAX_EXISTING_OUTPUT_BYTES + 1U, &response_used,
@@ -6511,12 +6676,12 @@ static bool __attribute__((unused)) existing_output_committed(
       "\",\"selectionDigest\":\"%s\",\"state\":\"COMMITTED\"}",
       request->artifact, request->base_history, request->created_phase, token,
       request->items[0].after_content, commit->after_leaf, request->items[0].selected,
-      request->marker_digest, request->operation, set_digest, request->selection) ||
+      request->active_marker_digest, request->operation, set_digest, request->selection) ||
       !digest_domain(EXISTING_TERMINAL_SCHEMA, terminal, terminal_digest)) return false;
   int length = snprintf(line, sizeof(line),
     "%c\tRESULT\tCOMMITTED\t%s\t%s\t%s\t%s\t%s\t%s\t%s\t%s\t%s\t1\t-\n",
     command,
-    request->operation, request->request_digest, request->marker_digest, request->artifact,
+    request->operation, request->request_digest, request->active_marker_digest, request->artifact,
     request->created_phase, request->selection, request->base_history, set_digest,
     terminal_digest);
   if (length <= 0 || (size_t)length >= sizeof(line) || !write_line(line)) return false;
@@ -6618,7 +6783,7 @@ static bool existing_execute_unknown(RootBinding *root, char *line) {
   ExistingExecuteRequest request;
   memset(&request, 0, sizeof(request));
   bool result = false;
-  if (!existing_execute_header(line, &request)) goto done;
+  if (!existing_execute_header(line, &request)) { goto done; }
   for (size_t index = 0U; index < request.count; index += 1U) {
     if (!read_protocol_line(line) || !existing_execute_item_line(line, &request, index)) goto done;
   }

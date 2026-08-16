@@ -55,7 +55,7 @@ const LIMITS = Object.freeze({
   maxRunItemBytes: 2048,
   maxRecordBytes: 16 * 1024,
   maxFinalRecordBytes: 4 * 1024,
-  maxJournalBindingHeaderBytes: journalBindingSchema.MAX_BINDING_HEADER_BYTES,
+  maxJournalBindingHeaderBytes: 4096,
   maxJournalFrameBytes: journalBindingSchema.MAX_FRAME_BYTES,
 });
 
@@ -1604,6 +1604,17 @@ function encodeExistingCommand(rawAuthority, command) {
     String(binding.activeMarkerOffset), String(binding.activeMarkerByteLength),
     binding.activeMarkerDigest, binding.activeMarkerCanonicalSha256,
     binding.rootIdentityDigest, binding.recoveryDirectoryIdentityDigest,
+    // Held-descriptor authorities the native helper verifies against its
+    // artifact/history fds: the journal binding is the marker authority; these
+    // fields carry the artifact/selection/base-history authorities that the
+    // recovery marker itself does not (it only carries artifactDigest via the
+    // public-markdown phase).
+    request.artifactDigest, request.artifactIdentityDigest, String(request.artifactByteLength),
+    request.createdReceiptPhaseDigest, request.selectionDigest,
+    request.baseHistoryDigest, String(request.baseHistoryByteLength),
+    request.baseHistoryExists ? '1' : '0',
+    request.baseHistoryExists ? request.baseHistoryContentDigest : '-',
+    request.historyParentIdentityDigest,
     String(request.items.length),
   ].join('\t')];
   for (const item of request.items) {

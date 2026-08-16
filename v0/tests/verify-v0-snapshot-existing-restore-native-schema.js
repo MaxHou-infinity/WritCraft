@@ -823,8 +823,9 @@ test('wire commands are bounded, command-tagged and never carry a decoded path/b
   );
   const bindingValue = value.bound.request.journalMarkerBinding;
   const header = executeWire.split('\n', 1)[0];
+  const request = value.bound.request;
   assert.deepStrictEqual(header.split('\t'), [
-    'E', value.bound.request.operationId, schema.requestDigest(value.bound), bindingValue.bindingDigest,
+    'E', request.operationId, schema.requestDigest(value.bound), bindingValue.bindingDigest,
     bindingValue.journalBasename, bindingValue.journalMagic, bindingValue.activeSlot,
     bindingValue.head.journalId, bindingValue.head.generation,
     bindingValue.previousValueDigest, bindingValue.head.valueDigest,
@@ -834,13 +835,20 @@ test('wire commands are bounded, command-tagged and never carry a decoded path/b
     String(bindingValue.activeMarkerByteLength), bindingValue.activeMarkerDigest,
     bindingValue.activeMarkerCanonicalSha256, bindingValue.rootIdentityDigest,
     bindingValue.recoveryDirectoryIdentityDigest,
-    String(value.bound.request.items.length),
+    // Held-descriptor authorities the native helper verifies against its fds.
+    request.artifactDigest, request.artifactIdentityDigest, String(request.artifactByteLength),
+    request.createdReceiptPhaseDigest, request.selectionDigest,
+    request.baseHistoryDigest, String(request.baseHistoryByteLength),
+    request.baseHistoryExists ? '1' : '0',
+    request.baseHistoryExists ? request.baseHistoryContentDigest : '-',
+    request.historyParentIdentityDigest,
+    String(request.items.length),
   ]);
   assert.ok(Buffer.byteLength(`${header}\n`, 'ascii') <=
     schema.LIMITS.maxJournalBindingHeaderBytes);
   assert.strictEqual(
     evidence.sha256(Buffer.from(executeWire, 'ascii')),
-    'sha256:ff5d865fb16a00acaaab2efd38f0c6ef2747f2468a94e6ddcbef6e030f5906df'
+    'sha256:c183196d43b220506f0c37adf9257f4487c107507996a1406d885470c9edf08a'
   );
   assert.strictEqual(
     reconcileWire.split('\n').filter(Boolean).length,
