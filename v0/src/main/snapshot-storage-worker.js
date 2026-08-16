@@ -21,6 +21,10 @@ const MAX_CAPTURE_CANDIDATES = 300;
 const MAX_CAPTURE_IMAGES = 200;
 const MAX_CAPTURE_MARKDOWN_BYTES = 4 * 1024 * 1024;
 const MAX_CAPTURE_TOTAL_MARKDOWN_BYTES = 64 * 1024 * 1024;
+// Memory note (P2-28): the capture wire (128MiB), C-side stage assembly
+// (520MiB) and JS Buffer materialization make the peak working set of a
+// snapshot capture roughly 1.5GiB on a large project. This is documented
+// so the settings page can hint at it before a heavy capture.
 const MAX_WRITE_CHUNK_BYTES = 64 * 1024;
 const MAX_STAGE_BYTES = 520 * 1024 * 1024;
 const MAX_COMMITTED_READ_METADATA_BYTES = 8 * 1024 * 1024;
