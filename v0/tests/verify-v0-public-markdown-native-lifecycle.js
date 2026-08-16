@@ -13,6 +13,8 @@ const lifecycle = require('../src/main/public-markdown-native-lifecycle');
 const nativeBuild = require('../scripts/build-native-helper');
 const evidence = require('../src/main/evidence-delivery-schema');
 const phaseSchema = require('../src/main/snapshot-public-markdown-phase-schema');
+const journal = require('../src/main/changes-history-marker-journal-schema');
+const existingJournalBinding = require('../src/main/snapshot-existing-journal-binding-schema');
 const existingSchema = require('../src/main/snapshot-existing-restore-native-schema');
 
 const SOURCE = path.join(__dirname, '..', 'native', 'public-markdown-create-helper.c');
@@ -251,7 +253,6 @@ function existingProductionFixture(
     artifactOffset += afterBytes[index].length;
   }
   const artifactBytes = Buffer.concat(artifactParts);
-  const markerBytes = Buffer.from('existing marker\n', 'utf8');
   const historyBytes = baseHistoryExists ? Buffer.from('{}\n', 'utf8') : Buffer.alloc(0);
   const chaptersDir = nestedExistingPath ? path.join(rootPath, 'chapters') : rootPath;
   if (nestedExistingPath) fs.mkdirSync(chaptersDir, { mode: 0o700 });
@@ -264,12 +265,11 @@ function existingProductionFixture(
     fs.writeFileSync(chapterPaths[index], beforeBytes[index], { flag: 'wx', mode: 0o600 });
   }
   fs.writeFileSync(artifactPath, artifactBytes, { flag: 'wx', mode: 0o600 });
-  fs.writeFileSync(markerPath, markerBytes, { flag: 'wx', mode: 0o600 });
   if (baseHistoryExists) {
     fs.writeFileSync(historyPath, historyBytes, { flag: 'wx', mode: 0o600 });
   }
   const artifactFd = fs.openSync(artifactPath, fs.constants.O_RDONLY);
-  const markerFd = fs.openSync(markerPath, fs.constants.O_RDONLY);
+  let markerFd = null;
   const historyParentFd = fs.openSync(metadata, fs.constants.O_RDONLY);
   const historyFd = baseHistoryExists
     ? fs.openSync(historyPath, historyWritable ? fs.constants.O_RDWR : fs.constants.O_RDONLY)
@@ -281,7 +281,9 @@ function existingProductionFixture(
   });
   const close = () => {
     for (const fd of [artifactFd, markerFd, historyParentFd, historyFd]) {
-      try { fs.closeSync(fd); } catch (_) {}
+      if (fd !== null && fd !== undefined) {
+        try { fs.closeSync(fd); } catch (_) {}
+      }
     }
     fs.rmSync(rootPath, { recursive: true, force: true });
   };
@@ -336,6 +338,98 @@ function existingProductionFixture(
     rollbackReceiptDigest: null,
     updatedAt: '2026-08-12T00:00:00.000Z',
   };
+  // WRCCHRJ2 single-authority journal: the marker lives inside the journal
+  // frame, and the EXISTING request carries the derived physical binding.
+  const markerPayload = {
+    schema: 'writcraft.changes-history-recovery/v1',
+    operationId,
+    projectId: 'existing-production',
+    kind: 'snapshot_restore',
+    state: 'applying',
+    outcome: null,
+    files: selectedExisting.map((item, index) => ({
+      path: item.path,
+      beforeRevision: digest(beforeBytes[index]).slice('sha256:'.length),
+      afterRevision: item.revision,
+    })),
+    baseHistoryState: {
+      exists: baseHistoryExists,
+      digest: baseHistoryExists ? digest(historyBytes).slice('sha256:'.length) : null,
+    },
+    preparedHistoryState: { exists: true, digest: '4'.repeat(64) },
+    publicMarkdownPhase: phase,
+    recoveryWritePending: false,
+    createdAt: '2026-08-12T00:00:00.000Z',
+    updatedAt: '2026-08-12T00:00:00.000Z',
+  };
+  const marker = {
+    ...markerPayload,
+    integrity: crypto.createHash('sha256')
+      .update(JSON.stringify(markerPayload), 'utf8').digest('hex'),
+  };
+  const journalValue = {
+    schema: journal.SCHEMAS.VALUE,
+    journalId: `chrj_${'c'.repeat(48)}`,
+    generation: '0',
+    previousValueDigest: null,
+    state: 'ACTIVE',
+    projectId: 'existing-production',
+    activeOperationId: operationId,
+    activeKind: 'snapshot_restore',
+    activeMarker: marker,
+    activeMarkerDigest: journal.activeMarkerDigest(marker),
+    nativePublication: null,
+    existingTerminalPublication: null,
+    terminalCleanup: null,
+    terminalCleanupDigest: null,
+    valueDigest: null,
+  };
+  journalValue.valueDigest = journal.valueDigest(journalValue);
+  const journalFrame = journal.encodeSlotFrame(journalValue, 'A');
+  fs.writeFileSync(markerPath, journalFrame, { flag: 'wx', mode: 0o600 });
+  markerFd = fs.openSync(markerPath, fs.constants.O_RDONLY);
+  const journalStat = fs.fstatSync(markerFd, { bigint: true });
+  const journalFileBytes = fs.readFileSync(markerPath);
+  const rootStat = fs.statSync(rootPath, { bigint: true });
+  const recoveryStat = fs.statSync(recovery, { bigint: true });
+  const rootIdentityDigest = evidence.digestRootIdentity({
+    schema: evidence.SCHEMAS.ROOT_IDENTITY,
+    dev: rootStat.dev.toString(), ino: rootStat.ino.toString(),
+    uid: Number(rootStat.uid), mode: Number(rootStat.mode & 0o7777n),
+  });
+  const recoveryDirectoryIdentityDigest = evidence.digestRootIdentity({
+    schema: evidence.SCHEMAS.ROOT_IDENTITY,
+    dev: recoveryStat.dev.toString(), ino: recoveryStat.ino.toString(),
+    uid: Number(recoveryStat.uid), mode: Number(recoveryStat.mode & 0o7777n),
+  });
+  const journalCanonicalMarker = Buffer.from(evidence.canonicalJson(marker), 'utf8');
+  const journalPayloadOffset = journalFrame.indexOf(0x0a) + 1;
+  const journalPayload = journalFrame.subarray(journalPayloadOffset);
+  const journalActiveMarkerOffset = journalFrame.indexOf(journalCanonicalMarker, journalPayloadOffset);
+  if (journalPayloadOffset < 1 || journalActiveMarkerOffset < journalPayloadOffset) {
+    throw new Error('fixture journal marker slice is unavailable');
+  }
+  const journalMarkerBinding = existingJournalBinding.buildExistingJournalBinding({
+    schema: existingJournalBinding.SCHEMA,
+    journalBasename: existingJournalBinding.JOURNAL_BASENAME,
+    journalMagic: existingJournalBinding.JOURNAL_MAGIC,
+    journalFileIdentity: objectIdentity(journalStat, digest(journalFileBytes)),
+    rootIdentityDigest,
+    recoveryDirectoryIdentityDigest,
+    activeSlot: 'A',
+    head: journal.expectedHead(journalValue),
+    previousValueDigest: null,
+    frameByteLength: journalFrame.length,
+    frameSha256: digest(journalFrame),
+    payloadOffset: journalPayloadOffset,
+    payloadByteLength: journalPayload.length,
+    payloadSha256: digest(journalPayload),
+    activeMarkerOffset: journalActiveMarkerOffset,
+    activeMarkerByteLength: journalCanonicalMarker.length,
+    activeMarkerDigest: journal.activeMarkerDigest(marker),
+    activeMarkerCanonicalSha256: digest(journalCanonicalMarker),
+    bindingDigest: null,
+  });
   const beforeBindings = selectedExisting.map((item, index) => ({
     selectedId: item.selectedId,
     path: item.path,
@@ -356,7 +450,7 @@ function existingProductionFixture(
   const request = {
     schema: existingSchema.SCHEMAS.REQUEST,
     operationId,
-    markerDigest: digest(markerBytes),
+    markerDigest: journalMarkerBinding.activeMarkerDigest,
     artifactDigest: digest(artifactBytes),
     artifactIdentityDigest: evidence.digestObjectIdentity(objectIdentity(
       fs.fstatSync(artifactFd, { bigint: true }), digest(artifactBytes)
@@ -366,6 +460,7 @@ function existingProductionFixture(
     selectionDigest: phase.selectionDigest,
     ...existingSchema.buildBaseHistoryAuthority(historyBytes, baseHistoryExists),
     historyParentIdentityDigest,
+    journalMarkerBinding,
     items: selectedExisting.map((item, index) => ({
       selectedId: item.selectedId,
       path: item.path,
