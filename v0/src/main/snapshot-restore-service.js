@@ -707,7 +707,13 @@ function createSnapshotRestoreService(options = {}) {
 
       const missingSelection = current.files.every(file => file.state === 'missing');
       const hasMissing = current.files.some(file => file.state === 'missing');
-      if (hasMissing && !missingSelection) {
+      if (hasMissing && !missingSelection &&
+          (typeof transaction.commitExistingRestore !== 'function' ||
+           typeof transaction.preparePublicMarkdownMarker !== 'function' ||
+           typeof transaction.reconcileExistingRestore !== 'function' ||
+           typeof transaction.createMissingLeaves !== 'function' ||
+           typeof transaction.commitMissingRestoreHistory !== 'function' ||
+           typeof transaction.finalizeMissingRestore !== 'function')) {
         fail('SNAPSHOT_RESTORE_MIXED_SELECTION_UNAVAILABLE',
           'Mixed existing and missing Markdown requires one all-or-nothing transaction');
       }
@@ -738,13 +744,13 @@ function createSnapshotRestoreService(options = {}) {
         comparisonDigest: snapshot.comparisonDigest,
         selectedIds: snapshot.selectedIds,
       });
-      const parentSelectionBinding = missingSelection
+      const parentSelectionBinding = hasMissing
         ? publicMarkdownPhaseSchema.assertParentSelectionBinding({
           schema: publicMarkdownPhaseSchema.SELECTION_SCHEMA,
           kind: 'snapshot_restore',
           selected: snapshot.files.map((after, index) => ({
             selectedId: after.fileId,
-            action: 'MISSING',
+            action: current.files[index].state === 'missing' ? 'MISSING' : 'EXISTING',
             path: after.path,
             revision: after.revision,
             ancestorIdentityDigest: current.files[index].ancestorIdentityDigest,
@@ -833,21 +839,76 @@ function createSnapshotRestoreService(options = {}) {
       let authority = null;
       let directErrorCode = null;
       let directMatrixAnomaly = false;
+
+      // All-or-nothing mixed journey: the EXISTING E/R terminal is CAS-installed
+      // into the WRCCHRJ2 journal first (existingTerminalPublication), then the
+      // MISSING CREATE runs, then History is committed and the restore finalizes.
+      // A lost EXISTING response after the native E committed is rebuilt with a
+      // fresh native R before the MISSING side proceeds (no CREATE replay).
+      function runMixedJourney(preparedTransaction) {
+        let marker = transaction.preparePublicMarkdownMarker(preparedTransaction);
+        let reconciled = false;
+        try {
+          marker = transaction.commitExistingRestore(preparedTransaction, marker);
+        } catch (existingError) {
+          if (existingError?.code !== 'CHANGES_MANUAL_RECOVERY_REQUIRED') throw existingError;
+          try {
+            marker = transaction.reconcileExistingRestore(preparedTransaction, marker);
+            reconciled = true;
+          } catch (_) {
+            throw existingError;
+          }
+        }
+        marker = transaction.createMissingLeaves(preparedTransaction, marker);
+        marker = transaction.commitMissingRestoreHistory(preparedTransaction, marker);
+        marker = transaction.finalizeMissingRestore(preparedTransaction, marker);
+        const terminal = transaction.reconciliation.finish(
+          preparedTransaction.rootPath,
+          marker.operationId
+        );
+        if (terminal.state !== 'terminal' || terminal.outcome !== 'applied') {
+          fail('SNAPSHOT_RESTORE_TRANSACTION_INVALID',
+            'Mixed restore terminal authority is invalid');
+        }
+        transaction.reconciliation.clear(
+          preparedTransaction.rootPath,
+          preparedTransaction.projectId,
+          marker.operationId
+        );
+        const base = Object.freeze({
+          ok: true,
+          outcome: 'applied',
+          status: 'applied',
+          affectedPaths: Object.freeze(terminal.files.map(file => file.path)),
+          recoveryRequired: false,
+          responseRecovered: reconciled,
+        });
+        return reconciled
+          ? Object.freeze({
+            ...base,
+            residualUnavailable: false,
+            confirmationUnavailable: true,
+          })
+          : base;
+      }
+
       try {
         const raw = missingSelection
           ? transaction.executeMissingSnapshotRestore(prepared)
-          : transaction.execute(prepared);
+          : hasMissing
+            ? runMixedJourney(prepared)
+            : transaction.execute(prepared);
         authority = cloneAuthorityResult(raw, expectedPaths);
       } catch (executionError) {
         directErrorCode = stableCode(executionError, 'SNAPSHOT_RESTORE_RESPONSE_LOST');
         directMatrixAnomaly = executionError?.code === 'SNAPSHOT_RESTORE_RESULT_MATRIX_INVALID';
       }
-      const executorAnomaly = missingSelection
+      const executorAnomaly = hasMissing
         ? executorInvocations !== 0 || executorCompletions !== 0
         : executorInvocations !== 1 ||
           (authority?.responseRecovered !== true && executorCompletions !== 1);
       if (!authority || executorAnomaly) {
-        if (!missingSelection) {
+        if (!missingSelection && !hasMissing) {
           try {
             authority = await reconcileOnce(directErrorCode || (executorAnomaly
               ? 'SNAPSHOT_RESTORE_EXECUTOR_COUNT_INVALID'

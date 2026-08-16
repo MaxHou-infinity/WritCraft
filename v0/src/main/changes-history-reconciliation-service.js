@@ -1499,6 +1499,8 @@ function createChangesHistoryReconciliationService(options = {}) {
         ? null
         : marker.publicMarkdownPhase.preparedHistoryDigest,
       finalReceiptDigest: null,
+      existingReceiptSetDigest: null,
+      rollbackReceiptDigest: null,
       updatedAt: marker.createdAt,
     }, marker.parentSelectionBinding);
     return evidenceDeliverySchema.digestObject(publicMarkdownPhaseSchema.SCHEMA, precreate);
@@ -1966,7 +1968,8 @@ function createChangesHistoryReconciliationService(options = {}) {
         marker.kind !== 'snapshot_restore') {
       fail('CHANGES_RECOVERY_STALE', 'Snapshot History journal operation is stale');
     }
-    if (!['CREATED_RECEIPT', 'HISTORY_COMMITTED'].includes(marker.publicMarkdownPhase?.phase)) {
+    if (!['CREATED_RECEIPT', 'EXISTING_COMMITTED', 'HISTORY_COMMITTED']
+      .includes(marker.publicMarkdownPhase?.phase)) {
       fail('CHANGES_RECOVERY_CONFLICT', 'Snapshot History journal phase is invalid');
     }
 
@@ -4900,11 +4903,12 @@ function createChangesHistoryReconciliationService(options = {}) {
       ? scopedDescriptor.value
       : rawScoped;
     const execute = method(scoped, 'execute');
-    if (execute === null) {
+    const reconcile = method(scoped, 'reconcile');
+    if (execute === null || reconcile === null) {
       fail('SNAPSHOT_RESTORE_EXISTING_LIFECYCLE_UNAVAILABLE',
         'formal existing Markdown lifecycle is unavailable');
     }
-    return Object.freeze({ execute });
+    return Object.freeze({ execute, reconcile });
   }
 
   function identityFromStat(stat, contentSha256) {
@@ -4920,6 +4924,32 @@ function createChangesHistoryReconciliationService(options = {}) {
       ctimeNs: stat.ctimeNs.toString(),
       contentSha256,
     });
+  }
+
+  // Response-loss recovery: after a native EXISTING E committed (leaf already
+  // at AFTER), a fresh R rebuilds the terminal from the on-disk records. The
+  // before-leaf identity is no longer observable from the public leaf; it is
+  // recovered from the exact control record the E wrote.
+  function existingControlBeforeLeafDigest(rootPath, selectedId) {
+    const location = markerLocation(rootPath, false, fileSystem);
+    let entries;
+    try { entries = fileSystem.readdirSync(location.directory); }
+    catch (_) {
+      fail('CHANGES_MANUAL_RECOVERY_REQUIRED', 'EXISTING reconcile leaf authority is unavailable');
+    }
+    for (const entry of entries) {
+      if (!/^\.changes-history-native-existing-control\.[a-f0-9]{64}$/.test(entry)) continue;
+      let raw;
+      try {
+        raw = fileSystem.readFileSync(path.join(location.directory, entry));
+      } catch (_) { continue; }
+      const fields = String(raw).trimEnd().split('\t');
+      if (fields.length >= 21 && fields[2] === selectedId &&
+          /^sha256:[a-f0-9]{64}$/.test(fields[19])) {
+        return fields[19];
+      }
+    }
+    fail('CHANGES_MANUAL_RECOVERY_REQUIRED', 'EXISTING reconcile leaf authority is unavailable');
   }
 
   function readExactLeaf(rootPath, binding) {
@@ -5038,7 +5068,7 @@ function createChangesHistoryReconciliationService(options = {}) {
     }
   }
 
-  function executeExistingRestore(rootPath, projectId, operationId) {
+  function runExistingRestore(rootPath, projectId, operationId, command) {
     projectIdentity(projectService, rootPath, projectId);
     const scopedJournal = markerJournalFor(rootPath, true);
     const current = journalCurrent(scopedJournal);
@@ -5103,7 +5133,12 @@ function createChangesHistoryReconciliationService(options = {}) {
                 byteLength: file.before.bytes.length,
                 contentDigest: `sha256:${file.before.revision}`,
               };
-              const beforeLeaf = readExactLeaf(rootPath, leafBinding);
+              const beforeLeaf = command === existingRestoreSchema.COMMANDS.EXECUTE
+                ? readExactLeaf(rootPath, leafBinding)
+                : Object.freeze({ digest: existingControlBeforeLeafDigest(
+                  rootPath,
+                  item.selectedId
+                ) });
               return Object.freeze({
                 selectedId: item.selectedId,
                 path: item.path,
@@ -5157,18 +5192,23 @@ function createChangesHistoryReconciliationService(options = {}) {
             );
             const descriptors = Object.freeze({
               artifactFd,
-              journalFd,
+              // WRCCHRJ2 single-authority: the held marker IS the journal
+              // file; the EXISTING lifecycle contract names the fd markerFd.
+              markerFd: journalFd,
               historyParentFd: baseHistory.directoryFd,
               historyFd: baseHistory.fd === null ? baseHistory.directoryFd : baseHistory.fd,
             });
+            const nativeRun = command === existingRestoreSchema.COMMANDS.EXECUTE
+              ? lifecycle.execute(authority, descriptors)
+              : lifecycle.reconcile(authority, descriptors);
             const result = existingRestoreSchema.assertRunResult(
-              lifecycle.execute(authority, descriptors),
+              nativeRun,
               authority,
-              existingRestoreSchema.COMMANDS.EXECUTE
+              command
             );
             if (result.state !== 'COMMITTED' || result.terminalReceipt === null) {
               fail('CHANGES_MANUAL_RECOVERY_REQUIRED',
-                'EXISTING execute is not durably committed');
+                'EXISTING terminal is not durably committed');
             }
             const terminal = result.terminalReceipt;
             const terminalItems = terminal.items.map((terminalItem, index) => {
@@ -5275,13 +5315,31 @@ function createChangesHistoryReconciliationService(options = {}) {
       if (error instanceof ChangesHistoryRecoveryError) throw error;
       const wrapped = new ChangesHistoryRecoveryError(
         'CHANGES_MANUAL_RECOVERY_REQUIRED',
-        'EXISTING execute authority cannot be completed'
+        'EXISTING restore authority cannot be completed'
       );
       wrapped.cause = error;
       throw wrapped;
     } finally {
       closeHistoryAuthority(baseHistory);
     }
+  }
+
+  function executeExistingRestore(rootPath, projectId, operationId) {
+    return runExistingRestore(
+      rootPath,
+      projectId,
+      operationId,
+      existingRestoreSchema.COMMANDS.EXECUTE
+    );
+  }
+
+  function reconcileExistingRestore(rootPath, projectId, operationId) {
+    return runExistingRestore(
+      rootPath,
+      projectId,
+      operationId,
+      existingRestoreSchema.COMMANDS.RECONCILE
+    );
   }
 
   function authoritativeState(rootPath, marker) {
@@ -6351,6 +6409,7 @@ function createChangesHistoryReconciliationService(options = {}) {
     readMarker,
     createMissingLeaves,
     executeExistingRestore,
+    reconcileExistingRestore,
     commitMissingRestoreHistory,
     finalizeMissingRestore,
     quarantineSnapshotRestoreUndo,

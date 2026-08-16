@@ -1,7 +1,7 @@
 {
   "schemaVersion": "writcraft.test-gates/v1",
   "targetVersion": "0.4.0",
-  "expectedTestCount": 51,
+  "expectedTestCount": 52,
   "legacyBaseline": "tests/0.4.0-legacy-test-baseline.json",
   "tests": [
     {
@@ -315,6 +315,15 @@
       "stage": "A",
       "lane": "snapshot-service",
       "evidenceKind": "service-integration",
+      "requiredInCurrentGate": true,
+      "completionEligible": false,
+      "requiresGui": false
+    },
+    {
+      "test": "tests/verify-v0-snapshot-restore-mixed-journey.js",
+      "stage": "A",
+      "lane": "snapshot-mixed-journey",
+      "evidenceKind": "production-boundary-journey",
       "requiredInCurrentGate": true,
       "completionEligible": false,
       "requiresGui": false

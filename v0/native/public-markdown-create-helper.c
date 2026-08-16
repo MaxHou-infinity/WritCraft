@@ -6738,12 +6738,12 @@ static bool existing_reconcile_readonly(RootBinding *root, char *line) {
 
 static bool existing_reconcile_header_shape(const char *line) {
   char copy[MAX_LINE_BYTES + 1U];
-  char *fields[16];
+  char *fields[34];
   size_t count = 0U;
   size_t length = strlen(line);
   if (length >= sizeof(copy)) return false;
   memcpy(copy, line, length + 1U);
-  return split_fields(copy, fields, 16U, &count) && count == 15U &&
+  return split_fields(copy, fields, 34U, &count) && count == 33U &&
     strcmp(fields[0], "R") == 0;
 }
 
@@ -7270,7 +7270,9 @@ static bool create_journal_frame_exact(
 #endif
   char publication[4096];
   if (!create_journal_request_publication(request, publication, sizeof(publication)) ||
-      !create_journal_command_authority(request)) return false;
+      !create_journal_command_authority(request)) {
+    return false;
+  }
   int journal_fd = openat(root->recovery_fd, JOURNAL_BASENAME,
     O_RDONLY | O_NOFOLLOW | O_CLOEXEC);
   struct stat journal_stat;
@@ -7382,7 +7384,9 @@ static bool create_journal_guard_full(RootBinding *root, const CreateJournalGuar
 
 static bool create_journal_guard_cheap(RootBinding *root, const CreateJournalGuard *guard) {
   if (guard == NULL || guard->request == NULL ||
-      !open_recovery(root, false)) return false;
+      !open_recovery(root, false)) {
+    return false;
+  }
   int artifact_flags = fcntl(HELD_ARTIFACT_FD, F_GETFL);
   struct stat artifact_stat;
   Identity artifact_identity;
@@ -7390,7 +7394,9 @@ static bool create_journal_guard_cheap(RootBinding *root, const CreateJournalGua
       fstat(HELD_ARTIFACT_FD, &artifact_stat) != 0 ||
       !identity_from_stat(&artifact_stat, &artifact_identity) ||
       !same_file(&guard->artifact_identity, &artifact_identity) ||
-      permission_mode(artifact_identity.mode) != 0600U || artifact_identity.nlink != 1U) return false;
+      permission_mode(artifact_identity.mode) != 0600U || artifact_identity.nlink != 1U) {
+    return false;
+  }
   int journal_fd = openat(root->recovery_fd, JOURNAL_BASENAME,
     O_RDONLY | O_NOFOLLOW | O_CLOEXEC);
   struct stat journal_stat;
@@ -7495,7 +7501,9 @@ static bool create_journal_parse_and_run(RootBinding *root, char *line) {
   create_journal_frame_full_hashes = 0U;
 #endif
   CreateJournalRequest *request = calloc(1U, sizeof(*request));
-  if (request == NULL || !create_journal_header(line, request)) { free(request); return false; }
+  if (request == NULL || !create_journal_header(line, request)) {
+    free(request); return false;
+  }
   for (size_t i = 0U; i < request->create.count; i += 1U) {
     if (!read_protocol_line(line) || !parse_item(line, &request->create, i)) {
       free(request); return false;

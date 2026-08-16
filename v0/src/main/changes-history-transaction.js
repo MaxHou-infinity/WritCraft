@@ -473,6 +473,31 @@ function createChangesHistoryTransaction(options = {}) {
     );
   }
 
+  function reconcileExistingRestore(prepared, marker) {
+    if (!prepared || prepared.mixedRestoreMode !== true ||
+        prepared.kind !== 'snapshot_restore' || !marker ||
+        marker.kind !== 'snapshot_restore' ||
+        marker.publicMarkdownPhase?.phase !== 'CREATED_RECEIPT') {
+      const error = new Error('mixed EXISTING reconciliation is invalid');
+      error.code = 'PUBLIC_MARKDOWN_PHASE_REQUIRED';
+      throw error;
+    }
+    const reconcile = descriptorLifecycleMethod(
+      reconciliationService,
+      'reconcileExistingRestore'
+    );
+    if (reconcile === null) {
+      const error = new Error('mixed EXISTING journal CAS reconcile is unavailable');
+      error.code = 'SNAPSHOT_RESTORE_EXISTING_LIFECYCLE_UNAVAILABLE';
+      throw error;
+    }
+    return reconcile(
+      prepared.rootPath,
+      prepared.projectId,
+      marker.operationId
+    );
+  }
+
   function commitMissingRestoreHistory(prepared, marker) {
     if (!prepared || prepared.publicMarkdownPhaseMode !== true || !marker ||
         marker.kind !== 'snapshot_restore') {
@@ -864,6 +889,7 @@ function createChangesHistoryTransaction(options = {}) {
     preparePublicMarkdownMarker,
     createMissingLeaves,
     commitExistingRestore,
+    reconcileExistingRestore,
     commitMissingRestoreHistory,
     finalizeMissingRestore,
     executeMissingSnapshotRestore,
