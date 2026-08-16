@@ -1,4 +1,6 @@
 #!/usr/bin/env node
+// 证据级别：COMPONENT + 边界证据。artifact 边界使用自认的测试替身
+// trustedFakeArtifactLifecycle，不能作为真实 native 生命周期的签收证据。
 'use strict';
 
 const assert = require('assert');

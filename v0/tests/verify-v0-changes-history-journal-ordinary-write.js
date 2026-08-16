@@ -1,4 +1,7 @@
 #!/usr/bin/env node
+// 证据级别：COMPONENT（组件证据）。本脚本用内存 fake adapter 驱动 journal
+// 层，证明 reconciliation 的决策逻辑，不是 journal 持久化证明；持久化
+// 证明以 verify-v0-changes-history-marker-journal-native-* 为准。
 'use strict';
 
 const assert = require('assert');

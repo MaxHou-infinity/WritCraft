@@ -1,0 +1,37 @@
+name: verify
+
+on:
+  push:
+  pull_request:
+
+jobs:
+  verify:
+    runs-on: macos-14
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-node@v4
+        with:
+          node-version: 22
+          cache: npm
+          cache-dependency-path: v0/npm-shrinkwrap.json
+      - name: Install locked dependencies
+        run: npm ci
+        working-directory: v0
+      - name: Build native helpers
+        run: npm run build:native-helper
+        working-directory: v0
+      - name: 0.4 test registration gate
+        run: npm run verify:0.4:registration
+        working-directory: v0
+      - name: Syntax gate (node --check sweep)
+        run: npm run verify:syntax
+        working-directory: v0
+      - name: Stage A/B component gates
+        run: npm run verify:0.4:current-components
+        working-directory: v0
+      - name: Node behavior suite
+        run: npm test
+        working-directory: v0
+      - name: Production dependency audit
+        run: npm audit --omit=dev
+        working-directory: v0

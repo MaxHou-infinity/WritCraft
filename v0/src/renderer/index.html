@@ -1320,6 +1320,22 @@
     </form>
   </dialog>
 
+  <dialog id="confirm-dialog">
+    <div class="dialog-body">
+      <h2 id="confirm-title">确认</h2>
+      <p id="confirm-message"></p>
+      <div class="dialog-actions"><button class="secondary-button" id="confirm-cancel" type="button">取消</button><button class="primary-button" id="confirm-ok" type="button">确认</button></div>
+    </div>
+  </dialog>
+
+  <dialog id="input-dialog">
+    <div class="dialog-body">
+      <h2 id="input-title">输入</h2>
+      <input id="input-field" maxlength="180" autocomplete="off" required>
+      <div class="dialog-actions"><button class="secondary-button" id="input-cancel" type="button">取消</button><button class="primary-button" id="input-ok" type="button">确定</button></div>
+    </div>
+  </dialog>
+
   <dialog id="migration-dialog">
     <form class="dialog-body migration-dialog-body" method="dialog" id="migration-form">
       <h2 id="migration-title">迁移旧稿</h2>
@@ -1404,6 +1420,7 @@
   <script src="onboarding-state.js"></script>
   <script src="project-onboarding-view.js"></script>
   <script src="external-sync-state-service.js"></script>
+  <script src="dialog-prompt.js"></script>
   <script src="workspace.js"></script>
   <script src="daily-workspace-state.js"></script>
   <script src="daily-workspace-view.js"></script>

@@ -1,4 +1,6 @@
 #!/usr/bin/env node
+// 证据级别：COMPONENT（组件证据）。本脚本用内存 fake adapter 驱动
+// reconciliation 读取收敛路径，证明决策逻辑；不是持久化证明。
 'use strict';
 
 const assert = require('assert');

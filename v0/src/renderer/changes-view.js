@@ -1332,7 +1332,7 @@
     if (recoveryBlocked || historyUndoInFlight || !bridge?.undoChange || entry.status !== 'applied') return;
     const message = historyPresentation?.undoConfirmation?.(entry, options) ||
       `撤销这次对 ${entry.files.length} 个文件的修改？\n撤销前会再次检查所有文件版本。`;
-    const accepted = window.confirm(message);
+    const accepted = await window.WritCraftDialogs.confirm(message);
     if (!accepted) return;
     const projectInstanceId = window.__workspace?.state?.project?.instanceId || null;
     const progressOwner = startGenerationProgress(

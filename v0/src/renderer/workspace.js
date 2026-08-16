@@ -1026,7 +1026,7 @@
 
   async function promptRenameFile(sourcePath) {
     const currentName = fileName(sourcePath);
-    const nextName = window.prompt('输入新的 Markdown 文件名', currentName);
+    const nextName = await window.WritCraftDialogs.input('重命名 Markdown 文件', '输入新的 Markdown 文件名', currentName);
     if (nextName === null) return;
     const cleanName = nextName.trim();
     if (!cleanName || cleanName.includes('/') || cleanName.includes('\\')) {
@@ -1038,14 +1038,14 @@
   }
 
   async function promptMoveFile(sourcePath) {
-    const targetPath = window.prompt('输入移动后的项目内 Markdown 路径', sourcePath);
+    const targetPath = await window.WritCraftDialogs.input('移动 Markdown 文件', '输入移动后的项目内 Markdown 路径', sourcePath);
     if (targetPath === null) return;
     await relocateFile(sourcePath, targetPath.trim().replace(/\\/g, '/'), 'moveFile', '移动');
   }
 
   async function trashFile(sourcePath) {
     if (!state.project || !bridge?.trashFile || sourcePath === 'edit.md') return false;
-    const confirmed = window.confirm(`将“${sourcePath}”移到项目回收区？\n\n文件不会永久删除，可根据 .writcraft/trash/manifest.json 恢复。`);
+    const confirmed = await window.WritCraftDialogs.confirm(`将“${sourcePath}”移到项目回收区？\n\n文件不会永久删除，可根据 .writcraft/trash/manifest.json 恢复。`);
     if (!confirmed) return false;
     if (!(await persistCurrent(true))) return false;
     closeFileMenus();
@@ -3333,4 +3333,14 @@
   };
   window.WritCraftWorkspace = workspaceApi;
   window.__workspace = workspaceApi;
+
+  // 渲染层全局错误观测：未捕获异常 / 未处理 rejection 落入控制台并反映到
+  // 状态栏，而不是在 82 处 catch(_) 里被静默吞掉后无迹可寻。
+  window.addEventListener('error', event => {
+    console.error('renderer uncaught error', event.error || event.message);
+    try { setSaveState('渲染层出现未捕获错误，请查看控制台', 'error'); } catch (_) {}
+  });
+  window.addEventListener('unhandledrejection', event => {
+    console.error('renderer unhandled rejection', event.reason);
+  });
 })();

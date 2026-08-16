@@ -189,7 +189,7 @@
   async function emptyTrash() {
     const owner = trashOwner;
     if (trashBusy || !owner?.snapshotToken || !bridge?.emptyImageTrash) return false;
-    const confirmed = window.confirm?.(
+    const confirmed = await window.WritCraftDialogs.confirm(
       `永久清空当前核验的 ${owner.totalCount} 张图片？\n\n该操作无法撤销；清空期间新进入的图片不会被删除。`
     );
     if (!confirmed) return false;

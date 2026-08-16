@@ -329,6 +329,8 @@ function loadChangesHarness(overrides = {}) {
       aggregate: async () => ({ status: 'ready', metrics: {} }),
     },
     confirm: () => true,
+    // Production dialog helper; stubbed so sandboxed views can await it.
+    WritCraftDialogs: { confirm: async () => true, input: async () => null },
     addEventListener() {},
   };
   const context = {

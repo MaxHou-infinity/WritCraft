@@ -16,6 +16,11 @@ const MAX_TOOL_SCHEMA_BYTES = 64 * 1024;
 const MAX_TOOL_INPUT_BYTES = 512 * 1024;
 const MAX_JSON_DEPTH = 32;
 const MAX_JSON_NODES = 4096;
+// Bounded retry for transient provider failures (rate limit / 5xx / timeout).
+// AUTH/API failures and explicit aborts are never retried.
+const MAX_REQUEST_RETRIES = 2;
+const RETRY_BACKOFF_MS = 500;
+const RETRYABLE_FAILURES = new Set(['RATE_LIMITED', 'SERVICE_UNAVAILABLE', 'TIMEOUT']);
 const KEY_RE = /^sk-(cp|api)-[A-Za-z0-9_-]{8,240}$/i;
 const MODEL_RE = /^[A-Za-z0-9][A-Za-z0-9._-]{0,127}$/;
 const TOOL_NAME_RE = /^[A-Za-z][A-Za-z0-9_-]{0,63}$/;
@@ -145,6 +150,10 @@ function abortable(promise, signal) {
   });
 }
 
+function sleep(ms) {
+  return new Promise(resolve => setTimeout(resolve, ms));
+}
+
 async function readBoundedJson(response, signal) {
   if (!response || typeof response !== 'object') throw Object.assign(new Error('invalid response'), { code: 'INVALID_RESPONSE' });
   const contentType = response.headers?.get?.('content-type');
@@ -211,6 +220,23 @@ async function requestJson({ endpoint, method, headers, body, fetchImpl, timeout
   const request = typeof fetchImpl === 'function' ? fetchImpl : globalThis.fetch;
   if (typeof request !== 'function') return failure('SERVICE_UNAVAILABLE');
   if (externalSignal?.aborted) return failure('REQUEST_ABORTED');
+  // Transient provider failures get a bounded retry with backoff. The AI task
+  // deadline (externalSignal) is re-checked between attempts, so a cancelled
+  // request stops immediately and the total budget stays bounded.
+  let lastResult = null;
+  for (let attempt = 0; attempt <= MAX_REQUEST_RETRIES; attempt += 1) {
+    if (externalSignal?.aborted) return failure('REQUEST_ABORTED');
+    lastResult = await requestOnce({ endpoint, method, headers, body, request, externalSignal, timeoutMs });
+    if (!lastResult.ok && RETRYABLE_FAILURES.has(lastResult.error) && attempt < MAX_REQUEST_RETRIES) {
+      await sleep(RETRY_BACKOFF_MS * (attempt + 1));
+      continue;
+    }
+    return lastResult;
+  }
+  return lastResult;
+}
+
+async function requestOnce({ endpoint, method, headers, body, request, externalSignal, timeoutMs }) {
   const controller = new AbortController();
   let timedOut = false;
   const timeout = setTimeout(() => { timedOut = true; controller.abort(); }, timeoutValue(timeoutMs));

@@ -11,6 +11,12 @@ const MAX_IMAGE_BYTES = 8 * 1024 * 1024;
 const MAX_RESPONSE_CHARS = Math.ceil(MAX_IMAGE_BYTES * 4 / 3) + 64 * 1024;
 const REQUEST_TIMEOUT_MS = 90_000;
 const KEY_RE = /^sk-(cp|api)-[A-Za-z0-9_-]{8,240}$/i;
+// Bounded retry for transient provider failures (rate limit / 5xx / server
+// timeouts). Client-side timeouts and explicit aborts are never retried; the
+// shared controller deadline bounds the whole loop.
+const MAX_IMAGE_RETRIES = 2;
+const IMAGE_RETRY_BACKOFF_MS = 500;
+const IMAGE_RETRYABLE = new Set(['IMAGE_RATE_LIMITED', 'IMAGE_SERVICE_UNAVAILABLE']);
 const ASPECT_RATIOS = Object.freeze(['1:1', '16:9', '4:3', '3:2', '2:3', '3:4', '9:16', '21:9']);
 const ASPECT_RATIO_SET = new Set(ASPECT_RATIOS);
 const ASPECT_RATIO_DIMENSIONS = Object.freeze({
@@ -135,6 +141,10 @@ function abortable(promise, signal) {
       error => { signal.removeEventListener('abort', onAbort); reject(error); }
     );
   });
+}
+
+function sleep(ms) {
+  return new Promise(resolve => setTimeout(resolve, ms));
 }
 
 function imageHttpFailure(status) {
@@ -368,43 +378,55 @@ async function generateAndSaveImage(options = {}) {
   const timeout = setTimeout(() => { timedOut = true; controller.abort(); }, timeoutMs);
   const abortFromOwner = () => controller.abort();
   externalSignal?.addEventListener?.('abort', abortFromOwner, { once: true });
+  const requestBody = JSON.stringify({
+    model: MODEL,
+    prompt,
+    aspect_ratio: aspectRatio,
+    response_format: 'base64',
+    n: 1,
+  });
   let payload;
-  try {
-    const response = await abortable(request(ENDPOINT, {
-      method: 'POST',
-      redirect: 'error',
-      headers: {
-        Authorization: `Bearer ${apiKey}`,
-        'Content-Type': 'application/json',
-      },
-      body: JSON.stringify({
-        model: MODEL,
-        prompt,
-        aspect_ratio: aspectRatio,
-        response_format: 'base64',
-        n: 1,
-      }),
-      signal: controller.signal,
-    }), controller.signal);
-    payload = await responsePayload(response, controller.signal);
-  } catch (error) {
-    if (error instanceof ImageGenerationError) {
-      if (error.code === 'IMAGE_TIMEOUT' && !timedOut && externalSignal?.aborted) {
-        fail('IMAGE_ABORTED', '图片生成已因项目状态变化而取消');
+  for (let attempt = 0; attempt <= MAX_IMAGE_RETRIES; attempt += 1) {
+    if (externalSignal?.aborted) fail('IMAGE_ABORTED', '图片生成已因项目状态变化而取消');
+    try {
+      const response = await abortable(request(ENDPOINT, {
+        method: 'POST',
+        redirect: 'error',
+        headers: {
+          Authorization: `Bearer ${apiKey}`,
+          'Content-Type': 'application/json',
+        },
+        body: requestBody,
+        signal: controller.signal,
+      }), controller.signal);
+      payload = await responsePayload(response, controller.signal);
+      break;
+    } catch (error) {
+      if (error instanceof ImageGenerationError) {
+        if (error.code === 'IMAGE_TIMEOUT' && !timedOut && externalSignal?.aborted) {
+          fail('IMAGE_ABORTED', '图片生成已因项目状态变化而取消');
+        }
+        // Server-reported timeouts (408 / provider 1001) are transient when
+        // the client deadline has not fired; client timeouts already aborted
+        // the shared controller, so any further attempt fails fast.
+        const serverTimeout = error.code === 'IMAGE_TIMEOUT' && !timedOut && !controller.signal.aborted;
+        const retryable = IMAGE_RETRYABLE.has(error.code) || serverTimeout;
+        if (!retryable) throw error;
+        if (attempt >= MAX_IMAGE_RETRIES) throw error;
+      } else if (controller.signal.aborted) {
+        // An external cancel (project switch) aborts the same controller as the
+        // timeout; report it truthfully instead of mislabeling it as a timeout.
+        if (externalSignal?.aborted) fail('IMAGE_ABORTED', '图片生成已因项目状态变化而取消');
+        fail('IMAGE_TIMEOUT', '图片生成超时，请稍后重试');
+      } else {
+        fail('IMAGE_REQUEST_FAILED', '图片服务连接失败，请稍后重试');
       }
-      throw error;
+      await sleep(IMAGE_RETRY_BACKOFF_MS * (attempt + 1));
     }
-    if (controller.signal.aborted) {
-      // An external cancel (project switch) aborts the same controller as the
-      // timeout; report it truthfully instead of mislabeling it as a timeout.
-      if (externalSignal?.aborted) fail('IMAGE_ABORTED', '图片生成已因项目状态变化而取消');
-      fail('IMAGE_TIMEOUT', '图片生成超时，请稍后重试');
-    }
-    fail('IMAGE_REQUEST_FAILED', '图片服务连接失败，请稍后重试');
-  } finally {
-    clearTimeout(timeout);
-    externalSignal?.removeEventListener?.('abort', abortFromOwner);
   }
+  if (externalSignal?.aborted) fail('IMAGE_ABORTED', '图片生成已因项目状态变化而取消');
+  clearTimeout(timeout);
+  externalSignal?.removeEventListener?.('abort', abortFromOwner);
   const images = payload?.data?.image_base64;
   if (!Array.isArray(images) || images.length !== 1) {
     fail('INVALID_IMAGE_RESPONSE', '图片服务未返回唯一的 Base64 图片');
