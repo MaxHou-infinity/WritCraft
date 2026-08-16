@@ -1,10 +1,12 @@
 # Repository Guidelines
 
-## Project Structure & Module Organization
+## Project Structure and Authority
 
-Use `docs/INDEX.md` to select documentation. The mandatory current entry set is `docs/ROADMAP.md`, `docs/ROADMAP-0.4.0.md`, `v0/DEVELOPMENT-STATUS.md`, `docs/WRITCRAFT-PRD-V3.md`, `docs/ARCHITECTURE.md`, and `v0/package.json`. Treat `docs/ROADMAP.md` as the only authority for target-version order and scope, `docs/ROADMAP-0.4.0.md` as the approved detailed contract, and `v0/DEVELOPMENT-STATUS.md` as the current execution ledger. 0.1.x–0.3.0 route/contracts are frozen compatibility evidence and cannot dispatch work; archived documents explain history only.
+Use `docs/INDEX.md` to select only the documentation needed for the current task. Before implementation, read the current control block in `v0/DEVELOPMENT-STATUS.md`, the one directly relevant contract or matrix, and the affected source/tests. Read `docs/ROADMAP.md` only for version or scope decisions, and `docs/0.4.0-EXECUTION-PROTOCOL.md` when opening or signing a checkpoint. PRD, architecture, old review records, and frozen 0.1.x–0.3.0 contracts are on-demand compatibility evidence, not universal startup reading.
 
-The Electron application is under `v0/`. Main-process services and the narrow preload bridge live in `v0/src/main/`; UI, state machines, CSS, and vendored browser assets live in `v0/src/renderer/`. Standalone verification scripts are in `v0/tests/`, fixtures in `v0/tests/fixtures/`, and packaging utilities in `v0/scripts/`. Research inputs and historical product deliverables remain in `raw/` and `deliverables/`; do not mix them into runtime code or use them to dispatch current work.
+The Electron application is under `v0/`. Main-process services and the narrow preload bridge live in `v0/src/main/`; UI and state live in `v0/src/renderer/`; pure cross-process logic belongs in `v0/src/shared/`. Standalone verification scripts are in `v0/tests/`, fixtures in `v0/tests/fixtures/`, and packaging utilities in `v0/scripts/`. `raw/`, `deliverables/`, and `docs/archive/` never dispatch current work.
+
+Source and reproducible tests establish current implementation facts. `docs/ROADMAP.md` alone decides version order and scope; `v0/DEVELOPMENT-STATUS.md` records the current checkpoint and open risks; the relevant current contract defines acceptance.
 
 ## Build, Test, and Development Commands
 
@@ -15,142 +17,54 @@ Run commands from `v0/`:
 - `npm start` — launch the normal local application.
 - `npm test` — run the main Node behavior suite.
 - `npm run verify` — run the broader regression, security, and packaging checks.
-- `npm run verify:full` — run verification plus forced real-Electron E2E.
-- `npm run verify:npm-preview` — verify the CLI/package allowlist and inspect the preview tarball without publishing.
-- `npm run verify:npm-preview:installed` — install the tarball in isolation and prove Main-observed page-load IPC, profile isolation, signal forwarding, and cleanup.
-- `npm audit --omit=dev` — require zero known production vulnerabilities for every preview candidate and again immediately before publication.
+- `npm run verify:full` — add forced real-Electron E2E.
+- `npm run verify:npm-preview` — verify the package allowlist and preview tarball without publishing.
+- `npm run verify:npm-preview:installed` — verify the installed tarball in isolation.
+- `npm audit --omit=dev` — require zero known production vulnerabilities for a preview candidate and before publication.
 - `npm run package:mac` and `npm run release:verify` — build and inspect the macOS artifact.
 
-Real API checks require explicit gates; never enable them casually or log keys, prompts, or document content.
+Real API checks require explicit gates; never log keys, prompts, document content, or private paths. Do not publish, move a dist-tag, create a GitHub Release/Tag, push a release, or distribute App/ZIP without explicit owner authorization.
 
-The distribution route is the macOS npm Developer Preview in `docs/NPM-DEVELOPER-PREVIEW-V1-CONTRACT.md`. `writ-craft@0.3.0` is public under npm `preview`; `latest` intentionally remains `0.1.0`. Do not publish another version, move a dist-tag, create a GitHub Release/Tag, or distribute App/ZIP without explicit authorization.
+## Coding and Architecture
 
-Do not infer a validated platform matrix from manifest declarations or universal helper slices. Record the exact Node/npm/architecture used by installed-tarball evidence. The 0.1.1 candidate closed Node 22/npm 10 arm64 and Node 24/npm 11 x64 at 2/2 each; future candidates must repeat their own applicable matrix. Main-observed page-load IPC proves `did-finish-load`, not every workspace/bootstrap behavior.
+Use CommonJS JavaScript with `'use strict'`, two-space indentation, semicolons, single quotes, and `const` by default. Name modules in kebab-case, verification files `verify-v0-<feature>.js`, and constants in `UPPER_SNAKE_CASE`. Preserve surrounding style and run `node --check` for changed JavaScript.
 
-## Coding Style & Naming Conventions
+Main owns filesystem, revision, capability, network, transaction, and recovery authority. Renderer must not access Node APIs, perform HTTP(S), submit absolute paths or content authority, or bypass ChangeSet/History review. Main must not import Renderer modules; shared code stays pure and has parity/static dependency coverage. New 0.4 IPC enters through a focused service/handler rather than expanding `main.js` without a boundary.
 
-Use CommonJS JavaScript with `'use strict'`, two-space indentation, semicolons, single quotes, and `const` by default. Name modules in kebab-case (`onboarding-batch-service.js`), verification files `verify-v0-<feature>.js`, and constants in `UPPER_SNAKE_CASE`. No formatter or linter is enforced; preserve surrounding style and run `node --check <file>` for changed JavaScript.
+Before a paid call or irreversible side effect, complete authority/capacity preflight and acquire an owner-specific single-flight lease. Release only authority acquired by that operation. After a commit, retries must preserve committed truth and may only complete reconciliation, durability, or response reconstruction; never replay the mutation from stale pre-commit validation.
 
-Main owns filesystem, revision, capability, and network authority. Renderer code must not access Node APIs or make HTTP(S) requests directly. AI writes must remain reviewable through ChangeSet/History boundaries.
+When Main reconciliation has installed authoritative tree, current-file, and History state, publish that committed truth. Optional refresh work must not obscure or invalidate it.
 
-Main must not import or `require` Renderer modules. Put pure logic needed by both processes in `v0/src/shared/`, keep it free of Electron/filesystem/network authority, and cover it with parity tests plus a static Main-to-Renderer dependency gate. The reverse dependencies were removed in frozen 0.2.0 stage 0; preserve that completed boundary. Any future 0.4.0 IPC must enter through a focused service/handler instead of further expanding `main.js`.
+## Testing and Data Safety
 
-Never infer provider capability from a credential prefix. `sk-cp-` and `sk-api-` identify credential/billing families; current official documentation plus a gated, privacy-safe provider response decide whether `image-01` is available. Pin Electron to a currently supported stable release and re-run real-Electron behavior after every upgrade.
+Tests use Node's built-in `assert` and executable scripts. Add failure, stale revision, project-switch, no-op, and async-destroy coverage where relevant. Fault injection must cross the claimed production boundary: partial-write tests write bytes before throwing, committed-rename/fsync tests prove durability retry, and cleanup never deletes an unproven replacement.
 
-Before any paid call or irreversible side effect, complete authority/capacity preflight and acquire an owner-specific single-flight lease. Release only a lease this request actually acquired. After a commit, retries must preserve committed truth: do not rerun stale pre-commit validation or repeat the mutation; retry only missing evidence, fsync, or response reconstruction.
+Focused, schema, fake-adapter, direct-service, or seeded-storage green evidence is component evidence, not App, Stage, candidate, author, or release sign-off. Register every new or renamed `verify-v0-*.js` in the 0.4 inventory and active top-level gate in the same change set.
 
-When a Main-owned reconciliation has already installed authoritative tree, current-file, and History state and cleared the exact recovery marker, publish the committed terminal UI from that result. Do not make success depend on a second unbounded refresh chain. Any optional follow-up refresh must not obscure committed truth; retain the old fail-closed refresh path when authoritative reload is absent or untrusted.
+For destructive or public-file mutation, bind the exact project/owner, selected target, current revision, and recovery truth. Preserve unselected files. Cancellation, conflict, project switch, and proven pre-commit failure produce no unintended public write. Ambiguous post-commit outcomes fail closed without replay; automatic recovery is not required when safe manual recovery is the only provable result.
 
-## Testing Guidelines
+The blocking threat model covers accidental concurrency, external editor drift, symlink/path escape, crash/response loss, wrong-target writes, replay, and cross-project pollution. An active same-UID process defeating owner-only private storage is P2 hardening unless the owner explicitly upgrades that threat model.
 
-Tests use Node's built-in `assert` and executable scripts rather than a test framework. Add failure, stale revision, project-switch, no-op, and async-destroy coverage where relevant. Directed tests are not sign-off: run full verification, real Electron behavior, Computer Use where visual/OS interaction matters, the minimal owner journey required by the active contract, and independent review.
+## 0.4.0 Execution
 
-Fault injection must cross the claimed boundary. A “partial write” test must write bytes before throwing; a “rename committed, fsync failed” test must prove the retry performs another directory fsync. Readable files are not automatically durable. Verify cleanup against the exact inode so failures never delete a concurrent replacement.
+`docs/0.4.0-EXECUTION-PROTOCOL.md` alone controls current checkpoint order, WIP, review, and Stage gates. A1a–A2d are the independently reviewed checkpoints. Their internal schema, wire, locator, native, E/R/V/F, and other implementation slices may have focused reds/greens but are not separate sign-offs and do not block adjacent work through chat-only final bindings.
 
-Security precision belongs in a private authority record, not by silently changing a public compatibility field. For example, watcher identity may use BigInt `dev`/`ino` and nanosecond times while the public snapshot must retain its established numeric `mtimeMs` rounding. When changing stat representations, add a parity test against the old public contract and repeat the race test enough times to cross timestamp-boundary variance.
+Maintain one primary checkpoint and at most one support task that does not modify the same authority. A primary turn must produce an inspectable red, minimal implementation, test result, or explicit blocker. Run focused gates before full suites. Bind an independent checkpoint review to one clean local commit/tree; do not substitute cumulative binary-diff manifests.
 
-## Documentation Discipline
+Only Stage A may receive implementation work. Stage B remains frozen pending the real A→B journey; Stage C/D/E remain blocked. Push, Tag, Release, publication, and distribution remain separately authorized actions.
 
-Before resuming work, read `docs/ROADMAP.md`, `v0/DEVELOPMENT-STATUS.md`, the relevant contract in `docs/`, and `v0/package.json`; source and current test evidence override historical snapshots. Work only inside the single current target version declared by the roadmap. New ideas go to its candidate pool unless they are P0/P1, data-safety issues, or required by the current version's acceptance. In the same change set as every completed feature, review, or verification result, update the status ledger and any affected contract/README/roadmap. Mark old figures as **historical focused evidence** with scope and date—never present them as the current total. Do not begin a follow-up fix from an old TODO until the status ledger confirms it remains open.
+## Documentation and Delegation
 
-The 0.1.2 Navigation, structure, unified-task, real-Electron and author journeys are signed and frozen. The old public Project Plan and retired `submit_project_plan` assets were physically removed in frozen 0.2.0 stage 0; do not restore them. Chapter's internal block planning, normal Changes scope planning, and standalone advanced Research remain valid compatibility capabilities.
+Update roadmap, status, contracts, README, and Nowledge Mem only at a checkpoint opening, independently verified checkpoint close, Stage exit, or scope decision—not after mechanical edits or internal component greens. The current status control block stays concise; detailed rounds and superseded totals go to archive.
 
-Do not use one green row or “module complete” sentence for a composite experience when any required sub-capability is absent. Split status by user-visible boundary—for example single-turn Chat versus conversation continuity, conflict recovery versus trash restore UI, and `edit.md` onboarding versus section-aware context compilation. A Main service without preload/IPC/Renderer access is not an App feature.
+Split delegated work by one independently testable layer: contract, Main service, IPC wiring, Renderer, or verification. Writer and reviewer passes stay separate. Report changed facts, failures, commands, remaining work, and blockers; do not spend repeated turns polling without evidence.
 
-The owner approved `docs/ROADMAP-0.4.0.md` as `WRC-0.4.0-R1` and then submitted its complete target-mode instruction on 2026-08-06. Stage 0 completed as a documentation-only contract/baseline freeze with independent review P0=0, P1=0, P2=4 and no product, test, package, or shrinkwrap changes. Stage A is now current; follow A → B → C → D → E and never resume work from a 0.1.x–0.3.0 TODO or historical target-mode text.
+Module-specific incident rules for watcher/UI ownership, native helpers, packaging, model output, real-author acceptance, and destructive History UX are archived in `docs/archive/engineering/INCIDENT-GUARDRAILS-THROUGH-2026-08-13.md`. Load them only when the current change touches that module; they do not expand current product scope or create new checkpoint gates.
 
-At each durable closeout, compare current `main`, test evidence, README, PRD, architecture, affected contracts and the current status ledger. Search active documents for superseded version/status claims, run `git diff --check`, then update and re-query the same Nowledge authority memory. Do not use archived PDCA, Phase A milestones, or old test totals as current status.
+When shell search text contains Markdown backticks, `$()`, or substitution syntax, pass it as a single-quoted literal. An audit must never execute the text it is searching for.
 
-When a shell search pattern contains Markdown backticks, `$()`, or other substitution syntax, use a single-quoted fixed string or pass the pattern as a literal argument. Never place such documentation text inside a double-quoted shell command; an audit must not execute the content it is searching for.
+## Commit and Pull Request Guidelines
 
-## Delegation & Efficiency Guardrails
+Use concise imperative commits, for example `fix(onboarding): preserve committed state`. Keep source, tests, and affected documentation in the same checkpoint commit. PRs explain user impact, authority/state-machine changes, tests run, and remaining risks; include screenshots for UI changes and never attach secrets or stale release artifacts.
 
-Split delegated work into one independently testable layer: contract, Main service, Main/IPC wiring, Renderer state/UI, or verification. Do not assign an entire cross-layer feature to one lane. Each lane must surface a runnable checkpoint within 5–10 minutes: changed files, tests run, remaining work, and blockers.
-
-Distinguish a tool polling timeout from the lane's 5–10 minute delivery window. A 10-second `wait`/poll result is only a transport checkpoint and must not be treated as a failed review. Give a newly started reviewer one real evidence window (normally 60 seconds first, then a bounded checkpoint request); interrupt or take over only after the agreed delivery window expires without inspectable work. Never spend repeated turns polling an agent that has not produced evidence.
-
-Freeze the failure/state matrix and authority boundary before implementation. Require a minimal runnable result before expanding scope. Report only changed facts, failures, and the next action; avoid repeating full logs. Synchronize `v0/DEVELOPMENT-STATUS.md` and Nowledge Mem at durable milestones—contract freeze, independently verified implementation, and final sign-off—not after every mechanical edit.
-
-Watcher-driven flows must not infer authority from elapsed time. A drained Renderer queue, one observed generation advance, or a stable window is only diagnostic evidence because native events, debounce, and polling fallback can arrive in separate waves. Before minting fresh AI authority, use a Main-owned barrier that waits in-flight polling, forces a new bounded snapshot, drains pending changes, and binds the exact project instance plus mutation generation; scan limits, watcher degradation, project drift, and barrier failure all fail closed. A time window may remain only as a temporary observation fallback and must be recorded as an open P2.
-
-Progress UI is also an ownership boundary. Long-wait copy must describe the actual operation—local undo must never inherit an AI message—and every async progress/busy cleanup must carry an owner token. Unowned recovery-state refreshes may recompute controls but must not replace or release a live owner; project switch and unload explicitly invalidate the old owner. Test both the elapsed-time branch and an old-finally/new-project overlap through the real cross-component callback path.
-
-An owner check after `await helper()` is insufficient when that helper mutates shared state before returning. Every entry-owned helper must receive the exact operation generation and project instance, revalidate them after each internal await and before every state, UI, file, or capability mutation, and release only capabilities it acquired. Race tests must defer the real helper boundary; replacing the helper with a no-op cannot certify stale-result isolation.
-
-Controlled author inputs must not rebuild their DOM node on every character. If a reducer update does not change page structure, update state and only the dependent controls; preserve the same textarea/input identity, focus, selection, and IME composition. A one-shot synthetic `input` test is insufficient—type multiple values and assert node identity, activeElement, caret, and composition behavior. For a two-stage mutation, button copy must expose the whole path while naming the exact authority boundary: the preview button must not imply that a write already occurred, and the final confirmation button must name the write it performs.
-
-Project-root authority starts from a trusted filesystem-root directory fd, not `open(rootPath)`. Keep the absolute canonical path private and bounded; pass it to the native helper only through the startup bind record. Native code must traverse every external component with no-follow `openat`, compare the final identity captured by Main, and rewalk the full root chain before and after each hash batch. A batch-level root drift invalidates the whole batch but may recover on the same worker after the original chain returns. Never claim this proves pre-file-picker selection, atomic `readdir`/`fs.watch`, or protection from a same-UID writer already holding an fd.
-
-After any awaited worker readiness or test hook, recheck close state immediately before writing to child stdin. Filesystem errors at the worker module boundary must map to stable path-free codes even when current callers already redact them; future call sites must not inherit raw absolute-path exceptions.
-
-Committed UI truth must survive optional follow-up decisions. If stage one has already applied `edit.md`, a later “skip initial files” action may settle only the file-creation capability; its terminal preview and status must state that the accepted edit remains committed. Branch copy on the recorded stage-one outcome, not on the stage-two button label, and dynamically test both changed-edit and no-op paths through the real Changes callbacks.
-
-A forced tree walk is not automatically a complete authority scan. If ordinary polling rotates a small hash budget, an explicit flush must use an independent bounded full-Markdown hash budget or fail closed; otherwise a same-size, restored-mtime edit outside the rotation can be missed. Propagate flush failure as an explicit user-visible blocked state—never as an unhandled Renderer rejection.
-
-Leaf-fd identity is not full path authority. An attacker can replace an ancestor while exposing the same hard-linked leaf, so a watcher hash must bind every project-internal ancestor identity and validate it through descriptor-relative traversal before and after the read. Keep the native project-root binding and helper attestation scope explicit: this does not prove the initial root-path open, make enumeration atomic, or eliminate concurrent same-UID fd writes.
-
-Treat native-helper stdout as untrusted input even after a valid response prefix. Catch the complete parse inside the event callback and convert malformed numeric identity or protocol fields into a bounded fail-closed error; an exception must never escape an EventEmitter callback into Electron Main. Bound serialized metadata separately from candidate content bytes. Count the exact header/item/newline bytes incrementally and reject before appending the item to an aggregate payload; mirror the same byte definition and terminal budget error in the native parser.
-
-Packaged and development resource lookup are different contracts. Use packaged helper paths only when `process.resourcesPath` exists **and** `process.defaultApp` is false; verify both a source-tree Electron launch and the packaged App so a local run cannot accidentally search inside Electron.app.
-
-Real Electron harnesses must not let their own infrastructure self-certify. Register a child immediately after spawn; clean it up across discovery, CDP connect/enable/reload/readiness failures; latch both unexpected process exit and CDP failure; check that latch before/after every stage and before the final green line; compare against a fixed expected stage count.
-
-Classify a real-Electron process signal before editing product code. A sandbox-denied GUI launch can exit with `code === null` and `SIGABRT`; rerun the identical probe in the approved unsandboxed GUI context and record both outcomes. Only a failure that reproduces there is product or harness evidence.
-
-When an integration assertion fails after the product boundary already succeeded, verify that the test compares against runtime authority rather than fixture metadata. Preserve the red run, classify the faulty assertion, and rerun only after the test has been corrected; do not patch product code to satisfy an undefined or incidental fixture field.
-
-When replacing a production synchronization primitive, search the test harness and diagnostics for every old wait/read before sign-off. Tests must call the new authority boundary; waiting on a removed private queue can overlap later work and create false performance or stale-state failures.
-
-When retiring a public workflow, update real-Electron selectors, tab matrices, fixture routes, stage names, and the fixed expected-stage count in the same change set. Preserve the first red run as test-drift evidence, but do not repeatedly rerun a harness that still targets removed UI. Any unreachable legacy journey must be explicitly historical and excluded from current sign-off.
-
-For macOS packages, sign nested executable code before the outer App and verify each nested executable independently after ZIP extraction. `codesign --deep` on the outer bundle is not evidence that code stored in an unexpected location is signed. Keep `LSMinimumSystemVersion` aligned with every Mach-O slice, and bind generated native binaries to their source hash in release evidence. Create ZIPs with `ditto --norsrc`, assert there are no `._*` AppleDouble entries, and verify an App extracted by standard `unzip`; a `ditto`-only round trip can hide a broken archive.
-
-For fd-backed preflight, validate the opened descriptor's access mode as well as identity and permissions; adversarial tests must also attack failures after the private artifact is created, not only the pre-create path.
-
-Build evidence is one hash chain, not parallel digests: attest the signed helper during the build, prove the App helper and standard-`unzip` helper equal that digest, and never re-sign the attested helper during outer-App signing.
-
-For destructive filesystem work, an `lstat` followed by path-based `unlink` is not an identity guarantee. Move the path into a private unpredictable transaction quarantine, revalidate inode, size, canonical parent, and content digest, then remove only the quarantined identity. Snapshot deletion must bind content identity as well as inode; same-inode rewrites and late replacements fail closed. Once a mutation is committed, its exact retry truth must outlive the live capability TTL until fsync/partial recovery reaches a terminal state.
-
-When a create syscall does not atomically return an fd, post-open `stat` checks prove only the object currently at the name, not that this process created it. Do not mutate, write receipts, or clean up before eligibility is established. Random names reduce likelihood but do not prove ownership. If the accepted threat model still includes an indistinguishable same-UID replacement, record that residual explicitly and change the protected-parent or privilege architecture before claiming closure; repeated after-the-fact checks are not a substitute for an atomic primitive.
-
-Tests must derive expectations from the production contract, not incidental ordering. If production sorts candidates by metadata, a race/fault injection must target the first candidate actually processed or explicitly control the metadata; never assume fixture creation order. Before changing product code for a next-session failure, first prove whether the failure is implementation drift, environmental variance, or a brittle test assumption.
-
-For strict structured model output, repeated real failures after prompt tightening mean the generation protocol is wrong, not that the prompt needs another adjective. Prefer a provider-supported structured channel with one complete schema over free-form large JSON. Count every raw `tool_use` block before validating the matching one; keep Main exact-key, array, path, dependency, revision and resource validation; never strip, extract or coerce a plausible value locally. Retry and token behavior are feature-contract decisions, not generic defaults. The retired `submit_project_plan` protocol and `verify:plan:historical` command are archive evidence only and must not be revived or used for current sign-off.
-
-Do not make a model reproduce canonical evidence authority that Main already owns. Paths, complete heading hierarchies and verbatim quotes are brittle structured outputs: one harmless punctuation or whitespace change can invalidate an otherwise useful result. Main must build a bounded, revision-bound catalog of non-code evidence blocks, expose only request-local reference IDs in the dynamic tool schema, and let the model select those IDs. Main then restores path, heading, quote, locator and revision from the frozen catalog. Unknown, duplicate, cross-request or stale references fail closed; prompt tightening and local quote repair are not substitutes.
-
-Reference fields need field-level semantics, not only a string length. Put exact ID patterns, prior-reference instructions, and uniqueness into the tool schema and prompt, then validate the same raw identifier in Main without trimming. A schema-valid value must not trigger a paid retry solely because Main applies a stricter undocumented normalization.
-
-Provider token capacity must close over the largest legal structured output. Do not rely on a `thinking` default or a prompt request for brevity, especially when China and international compatibility documentation differ or a parameter may be ignored. Give generation its own enforceable item and field limits, mirror them in Main and Renderer, and build a maximum-count/maximum-length Unicode fixture that stays inside the frozen envelope while retaining required multi-target behavior. A real `stop_reason=max_tokens` is terminal even when a tool block looks complete: do not auto-retry it, accept a partial result, or raise a shared token ceiling.
-
-When claiming a maximum serialized JSON envelope, exclude escape amplification at both the schema and Main parser boundaries. C0 controls and unpaired UTF-16 surrogates may serialize as six-byte `\uXXXX` sequences even when JavaScript `length` reports one; reject them explicitly, retain valid surrogate pairs such as emoji, and test both the maximum accepted fixture and the hostile escaped cases.
-
-Test-only helper bind and ordinary recovery budgets must be distinguished from injected operation deadlines. A one-second helper bind budget can fail only under the full compile/spawn load while focused tests stay green; preserve the red run, keep the production timeout unchanged, name the broader test bind/recovery budget accurately, and retain the short post-readiness deadline that creates the intended crash or unknown outcome. Do not call a shared test worker timeout “startup-only” when it also bounds ordinary requests.
-
-Real-author acceptance is an explicit privacy boundary. Validate only an author-selected project; never crawl unrelated home folders to find a convenient manuscript. Preflight must remain read-only and path/content-free, and testing must use an isolated working copy whose source snapshot is proven unchanged. Synthetic fixtures can verify mechanics but can never count as author evidence.
-
-An isolated npm/App profile also isolates credential configuration. Before a real AI acceptance journey, preflight only the public configured/not-configured status for the exact profile that will launch the App; never read, copy, print, or silently migrate the Key. A sub-100 ms `NO_KEY` failure is pre-provider evidence, not a provider/model-quality failure. Preserve zero-write evidence, switch to an already authorized configured profile or let the owner configure it, and record any generic Renderer fallback that hides the stable error code as a UX defect.
-
-A stable pre-provider error must lead to an executable recovery action, not a generic retry. For `NO_KEY`, state that no AI call or file write occurred, open the existing Settings surface, and preserve the in-progress author form across that detour. Test the error copy, action routing, and retained draft together.
-
-A fresh author copy may legitimately inherit private `.writcraft` History and metrics from its source. Bind journey evidence to the copy manifest `createdAt`: only later events and History entries count as the fresh run. Report inherited totals separately or omit them; never inflate a real-author sample with pre-copy activity.
-
-Opening that copy may immediately update private `.writcraft/workspace.json` for tabs, current file, or scroll restoration. Therefore the post-launch whole-tree digest is not a manuscript zero-write oracle. Prove preview safety with exact Markdown hashes, post-manifest History/recovery counts, and the unchanged source snapshot; record the private workspace-only delta separately.
-
-Destructive History UX must identify the exact target at the decision point. Mark the newest record, name single-file paths directly, and warn separately when an author selects a non-latest record or `edit.md` because that changes the Project Prompt used by later AI calls. A generic file count, identical button labels, or a confirmation that omits the target is a P1 anti-misoperation gap; a green storage transaction does not make the user journey safe.
-
-Progress UI is part of the operation authority boundary. A local History undo must never reuse AI-generation copy or leave an AI timer/generation flag alive after its promise settles. Name the actual operation, state whether AI/network is involved, and clear timers, busy controls, and generation state on every success, failure, cancellation, and recovery path. Real-Electron tests must assert both the terminal status and the absence of stale in-flight UI.
-
-For filesystem copy/publish workflows, freeze the complete read/copy/commit matrix before implementing the happy path. Eligibility and copied bytes must come from one authoritative snapshot; bind every source ancestor and destination parent/stage identity; make the final source recheck the last pre-commit action; publish with atomic no-clobber semantics; and reconcile committed-then-threw outcomes from disk. `O_NOFOLLOW` protects only the final path component, and `existsSync` followed by `renameSync` is neither ancestor-safe nor no-clobber. Add adversarial tests for each boundary before treating full-suite green as sign-off.
-
-Treat an external filesystem helper as a three-state transaction: proven uncommitted, proven committed, or unknown. If both the primary result and independent reconciliation are unavailable, report committed-risk and never enter precommit cleanup. Moving work into a native helper does not make `mkdir→open` atomic; attack the exact syscall gap or document the residual explicitly. Random names reduce likelihood but do not prove inode ownership.
-
-The private recovery directory is part of transaction authority, not incidental storage. Validate its owner and permissions in both Main and the native helper; validate marker/receipt identity and metadata before reading or removing them. Return `UNCOMMITTED` only after stage and control cleanup plus directory fsync all succeed. After a committed mutation, acknowledge and release the shared write lease only after authoritative file state, generation, and tree state are installed; a warning is not permission to discard recovery truth.
-
-Never erase a red integration run with a green retry. Record both, inspect the failed boundary, and keep a flake as an explicit P2/TODO until its timing cause is explained or repeated clean runs justify closing it. A retry is evidence about nondeterminism, not proof that the first failure was harmless.
-
-## Commit & Pull Request Guidelines
-
-Local Git history begins with the 2026-07-26 V0 baseline, so it does not describe earlier development conventions. Use concise imperative commits, for example `fix(onboarding): preserve committed state`. Keep source, tests, and affected documentation in the same commit. PRs should explain user impact, authority/state-machine changes, tests run, and remaining risks; include screenshots for UI changes and never attach secrets or stale release artifacts.
-
-The public GitHub remote is `https://github.com/MaxHou-infinity/WritCraft.git`, with local `main` tracking `origin/main`. A local commit or merge is still not public until its exact commit is pushed and verified on GitHub. Never change repository visibility, rewrite public history, publish a release, or push credentials/artifacts without explicit authorization.
+The public remote is `https://github.com/MaxHou-infinity/WritCraft.git`, with local `main` tracking `origin/main`. A local commit is not public until its exact commit is pushed and verified. Never rewrite public history, change repository visibility, publish a release, or push credentials/artifacts without explicit authorization.

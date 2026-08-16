@@ -3,7 +3,7 @@
 > 合同编号：`WRC-EVIDENCE-DELIVERY-V1`
 > 适用版本：`writ-craft@0.4.0`
 > 冻结日期：2026-08-06
-> 状态：**阶段 0 已冻结并经独立复审签收（P0=0、P1=0、P2=4）；阶段 A 可按本合同开始实现**
+> 状态：**阶段 0 已冻结并经独立复审签收（P0=0、P1=0、P2=4）；阶段 A 进行中。A-R1.1 首红 P0=0/P1=7/P2=1，A-R1.2 为 P0=0/P1=4/P2=1，A-R1.3 为 P0=0/P1=2/P2=0，A-R1.4 已由同一独立复审员以 P0=0/P1=0/P2=0 签收；native/storage 实现门禁已解锁，但阶段 A、App 与真实作者验收均未完成**
 > 上位合同：`docs/ROADMAP-0.4.0.md`（`WRC-0.4.0-R1`）
 
 本合同冻结 0.4.0 的 Snapshot、选择性恢复、交付预检、引用健康度、DOCX、Graph 多视图和真实渲染边界。它不授权发布，也不把现有 History、Diagnostic Export、SourceIndex、Citation、Graph v2、Image Trash 或 0.3.0 AI task 包装成新能力。
@@ -56,14 +56,17 @@ exact-key 集合冻结为：
 
 所有嵌套、事务、capability 与 public projection 的 exact keys 均在 3.1.1–3.1.5 冻结；生产解析器拒绝任何额外键。上述私有 manifest 可包含安全事务所需的完整身份摘要；public projection 不能返回 root identity、ancestor identity、source object identity、输出路径或任何 capability 原文。“正文”特指段落/行级作者内容，唯一例外是 3.1.3 的 Main 生成、有界 snapshot Diff `line.text`；Main 生成的有界标题 `outline.text` 与显示标签 `subjectLabel` 是 metadata，不是正文例外。Renderer 始终不得提交正文。
 
-所有 authority/manifest/receipt 使用 exact-key 普通对象、UTF-8 和 RFC 8785 风格的确定性 JSON：对象键按 Unicode code point 升序，数组保持合同顺序，禁止浮点、`undefined`、非有限数、C0 control 和 unpaired surrogate；摘要为 `sha256:` 加 64 位小写十六进制。项目相对路径是来源文件系统返回并由 Main 校验的 opaque NFC-agnostic identity，不做 NFKC、大小写折叠或 trim；显示文本的规范化不得改变 path/source identity。
+所有 authority/manifest/receipt 使用 exact-key 普通对象、UTF-8 和 RFC 8785 风格的确定性 JSON：对象键按 Unicode code point 升序，数组保持合同顺序，禁止浮点、`undefined`、非有限数、C0 control 和 unpaired surrogate；U+007F 不在该禁止集，parser 不得额外拒绝；摘要为 `sha256:` 加 64 位小写十六进制。项目相对路径是来源文件系统返回并由 Main 校验的 opaque NFC-agnostic identity，不做 NFKC、大小写折叠或 trim；显示文本的规范化不得改变 path/source identity。parser 必须先证明对象是无 getter/accessor 的 plain data record，再读取包括 `schema` 在内的任何字段。
 
 阶段 A 必须把本节已冻结的 schema 写成代码常量和 hostile fixture；不能自行增删字段、接受额外字段、局部 schema 或解析后再修补的值。任何 schema 变更必须先回到本合同复审。
 
 #### 3.1.1 嵌套 exact-key 与类型
 
 - `budgets`：`limits`、`observed`。`limits` exact keys 为 `maxMarkdownFiles`、`maxImageFiles`、`maxTotalItems`、`maxMarkdownFileBytes`、`maxMarkdownTotalBytes`、`maxImageFileBytes`、`maxSnapshotBytes`、`maxManifestBytes`、`maxControlRecordBytes`、`maxPrivateMetadataBytes`；`observed` exact keys 为 `markdownFiles`、`imageFiles`、`totalItems`、`markdownBytes`、`imageBytes`、`snapshotBytes`、`manifestBytes`、`privateMetadataBytes`。全部为非负安全整数。
-- file `references` item：`fromFileId`、`tokenOrdinal`、`locatorDigest`；最多 2000 项/图片。
+- file `references` item：`fromFileId`、`tokenOrdinal`、`locatorDigest`；只有 `kind=image` 的 file item 可携带，最多 2000 项/图片，且每个 `fromFileId` 必须指向同一 manifest 内的 `kind=markdown` file item；Markdown item 的 `references` 必须是空数组。
+- snapshot image-token pass envelope：`schema`（`writcraft.snapshot-image-token-pass/v1`）、`transactionId`、`parserId`、`candidates`；`parserId` exact 值冻结为 `marked@18.0.6+sha256:62ad5de5bea6d79b4c47e5c0b5cbe4be61e25ee8994595c2cc0969b2a144cc5d`。candidate exact keys 为 `candidateId`、`captureDigest`、`fileId`、`revision`、`tokens`；token exact keys 为 `tokenOrdinal`、`rawTokenSha256`、`hrefUtf8Base64`、`locatorDigest`。candidate 必须与 helper 本次 sealed capture 一一对应、按 native 签发顺序排列且最多 300 项；`captureDigest` 是 3.1.5 的完整 Markdown sealed-capture payload 摘要，同一 pass 的全部 candidate 必须逐字相同。`tokenOrdinal` 是固定选项下 `marked.walkTokens` 深度优先访问**全部** token 时从 0 开始的全局序号，不是 image-only 序号，tokens 按该值严格递增。`rawTokenSha256` 绑定 token 的 exact UTF-8 `raw`，`hrefUtf8Base64` 绑定 marked 已解析的 exact `href` UTF-8 bytes；单个 raw href 继承 3.1.5 的 4096-byte URL 上限，超过即为 token-pass budget failure，不能截断、只留 digest 或静默丢弃。helper 不信任 Main 的路径判断，必须按下一段独立解析并绑定来源。全部 sealed Markdown exact bytes 仍须同时满足 300 文件/单文件 4 MiB/合计 64 MiB；整个 pass 最多 10,000 个 image token、确定性 JSON 最多 4 MiB，并计入 8 MiB 私有事务元数据预算。shared adapter 必须在 tokenization 前累计 sealed input bytes，并在组装过程中增量计算输出 envelope 预算；任一超限都在返回 authority 前 fail closed。
+
+图片 `href` 由 shared tokenizer 原样绑定，native 再把它分类为 eligible project image 或 excluded/unavailable reference；token pass 必须保留全部 marked image token，不能因为 href 类别而丢弃 token 或把 Stage B blocker 提前升级为 snapshot 创建失败。eligible path 是相对于其 `fromFileId` Markdown 所在目录的 source-relative URL path：fragment 不参与文件 path；helper 对 URL path 只做一次严格 UTF-8 percent decode，再从已持有的 Markdown parent fd 逐段 descriptor-relative 解析 `.`/`..`。允许既有 `chapters/*.md` 引用 `../assets/generated/*`，但 canonical resolution 必须始终由可信 root fd 约束且最终仍在项目根内；每个外部 component 都 no-follow。空值、scheme/network path、query、反斜线、NUL、绝对路径、非法/非 UTF-8 percent encoding、越出 root、隐藏/排除 component、不受支持扩展、missing leaf 或 symlink 只被分类为 excluded/unavailable，不读取、不复制、不写入 manifest 图片项；其 exact token identity/href 仍由 immutable Markdown 保留，阶段 B 从同一 parser authority 重建对应 blocker。只有 token-pass schema/identity/digest/预算损坏、eligible 来源在复制期间漂移或权威 scan 失败才使 snapshot 创建 fail closed。Main/Renderer 不做路径 canonicalization，也不能把 token href 改写后重试。
 - `revisionBinding`：`fileRevisionSetDigest`、`subjectRevision`、`locatorDigest`、`quoteSha256`；不可适用字段必须为 `null`，不能省略。
 - health `evidence` item：`evidenceId`、`fileId`、`revision`、`blockId`、`start`、`end`、`quoteSha256`、`contentSha256`；最多 100 项，offset 为安全整数且 `0 <= start < end`。
 - delivery `selectedFiles` item：`fileId`、`revision`、`sha256`、`order`、`pageBreakBefore`；`order` 从 0 连续递增。
@@ -83,6 +86,7 @@ exact-key 集合冻结为：
 - delete transaction：`schema`、`transactionId`、`projectInstanceId`、`snapshotId`、`ownerGeneration`、`state`、`sourceIdentityDigest`、`quarantineIdentityDigest`、`snapshotManifestDigest`、`createdAt`、`updatedAt`、`receiptDigest`、`lastErrorCode`；state 同样只允许三态加 `PREPARING`。
 - delete receipt：`schema`（`writcraft.snapshot-delete-receipt/v1`）、`transactionId`、`snapshotId`、`deletedIdentityDigest`、`snapshotManifestDigest`、`directoryFsyncComplete`、`committedAt`、`receiptDigest`。delete recovery：`schema`（`writcraft.snapshot-delete-recovery/v1`）、`transactionId`、`snapshotId`、`expectedManifestDigest`、`expectedDeletedIdentityDigest`、`state`、`updatedAt`、`markerDigest`。
 - comparison：`schema`、`projectInstanceId`、`snapshotId`、`snapshotManifestDigest`、`currentMutationGeneration`、`currentFileRevisionSetDigest`、`items`、`createdAt`、`comparisonDigest`。item exact keys：`fileId`、`kind`、`status`、`snapshotRevision`、`currentRevision`、`snapshotSha256`、`currentSha256`、`byteDelta`、`diffId`；不可适用值必须为 `null`。
+- snapshot restore result：`schema`（`writcraft.snapshot-restore-result/v1`）、`projectInstanceId`、`snapshotId`、`restoreCapabilityId`、`task`、`history`。`task` 必须是 3.1.3 的 terminal local-task；`history` exact keys 为 `operationId`、`outcome`、`status`、`affectedPaths`、`historyEntryId`、`recoveryRequired`、`responseRecovered`、`committedWarning`，不可适用字符串为 `null`，布尔值不得省略。`affectedPaths` 只由 Main 从 sealed selection 恢复为公开相对 Markdown path；Renderer 不提交 path。该 envelope 是 restore commit 的唯一直接返回值，Renderer 用它进入既有 Changes/History authoritative reconciliation；create/delete commit 直接返回 terminal local-task 后重新 list，不发明自由结构 `{ok,message}`。
 - DOCX artifact：`schema`（`writcraft.docx-artifact/v1`）、`artifactId`、`projectInstanceId`、`snapshotId`、`authorityDigest`、`deliveryManifestDigest`、`byteLength`、`sha256`、`packageReportDigest`、`createdAt`、`expiresAt`、`artifactDigest`。
 - DOCX save target binding（仅 private profile recovery store，`0700/0600`，永不进入 Renderer/日志）：`schema`（`writcraft.docx-save-target-binding/v1`）、`bindingId`、`absoluteTargetPath`、`parentChainDigest`、`finalBasename`、`stageBasename`、`volumeIdentityDigest`、`createdAt`、`bindingDigest`；path 最多 4096 UTF-8 bytes，basename 最多 255 bytes，禁止 NUL，bindingDigest 排除自身后按 3.1.4 计算。
 - DOCX save transaction：`schema`（`writcraft.docx-save-transaction/v1`）、`transactionId`、`artifactId`、`ownerGeneration`、`state`、`artifactDigest`、`targetBindingDigest`、`stageIdentityDigest`、`expectedPublishedIdentityDigest`、`publishedIdentityDigest`、`createdAt`、`updatedAt`、`receiptDigest`、`lastErrorCode`；不可适用 digest 为 `null`。save receipt `writcraft.docx-save-receipt/v1` exact keys：`schema`、`transactionId`、`artifactId`、`targetBindingDigest`、`publishedIdentityDigest`、`artifactDigest`、`directoryFsyncComplete`、`committedAt`、`receiptDigest`。save recovery `writcraft.docx-save-recovery/v1` exact keys：`schema`、`transactionId`、`artifactId`、`targetBindingDigest`、`expectedArtifactDigest`、`stageIdentityDigest`、`expectedPublishedIdentityDigest`、`state`、`updatedAt`、`markerDigest`。
@@ -104,7 +108,7 @@ exact-key 集合冻结为：
 - snapshot diff page envelope：`schema`（`writcraft.snapshot-diff/v1`）、`projectInstanceId`、`snapshotId`、`diffId`、`fileId`、`pageIndex`、`pageCount`、`hunks`、`nextPageToken`、`truncated`。hunk：`oldStart`、`oldLines`、`newStart`、`newLines`、`lines`；line：`kind`（`context|delete|insert`）、`text`。这是 public projection 唯一允许返回的作者正文，必须由 Main 从绑定的 snapshot/current bytes 生成；每页最多 256 KiB、单文件完整 diff 最多 32 MiB、单次 comparison 全部完整 diff 最多 256 MiB。next token 是 compare capability 内的 opaque cursor，最后一页为 `null`；任何输出超限才设 `truncated=true`，该文件禁止签发 restore capability，不能把分页本身称为截断。
 - delivery preflight envelope：`schema`（`writcraft.delivery-preflight/v1`）、`projectInstanceId`、`snapshotId`、`authorityDigest`、`selectedFiles`、`outline`、`health`、`blockers`、`warnings`、`canExport`、`exportCapabilityId`；public selected file 为 `fileId`、`displayPath`、`order`，public outline 为 `outlineId`、`fileId`、`level`、`text`、`ordinal`。public health item 为 `healthId`、`type`、`severity`、`reasonCode`、`subjectLabel`、`evidenceSummaries`、`nextAction`；evidence summary 为 `fileId`、`displayPath`、`locatorDigest`，nextAction 只允许 `ADD_SOURCE`、`REVIEW_LOCATOR`、`MERGE_SOURCE`、`ADD_EVIDENCE`、`FIX_FOOTNOTE`。阻断/partial/stale 时 `exportCapabilityId` 必须为 `null`。
 - DOCX artifact public envelope：`schema`（`writcraft.docx-artifact-public/v1`）、`projectInstanceId`、`snapshotId`、`artifactId`、`byteLength`、`sha256`、`warnings`、`createdAt`、`expiresAt`、`artifactCapabilityId`；只有 build terminal truth 为 committed 且 package report valid 才返回非空 capability。
-- local task envelope：`schema`（`writcraft.local-task/v1`）、`taskId`、`projectInstanceId`、`kind`、`stage`、`status`、`startedAt`、`elapsedMs`、`cancelAvailable`、`terminalTruth`、`errorCode`；不返回 AI attempt、root、正文、target 或 capability。
+- local task envelope：`schema`（`writcraft.local-task/v1`）、`taskId`、`projectInstanceId`、`kind`、`stage`、`status`、`startedAt`、`elapsedMs`、`cancelAvailable`、`terminalTruth`、`errorCode`；不返回 AI attempt、root、正文、target 或 capability。Stage A 的 `kind` 只允许 `SNAPSHOT_CREATE|SNAPSHOT_COMPARE|SNAPSHOT_RESTORE|SNAPSHOT_DELETE`；`status` 只允许 `queued|running|cancelling|completed|failed`；`stage` 只允许 `preparing|settling_watcher|scanning_sources|writing_private_bundle|publishing_bundle|reconciling|reading_snapshot|comparing|preparing_restore|restoring_markdown|quarantining_snapshot|deleting_snapshot|completed`。`queued|running|cancelling` 时 `terminalTruth=null`、`errorCode=null` 且 stage 不得为 `completed`；terminal 时 stage 必须为 `completed`，`terminalTruth` 只允许 `UNCOMMITTED|COMMITTED|COMMITTED_RISK|UNKNOWN`，成功 `COMMITTED` 的 `errorCode=null`，其余 terminal 必须给稳定、无路径 ASCII error code。`cancelAvailable` 仅能在已运行至少 10 秒、`status=running` 且 stage 属于 `preparing|settling_watcher|scanning_sources|writing_private_bundle|reading_snapshot|comparing|preparing_restore` 时为 `true`；其他 status/stage、`elapsedMs < 10000`、`publishing_bundle|restoring_markdown|quarantining_snapshot|deleting_snapshot|reconciling|completed` 均必须为 `false`。创建与恢复 120 秒、比较 60 秒的 deadline 是 task owner 的终止请求，不把 rename 后超时推断成 `UNCOMMITTED`。
 
 operation request exact schemas：
 
@@ -128,28 +132,54 @@ operation request exact schemas：
 - `manifestDigest` 排除 delivery manifest 的 `manifestDigest`，保留完整 authority；
 - `receiptDigest`、`markerDigest`、`comparisonDigest` 分别只排除其同名最外层字段；
 - `fileRevisionSetDigest` 的 schema 域为 `writcraft.file-revision-set/v1`，payload exact keys 为 `schema`、`items`，item 为按 path byte order 排序的 `fileId`、`path`、`revision`、`sha256`；
-- `rootIdentityDigest`、`ancestorIdentityDigest`、`sourceObjectIdentityDigest` 和 locator digest 使用各自 `writcraft.*-identity/v1` exact-key payload，原始设备/inode/path 只留在私有 helper 进程与私有记录，不进入 public projection；`bundleObjectDigest` 只使用 3.1.5 的 bundle object payload。
+- `rootIdentityDigest`、`ancestorIdentityDigest`、`sourceObjectIdentityDigest` 和 locator digest 使用各自 `writcraft.*-identity/v1` exact-key payload，原始设备/inode/path 只留在私有 helper 进程与私有记录，不进入 public projection；snapshot 图片引用的 locator 单独使用本节冻结的 `writcraft.snapshot-image-token-locator/v1`，不伪造 block/offset locator；`bundleObjectDigest` 只使用 3.1.5 的 bundle object payload。
 
 Main JavaScript 与 native helper 必须对同一 golden/hostile Unicode fixture 产生逐字节相同的 preimage 与 digest；任何无法复现的 digest 都按损坏处理，不能本地修补。
 
 #### 3.1.5 Identity payload、字段上限与 bundle bytes
 
 - root identity payload `writcraft.root-identity/v1`：`schema`、`dev`、`ino`、`uid`、`mode`；ancestor payload `writcraft.ancestor-identity/v1`：`schema`、`components`，component 为 `nameSha256`、`dev`、`ino`、`uid`、`mode`；object payload `writcraft.object-identity/v1`：`schema`、`dev`、`ino`、`uid`、`mode`、`nlink`、`size`、`mtimeNs`、`ctimeNs`、`contentSha256`；locator payload `writcraft.locator-identity/v1`：`schema`、`fileId`、`revision`、`blockId`、`start`、`end`、`quoteSha256`。`dev/ino/size/mtimeNs/ctimeNs` 永远编码为无符号、无前导零的十进制字符串（零只写 `"0"`）；`uid/mode/nlink/start/end` 永远为非负安全整数，禁止同一字段混用 number/string。
+- snapshot image-token locator payload `writcraft.snapshot-image-token-locator/v1`：`schema`、`fileId`、`revision`、`tokenOrdinal`、`rawTokenSha256`、`hrefSha256`；摘要仍按 3.1.4 domain-separated canonical digest。它只证明 exact snapshot Markdown token 身份，不冒充可跳转的 block/UTF-16 range；阶段 B/D 如需跳转，必须从同一 immutable snapshot 与同一 parser authority 重建并校验受限 UI locator，不能从 ordinal 猜 offset。
+- Markdown sealed-capture payload `writcraft.snapshot-capture-identity/v1`：`schema`、`transactionId`、`projectInstanceId`、`snapshotId`、`ownerGeneration`、`creationMutationGeneration`、`rootIdentityDigest`、`candidates`；candidate exact keys 为 `candidateId`、`fileId`、`revision`、`byteLength`、`sha256`、`ancestorIdentityDigest`、`sourceObjectIdentityDigest`，按 native scan 的 path-byte order 对应顺序排列且最多 300 项。`captureDigest` 是该完整 payload 的 3.1.4 external-binding digest，不删除任何字段；原始 path 只在 native 私有 scan record 中，不能进入 Main/Renderer token pass。helper 必须在发送 exact bytes 前持久绑定并复算该 payload；Main 只能原样回传 digest，不能生成或修补它。
 - `projectInstanceId` 严格复用 `^instance_[a-f0-9]{24}$`；schema/reason/status/kind/confirmation 最多 96 ASCII bytes；opaque ID 最多 128 ASCII bytes；digest 固定 71 ASCII bytes（`sha256:` + 64 hex）；相对 path 最多 4096 UTF-8 bytes/1024 scalar；display path/title/label/alt/caption/nextAction 各最多 1024 UTF-8 bytes/512 scalar；URL 最多 4096 bytes；单个 Diff line text 最多 64 KiB，全部 Diff 仍受 3.1.3 总预算。超限不截断权威字段；display-only 字段可带显式 `truncated=true` 的对应 public schema，未含该键的 schema 不允许静默截断。
 - bundle bytes 固定为：8-byte magic `57 43 53 42 01 00 00 00`；4-byte unsigned big-endian manifest length；manifest canonical UTF-8 bytes；4-byte unsigned big-endian entry count；随后按 manifest path UTF-8 byte order逐项写入 `4-byte header length + canonical UTF-8 entry header + 8-byte unsigned big-endian content length + exact content bytes`；最后写 32-byte raw SHA-256（覆盖 magic 到最后 content）与 8-byte footer `57 43 53 42 45 4e 44 01`。无 padding、对齐、可选字段或重复项。
 - bundle entry header schema `writcraft.snapshot-bundle-entry/v1`，exact keys 为 `schema`、`fileId`、`path`、`kind`、`byteLength`、`sha256`；kind 只允许 `markdown|image`。header 与 manifest item 必须逐项一致；entry count 最多 500，manifest/header 各最多 4 MiB，content 合计最多 512 MiB，bundle 总长最多 520 MiB。任何 length 溢出、trailing byte、顺序差异、duplicate ID/path、footer/hash 不符或未完整消费都按损坏拒绝。
-- `sourceObjectIdentityDigest` 是 3.1.5 object identity payload 的 3.1.4 摘要；published identity payload `writcraft.snapshot-published-identity/v1` exact keys 为 `schema`、`dev`、`ino`、`uid`、`mode`、`nlink`、`size`、`bundlePayloadSha256`、`snapshotManifestDigest`。
+- `sourceObjectIdentityDigest` 是 3.1.5 object identity payload 的 3.1.4 摘要。
+- `root-identity`、`ancestor-identity` 与 `object-identity` 不是只供命名的 key 列表：JS/native 都必须用 3.1.5 exact 类型、canonical 大整数和 hostile fixture 完整校验并复现摘要。任何接收 `parentIdentityDigest` 的 stage/published/quarantine validator 必须同时接收已验证 parent payload，重算 digest，并分别要求 parent role 为 `control|bundles|quarantine`；只检查 digest 字符串形状不构成 authority。
+- private parent identity payload `writcraft.snapshot-private-parent-identity/v1` exact keys 为 `schema`、`role`、`rootIdentityDigest`、`dev`、`ino`、`uid`、`mode`；`role` 只允许 `control|bundles|quarantine`。它由 helper 在已绑定项目根 fd 下逐级 `openat(O_DIRECTORY|O_NOFOLLOW)` 后生成，不能从 path `stat` 拼装。
+- snapshot stage identity payload `writcraft.snapshot-stage-identity/v1` exact keys 为 `schema`、`transactionId`、`snapshotId`、`parentIdentityDigest`、`stageBasenameSha256`、`dev`、`ino`、`uid`、`mode`、`nlink`、`size`、`bundlePayloadSha256`、`snapshotManifestDigest`；parent 必须是 role=`control` 的 exact private parent。
+- published identity payload `writcraft.snapshot-published-identity/v1` exact keys 为 `schema`、`snapshotId`、`parentIdentityDigest`、`finalBasenameSha256`、`dev`、`ino`、`uid`、`mode`、`nlink`、`size`、`bundlePayloadSha256`、`snapshotManifestDigest`；parent 必须是 role=`bundles` 的 exact private parent。delete transaction 的 `sourceIdentityDigest` 必须逐字等于 create receipt 持有的该 `publishedIdentityDigest`，不能重新发明 source payload。
+- snapshot quarantine identity payload `writcraft.snapshot-quarantine-identity/v1` exact keys 为 `schema`、`transactionId`、`snapshotId`、`parentIdentityDigest`、`quarantineBasenameSha256`、`dev`、`ino`、`uid`、`mode`、`nlink`、`size`、`bundlePayloadSha256`、`snapshotManifestDigest`；parent 必须是 role=`quarantine` 的 exact private parent。delete transaction 的 `quarantineIdentityDigest` 使用该 payload；delete receipt 的 `deletedIdentityDigest` 必须逐字等于 unlink 前最后一次完整重检得到的 `quarantineIdentityDigest`，不存在第四种 deleted identity 算法。
 - `bundleObjectDigest` 的 exact preimage 为 `UTF8("writcraft-snapshot-object/v1") || byte(0x00) || uint32be(headerByteLength) || headerCanonicalUtf8 || uint64be(contentByteLength) || exactContentBytes`；结果使用 `sha256:` + 64 hex。禁止省略长度、改用 JSON array/base64 或复用 3.1.4 object-with-digest 算法。
 - snapshot entry binding schema `writcraft.snapshot-entry-binding/v1` exact keys 为 `schema`、`snapshotId`、`bundlePayloadSha256`、`fileId`、`bundleObjectDigest`、`contentOffset`、`contentLength`、`entryBindingDigest`；offset/length 为非负安全整数，`entryBindingDigest` 排除自身后按 3.1.4 计算。它只由完整验证 bundle header/order/footer/hash 的 parser 产生。
 - save volume identity payload `writcraft.save-volume-identity/v1` exact keys 为 `schema`、`deviceId`、`fsid0`、`fsid1`、`mountFlags`；`deviceId` 是无符号无前导零十进制字符串，`fsid0/fsid1` 是 macOS `int32_t` 原值的有符号十进制字符串（范围 `-2147483648..2147483647`，零只写 `"0"`，非零禁止前导零），`mountFlags` 是非负安全整数。save parent chain `writcraft.save-parent-chain/v1` exact keys 为 `schema`、`volumeIdentityDigest`、`components`，component 为 `nameSha256`、`dev`、`ino`、`uid`、`mode`；save stage identity `writcraft.save-stage-identity/v1` exact keys 为 `schema`、`parentChainDigest`、`stageBasenameSha256`、`dev`、`ino`、`uid`、`mode`、`nlink`、`size`、`artifactDigest`；expected/actual published identity 共用 schema `writcraft.save-published-identity/v1` 与 exact keys `schema`、`parentChainDigest`、`finalBasenameSha256`、`dev`、`ino`、`uid`、`mode`、`nlink`、`size`、`artifactDigest`。其余 native 大整数沿用 3.1.5 unsigned 十进制字符串规则，所有 digest 均按 3.1.4 计算；expected 与 actual 必须逐字段相同。
+
+#### 3.1.6 Snapshot transaction 状态与 nullability（A-R1.1）
+
+所有 transaction/recovery 字段始终存在；本节只允许明确列出的 `null`。receipt schema 只表示已证明 `COMMITTED` 的终态，不为失败伪造 receipt。
+
+| record / state | 必须非 null | 必须为 null |
+|---|---|---|
+| create transaction `PREPARING` | `snapshotManifestDigest` | `receiptDigest`、`lastErrorCode`；`stageIdentityDigest` 在 stage 首次合格 `fstat` 前为 null、随后必须为 digest |
+| create transaction `UNCOMMITTED` | `snapshotManifestDigest`、`lastErrorCode` | `receiptDigest`；`stageIdentityDigest` 可为 null（从未创建）或保留已清理 exact stage digest |
+| create transaction `COMMITTED` | `stageIdentityDigest`、`snapshotManifestDigest`、`receiptDigest` | `lastErrorCode` |
+| create transaction `UNKNOWN` | `snapshotManifestDigest`、`lastErrorCode` | `receiptDigest`；`stageIdentityDigest` 可为 null 或 digest |
+| delete transaction `PREPARING` | `sourceIdentityDigest`、`snapshotManifestDigest` | `quarantineIdentityDigest`、`receiptDigest`、`lastErrorCode` |
+| delete transaction `UNCOMMITTED` | `sourceIdentityDigest`、`snapshotManifestDigest`、`lastErrorCode` | `receiptDigest`；`quarantineIdentityDigest` 可为 null 或保留已回滚 exact quarantine digest |
+| delete transaction `COMMITTED` | `sourceIdentityDigest`、`quarantineIdentityDigest`、`snapshotManifestDigest`、`receiptDigest` | `lastErrorCode` |
+| delete transaction `UNKNOWN` | `sourceIdentityDigest`、`snapshotManifestDigest`、`lastErrorCode` | `receiptDigest`；`quarantineIdentityDigest` 可为 null 或 digest |
+
+create/delete recovery marker 的 `state` 只允许 `PREPARING|UNCOMMITTED|COMMITTED|UNKNOWN`。Create marker 的 `expectedPublishedIdentityDigest` 在完整 stage fsync + held-fd 重检之前为 null，之后必须为 digest；delete marker 的 `expectedDeletedIdentityDigest` 在 quarantine reopen + full bundle/manifest 重检前为 null，之后必须为 digest。`COMMITTED` marker 的 expected digest 必须非 null 且与 receipt 对应 identity 相同；`UNCOMMITTED` 只能在 exact owned stage/quarantine cleanup 或 source rollback、final state 重检与全部所需目录 fsync 完成后持久化；`UNKNOWN` 不允许清理任何可能已提交的 final。所有 identity digest 使用 3.1.4 + 本节/3.1.5 exact payload，并加入 JS/native golden 与 hostile fixture。
 
 ### 3.2 Allowlist 与预算
 
 V1 只纳入以下字节：
 
-1. 非隐藏、项目内普通文件的 `.md` 或 `.markdown`（扩展名匹配大小写不敏感），包括 `edit.md`、`chapters/**/*.{md,markdown}`、`references/**/*.{md,markdown}` 和作者创建的其他公开 Markdown；
+1. 非隐藏、项目内普通文件的 `.md` 或 `.markdown`（扩展名匹配大小写不敏感），包括 `edit.md`、`chapters/**/*.{md,markdown}`、`references/**/*.{md,markdown}` 和作者创建的其他公开 Markdown；其 exact bytes 必须可由 fatal UTF-8 decoder 完整解码，非法 UTF-8 是创建 blocker，不得用 replacement character 修补、截断或跳过；
 2. 被纳入 Markdown 以相对路径明确引用、并位于项目根内的普通图片：`.png`、`.jpg`、`.jpeg`、`.gif`、`.webp`；
 3. 同一图片只存一次字节对象，但 manifest 保留所有引用位置。
+
+阶段 A 的图片引用闭包只允许使用仓库唯一的 `marked v18.0.6` token authority，禁止 native helper 自写第二套 Markdown 图片正则或让 Main 重新读取项目正文。具体冻结为两阶段 sealed capture：helper 在已绑定项目根的一次权威 scan 中以 descriptor-relative 方式打开、校验并封存每个 Markdown 的 exact bytes、完整 ancestor/leaf identity 与 digest，同时为每个候选 Markdown 签发仅在本次 transaction 内有效的 opaque candidate ID，并返回受限的 `candidateId + captureDigest + fileId + revision + exact UTF-8 bytes`；Main 只对 helper 返回的这些 sealed exact bytes 使用 §7.1 的共享 tokenizer，按 3.1.1 的 exact token-pass schema生成 image token identity 与相对引用，不重新读取项目文件。helper 必须验证 candidate ID、capture digest、file/revision binding、parser ID、token 数量/序列/预算与 transaction 归属，再从同一 sealed capture 决定唯一图片集合、复制图片并生成 bundle；任一 unknown/duplicate/cross-request/stale candidate 或 token 结果都 fail closed。这里的 “same-scan” 指同一个 native-owned sealed capture，不允许在 tokenizer 前后以 Main/Renderer 的第二次文件读取替代；发布前仍须按 §3.4 第 4 步重枚举 allowlist，并重走全部 Markdown/图片 ancestor 与 leaf identity、重新核对 digest。阶段 A 必须先把 vendored tokenizer 的唯一字节源迁入 `v0/src/shared/` 并用 Main/Renderer parity 与 hostile corpus 证明一致，之后才可把该流程接入 production create。
 
 V1 排除 symlink、hard-link count 大于 1 的文件、socket/device/FIFO、绝对或越界引用、远程图片、未被 Markdown 引用的图片、其他附件，以及 `.writcraft/`、所有隐藏路径、`node_modules/`、`.git/`、缓存、日志、指标、Graph 派生文件、API Key 和应用 profile。排除项不能被静默纳入；正文引用到排除或越界资源时生成预检 blocker。
 
@@ -161,6 +191,8 @@ V1 排除 symlink、hard-link count 大于 1 的文件、socket/device/FIFO、�
 - 每项目最多 20 个已提交 snapshot、私有 snapshot 总量最多 2 GiB；
 - 恢复一次最多选择 300 个 Markdown、总计最多 64 MiB。
 - snapshot manifest 确定性 JSON 最多 4 MiB；单个 transaction/receipt/recovery 记录最多 1 MiB；上述元数据另计但必须先纳入 8 MiB 的单事务私有元数据总预算。
+
+manifest 的 `budgets.limits` 必须逐字段等于上述冻结常量，不能作为可由 producer 自报放宽的参数；`observed.privateMetadataBytes` 也必须小于等于 8 MiB。JS、native helper 与 parser 使用同一组 golden 常量，任一不相等均视为损坏/不兼容而 fail closed。
 
 任一预算超限、容量不足或预算计算不完整都 fail closed，不发布 snapshot、不自动删除旧 snapshot，也不降级成部分 snapshot。
 
@@ -176,7 +208,7 @@ V1 排除 symlink、hard-link count 大于 1 的文件、socket/device/FIFO、�
 
 创建流程固定为：
 
-1. 获取 snapshot owner 和项目共享写/扫描 lease；等待现有 watcher in-flight polling，执行一次独立有界的全量 Markdown/引用图片 barrier；scan limit、watcher degradation、项目漂移或 barrier 失败均停止。
+1. 获取 snapshot owner，再取得 owner-specific 项目共享写/扫描 lease。该 exact lease 被专用 barrier 允许通过，但所有其他 mutation 仍被拒绝；barrier 先等待旧 watcher in-flight polling，强制一次更新的完整 Markdown hash，drain 该 root 已排队的 watcher payload，使 `projectMutationGeneration` 先反映 barrier 前变化，再冻结 `project instance + owner generation + mutation generation`。随后原生 helper 执行一次独立有界的全量 Markdown/引用图片 same-scan copy；普通 `flush()` 返回的计数、旧 watcher snapshot 或稳定时间窗都不是 snapshot 字节权威。scan limit、watcher degradation、项目漂移、lease 漂移或 barrier 失败均停止。helper 发布前仍按第 4 步重枚举 allowlist 并重检全部来源，不能只比较 Renderer/Main generation。
 2. 原生 helper 从 startup bind record 中的可信项目根 fd 开始，对每个外部 path component 做 no-follow `openat`，记录并重检完整 ancestor chain。allowlist、摘要和复制字节来自同一权威扫描。
 3. helper 持有已验证 `control/` 目录 fd，以 `openat(O_CREAT|O_EXCL|O_RDWR|O_NOFOLLOW|O_CLOEXEC, 0600)` 原子创建不可猜测的单文件 stage 并直接取得 fd；首次写入前 `fstat` 必须证明 regular file、预期 uid/mode、`nlink === 1`、size 0，并记录 dev/ino。snapshot bundle 只通过该 fd 顺序写入，写入、`fsync` 后重检身份、大小和摘要。manifest/receipt 计入单独的序列化元数据预算。
 4. 原子 no-clobber 发布前的最后一个动作是重走项目根链并重检全部来源身份与摘要；任何来源变化都使事务保持 uncommitted。
@@ -213,11 +245,23 @@ V1 排除 symlink、hard-link count 大于 1 的文件、socket/device/FIFO、�
 
 1. Renderer 只能提交 compare capability 和作者选择的 opaque Markdown file IDs；Main 解析为相对路径和 snapshot 字节。
 2. 只允许选择 snapshot 中的公开 `.md|.markdown`。`added` 当前文件永不自动删除；未选择文件和所有图片永不写入。
-3. Main 在任何私有 stage 前再次校验 project/snapshot/capability/revision/path/ancestor identity，并复用既有多文件 History/recovery/authoritative reload/Safe Undo 事务边界。
+3. `modified` 选择写回现有 Markdown；`missing` 选择只允许在其全部项目内 ancestor 仍存在且通过 trusted-root descriptor-relative identity 校验时，以 `O_CREAT|O_EXCL|O_NOFOLLOW` 创建缺失 leaf。缺失 ancestor、目标竞争、symlink/hard link 或不可信 parent 一律 `conflict`，不创建目录。Main 在任何私有 stage 前再次校验 project/snapshot/capability/revision/path/ancestor identity，并复用既有多文件 History/recovery/authoritative reload/Safe Undo 事务边界。
 4. 一次恢复是单个全有或全无的多文件 ChangeSet：任一所选文件预检失败则全部不提交；不允许把成功子集静默提交。
 5. 预提交取消、冲突、能力过期或失败必须使公开 Markdown、History 和 recovery marker 零写入。
 6. 已提交后发生 fsync、响应或 UI refresh 失败，必须先安装 authoritative tree/current-file/History truth，再返回 committed 或 committed-risk；不得重放恢复。
 7. Safe Undo 只撤销该恢复实际写入的 Markdown，不触碰快照后新增文件、未选择文件或图片。
+
+为闭合 `missing` 与最大合法 300 文件/64 MiB 恢复，Stage A 将既有 History 升级为 `writcraft.changes/v4`，同时继续只读兼容并确定性迁移 v1–v3；不得建立第二套 Snapshot restore history。v4 application file exact keys 为 `path`、`summary`、`before`、`after`、`createdIdentityDigest`；`before/after` exact keys 为 `exists`、`revision`、`contentHash`、`byteLength`、`encoding`、`data`。存在状态的 `revision/contentHash` 为 64 位小写 hex，`byteLength` 为 exact UTF-8 bytes，`encoding` 只允许 `utf8|base64`；snapshot restore 一律用 canonical RFC 4648 padded `base64` 保存 snapshot/current 的 exact raw bytes，避免 JSON escape amplification。由于 3.2 已把非法 UTF-8 Markdown 冻结为 snapshot 创建 blocker，这些 raw bytes 必须同时可由 fatal UTF-8 decoder 完整解码；恢复写回和 Safe Undo 必须逐字节复现，不能经过字符串 replacement/normalization。缺失状态固定为 `exists=false`、`revision=null`、`contentHash=null`、`byteLength=0`、`encoding=null`、`data=null`。普通既有 Changes 可继续使用 `utf8`，加载时必须重算 bytes/hash；不允许修补无效 base64。
+
+v4 document exact keys 为 `schema`、`entries`，生产文档最多保留 100 条；新写入的 applied snapshot-restore application entry exact keys 为 `id`、`kind`、`changeSetId`、`status`、`appliedAt`、`files`、`provenance`、`integrity`，其中 `kind=application`、`status=applied`。Safe Undo 提交后的同一 entry 保留上述全部 authority 字段并追加 `undoneAt`，`status=undone`；`undoneAt` 只在该状态存在。provenance schema 为 `writcraft.snapshot-restore-history/v1`，exact keys 为 `schema`、`snapshotId`、`snapshotManifestDigest`、`restoreCapabilityId`、`comparisonDigest`、`selectedIds`；`selectedIds` 与 files 一一对应且最多 300 个。普通 undo 入口必须识别该 provenance 并路由到 Snapshot 专用预检/事务；不得把 `before.exists=false` 转成普通 ChangeSet 的 null 正文，也不得在 identity-bound quarantine 删除完成前把 History 标成 undone。
+
+单条最大 fixture proof 与生产完整文档是两个不同职责。proof document 只含当前 snapshot-restore entry，用 concrete document/entry/provenance template 精确扣除空 `files=[]` 的两字节并替换为 300 个最大合法 file 的 canonical byte count，不能接受调用方自报 envelope；小型真实 record 必须对账 accountant 与完整 canonical JSON 实际字节数。生产 `changes/v4` envelope 允许 1–100 条，保留项必须先由既有 History 对应 kind validator 验证并冻结，当前 snapshot-restore entry 再由上述 exact validator 验证；随后对 FIFO 后完整 document 重新做冻结 JSON byte 计数。History v4 的 byte 计数是对验证并按冻结字段顺序重建后的 plain data document 执行无空白 `JSON.stringify`；这是 3.1.4 C0 禁令的唯一兼容例外，只允许既有普通 Changes 的 `before/after.encoding=utf8` 对应 `data` 保留并转义 Markdown 中的换行、制表等 C0。identity、path、schema、provenance、summary 和 snapshot restore 的 base64 data 仍使用各自严格 validator；不得借该例外接受 getter、extra key、稀疏数组、非安全数、无配对 surrogate 或自由结构。单条 proof validator 不得命名或用于冒充 production full-document validator；只有完整文档超过 192 MiB 才按既有 FIFO 丢弃最旧项，不能为了通过单条 validator 无条件清空其他合法 History。
+
+`createdIdentityDigest` 只在 `before.exists=false && after.exists=true` 时非 null，payload schema `writcraft.restore-created-identity/v1` exact keys 为 `schema`、`parentIdentityDigest`、`leafNameSha256`、`dev`、`ino`、`uid`、`mode`、`nlink`、`size`、`contentSha256`，按 3.1.4 摘要；其他文件该字段必须为 null。这里的 leaf 是公开项目 Markdown，不是私有 snapshot 文件：`mode` 只要求 `0..65535` 的非负安全整数，`nlink` 必须为 1，不得复用私有文件 `0600` validator；parent 必须绑定已验证的项目内 ancestor identity payload。事务在 exact no-clobber create 后、History 持久化前从 held fd 生成该 digest。应用失败回滚或 Safe Undo 删除这种 leaf 时，必须先移入私有不可猜测 quarantine，重检 parent/leaf/inode/size/content digest 与 `createdIdentityDigest`，再 unlink + directory fsync；文件缺失、内容变化、同 inode 改写或 replacement 均 conflict，不能删除。Safe Undo 不删除 parent 目录。
+
+单次 snapshot restore 仍最多 300 个 Markdown、snapshot after 合计 64 MiB；current before 与 snapshot after 合计最多 128 MiB。v4 restore record 使用 base64 后的完整 `changes.json` hard cap 冻结为 192 MiB，达到容量时可在写入前按既有 FIFO 规则丢弃最旧历史，但必须保留本次记录；若单条规范序列化记录仍超限则整个 restore preflight fail closed。ChangeSet/History 文件数与 byte gate 必须同步扩大到该冻结上限并有最大合法 fixture；不能静默拆成多个事务或成功子集。
+
+snapshot restore 的 public/history path 必须复用 3.2 allowlist：任一 segment 为空、`.`、`..` 或以 `.` 开头均拒绝，尤其不得接受 `.writcraft/**`。COMMITTED create/delete transaction 的 authority validator 必须绑定并校验对应 receipt；若只做无 receipt 的结构读取，必须使用不宣称终态证明的独立 structural parser 名称，不能由 authority validator 接受。
 
 ## 5. Delivery Authority 与预检
 
@@ -289,7 +333,7 @@ Main 生成 `writcraft.delivery-manifest/v1`，至少包含 authority、选定�
 
 ### 7.1 支持的 Markdown 子集
 
-预检与 DOCX 编译唯一 token authority 为仓库现有、已 vendored 的 `marked v18.0.6`（当前字节 SHA-256 `62ad5de5bea6d79b4c47e5c0b5cbe4be61e25ee8994595c2cc0969b2a144cc5d`），固定选项 `gfm: true`、`pedantic: false`、`breaks: false`、`async: false`。阶段 B 把这组纯 tokenizer/parser 字节从 Renderer 迁移到 `v0/src/shared/`，Main 与 Renderer 共同消费同一模块并做 token parity；Main 不导入 Renderer 文件、不另写 Markdown 正则扫描器。Footnote 是 WritCraft 在同一 token stream/源 offset 上的冻结扩展，不能另行全文解析。parser 版本或 hash 变化必须先更新合同和最大/hostile fixture。
+Snapshot 图片发现、预检与 DOCX 编译唯一 token authority 为仓库现有、已 vendored 的 `marked v18.0.6`（当前字节 SHA-256 `62ad5de5bea6d79b4c47e5c0b5cbe4be61e25ee8994595c2cc0969b2a144cc5d`），固定选项 `gfm: true`、`pedantic: false`、`breaks: false`、`async: false`。阶段 A 先把这组纯 tokenizer/parser 字节从 Renderer 迁移到 `v0/src/shared/`，以支持 §3.2 的 sealed capture image-token pass；Main 与 Renderer 必须共同消费同一模块并做 token parity，Main 不导入 Renderer 文件、不另写 Markdown 正则扫描器。阶段 B 在同一 token authority 上增加预检/Footnote 支持；Footnote 是 WritCraft 在同一 token stream/源 offset 上的冻结扩展，不能另行全文解析。parser 版本或 hash 变化必须先更新合同和最大/hostile fixture。
 
 DOCX 编译器必须确定性支持：
 
@@ -412,6 +456,8 @@ Renderer 可见失败只使用以下稳定、无路径 code；内部异常不得
 
 ## 12. 阶段与验证门禁
 
+0.4.0 当前执行同时受 [`WRC-0.4.0-EXEC-R1`](0.4.0-EXECUTION-PROTOCOL.md) 约束。该协议只收紧派工、WIP、复审和证据，不改变本合同的产品/安全语义。
+
 - 阶段 A：Snapshot service/native helper/handler/preload/Renderer、列表/删除、比较/恢复、三态与故障注入；不得开始 DOCX 编译。
 - 阶段 B：exact-snapshot delivery manifest、共享 citation authority、五类健康项；完全离线、零正文写入。
 - 阶段 C：冻结子集 DOCX、严格 package/schema 校验、Main 保存对话框、原生 no-clobber 与 committed reconciliation、Pages fixture 打开。
@@ -419,6 +465,14 @@ Renderer 可见失败只使用以下稳定、无路径 code；内部异常不得
 - 阶段 E：所有者指定源项目的生产隔离副本、源摘要不变、真实 Pages 打开、全量回归、真实 Electron/Computer Use 和独立复审。
 
 每阶段必须保留首红，运行相关专项、`npm test`、`npm run verify`、受影响真实 Electron，并分别记录代码、自动化、真实 Electron、真实作者、外部发布授权。外部 npm、dist-tag、GitHub Release/Tag、push 和 App/ZIP 分发始终需要新的单独授权。
+
+阶段签收还必须满足：
+
+- 前一阶段产物由其生产 App/Main 入口创建；direct storage seed 只能证明下游纯层，不证明跨阶段集成；
+- filesystem/fd/journal/receipt/capability/package 结论必须使用 production adapter 和真实故障边界，fake/injected 层不能自签；
+- 所有新增/改名验证脚本进入当前 stage/candidate 顶级 npm gate，未注册即不得退出阶段；
+- 同类 authority/state-transition P1 连续两轮复审仍出现时，停止补丁并重新冻结完整状态/失败矩阵；
+- 当前 Stage A 与真实 A→B 连续旅程签收前，不得实现 Stage C/D/E。
 
 ## 13. 阶段 0 退出清单
 

@@ -8,5 +8,9 @@
 - `development/DEVELOPMENT-STATUS-THROUGH-0.1.2.md`：截至 0.1.2 发布的完整里程碑、红灯和测试账本。
 - `retrospectives/PDCA-V0-调研复盘.md`：早期调研和路线复盘。
 - `releases/RELEASE-NOTES-v0.1.1.md`：旧 Preview 发布说明。
+- `development/0.4.0-WORKTREE-BASELINE-2026-08-13.md`：0.4.0 治理重置前工作树基线（恢复点与 WIP 恢复提交，只读恢复与审计证据）。
+- `development/0.4.0-A1B-EXISTING-STATE-MATRIX-THROUGH-2026-08-13.md`：0.4.0 A1b EXISTING/ROLLBACK_CREATE 既有状态矩阵（截至 2026-08-13 冻结，仅 Stage A/A1b 执行矩阵，非签收）。
+- `development/0.4.0-EXECUTION-PROTOCOL-R1-THROUGH-2026-08-13.md`：0.4.0 封版恢复执行协议（`WRC-0.4.0-EXEC-R1`，截至 2026-08-13）。
+- `engineering/INCIDENT-GUARDRAILS-THROUGH-2026-08-13.md`：历史事故护栏汇编（截至 2026-08-13，按受影响模块读取）。
 
 归档文档可以回答“当时为什么这样做”，不能回答“现在下一步做什么”。任何旧 TODO 必须在 `v0/DEVELOPMENT-STATUS.md` 重新确认后才可执行。

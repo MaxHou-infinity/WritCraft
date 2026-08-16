@@ -5,7 +5,33 @@
 > 版本主题：证据与交付闭环
 > 起草日期：2026-08-06
 > 批准日期：2026-08-06
-> 当前状态：**阶段 0 已完成并由独立复审以 P0=0、P1=0、P2=4 签收；阶段 A 已解锁，当前代码版本仍为 0.3.0。阶段 0 未修改产品源码、测试、脚本、`v0/package.json` 或 `v0/npm-shrinkwrap.json`。**
+> 当前状态：**阶段 0 已由独立复审以 P0=0、P1=0、P2=4 签收；阶段 A 基线已冻结，阶段 B App 交付预检已完成最终验收，代码版本仍为 0.3.0。**
+>
+> **历史 focused 证据（不作为当前集成签收）**：production snapshot create、public-Markdown CREATE/RECONCILE/FINALIZE helper、Safe Undo Q/R/B/D/A native lifecycle、Safe Undo transaction 的 entryId→PRECREATE→Q/fresh-R→QUARANTINED query、B restart settlement 合同/schema、B→RESTORED transaction/restart、immutable undone-History template/materializer、QUARANTINED→HISTORY_COMMITTED、D/A restart finalization 合同/schema及其 production lifecycle/transaction/restart 编排、Changes/History artifact lifecycle、Main comparison、existing-leaf Restore、Main safe-delete service、full-missing Restore transaction/service、missing restore 的 exact-marker 合同/schema、Safe Undo private合同/schema、mixed Restore 高层 phase合同/schema、formal EXISTING executor 与 fd-rebuildable leaf identity 合同/schema、独立 `ROLLBACK_CREATE` 合同/schema、以及 Snapshot History ancestor + Safe Undo `RESTORED` phase 均为 P0=0、P1=0、P2=0；committed read/list、safe-delete storage、public-Markdown production adapter bridge 与 missing-leaf/SafeUndo 高层合同/phase schema 均为 P0=0、P1=0、P2=1；production exact-marker source/lifecycle 为 P0=0、P1=0、P2=4。同一 marker/WRCCHRA2 的 PRECREATE 与完整 HISTORY_COMMITTED transaction 层均为 P0=0、P1=0、P2=0。旧 exact-marker `CREATED_RECEIPT` P0=0、P1=0、P2=1 仅是 delegated checkpoint 未先执行首红的历史证据纪律记录，已由下方 permanent-journal CREATE 至 `CREATED_RECEIPT` 的当前签收取代，不再作为当前实现分级。详细项数、首红与 P2 见 `v0/DEVELOPMENT-STATUS.md`；当前基线以本页后面的“当前基线冻结”段为准。
+>
+> **永久 marker journal 合同/schema 与物理层**：同一 basename、稳定 inode、双 slot、generation/value-CAS、publication ARM、ACK_PREPARED 与 terminal IDLE 已独立签收 P0=0、P1=0、P2=2。两个 P2 仅为 pre-ARM hard crash 私有 stage 与 stale journal clone 的 fail-closed `UNKNOWN/manual` 可用性残余；都要求零公开 mutation、不收养或删除无法证明的 foreign。small native INIT/READ/APPEND/DISCOVER collaborator、ordinary service闭环及 Snapshot CREATE/History 至 `HISTORY_COMMITTED` 已接；96MiB实载、Snapshot finalize/cleanup、Main/App迁移仍未完成。
+
+> **ACTIVE marker preimage amendment**：`ACTIVE`现持久完整descriptor-safe recovery marker preimage及3.1.4全文digest，restart不再依赖不可反演的摘要；legacy integrity与业务语义仍只由既有reconciliation validator消费时验证。该纯层独立签收P0=0、P1=0、P2=1；P2为95MiB cap/+1真实边界fixture尚未持久覆盖。
+>
+> **Missing-leaf CREATE journal capture**：normal `CREATE_MISSING` 的 post-facto capture合同/纯schema、CREATE domain重建桥与current-head独立pure wire均已签收；current-head层P0=0、P1=0、P2=0。helper 已被持久 attempt latch 标记但 capture 尚未落 journal 时的 crash/response loss仍是已接受的安全P2，固定为`UNKNOWN`/manual，禁止fresh R、restart或显式retry重新铸造authority或重CREATE。`CJ`命令只使用fd3 trusted root与fd4 artifact，绑定exact latched PREPARED publication及current ACTIVE journal head/frame/payload五slice，不再携带fd5 transient preimage；专属`WRCCHPC2`响应不放宽旧CREATE/Undo预算。300-item最大字段fixture已闭合395,434-byte响应、4,697,033-byte capture、4,699,529-byte frame及301拒绝。
+> **Missing-leaf CREATE native/service checkpoint**：完整multi-item、fault/response-loss与300-item native/lifecycle层已独立签收P0=0、P1=0、P2=1；唯一P2是near-cap真实时间证据尚未持久化，安全P1已清零。C从physical head/frame/payload与五个canonical slices独立重算request、attempt latch、publication与command authority。Snapshot permanent-journal PREPARE→attempt latch→单次CJ→ARMED capture→COMMITTED→`CREATED_RECEIPT` service层复审为P0=0、P1=0、P2=0：prepare 2次、latch 1次、capture/phase 3次，共6次APPEND；latch与各APPEND响应丢失只fresh exact READ，已latched retry不重CREATE。focused41/41、journal read8/8、recovery24/24、high lifecycle63/63、CJ26/26、pure13/13均通过；整条CREATE路线仍继承pre-capture `UNKNOWN/manual`可用性P2。
+> **Missing-leaf History journal checkpoint**：full-missing `CREATED_RECEIPT→HISTORY_COMMITTED` 已独立签收P0=0、P1=0、P2=0；复用 immutable History template/materializer、raw base/prepared authority与held parent durability，第7次APPEND响应丢失只fresh exact READ，base/prepared restart不重CREATE或正文，temp/file-fsync/rename/parent-fsync及foreign History均按可证明三态收敛或manual。focused52/52、journal read8/8、recovery24/24、History24/24、high lifecycle63/63、CJ26/26通过。
+>
+> **2026-08-10 当前 Stage A 基线冻结**：上面较早的 Safe Undo D/A、`ROLLBACK_CREATE`、finalization/settlement 等“窄层签收”文字仅保留为历史 focused 证据；本段只描述 Stage A 后端基线，集成边界止于 permanent journal ordinary 闭环，以及 full-missing Snapshot 的 `CREATED_RECEIPT→HISTORY_COMMITTED`。Stage A 的 finalize/ACK、mixed EXISTING、Safe Undo Main wiring 与 Snapshot helper package 仍未完成；Stage B App 已在下方独立完成验收，后续不得把纯 schema focused 绿灯当成 Stage A 集成完成。
+
+> **2026-08-10 Stage B App 最终验收（以本段为当前状态）**：delivery service **22/22**、schema 6/6、evidence 22/22、SourceIndex 10/10、shared marked 4/4、provider 9/9、handler 7/7、capability 7/7、IPC 4/4、ImageIO worker **8/8**；真实 Electron 隔离项目 **1/1**（已提交 snapshot、Markdown 字节零写入、无 HTTP(S) 请求、Renderer 不暴露 root）；`npm test` 与批准环境 `npm run verify` 均退出码 0，native strict Clang、Node syntax、`git diff --check` 均通过。footnote token/source-offset、health-root digest、Graph correction artifact、同一图片多引用与 Renderer loading-owner 已闭合。
+
+> **Stage B 图片合同边界已闭合**：ImageIO helper 现接收 Main 保持打开的已验证 bundle fd 与 `writcraft.snapshot-entry-binding/v1`，native 以 `pread` 读取 exact entry，复核 bundle published identity/footer、entry offset/length、原始 SHA、object digest 与 binding digest，并在 decode 后再次复核 fd identity。PNG 另行执行 IDAT inflate/scanline/CRC/IEND 校验，JPEG 限制 single-frame baseline、Huffman/熵流/填充/EOI；CRC 合法但压缩流损坏的 PNG/JPEG hostile fixture 均由 native 路径拒绝。DOCX build/consume 属 Stage C，真实作者验收属 Stage E。
+
+> 状态账本解释：本文件稍后仍保留的早期 Stage B 纯层/ wiring 段落属于历史 focused 证据；若其中出现 20/20、尚无 Electron 或“root projection 未完成”，均以本段和上方 App 增量段的当前数字与边界为准。
+
+> **Stage B Main/IPC/Renderer 最终验收**：`delivery-preflight-handler.js` 已接入 `main.js` 的 `writcraft:project:delivery-preflight`、snapshot list/files 两个只读 IPC，preload 暴露同名窄桥，Sources 面板提供 snapshot/file 选择和只读 preflight 结果。Main 使用 committed snapshot worker、request-scoped snapshot provider、固定 TTL 的 opaque capability store；Renderer 只发送 `projectInstanceId/snapshotId/orderedFiles/warningDecision`，不发送 root/content/Graph/SourceIndex。定向证据：capability store 7/7、snapshot provider 9/9、Main adapter 3/3、handler 7/7（含 120 秒 owner deadline/abort）、IPC boundary 4/4；批准环境真实 Electron 1/1、`npm test` 与 `npm run verify` 通过。Stage B 完成不等于 0.4.0 全部完成：DOCX build/consume 属 Stage C，真实作者隔离验收属 Stage E；provider 对缺失、Graph identity 不匹配或未绑定/stale correction artifact 直接 stale/block，不会静默用 fresh graph 铸造 capability。
+
+> **Stage B 后续边界**：上述 40 图/40Mpx worker 压力、storage-held bundle entry 绑定、native corrupt-draw 拒绝、footnote token/source-offset authority、Graph stale current locator、correction artifact fail-closed 与同一图片多引用逐一 token 绑定均已通过当前专项与 Electron 证据。当前只回到 Stage A，先完成 A0、A1a–A1c、A2a–A2d、A3，再以 App 创建的真实 snapshot 重签 A→B；只有这条连续链签收后才解锁 Stage C，Stage D/E 继续按顺序等待。capability consume 随 Stage C 导出事务接线。
+
+> **仍未完成**：下一层是 CREATE finalize/ACK cleanup；随后仍需 mixed EXISTING transaction/native lifecycle、Safe Undo 与 `ROLLBACK_CREATE` journal response-loss重签、missing restore/SafeUndo Main wiring、96MiB实载、Snapshot helper package，以及 Stage C DOCX 与 Stage E 作者验收。因此阶段 A 与 0.4.0 候选仍未完成，但 Stage B App 交付预检本身已完成。
+
+> **2026-08-11 封版恢复控制**：独立差距审计确认 Stage B 在 Stage A App 未完成时先形成纵切，现有 Electron 证据使用预制 committed snapshot，不能证明真实 A→B 用户链；Stage C/D/E 仍未开始，当前工作树也尚未形成 implementation candidate。执行方式切换为 [`WRC-0.4.0-EXEC-R1`](0.4.0-EXECUTION-PROTOCOL.md)：只推进 Stage A 的事务收口→App 纵切→顶级门禁→真实 A→B 重签；在这些门禁完成前冻结 Stage B 扩展并禁止 C/D/E 开工。该控制不改变本合同范围或已签收的 Stage B 纯层。
 
 0.3.0 让 AI 协作变得透明、可取消、可审阅。0.4.0 的任务不是继续增加生成入口，而是让作者能够冻结一个可证明的作品状态、检查证据和交付风险，并把选定版本可靠地交给下一位编辑或读者。
 
@@ -112,8 +138,8 @@ V1 只冻结以下类型：
 | 阶段 | 交付 | 退出条件 |
 |---|---|---|
 | 0 | ✅ 合同冻结与基线盘点（仅文档，已完成） | [`EVIDENCE-DELIVERY-V1-CONTRACT.md`](EVIDENCE-DELIVERY-V1-CONTRACT.md) 已冻结 DOCX 子集、snapshot copy/publish 三态事务、snapshot 删除事务、allowlist/容量、恢复不删除原则、delivery authority、导出 manifest、健康类型、真实渲染基准、失败矩阵和媒体范围；活动文档派工权已清理。独立复审 P0=0/P1=0、P2=4，详见 [`0.4.0-STAGE-0-INDEPENDENT-REVIEW.md`](0.4.0-STAGE-0-INDEPENDENT-REVIEW.md)；阶段 0 未改产品版本或实现代码 |
-| A | ▶️ Main 项目快照、比较与恢复权威（当前） | 完成独立 snapshot service/handler、窄 IPC、私有存储、容量/权限/损坏处理、列表/显式删除、比较和 Markdown 选择性恢复；取消/失败/冲突/项目切换零写入，提交后 History/recovery/Safe Undo 真相一致；二进制图片只冻结/比较，不借 Markdown History 恢复 |
-| B | 导出预检与引用健康度 | Main 从 exact snapshot 生成目录、标题层级、脚注、引用、图片、资源和健康 manifest；五类健康项有稳定 evidence，stale/partial/budget 状态明确，完全离线且不写正文 |
+| A | ▶️ Main 项目快照、比较与恢复权威（当前；A-R1.4 已签收，A1 启动） | 完成独立 snapshot service/handler、窄 IPC、私有存储、容量/权限/损坏处理、列表/显式删除、比较和 Markdown 选择性恢复；取消/失败/冲突/项目切换零写入，提交后 History/recovery/Safe Undo 真相一致；二进制图片只冻结/比较，不借 Markdown History 恢复。A-R1.1–A-R1.3 首红/定点结论均已保留；A-R1.4 P0=0/P1=0/P2=0 只解锁 native/storage 实现，不代表阶段完成 |
+| B | ✅ 导出预检与引用健康度（独立纵切已完成；等待 A→B 重签） | Main 从 exact snapshot 生成目录、标题层级、脚注、引用、图片、资源和健康 manifest；五类健康项有稳定 evidence，stale/partial/budget 状态明确，完全离线且不写正文。Stage A 签收后必须以 App 创建的真实 snapshot 重跑连续旅程；direct seed 只保留为纯层 fixture |
 | C | DOCX 编译、验证与安全保存 | 单一 DOCX exporter 覆盖冻结 Markdown 子集；私有临时构建、OOXML 结构校验、Main 保存对话框、no-clobber 和 committed reconciliation 完成；真实渲染检查通过，不把文件存在当作成功 |
 | D | Graph 多视图与连续交付体验 | 关系图、时间线、实体表、论点—证据表共享一个 Graph v2 快照和筛选；从健康/Graph evidence 可回正文或发起可审阅 Diff；快照→预检→修复→导出在同一项目上下文中连续可理解 |
 | E | 真实作者验收与发布候选 | 在所有者选定项目的隔离副本完成快照、比较、选择性恢复、冲突、Safe Undo、预检、健康项、四 Graph 视图、DOCX 导出和真实打开检查；完整测试、真实 Electron、Computer Use、独立复审 P0=0/P1=0，P2 明确记录后才可成为 0.4.0 候选 |
@@ -170,6 +196,9 @@ V1 只冻结以下类型：
 - 真实作者验收只使用所有者指定项目的生产隔离副本，源目录前后摘要不变；正文、来源、路径、Key 和截图不得进入 Git、日志或 Nowledge Mem。
 - 保留首个失败证据；代码通过、自动化通过、真实 Electron 通过、作者签收和外部发布授权必须分别记录。
 - 只有阶段 0–E 完成、P0=0/P1=0、P2 明确、文档与 Nowledge Mem 同步后，才能报告 0.4.0 候选完成。npm、Tag、GitHub Release、App/ZIP 和 `latest` 仍需另行授权。
+- 当前 Stage A 未签收前禁止 Stage C/D/E 实现；Stage B 已签收纯层不得扩写，只能在 Stage A 后补真实 A→B 连续证据。
+- fixture seed、fake/injected adapter、no-op helper 和 focused 绿灯不能签收跨层或跨阶段旅程；下游必须消费上游生产入口创建的真实产物。
+- 从 A0 起，全部新增或改名验证脚本必须在同一 change set 进入显式清册和当前 component/stage 顶级 npm gate；静态 orphan check 未绿时不得继续实现。component 绿灯不等于 stage 完成；`candidate` 名称只在 C/D/E 完成后的封版候选使用。
 
 ## 10. 已批准决定与启动门禁
 

@@ -2,16 +2,14 @@
 
 本页是项目文档的唯一导航入口。文档按“当前权威、按功能读取、冻结兼容合同、历史归档”分层；不要全量读取 Markdown 后自行拼接下一任务。
 
-## 开始任何开发前必读
+## 开始开发前只读四类入口
 
-1. [`ROADMAP.md`](ROADMAP.md)：唯一正式版本顺序、范围和非目标。
-2. [`../v0/DEVELOPMENT-STATUS.md`](../v0/DEVELOPMENT-STATUS.md)：当前事实、开放风险和下一动作。
-3. [`ROADMAP-0.4.0.md`](ROADMAP-0.4.0.md)：已启动的 0.4.0 生效合同；只按阶段 0 → E 派工，当前阶段 A。
-4. [`EVIDENCE-DELIVERY-V1-CONTRACT.md`](EVIDENCE-DELIVERY-V1-CONTRACT.md)：阶段 0 已冻结并签收的 Snapshot、DOCX、delivery authority、引用健康度、Graph 多视图和真实渲染合同。
-5. [`0.4.0-STAGE-0-INDEPENDENT-REVIEW.md`](0.4.0-STAGE-0-INDEPENDENT-REVIEW.md)：阶段 0 P0=0、P1=0、P2=4 的独立复审签收与首红记录。
-6. [`WRITCRAFT-PRD-V3.md`](WRITCRAFT-PRD-V3.md)：长期产品契约。
-7. [`ARCHITECTURE.md`](ARCHITECTURE.md)：稳定工程边界。
-8. `v0/package.json` 与实际源码/测试：最终工程事实。
+1. **当前事实**：只读 [`../v0/DEVELOPMENT-STATUS.md`](../v0/DEVELOPMENT-STATUS.md) 顶部当前控制块，确认唯一 checkpoint、开放风险和下一动作。
+2. **当前验收**：只读该 checkpoint 唯一直接相关的合同或矩阵。A1b 当前使用 [`0.4.0-A1B-EXISTING-STATE-MATRIX.md`](0.4.0-A1B-EXISTING-STATE-MATRIX.md) 与实际触及的 Changes/History 合同；不要把内部 E/R/V/F 或 schema/wire slice 当成独立签收点。
+3. **工程事实**：只读受影响源码、测试和 `v0/package.json`。源码与可复现测试优先于文字快照。
+4. **执行控制**：只在打开、暂停或签收 checkpoint 时读取 [`0.4.0-EXECUTION-PROTOCOL.md`](0.4.0-EXECUTION-PROTOCOL.md)。它控制 WIP/review/Stage 顺序，不改变产品范围。
+
+只有需要判断版本、阶段或产品范围时，才读取 [`ROADMAP.md`](ROADMAP.md) 与 [`ROADMAP-0.4.0.md`](ROADMAP-0.4.0.md)；只有实际触及长期产品或稳定架构决策时，才读取 [`WRITCRAFT-PRD-V3.md`](WRITCRAFT-PRD-V3.md) 与 [`ARCHITECTURE.md`](ARCHITECTURE.md)。阶段 0 review、旧 checkpoint review、PRD、架构和冻结兼容合同都不是每次开发的必读材料。
 
 0.2.0 的 [`ROADMAP-0.2.0.md`](ROADMAP-0.2.0.md) 与 [`DAILY-WORKSPACE-V1-CONTRACT.md`](DAILY-WORKSPACE-V1-CONTRACT.md) 已冻结；只有生产源码实际影响项目首页、大纲、`⌘P`、workspace/v2 或性能边界时才阅读并回归。
 
@@ -23,7 +21,26 @@
 
 `ROADMAP-0.3.0.md` 已于 2026-08-04 获批并完成阶段 0 → E，0.3.0 已发布为 npm/GitHub Developer Preview。
 
-`ROADMAP-0.4.0.md` 已于 2026-08-06 获批为 `WRC-0.4.0-R1`；所有者随后提交了其中 §11 的完整目标模式文本。阶段 0 已完成并由独立复审以 P0=0、P1=0、P2=4 签收；当前只允许阶段 A 的实现与验证工作。
+`ROADMAP-0.4.0.md` 已于 2026-08-06 获批为 `WRC-0.4.0-R1`；所有者随后提交了其中 §11 的完整目标模式文本。阶段 0 已完成并由独立复审以 P0=0、P1=0、P2=4 签收。2026-08-11 完成封版距离审计后，执行方式切换为 `WRC-0.4.0-EXEC-R1` 受约束里程碑恢复；当前只允许 Stage A，Stage B 冻结等待 A→B 重签，C/D/E 禁止开工。
+
+## A1b 历史 component evidence（不可派工）
+
+以下记录保留首红、修订和当时的 hash/diff 证据，但它们不是当前状态账本、不是新的 checkpoint，也不能以“final binding pending”阻断 A1b 内部相邻实现。A1b 只在完整 mixed EXISTING/`ROLLBACK_CREATE` checkpoint 出口独立复审一次：
+
+- [`0.4.0-A1B-E1-PARITY-REVIEW.md`](0.4.0-A1B-E1-PARITY-REVIEW.md)
+- [`0.4.0-A1B-E2A-BEFORE-AUTHORITY-REVIEW.md`](0.4.0-A1B-E2A-BEFORE-AUTHORITY-REVIEW.md)
+- [`0.4.0-A1B-E2B-LOCATOR-SCHEMA-REVIEW.md`](0.4.0-A1B-E2B-LOCATOR-SCHEMA-REVIEW.md)
+- [`0.4.0-A1B-E2B-PRIMARY-E-REVIEW.md`](0.4.0-A1B-E2B-PRIMARY-E-REVIEW.md)
+- [`0.4.0-A1B-E3-JOURNAL-SCHEMA-REVIEW.md`](0.4.0-A1B-E3-JOURNAL-SCHEMA-REVIEW.md)
+- [`0.4.0-A1B-E3-JOURNAL-BINDING-SCHEMA-REVIEW.md`](0.4.0-A1B-E3-JOURNAL-BINDING-SCHEMA-REVIEW.md)
+
+## 历史复审与发布记录
+
+以下复审与发布记录保留追溯价值，不再进入当前派工入口：
+
+- [`0.4.0-A0-EXECUTION-GATE-REVIEW.md`](0.4.0-A0-EXECUTION-GATE-REVIEW.md)：A0 可执行门禁独立复核记录（2026-08-11，`WRC-0.4.0-EXEC-R1`）。
+- [`0.4.0-STAGE-0-INDEPENDENT-REVIEW.md`](0.4.0-STAGE-0-INDEPENDENT-REVIEW.md)：0.4.0 阶段 0 独立复审记录（2026-08-06，P0=0/P1=0/P2=4）。
+- [`RELEASE-NOTES-v0.2.0.md`](RELEASE-NOTES-v0.2.0.md)：历史 0.2.0 发布说明。
 
 ## 派工权与冻结关系
 
@@ -31,8 +48,10 @@
 |---|---|---|
 | 当前版本顺序 | `ROADMAP.md` | 是；只决定当前/下一版本、范围和非目标 |
 | 当前详细合同 | `ROADMAP-0.4.0.md`、`EVIDENCE-DELIVERY-V1-CONTRACT.md` | 是；阶段 0 已关闭，当前只从阶段 A 开放项派工，按 A → B → C → D → E 推进 |
+| 当前执行控制 | `0.4.0-EXECUTION-PROTOCOL.md` | 是；只决定当前 checkpoint、WIP、停止条件、证据阶梯与测试注册，不得改变产品范围 |
 | 当前事实账本 | `v0/DEVELOPMENT-STATUS.md` | 是；只从其中尚未关闭的当前阶段和开放项续作 |
 | 长期产品/稳定架构 | `WRITCRAFT-PRD-V3.md`、`ARCHITECTURE.md` | 只约束边界，不能自行新增当前版本任务 |
+| A1b micro review | `0.4.0-A1B-E*-REVIEW.md` | 否；仅为 historical component evidence，不是 checkpoint、状态或派工门禁 |
 | 冻结兼容合同 | 0.1.x–0.3.0 路线图、`*-V1-CONTRACT.md`、阶段复审记录 | 否；只有 0.4.0 实际触及对应生产边界时才作为兼容与回归约束 |
 | 历史材料 | `docs/archive/`、`raw/`、`deliverables/` | 否；仅追溯证据，不得恢复旧 TODO、里程碑或目标模式文本 |
 
@@ -44,10 +63,13 @@
 - [`GETTING-STARTED.md`](GETTING-STARTED.md)：安装与首次使用。
 - [`NPM-DEVELOPER-PREVIEW-V1-CONTRACT.md`](NPM-DEVELOPER-PREVIEW-V1-CONTRACT.md)：npm Preview 分发合同。
 - [`RELEASE-NOTES-v0.1.2.md`](RELEASE-NOTES-v0.1.2.md)：历史 0.1.2 Preview 说明。
+- [`RELEASE-NOTES-v0.2.0.md`](RELEASE-NOTES-v0.2.0.md)：历史 0.2.0 Preview 说明。
 - [`RELEASE-NOTES-v0.3.0.md`](RELEASE-NOTES-v0.3.0.md)：当前公开 0.3.0 透明 AI 协作 Preview 说明。
 - [`../SECURITY.md`](../SECURITY.md)、[`../CONTRIBUTING.md`](../CONTRIBUTING.md)：安全与贡献。
 
 ## 冻结兼容合同（按受影响模块读取）
+
+`CHANGES-HISTORY-RECOVERY-V1-CONTRACT.md` 是双角色文件：其 0.1.x 冻结部分约束兼容回归；其 0.4.0 Snapshot extension 部分（头部声明 "0.4.0 Snapshot extension under Stage A independent review"）是当前权威，读取该文件时先看头部状态块。`EVIDENCE-DELIVERY-V1-CONTRACT.md` 是命名例外：虽用 `-V1-CONTRACT` 命名，但属于当前 0.4.0 合同（见“派工权与冻结关系”），不是冻结合同。
 
 这些合同描述 0.1.2 已公开行为。它们约束兼容和回归，但不是当前 TODO：
 
