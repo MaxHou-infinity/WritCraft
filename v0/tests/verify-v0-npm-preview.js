@@ -290,6 +290,7 @@ test('actual npm tarball has the shrinkwrap, notices, safe paths and executable 
     'src/main/native/snapshot-storage-helper',
     'src/main/native/changes-history-artifact-helper',
     'src/main/native/delivery-image-decode-helper',
+    'src/main/native/public-markdown-create-helper',
   ]) assert.strictEqual(files.get(executable).mode, 0o755, executable);
   const executablePaths = new Set([
     'bin/writcraft.js',
@@ -300,6 +301,7 @@ test('actual npm tarball has the shrinkwrap, notices, safe paths and executable 
     'src/main/native/snapshot-storage-helper',
     'src/main/native/changes-history-artifact-helper',
     'src/main/native/delivery-image-decode-helper',
+    'src/main/native/public-markdown-create-helper',
   ]);
   for (const file of files.values()) {
     if (!executablePaths.has(file.path)) {

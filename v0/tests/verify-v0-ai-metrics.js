@@ -106,7 +106,7 @@ test('事件数量超限时只保留最新的有界窗口', () => {
         time: new Date(1720000000000 + index).toISOString(),
       })),
     };
-    fs.writeFileSync(metricsPath(directory), JSON.stringify(seed));
+    fs.writeFileSync(metricsPath(directory), JSON.stringify(seed), { mode: 0o600 });
     metrics.appendEvent(directory, event({ beforeChars: 9999, afterChars: 10000 }), { now: new Date('2026-07-17T09:00:00.000Z') });
     const loaded = metrics.loadMetrics(directory);
     assert.equal(loaded.events.length, metrics.MAX_EVENTS);
@@ -240,7 +240,7 @@ test('旧 v1 文件可继续读取并追加新的隐私安全 workflow 事件', 
         time: '2026-07-17T00:00:00.000Z',
       }],
     };
-    fs.writeFileSync(metricsPath(directory), JSON.stringify(legacy));
+    fs.writeFileSync(metricsPath(directory), JSON.stringify(legacy), { mode: 0o600 });
     metrics.appendEvent(directory, event({
       operationId: '2'.repeat(32), action: 'image', outcome: 'generated', style: 'none', scope: 'file',
     }));
@@ -347,11 +347,11 @@ test('Research 改判写入失败保留旧样本，损坏文件与冲突双样�
     const stored = JSON.parse(before);
     stored.events.push({ ...stored.events[0], outcome: 'mismatched', time: '2026-07-22T05:00:00.000Z' });
     const conflicting = JSON.stringify(stored);
-    fs.writeFileSync(metricsPath(directory), conflicting);
+    fs.writeFileSync(metricsPath(directory), conflicting, { mode: 0o600 });
     expectCode('INVALID_METRICS_FILE', () => metrics.recordResearchAccuracy(directory, request));
     assert.equal(fs.readFileSync(metricsPath(directory), 'utf8'), conflicting);
 
-    fs.writeFileSync(metricsPath(directory), '{broken');
+    fs.writeFileSync(metricsPath(directory), '{broken', { mode: 0o600 });
     expectCode('METRICS_CORRUPT', () => metrics.recordResearchAccuracy(directory, request));
     assert.equal(fs.readFileSync(metricsPath(directory), 'utf8'), '{broken');
   } finally { fs.rmSync(directory, { recursive: true, force: true }); }

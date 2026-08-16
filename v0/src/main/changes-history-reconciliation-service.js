@@ -732,11 +732,24 @@ function serializeMarker(marker, projectService, historyService) {
 }
 
 function sameHistoryState(left, right) {
+  // History states embed multi-line manuscript content, so they must be
+  // compared through the history's own serialization (the exact on-disk
+  // compact form), never through the strict canonicalJson used for short
+  // identity fields (assertString rejects C0 control chars such as '\n').
   if (Object.hasOwn(right, 'digest')) {
-    return left.exists === right.exists && sha256(canonical(left.history)) === right.digest;
+    // Match compactHistoryBinding byte-for-byte: exists prefix + pretty JSON
+    // + trailing newline; otherwise a marker digest could never verify.
+    const bytes = left.exists
+      ? Buffer.from(`${JSON.stringify(left.history, null, 2)}\n`, 'utf8')
+      : Buffer.alloc(0);
+    const digest = crypto.createHash('sha256')
+      .update(Buffer.from([left.exists ? 1 : 0]))
+      .update(bytes)
+      .digest('hex');
+    return left.exists === right.exists && digest === right.digest;
   }
   return left.exists === right.exists &&
-    (!left.exists || canonical(left.history) === canonical(right.history));
+    (!left.exists || JSON.stringify(left.history, null, 2) === JSON.stringify(right.history, null, 2));
 }
 
 function compactHistoryBinding(state, historyService) {

@@ -237,7 +237,7 @@ test('项目树提供右键/更多菜单、flush 和危险确认，并同步工�
   assert.ok(workspace.includes("fileButton.addEventListener('contextmenu'"));
   assert.ok(workspace.includes("menu.className = 'tree-file-menu'"));
   assert.ok(workspace.includes('await persistCurrent(true)'));
-  assert.ok(workspace.includes('window.confirm(`将“${sourcePath}”移到项目回收区？'));
+  assert.ok(workspace.includes('WritCraftDialogs.confirm(`将“${sourcePath}”移到项目回收区？'));
   assert.ok(workspace.includes('WritCraftFileLifecycleState.relocate'));
   assert.ok(workspace.includes('WritCraftFileLifecycleState.trash'));
   assert.ok(workspace.includes('scheduleWorkspaceSave()'));

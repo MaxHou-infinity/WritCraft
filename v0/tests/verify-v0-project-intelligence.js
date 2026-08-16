@@ -124,7 +124,7 @@ check('一致性问题状态可审阅并通过受限 IPC 持久化', () => {
   assert.ok(main.includes("ipcMain.handle('writcraft:project:set-issue-status'"));
   assert.ok(preload.includes('setIssueStatus: (projectInstanceId, issueId, status)'));
   assert.ok(html.includes('id="issue-filter"'));
-  assert.ok(graphView.includes('bridge?.setIssueStatus?.(window.__workspace?.state?.project?.instanceId, issue.id, status)'));
+  assert.ok(graphView.includes('bridge?.setIssueStatus?.(window.__workspace?.readState()?.project?.instanceId, issue.id, status)'));
 });
 check('六类显式引用与选段由 Main 权威解析并绑定到 AI 回复', () => {
   assert.ok(html.includes('../shared/context-selection.js'));

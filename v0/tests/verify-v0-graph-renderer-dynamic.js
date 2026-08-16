@@ -297,6 +297,7 @@ console.log('\nGraph renderer dynamic stale verification');
     } },
     __workspace: {
       state,
+      readState: () => Object.freeze({ ...state }),
       getCurrentPath: () => 'other.md',
       flushExternalChanges: async () => {
         graphAuthorityEvents.push(`flush:${state.project?.instanceId || ''}`);
