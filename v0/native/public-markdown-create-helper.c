@@ -6747,6 +6747,151 @@ static bool existing_reconcile_header_shape(const char *line) {
     strcmp(fields[0], "R") == 0;
 }
 
+#define EXISTING_FINAL_RECORD_SCHEMA \
+  "writcraft.changes-history-native-existing-final-record/v1"
+#define EXISTING_FINAL_KEY_SCHEMA \
+  "writcraft.changes-history-native-existing-final-key/v1"
+
+/* EXISTING terminal finalize (F): seals the CAS-installed terminal with an
+ * owner-private final record. The wire carries the terminal authority digests
+ * that Main verified against the journal publication; the native side binds
+ * them into the immutable final record and captures its exact identity. */
+static bool existing_finalize(RootBinding *root, char *line) {
+  char *fields[8];
+  size_t count = 0U;
+  uint64_t item_count = 0U;
+  if (!split_fields(line, fields, 8U, &count) || count != 8U ||
+      strcmp(fields[0], "F") != 0 || strcmp(fields[1], "PUBLISH") != 0 ||
+      !valid_operation(fields[2]) || !valid_digest(fields[3]) ||
+      (strcmp(fields[4], "COMMITTED") != 0 &&
+       strcmp(fields[4], "UNCOMMITTED") != 0) ||
+      !valid_digest(fields[5]) || !valid_digest(fields[6]) ||
+      !parse_uint(fields[7], MAX_ITEMS, &item_count) || item_count == 0U ||
+      !open_recovery(root, false)) {
+    return false;
+  }
+  char canonical[1024];
+  int wrote = snprintf(canonical, sizeof(canonical),
+    "{\"itemCount\":%" PRIu64 ",\"operationId\":\"%s\""
+    ",\"receiptSetDigest\":\"%s\",\"recoveryFsyncComplete\":true"
+    ",\"requestDigest\":\"%s\",\"schema\":\"" EXISTING_FINAL_RECORD_SCHEMA
+    "\",\"terminalReceiptDigest\":\"%s\",\"terminalState\":\"%s\"}",
+    item_count, fields[2], fields[6], fields[3], fields[5], fields[4]);
+  char final_digest[72];
+  if (wrote <= 0 || (size_t)wrote >= sizeof(canonical) ||
+      !digest_domain(EXISTING_FINAL_RECORD_SCHEMA, canonical, final_digest)) {
+    return false;
+  }
+  char key[768];
+  wrote = snprintf(key, sizeof(key),
+    "{\"operationId\":\"%s\",\"requestDigest\":\"%s\",\"schema\":\""
+    EXISTING_FINAL_KEY_SCHEMA "\",\"terminalReceiptDigest\":\"%s\"}",
+    fields[2], fields[3], fields[5]);
+  char key_digest[72];
+  if (wrote <= 0 || (size_t)wrote >= sizeof(key) ||
+      !digest_domain(EXISTING_FINAL_KEY_SCHEMA, key, key_digest)) {
+    return false;
+  }
+  char final_name[128];
+  wrote = snprintf(final_name, sizeof(final_name),
+    ".changes-history-native-existing-final.%s", key_digest + 7U);
+  if (wrote <= 0 || (size_t)wrote >= sizeof(final_name)) return false;
+  char record[MAX_RECORD_BYTES + 1U];
+  wrote = snprintf(record, sizeof(record),
+    EXISTING_FINAL_RECORD_SCHEMA "\t%s\t%s\t%s\t%s\t%s\t%" PRIu64 "\t1\t%s\n",
+    fields[2], fields[3], fields[4], fields[5], fields[6], item_count,
+    final_digest);
+  if (wrote <= 0 || (size_t)wrote >= sizeof(record)) return false;
+  int final_fd = -1;
+  Identity final_identity;
+  NameState state = open_record_exact(
+    root->recovery_fd, final_name, record, &final_fd, &final_identity
+  );
+  if (final_fd >= 0) (void)close(final_fd);
+  if (state == NAME_ABSENT) {
+    RecordAttempt attempt;
+    memset(&attempt, 0, sizeof(attempt));
+    attempt.fd = -1;
+    if (!write_record(root->recovery_fd, final_name, record, &final_identity,
+        &attempt)) {
+      if (attempt.fd >= 0) (void)close(attempt.fd);
+      return false;
+    }
+    if (attempt.fd >= 0) (void)close(attempt.fd);
+    state = open_record_exact(
+      root->recovery_fd, final_name, record, &final_fd, &final_identity
+    );
+    if (final_fd >= 0) (void)close(final_fd);
+  }
+  if (state != NAME_EXACT || !open_recovery(root, false)) {
+    return false;
+  }
+  char record_digest[72];
+  sha256_prefixed((const unsigned char *)record, strlen(record), record_digest);
+  char line_out[2048];
+  wrote = snprintf(line_out, sizeof(line_out),
+    "F\tRESULT\tCOMMITTED\t%s\t%s\t%s\t%s\t%s\t%s\t%" PRIuMAX "\t%" PRIuMAX
+    "\t%" PRIuMAX "\t%" PRIuMAX "\t%" PRIuMAX "\t%" PRIuMAX "\t%" PRIuMAX
+    "\t%" PRIuMAX "\t%s\n",
+    fields[2], fields[3], final_digest, final_name,
+    fields[4], fields[5],
+    (uintmax_t)final_identity.dev, (uintmax_t)final_identity.ino,
+    (uintmax_t)final_identity.uid, permission_mode(final_identity.mode),
+    (uintmax_t)final_identity.nlink, (uintmax_t)final_identity.size,
+    (uintmax_t)final_identity.mtime_ns, (uintmax_t)final_identity.ctime_ns,
+    record_digest);
+  return wrote > 0 && (size_t)wrote < sizeof(line_out) && write_line(line_out);
+}
+
+/* EXISTING terminal ACK (A): verifies the final record is still the exact
+ * owner-private file Main sealed, then acknowledges it so cleanup may proceed. */
+static bool existing_ack(RootBinding *root, char *line) {
+  char *fields[16];
+  size_t count = 0U;
+  uint64_t dev, ino, uid, mode, nlink, size, mtime, ctime;
+  if (!split_fields(line, fields, 16U, &count) || count != 16U ||
+      strcmp(fields[0], "F") != 0 || strcmp(fields[1], "ACK") != 0 ||
+      !valid_operation(fields[2]) || !valid_digest(fields[3]) ||
+      !valid_digest_basename(fields[4], ".changes-history-native-existing-final.") ||
+      !valid_digest(fields[5]) || !valid_digest(fields[6]) ||
+      !parse_uint(fields[7], UINT64_MAX, &dev) ||
+      !parse_uint(fields[8], UINT64_MAX, &ino) ||
+      !parse_uint(fields[9], UINT64_MAX, &uid) ||
+      !parse_uint(fields[10], UINT64_MAX, &mode) ||
+      !parse_uint(fields[11], UINT64_MAX, &nlink) ||
+      !parse_uint(fields[12], UINT64_MAX, &size) ||
+      !parse_uint(fields[13], INTMAX_MAX, &mtime) ||
+      !parse_uint(fields[14], INTMAX_MAX, &ctime) ||
+      !valid_digest(fields[15]) || uid != (uint64_t)geteuid() ||
+      mode != 0600U || nlink != 1U || !open_recovery(root, false)) {
+    return false;
+  }
+  Identity expected;
+  expected.dev = (uintmax_t)dev;
+  expected.ino = (uintmax_t)ino;
+  expected.uid = (uintmax_t)uid;
+  expected.mode = (uintmax_t)(S_IFREG | mode);
+  expected.nlink = (uintmax_t)nlink;
+  expected.size = (uintmax_t)size;
+  expected.mtime_ns = (intmax_t)mtime;
+  expected.ctime_ns = (intmax_t)ctime;
+  int fd = openat(root->recovery_fd, fields[4],
+    O_RDONLY | O_NOFOLLOW | O_CLOEXEC);
+  Identity identity;
+  char content[72];
+  bool valid = fd >= 0 && hash_fd(fd, &identity, content,
+    MAX_RECORD_BYTES) && same_file(&expected, &identity) &&
+    strcmp(content, fields[15]) == 0 &&
+    record_path_matches_fd(root->recovery_fd, fields[4], fd) &&
+    open_recovery(root, false);
+  if (fd >= 0) (void)close(fd);
+  if (!valid) return false;
+  char line_out[512];
+  int wrote = snprintf(line_out, sizeof(line_out),
+    "F\tRESULT\tACKED\t%s\t%s\t%s\n", fields[2], fields[3], fields[5]);
+  return wrote > 0 && (size_t)wrote < sizeof(line_out) && write_line(line_out);
+}
+
 /*
  * A1b transport checkpoint: consume the formal EXISTING execute wire without
  * treating a process-level response as a committed mutation.  The complete
@@ -7644,6 +7789,12 @@ int main(void) {
     result = request.command == 'C'
       ? create_items(&root, &request, NULL)
       : reconcile_items(&root, &request);
+  } else if (line[0] == 'F' && strncmp(line + 1U, "\tPUBLISH\t", 9U) == 0) {
+    output_limit = MAX_EXISTING_OUTPUT_BYTES;
+    result = existing_finalize(&root, line);
+  } else if (line[0] == 'F' && strncmp(line + 1U, "\tACK\t", 5U) == 0) {
+    output_limit = MAX_EXISTING_OUTPUT_BYTES;
+    result = existing_ack(&root, line);
   } else if (line[0] == 'F') {
     char *fields[7];
     size_t field_count = 0U;

@@ -1043,8 +1043,9 @@ function createPublicMarkdownNativeTransport(options = {}) {
           invokeExisting(existingRestoreSchema.encodeFinalizeCommand(authority, rawTerminalReceipt), descriptors),
           'UNKNOWN'
         );
-        existingRestoreSchema.assertResponseEnvelope(result.stdout, result.stderr);
-        return unknownExistingFinalizeResult(authority, request);
+        return existingRestoreSchema.parseFinalizeResponse(
+          result.stdout, authority, request
+        );
       } catch (_) {
         return unknownExistingFinalizeResult(authority, request);
       }
@@ -1082,8 +1083,9 @@ function createPublicMarkdownNativeTransport(options = {}) {
           ),
           'UNKNOWN'
         );
-        existingRestoreSchema.assertResponseEnvelope(result.stdout, result.stderr);
-        return unknownExistingAckResult(authority, rawFinalizeRequest);
+        return existingRestoreSchema.parseAckResponse(
+          result.stdout, authority, rawFinalizeRequest
+        );
       } catch (_) {
         return unknownExistingAckResult(authority, rawFinalizeRequest);
       }

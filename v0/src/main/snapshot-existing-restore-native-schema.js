@@ -1713,6 +1713,63 @@ function buildCanonicalBundle(rawAuthority, rawTerminalReceipt) {
   });
 }
 
+// Parse the native EXISTING finalize (F) response. The C seals the terminal
+// with an owner-private final record and reports its exact identity.
+function parseFinalizeResponse(stdout, rawAuthority, rawFinalizeRequest) {
+  const authority = assertAuthority(rawAuthority);
+  const request = assertFinalizeRequest(rawFinalizeRequest, authority);
+  const envelope = assertResponseEnvelope(stdout);
+  const lines = envelope.slice(0, -1).split('\n');
+  if (lines.shift() !== 'P\tOK' || lines.length === 0) fail('finalize response bind missing');
+  const header = lines.shift().split('\t');
+  if (header.length !== 18 || header[0] !== COMMANDS.FINALIZE || header[1] !== 'RESULT' ||
+      header[3] !== authority.request.operationId ||
+      header[4] !== requestDigest(authority)) {
+    fail('finalize response header invalid');
+  }
+  if (header[2] === 'UNKNOWN') {
+    if (header.slice(5).some(value => value !== '-')) fail('UNKNOWN finalize authority invalid');
+    return buildFinalResult(authority, request, 'UNKNOWN');
+  }
+  if (header[2] !== 'COMMITTED') fail('finalize response state invalid');
+  const finalRecord = buildFinalRecord(request, authority);
+  if (header[5] !== finalRecord.finalRecordDigest ||
+      header[6] !== finalRecordName(request, authority) ||
+      header[7] !== finalRecord.terminalState ||
+      header[8] !== finalRecord.terminalReceiptDigest) {
+    fail('finalize response record authority invalid');
+  }
+  const finalWire = encodeFinalRecord(finalRecord, request, authority);
+  const finalRecordIdentity = assertPrivateRecordIdentity({
+    schema: evidence.SCHEMAS.OBJECT_IDENTITY,
+    dev: header[9], ino: header[10],
+    uid: canonicalWireInteger(header[11], 'finalRecordIdentity.uid'),
+    mode: canonicalWireInteger(header[12], 'finalRecordIdentity.mode'),
+    nlink: canonicalWireInteger(header[13], 'finalRecordIdentity.nlink'),
+    size: header[14],
+    mtimeNs: header[15], ctimeNs: header[16],
+    contentSha256: header[17],
+  }, finalWire, 'finalRecordIdentity');
+  return buildFinalResult(authority, request, 'COMMITTED', finalRecord, finalRecordIdentity);
+}
+
+// Parse the native EXISTING ACK (A) response.
+function parseAckResponse(stdout, rawAuthority, rawFinalizeRequest) {
+  const authority = assertAuthority(rawAuthority);
+  const request = assertFinalizeRequest(rawFinalizeRequest, authority);
+  const envelope = assertResponseEnvelope(stdout);
+  const lines = envelope.slice(0, -1).split('\n');
+  if (lines.shift() !== 'P\tOK' || lines.length === 0) fail('ACK response bind missing');
+  const header = lines.shift().split('\t');
+  if (header.length !== 6 || header[0] !== COMMANDS.FINALIZE || header[1] !== 'RESULT' ||
+      header[2] !== 'ACKED' || header[3] !== authority.request.operationId ||
+      header[4] !== requestDigest(authority) ||
+      header[5] !== buildFinalRecord(request, authority).finalRecordDigest) {
+    fail('ACK response header invalid');
+  }
+  return buildAckResult(authority, request, 'ACKED');
+}
+
 module.exports = Object.freeze({
   METHODS,
   COMMANDS,
@@ -1775,6 +1832,8 @@ module.exports = Object.freeze({
   assertResponseEnvelope,
   encodeRunResponse,
   parseRunResponse,
+  parseFinalizeResponse,
+  parseAckResponse,
   encodeControlRecord,
   encodeApplyReceiptRecord,
   encodeRollbackReceiptRecord,

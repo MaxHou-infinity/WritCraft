@@ -1769,6 +1769,93 @@ if (process.env.WRC_A1B_E3_R === '1') {
   }
 }
 
+if (process.env.WRC_A1B_E4_FA === '1') {
+  test('A1b E-4 finalize seals the committed terminal and ACK acknowledges the final record', () => {
+    const item = existingProductionFixture(helper);
+    try {
+      const executed = item.scoped.existingRestore.execute(item.bound, item.descriptors);
+      assert.strictEqual(executed.state, 'COMMITTED');
+      assert(executed.terminalReceipt);
+      const finalized = item.scoped.existingRestore.finalize(
+        item.bound,
+        executed.terminalReceipt,
+        item.descriptors
+      );
+      assert.strictEqual(finalized.command, existingSchema.COMMANDS.FINALIZE);
+      assert.strictEqual(finalized.state, 'COMMITTED');
+      assert(finalized.finalRecord);
+      assert(finalized.finalRecordIdentity);
+      const finalBasename = existingSchema.finalRecordName(
+        existingSchema.buildFinalizeRequest(item.bound, executed.terminalReceipt),
+        item.bound
+      );
+      const finalPath = path.join(item.rootPath, '.writcraft', 'recovery', finalBasename);
+      assert.strictEqual(fs.existsSync(finalPath), true);
+      const finalWire = existingSchema.encodeFinalRecord(
+        finalized.finalRecord,
+        existingSchema.buildFinalizeRequest(item.bound, executed.terminalReceipt),
+        item.bound
+      );
+      assert.strictEqual(fs.readFileSync(finalPath, 'utf8'), finalWire);
+      assert.strictEqual(
+        finalized.finalRecordIdentity.contentSha256,
+        evidence.sha256(Buffer.from(finalWire, 'utf8'))
+      );
+      const finalizeRequest = existingSchema.buildFinalizeRequest(
+        item.bound,
+        executed.terminalReceipt
+      );
+      const acked = item.scoped.existingRestore.ack(
+        item.bound,
+        finalizeRequest,
+        finalized.finalRecordIdentity,
+        `sha256:${'d'.repeat(64)}`,
+        item.descriptors
+      );
+      assert.strictEqual(acked.command, existingSchema.COMMANDS.FINALIZE);
+      assert.strictEqual(acked.state, 'ACKED');
+      assert.strictEqual(
+        acked.finalRecordDigest,
+        existingSchema.buildFinalRecord(finalizeRequest, item.bound).finalRecordDigest
+      );
+    } finally { item.close(); }
+  });
+
+  test('A1b E-4 finalize rejects an empty terminal wire', () => {
+    const item = existingProductionFixture(helper);
+    try {
+      const executed = item.scoped.existingRestore.execute(item.bound, item.descriptors);
+      assert.strictEqual(executed.state, 'COMMITTED');
+      const bind = schema.encodeRootBind({
+        schema: schema.SCHEMAS.ROOT_BIND,
+        canonicalRoot: item.rootPath,
+        expectedRootIdentityDigest: directoryIdentityDigest(item.rootPath),
+        expectedRecoveryIdentityDigest: directoryIdentityDigest(
+          path.join(item.rootPath, '.writcraft', 'recovery')
+        ),
+      });
+      // A terminal with zero items cannot be sealed: the finalize wire carries
+      // itemCount and the native command fails closed on 0.
+      const forgedWire = [
+        'F', 'PUBLISH', item.bound.request.operationId,
+        existingSchema.requestDigest(item.bound), 'COMMITTED',
+        executed.terminalReceipt.terminalReceiptDigest,
+        executed.terminalReceipt.receiptSetDigest, '0',
+      ].join('\t');
+      const result = childProcess.spawnSync(helper, [], {
+        input: `${bind}${forgedWire}\n`,
+        encoding: 'utf8',
+        stdio: [
+          'pipe', 'pipe', 'pipe', fs.openSync('/', fs.constants.O_RDONLY),
+          item.descriptors.artifactFd, item.descriptors.markerFd,
+          item.descriptors.historyParentFd, item.descriptors.historyFd,
+        ],
+      });
+      assert.notStrictEqual(result.status, 0);
+    } finally { item.close(); }
+  });
+}
+
 test('A1b native canonical control/apply parity matches the JS golden byte-for-byte', () => {
   const item = existingProductionFixture(canonicalHelper);
   try {
