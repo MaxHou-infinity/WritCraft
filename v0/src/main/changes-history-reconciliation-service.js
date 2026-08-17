@@ -2600,6 +2600,25 @@ function createChangesHistoryReconciliationService(options = {}) {
       value = ackCommittedValue;
       publication = ackCommittedPublication;
     }
+    // Mixed transaction exit: seal the EXISTING terminal (native finalize driven
+    // from the CAS-installed publication); the publication FINALIZED state and
+    // the marker FINALIZED phase are installed in one journal append below.
+    let finalizedExistingPublication = null;
+    if (value.existingTerminalPublication !== null) {
+      const existingPub = markerJournalSchema.assertExistingTerminalPublication(
+        value.existingTerminalPublication
+      );
+      if (existingPub.state === 'COMMITTED') {
+        finalizedExistingPublication = finalizeExistingRestore(
+          rootPath,
+          marker.projectId,
+          marker.operationId
+        );
+      } else if (existingPub.state !== 'FINALIZED') {
+        fail('CHANGES_MANUAL_RECOVERY_REQUIRED',
+          'EXISTING terminal publication state is invalid');
+      }
+    }
     if (marker.publicMarkdownPhase.phase === 'HISTORY_COMMITTED') {
       const nextPhase = publicMarkdownPhaseSchema.assertTransition(
         marker.publicMarkdownPhase,
@@ -2618,6 +2637,9 @@ function createChangesHistoryReconciliationService(options = {}) {
       const markerValue = journalNextValue(value, {
         activeMarker: marker,
         activeMarkerDigest: markerJournalSchema.activeMarkerDigest(marker),
+        ...(finalizedExistingPublication !== null
+          ? { existingTerminalPublication: finalizedExistingPublication }
+          : {}),
       });
       appendJournal(
         scopedJournal,
@@ -4904,11 +4926,14 @@ function createChangesHistoryReconciliationService(options = {}) {
       : rawScoped;
     const execute = method(scoped, 'execute');
     const reconcile = method(scoped, 'reconcile');
-    if (execute === null || reconcile === null) {
+    const finalizePublication = method(scoped, 'finalizePublication');
+    const ackPublication = method(scoped, 'ackPublication');
+    if (execute === null || reconcile === null || finalizePublication === null ||
+        ackPublication === null) {
       fail('SNAPSHOT_RESTORE_EXISTING_LIFECYCLE_UNAVAILABLE',
         'formal existing Markdown lifecycle is unavailable');
     }
-    return Object.freeze({ execute, reconcile });
+    return Object.freeze({ execute, reconcile, finalizePublication, ackPublication });
   }
 
   function identityFromStat(stat, contentSha256) {
@@ -5340,6 +5365,245 @@ function createChangesHistoryReconciliationService(options = {}) {
       operationId,
       existingRestoreSchema.COMMANDS.RECONCILE
     );
+  }
+
+  // Mixed transaction exit: seals the CAS-installed EXISTING terminal with the
+  // native finalize (F) driven from the publication and installs the
+  // EXISTING_FINALIZATION. Returns the FINALIZED publication; the caller
+  // transitions it (COMMITTED -> FINALIZED) in the same journal append as the
+  // marker FINALIZED phase (the journal requires the publication state to bind
+  // the marker phase). The marker phase object is not recoverable after the
+  // marker transitions (updatedAt moves), so the finalize is publication-
+  // driven; the publication's terminalReceiptDigest is the CAS-installed truth.
+  function finalizeExistingRestore(rootPath, projectId, operationId) {
+    projectIdentity(projectService, rootPath, projectId);
+    const scopedJournal = markerJournalFor(rootPath, true);
+    const current = journalCurrent(scopedJournal);
+    if (current.status !== 'VALUE' || current.value?.state !== 'ACTIVE' ||
+        current.value.projectId !== projectId ||
+        current.value.activeOperationId !== operationId ||
+        current.value.activeKind !== 'snapshot_restore' ||
+        current.value.existingTerminalPublication === null) {
+      fail('CHANGES_MANUAL_RECOVERY_REQUIRED',
+        'EXISTING finalize journal authority is unavailable');
+    }
+    const value = current.value;
+    const marker = validateMarker(value.activeMarker, projectService, historyService);
+    if (marker.operationId !== operationId || marker.projectId !== projectId ||
+        marker.kind !== 'snapshot_restore' ||
+        !['EXISTING_COMMITTED', 'HISTORY_COMMITTED']
+          .includes(marker.publicMarkdownPhase?.phase)) {
+      fail('CHANGES_RECOVERY_CONFLICT', 'EXISTING finalize requires an EXISTING terminal');
+    }
+    if (value.existingTerminalPublication.state === 'FINALIZED') {
+      // Idempotent: the terminal was already sealed and transitioned.
+      return value.existingTerminalPublication;
+    }
+    const publication = markerJournalSchema.assertExistingTerminalPublication(
+      value.existingTerminalPublication
+    );
+    if (publication.state !== 'COMMITTED') {
+      fail('CHANGES_MANUAL_RECOVERY_REQUIRED',
+        'EXISTING terminal finalization state is invalid');
+    }
+    const verified = verifyPublicMarkdownPhaseArtifact(rootPath, marker);
+    // At finalize time the History is already committed; the descriptors carry
+    // the prepared (current) History authority, not the base state.
+    const historyExpected = marker.preparedHistoryState &&
+        marker.preparedHistoryState.exists === true
+      ? { exists: true, digest: marker.preparedHistoryState.digest }
+      : marker.baseHistoryState;
+    const baseHistory = captureHistoryAuthority(rootPath, historyExpected);
+    const lifecycle = existingLifecycleFor(rootPath);
+    try {
+      assertHistoryAuthority(baseHistory);
+      return withExistingJournalBinding(rootPath, value, ({ binding, journalFd }) =>
+        withPublicMarkdownArtifactFd(
+          markerLocation(rootPath, false, fileSystem).directory,
+          marker,
+          artifactFd => {
+            const descriptors = Object.freeze({
+              artifactFd,
+              markerFd: journalFd,
+              historyParentFd: baseHistory.directoryFd,
+              historyFd: baseHistory.fd === null ? baseHistory.directoryFd : baseHistory.fd,
+            });
+            const finalResult = lifecycle.finalizePublication(publication, descriptors);
+            if (finalResult.state !== 'COMMITTED' || finalResult.finalRecord === null ||
+                finalResult.finalRecordIdentity === null) {
+              fail('CHANGES_MANUAL_RECOVERY_REQUIRED',
+                'EXISTING terminal finalize is not durably committed');
+            }
+            const finalizeWire = existingRestoreSchema.encodeFinalizePublicationCommand(
+              publication
+            );
+            const finalizationInput = {
+              schema: markerJournalSchema.SCHEMAS.EXISTING_FINALIZATION,
+              finalizeRequestDigest: evidenceDeliverySchema.sha256(
+                Buffer.from(finalizeWire, 'utf8')
+              ),
+              historyCommittedPhaseDigest: evidenceDeliverySchema.digestObject(
+                publicMarkdownPhaseSchema.SCHEMA,
+                marker.publicMarkdownPhase
+              ),
+              finalBasename: existingRestoreSchema.finalRecordNameFromPublication(publication),
+              finalRecordDigest: finalResult.finalRecord.finalRecordDigest,
+              finalRecordIdentity: finalResult.finalRecordIdentity,
+              markerFinalizedPhaseDigest: evidenceDeliverySchema.digestObject(
+                publicMarkdownPhaseSchema.SCHEMA,
+                marker.publicMarkdownPhase
+              ),
+              finalizationDigest: null,
+            };
+            const finalizedPhase = markerJournalSchema.assertExistingFinalization({
+              ...finalizationInput,
+              finalizationDigest: markerJournalSchema.existingFinalizationDigest(
+                finalizationInput
+              ),
+            }, operationId);
+            const nextBase = {
+              ...publication,
+              state: 'FINALIZED',
+              finalization: finalizedPhase,
+              publicationDigest: null,
+            };
+            const nextWithDigest = {
+              ...nextBase,
+              publicationDigest: markerJournalSchema.existingTerminalPublicationDigest(nextBase),
+            };
+            const storedNext = markerJournalSchema.assertExistingTerminalPublicationTransition(
+              publication,
+              markerJournalSchema.assertExistingTerminalPublication(nextWithDigest)
+            );
+            // The journal requires the publication FINALIZED state to bind a
+            // FINALIZED marker phase, so the publication CAS is performed in the
+            // same append as the marker FINALIZED transition by the caller.
+            return storedNext;
+          }
+        )
+      );
+    } catch (error) {
+      if (error instanceof ChangesHistoryRecoveryError) throw error;
+      const wrapped = new ChangesHistoryRecoveryError(
+        'CHANGES_MANUAL_RECOVERY_REQUIRED',
+        'EXISTING finalize authority cannot be completed'
+      );
+      wrapped.cause = error;
+      throw wrapped;
+    } finally {
+      closeHistoryAuthority(baseHistory);
+    }
+  }
+
+  // Mixed transaction exit: acknowledges the FINALIZED EXISTING terminal with
+  // the native ACK (A) and transitions its publication FINALIZED ->
+  // ACK_COMMITTED so the journal may return to IDLE.
+  function acknowledgeExistingRestore(rootPath, projectId, operationId) {
+    projectIdentity(projectService, rootPath, projectId);
+    const scopedJournal = markerJournalFor(rootPath, true);
+    const current = journalCurrent(scopedJournal);
+    if (current.status !== 'VALUE' || current.value?.state !== 'ACTIVE' ||
+        current.value.projectId !== projectId ||
+        current.value.activeOperationId !== operationId ||
+        current.value.activeKind !== 'snapshot_restore' ||
+        current.value.existingTerminalPublication === null) {
+      fail('CHANGES_MANUAL_RECOVERY_REQUIRED',
+        'EXISTING ack journal authority is unavailable');
+    }
+    const value = current.value;
+    const marker = validateMarker(value.activeMarker, projectService, historyService);
+    if (marker.operationId !== operationId || marker.projectId !== projectId ||
+        marker.kind !== 'snapshot_restore' ||
+        marker.publicMarkdownPhase?.phase !== 'FINALIZED') {
+      fail('CHANGES_RECOVERY_CONFLICT', 'EXISTING ack requires a FINALIZED terminal');
+    }
+    const publication = markerJournalSchema.assertExistingTerminalPublication(
+      value.existingTerminalPublication
+    );
+    if (publication.state === 'ACK_COMMITTED') {
+      return publication;
+    }
+    if (publication.state !== 'FINALIZED' || publication.finalization === null) {
+      fail('CHANGES_MANUAL_RECOVERY_REQUIRED',
+        'EXISTING terminal ack state is invalid');
+    }
+    const verified = verifyPublicMarkdownPhaseArtifact(rootPath, marker);
+    const historyExpected = marker.preparedHistoryState &&
+        marker.preparedHistoryState.exists === true
+      ? { exists: true, digest: marker.preparedHistoryState.digest }
+      : marker.baseHistoryState;
+    const baseHistory = captureHistoryAuthority(rootPath, historyExpected);
+    const lifecycle = existingLifecycleFor(rootPath);
+    try {
+      assertHistoryAuthority(baseHistory);
+      return withExistingJournalBinding(rootPath, value, ({ journalFd }) =>
+        withPublicMarkdownArtifactFd(
+          markerLocation(rootPath, false, fileSystem).directory,
+          marker,
+          artifactFd => {
+            const descriptors = Object.freeze({
+              artifactFd,
+              markerFd: journalFd,
+              historyParentFd: baseHistory.directoryFd,
+              historyFd: baseHistory.fd === null ? baseHistory.directoryFd : baseHistory.fd,
+            });
+            const markerPhaseDigest = evidenceDeliverySchema.digestObject(
+              publicMarkdownPhaseSchema.SCHEMA,
+              marker.publicMarkdownPhase
+            );
+            const ackResult = lifecycle.ackPublication(
+              publication,
+              markerPhaseDigest,
+              descriptors
+            );
+            if (ackResult.state !== 'ACKED') {
+              fail('CHANGES_MANUAL_RECOVERY_REQUIRED',
+                'EXISTING terminal ACK is not acknowledged');
+            }
+            const ackBase = {
+              ...publication,
+              state: 'ACK_COMMITTED',
+              publicationDigest: null,
+            };
+            const ackWithDigest = {
+              ...ackBase,
+              publicationDigest: markerJournalSchema.existingTerminalPublicationDigest(ackBase),
+            };
+            const storedAck = markerJournalSchema.assertExistingTerminalPublicationTransition(
+              publication,
+              markerJournalSchema.assertExistingTerminalPublication(ackWithDigest)
+            );
+            const nextValue = journalNextValue(value, {
+              existingTerminalPublication: storedAck,
+            });
+            const beforeAppend = () => {
+              assertHistoryAuthority(baseHistory);
+              const latest = journalCurrent(scopedJournal);
+              if (latest.status !== 'VALUE' || canonical(latest.value) !== canonical(value)) {
+                fail('CHANGES_RECOVERY_STALE',
+                  'EXISTING journal changed before ack CAS');
+              }
+            };
+            if (appendSnapshotPreparedJournal(scopedJournal, value, nextValue, beforeAppend)
+                !== 'COMMITTED') {
+              fail('CHANGES_MANUAL_RECOVERY_REQUIRED',
+                'EXISTING terminal ack CAS is unknown');
+            }
+            return storedAck;
+          }
+        )
+      );
+    } catch (error) {
+      if (error instanceof ChangesHistoryRecoveryError) throw error;
+      const wrapped = new ChangesHistoryRecoveryError(
+        'CHANGES_MANUAL_RECOVERY_REQUIRED',
+        'EXISTING ack authority cannot be completed'
+      );
+      wrapped.cause = error;
+      throw wrapped;
+    } finally {
+      closeHistoryAuthority(baseHistory);
+    }
   }
 
   function authoritativeState(rootPath, marker) {
@@ -6097,6 +6361,25 @@ function createChangesHistoryReconciliationService(options = {}) {
     }
     const currentHistory = historyService.loadHistoryState(rootPath);
     assertPersistedFinalRecordIdentity(rootPath, value.nativePublication);
+    // Mixed exit: acknowledge the EXISTING terminal (native ACK) and install
+    // its ACK_COMMITTED publication before the journal returns to IDLE; must
+    // run before the artifact is removed (the ACK validates the held artifact).
+    let existingTerminalPublicationState = 'NONE';
+    let existingTerminalPublicationDigest = null;
+    if (value.existingTerminalPublication !== null) {
+      const acknowledged = acknowledgeExistingRestore(rootPath, projectId, operationId);
+      existingTerminalPublicationState = 'ACK_COMMITTED';
+      existingTerminalPublicationDigest = acknowledged.publicationDigest;
+      // The ACK CAS advanced the journal; re-read so subsequent appends bind
+      // the exact current value.
+      const afterAck = journalCurrent(scoped);
+      if (afterAck.status !== 'VALUE' || afterAck.value?.state !== 'ACTIVE' ||
+          afterAck.value.activeOperationId !== operationId) {
+        fail('CHANGES_MANUAL_RECOVERY_REQUIRED',
+          'Snapshot terminal journal drifted after EXISTING ACK');
+      }
+      value = afterAck.value;
+    }
     const artifactLifecycle = artifactLifecycleFor(rootPath);
     if (!artifactLifecycle || typeof artifactLifecycle.reconcile !== 'function' ||
         typeof artifactLifecycle.verify !== 'function' ||
@@ -6172,8 +6455,8 @@ function createChangesHistoryReconciliationService(options = {}) {
       publicRecordDigests,
       publicationState: 'ACK_COMMITTED',
       publicationDigest: value.nativePublication.publicationDigest,
-      existingTerminalPublicationState: 'NONE',
-      existingTerminalPublicationDigest: null,
+      existingTerminalPublicationState,
+      existingTerminalPublicationDigest,
       recoveryDirectoryFsyncComplete: true,
     });
     const cleanupValue = journalNextValue(value, {
@@ -6410,6 +6693,8 @@ function createChangesHistoryReconciliationService(options = {}) {
     createMissingLeaves,
     executeExistingRestore,
     reconcileExistingRestore,
+    finalizeExistingRestore,
+    acknowledgeExistingRestore,
     commitMissingRestoreHistory,
     finalizeMissingRestore,
     quarantineSnapshotRestoreUndo,

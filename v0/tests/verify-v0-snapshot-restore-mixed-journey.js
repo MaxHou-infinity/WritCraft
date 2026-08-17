@@ -29,6 +29,7 @@ const publicNative = require('../src/main/public-markdown-native-lifecycle');
 const artifactLifecycleService = require('../src/main/changes-history-artifact-lifecycle');
 const markerLifecycleService = require('../src/main/changes-history-marker-lifecycle');
 const phaseSchema = require('../src/main/snapshot-public-markdown-phase-schema');
+const existingSchema = require('../src/main/snapshot-existing-restore-native-schema');
 const {
   createChangesHistoryTransaction,
 } = require('../src/main/changes-history-transaction');
@@ -253,11 +254,31 @@ function runMixedJourney(item, options = {}) {
     journal.SCHEMAS.EXISTING_TERMINAL_PUBLICATION
   );
   assert.strictEqual(installed.existingTerminalPublication.state, 'COMMITTED');
-  // The mixed exit (EXISTING terminal finalization -> HISTORY_COMMITTED ->
-  // FINALIZED) is the next slice: it requires the native EXISTING finalize
-  // record, which the C helper still fails closed on by design. This round's
-  // production-boundary evidence stops at the CAS-installed EXISTING terminal.
+  // The full mixed exit (EXISTING terminal finalization -> HISTORY_COMMITTED ->
+  // FINALIZED) runs through finalizeMissingRestore; see runMixedJourneyFullExit.
   return { marker, reconciled };
+}
+
+// Full mixed exit: after the EXISTING terminal is CAS-installed, History is
+// committed, then the finalize seals the EXISTING terminal (native F), the
+// publication transitions to FINALIZED, the marker reaches FINALIZED, and the
+// transaction terminates with a terminal marker and cleared recovery state.
+function runMixedJourneyFullExit(item) {
+  const { marker: committedMarker } = runMixedJourney(item);
+  let marker = item.transaction.commitMissingRestoreHistory(
+    item.prepared,
+    committedMarker
+  );
+  assert.strictEqual(marker.publicMarkdownPhase.phase, 'HISTORY_COMMITTED');
+  const finalized = item.transaction.finalizeMissingRestore(item.prepared, marker);
+  assert.strictEqual(finalized.publicMarkdownPhase.phase, 'FINALIZED');
+  // Capture the journal truth before clear returns it to IDLE.
+  const preClearValue = journalValue(item);
+  const terminal = item.transaction.reconciliation.finish(item.rootPath, marker.operationId);
+  assert.strictEqual(terminal.state, 'terminal');
+  assert.strictEqual(terminal.outcome, 'applied');
+  item.transaction.reconciliation.clear(item.rootPath, item.projectId, marker.operationId);
+  return { marker: finalized, terminal, preClearValue };
 }
 
 try {
@@ -373,6 +394,46 @@ try {
     } finally { item.cleanup(); }
   });
 
+  test('mixed journey exits to FINALIZED with the EXISTING terminal publication FINALIZED', () => {
+    const item = mixedFixture({ helperPath, artifactHelperPath });
+    try {
+      const { terminal, preClearValue } = runMixedJourneyFullExit(item);
+      assert.strictEqual(terminal.files.length, 2);
+      assert.deepStrictEqual(fs.readFileSync(path.join(item.rootPath, 'existing.md')), item.afterBytes);
+      assert.deepStrictEqual(fs.readFileSync(path.join(item.rootPath, 'new.md')), item.createdBytes);
+      assert.strictEqual(changeHistoryService.listHistory(item.rootPath).length, 1);
+      // The finalize sealed the terminal (FINALIZED + finalization); clear then
+      // ACKs it (ACK_COMMITTED) and returns the journal to IDLE.
+      assert.strictEqual(preClearValue.existingTerminalPublication.state, 'FINALIZED');
+      assert(preClearValue.existingTerminalPublication.finalization);
+      assert.strictEqual(
+        preClearValue.existingTerminalPublication.finalization.finalBasename
+          .startsWith('.changes-history-native-existing-final.'),
+        true
+      );
+      const finalPath = path.join(
+        item.rootPath,
+        '.writcraft',
+        'recovery',
+        preClearValue.existingTerminalPublication.finalization.finalBasename
+      );
+      assert.strictEqual(fs.existsSync(finalPath), true);
+      const finalRecord = existingSchema.buildFinalRecordFromPublication(
+        preClearValue.existingTerminalPublication
+      );
+      assert.strictEqual(
+        preClearValue.existingTerminalPublication.finalization.finalRecordDigest,
+        finalRecord.finalRecordDigest
+      );
+      assert.strictEqual(
+        fs.readFileSync(finalPath, 'utf8'),
+        existingSchema.encodeFinalRecordFromPublication(preClearValue.existingTerminalPublication)
+      );
+      const postClear = journalValue(item);
+      assert.strictEqual(postClear.state, 'IDLE');
+    } finally { item.cleanup(); }
+  });
+
   test('journal drift before the EXISTING terminal CAS fails closed and never installs the publication', () => {
     const item = mixedFixture({ helperPath, artifactHelperPath });
     try {
@@ -478,5 +539,5 @@ try {
   fs.rmSync(scratch, { recursive: true, force: true });
 }
 
-console.log(`\n${passed}/3 mixed production journey checks passed.`);
-if (passed !== 3) process.exitCode = 1;
+console.log(`\n${passed}/4 mixed production journey checks passed.`);
+if (passed !== 4) process.exitCode = 1;

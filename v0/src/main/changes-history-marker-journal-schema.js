@@ -1004,8 +1004,11 @@ function assertExistingFinalization(raw, operationId) {
     ),
     finalizationDigest: digest(value.finalizationDigest, 'finalizationDigest'),
   });
-  if (valid.finalRecordIdentity.contentSha256 !== valid.finalRecordDigest ||
-      valid.finalizationDigest !== existingFinalizationDigest(valid) ||
+  // The final record identity describes the actual owner-private final record
+  // file (raw content sha), while finalRecordDigest is the record's domain
+  // digest over its canonical JSON; the two are intentionally different. The
+  // finalization binds both via its own digest below.
+  if (valid.finalizationDigest !== existingFinalizationDigest(valid) ||
       !OPERATION_ID_RE.test(operationId)) {
     fail('EXISTING terminal finalization digest or record binding is invalid');
   }

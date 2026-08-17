@@ -7,6 +7,7 @@ const path = require('path');
 const evidenceSchema = require('./evidence-delivery-schema');
 const nativeSchema = require('./public-markdown-native-schema');
 const existingRestoreSchema = require('./snapshot-existing-restore-native-schema');
+const markerJournalSchema = require('./changes-history-marker-journal-schema');
 
 const HELPER_PATH = process.resourcesPath && !process.defaultApp
   ? path.join(process.resourcesPath, '..', 'Helpers', 'public-markdown-create-helper')
@@ -94,6 +95,17 @@ function boundProject(rootPath) {
     if (rootFd !== null) try { fs.closeSync(rootFd); } catch (_) {}
     if (recoveryFd !== null) try { fs.closeSync(recoveryFd); } catch (_) {}
   }
+}
+
+function publicationArtifactIdentityDigest(fd, publication) {
+  let stat;
+  try { stat = fs.fstatSync(fd, { bigint: true }); }
+  catch (_) { fail('PUBLIC_MARKDOWN_NATIVE_PROTOCOL', 'held artifact authority is invalid'); }
+  if (!stat.isFile() || stat.nlink !== 1n ||
+      Number(stat.uid) !== process.geteuid() || Number(stat.mode & 0o777n) !== 0o600) {
+    fail('PUBLIC_MARKDOWN_NATIVE_PROTOCOL', 'held artifact authority is invalid');
+  }
+  return evidenceSchema.digestObjectIdentity(identityFromStat(stat, publication.artifactDigest));
 }
 
 function artifactIdentityDigest(fd, request) {
@@ -1055,6 +1067,78 @@ function createPublicMarkdownNativeTransport(options = {}) {
       return finalizeExisting(rawAuthority, rawTerminalReceipt, rawDescriptors);
     }
 
+    // WRCCHRJ2 single-authority finalize driven from the CAS-installed terminal
+    // publication (the marker phase object is not recoverable after the marker
+    // transitions, so the authority is not rebuilt; the native finalize seals
+    // exactly the publication-bound digests).
+    function finalizePublication(rawPublication, rawDescriptors) {
+      const publication = markerJournalSchema.assertExistingTerminalPublication(rawPublication);
+      const descriptors = descriptorValues(
+        rawDescriptors,
+        ['artifactFd', 'markerFd', 'historyParentFd', 'historyFd'],
+        'existing restore held descriptors'
+      );
+      if (Object.values(descriptors).some(fd => !Number.isInteger(fd) || fd < 0) ||
+          publicationArtifactIdentityDigest(descriptors.artifactFd, publication) !==
+            publication.artifactIdentityDigest) {
+        fail('PUBLIC_MARKDOWN_NATIVE_PROTOCOL',
+          'existing restore held descriptor binding is invalid');
+      }
+      try {
+        const result = assertProcessSuccess(
+          invokeExisting(
+            existingRestoreSchema.encodeFinalizePublicationCommand(publication),
+            descriptors
+          ),
+          'UNKNOWN'
+        );
+        return existingRestoreSchema.parseFinalizePublicationResponse(
+          result.stdout, publication
+        );
+      } catch (_) {
+        return existingRestoreSchema.buildFinalResultFromPublication(publication, 'UNKNOWN');
+      }
+    }
+
+    function ackPublication(rawPublication, markerPhaseDigest, rawDescriptors) {
+      const publication = markerJournalSchema.assertExistingTerminalPublication(rawPublication);
+      if (publication.finalization === null) {
+        fail('PUBLIC_MARKDOWN_NATIVE_PROTOCOL',
+          'EXISTING terminal publication is not finalized');
+      }
+      const descriptors = descriptorValues(
+        rawDescriptors,
+        ['artifactFd', 'markerFd', 'historyParentFd', 'historyFd'],
+        'existing restore held descriptors'
+      );
+      if (Object.values(descriptors).some(fd => !Number.isInteger(fd) || fd < 0) ||
+          publicationArtifactIdentityDigest(descriptors.artifactFd, publication) !==
+            publication.artifactIdentityDigest) {
+        fail('PUBLIC_MARKDOWN_NATIVE_PROTOCOL',
+          'existing restore held descriptor binding is invalid');
+      }
+      try {
+        const result = assertProcessSuccess(
+          invokeExisting(
+            existingRestoreSchema.encodeAckPublicationCommand(publication, markerPhaseDigest),
+            descriptors
+          ),
+          'UNKNOWN'
+        );
+        return existingRestoreSchema.parseAckPublicationResponse(result.stdout, publication);
+      } catch (_) {
+        return Object.freeze({
+          schema: existingRestoreSchema.SCHEMAS.ACK_RESULT,
+          command: existingRestoreSchema.COMMANDS.FINALIZE,
+          state: 'UNKNOWN',
+          operationId: publication.operationId,
+          requestDigest: publication.requestDigest,
+          finalRecordDigest: publication.finalization.finalRecordDigest,
+          errorCode: 'UNKNOWN',
+        });
+      }
+    }
+
     function ackExisting(
       rawAuthority,
       rawFinalizeRequest,
@@ -1246,6 +1330,8 @@ function createPublicMarkdownNativeTransport(options = {}) {
       verifyExisting,
       finalizeExisting,
       reconcileFinalizeExisting,
+      finalizePublication,
+      ackPublication,
       ackExisting,
     });
   }
@@ -1502,6 +1588,8 @@ function createPublicMarkdownNativeLifecycle(options = {}) {
         reconcile: descriptorMethod(rawScoped, 'reconcileExisting'),
         verify: descriptorMethod(rawScoped, 'verifyExisting'),
         finalize: descriptorMethod(rawScoped, 'finalizeExisting'),
+        finalizePublication: descriptorMethod(rawScoped, 'finalizePublication'),
+        ackPublication: descriptorMethod(rawScoped, 'ackPublication'),
         reconcileFinalize: descriptorMethod(rawScoped, 'reconcileFinalizeExisting'),
         ack: descriptorMethod(rawScoped, 'ackExisting'),
       });
@@ -1626,6 +1714,16 @@ function createPublicMarkdownNativeLifecycle(options = {}) {
               existingRestore.reconcileFinalize(authority, terminal, rawDescriptors),
               authority,
               finalizeRequest
+            );
+          },
+          finalizePublication(rawPublication, rawDescriptors) {
+            return existingRestore.finalizePublication(rawPublication, rawDescriptors);
+          },
+          ackPublication(rawPublication, markerPhaseDigest, rawDescriptors) {
+            return existingRestore.ackPublication(
+              rawPublication,
+              markerPhaseDigest,
+              rawDescriptors
             );
           },
           ack: existingRestore.ack,

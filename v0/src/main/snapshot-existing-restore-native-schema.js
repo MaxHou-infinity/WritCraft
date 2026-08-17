@@ -6,6 +6,7 @@
 const evidence = require('./evidence-delivery-schema');
 const phaseSchema = require('./snapshot-public-markdown-phase-schema');
 const journalBindingSchema = require('./snapshot-existing-journal-binding-schema');
+const markerJournalSchema = require('./changes-history-marker-journal-schema');
 
 const METHODS = Object.freeze([
   'execute', 'reconcile', 'verify', 'finalize', 'reconcileFinalize',
@@ -1330,6 +1331,58 @@ function finalRecordName(rawFinalizeRequest, rawAuthority) {
   }).slice('sha256:'.length)}`;
 }
 
+// WRCCHRJ2 single-authority finalize: the CAS-installed EXISTING terminal
+// publication already binds requestDigest + the terminal digests, so the
+// finalize can be driven from the publication alone (the native finalize
+// seals exactly those digests). The phase object is not recoverable after the
+// marker transitions (updatedAt moves), so the authority is not rebuilt here.
+function buildFinalRecordFromPublication(rawPublication) {
+  const publication = markerJournalSchema.assertExistingTerminalPublication(rawPublication);
+  const base = {
+    schema: SCHEMAS.FINAL_RECORD,
+    operationId: publication.operationId,
+    requestDigest: publication.requestDigest,
+    terminalState: 'COMMITTED',
+    terminalReceiptDigest: publication.terminalReceiptDigest,
+    receiptSetDigest: publication.receiptSetDigest,
+    itemCount: publication.items.length,
+    recoveryFsyncComplete: true,
+  };
+  return immutable({
+    ...base,
+    finalRecordDigest: canonicalDigest(SCHEMAS.FINAL_RECORD, base),
+  });
+}
+
+function finalRecordNameFromPublication(rawPublication) {
+  const record = buildFinalRecordFromPublication(rawPublication);
+  return `.changes-history-native-existing-final.${canonicalDigest(SCHEMAS.FINAL_KEY, {
+    schema: SCHEMAS.FINAL_KEY,
+    operationId: record.operationId,
+    requestDigest: record.requestDigest,
+    terminalReceiptDigest: record.terminalReceiptDigest,
+  }).slice('sha256:'.length)}`;
+}
+
+function encodeFinalizePublicationCommand(rawPublication) {
+  const publication = markerJournalSchema.assertExistingTerminalPublication(rawPublication);
+  const record = buildFinalRecordFromPublication(publication);
+  return boundedWire([[
+    COMMANDS.FINALIZE, 'PUBLISH', record.operationId, record.requestDigest,
+    record.terminalState, record.terminalReceiptDigest, record.receiptSetDigest,
+    String(record.itemCount),
+  ].join('\t')], LIMITS.maxRequestBytes, 'publication finalize request');
+}
+
+function encodeFinalRecordFromPublication(rawPublication) {
+  const record = buildFinalRecordFromPublication(rawPublication);
+  return boundedWire([[
+    record.schema, record.operationId, record.requestDigest, record.terminalState,
+    record.terminalReceiptDigest, record.receiptSetDigest, String(record.itemCount),
+    '1', record.finalRecordDigest,
+  ].join('\t')], LIMITS.maxFinalRecordBytes, 'existing final record');
+}
+
 function buildFinalResult(
   rawAuthority,
   rawFinalizeRequest,
@@ -1753,6 +1806,117 @@ function parseFinalizeResponse(stdout, rawAuthority, rawFinalizeRequest) {
   return buildFinalResult(authority, request, 'COMMITTED', finalRecord, finalRecordIdentity);
 }
 
+// Publication-driven finalize parse: same native envelope, rebuilt from the
+// CAS-installed publication instead of a reconstructed authority.
+function parseFinalizePublicationResponse(stdout, rawPublication) {
+  const publication = markerJournalSchema.assertExistingTerminalPublication(rawPublication);
+  const envelope = assertResponseEnvelope(stdout);
+  const lines = envelope.slice(0, -1).split('\n');
+  if (lines.shift() !== 'P\tOK' || lines.length === 0) fail('finalize response bind missing');
+  const header = lines.shift().split('\t');
+  if (header.length !== 18 || header[0] !== COMMANDS.FINALIZE || header[1] !== 'RESULT' ||
+      header[3] !== publication.operationId ||
+      header[4] !== publication.requestDigest) {
+    fail('finalize response header invalid');
+  }
+  if (header[2] === 'UNKNOWN') {
+    if (header.slice(5).some(value => value !== '-')) fail('UNKNOWN finalize authority invalid');
+    return buildFinalResultFromPublication(publication, 'UNKNOWN');
+  }
+  if (header[2] !== 'COMMITTED') fail('finalize response state invalid');
+  const finalRecord = buildFinalRecordFromPublication(publication);
+  const finalWire = encodeFinalRecordFromPublication(publication);
+  if (header[5] !== finalRecord.finalRecordDigest ||
+      header[6] !== finalRecordNameFromPublication(publication) ||
+      header[7] !== finalRecord.terminalState ||
+      header[8] !== finalRecord.terminalReceiptDigest) {
+    fail('finalize response record authority invalid');
+  }
+  const finalRecordIdentity = assertPrivateRecordIdentity({
+    schema: evidence.SCHEMAS.OBJECT_IDENTITY,
+    dev: header[9], ino: header[10],
+    uid: canonicalWireInteger(header[11], 'finalRecordIdentity.uid'),
+    mode: canonicalWireInteger(header[12], 'finalRecordIdentity.mode'),
+    nlink: canonicalWireInteger(header[13], 'finalRecordIdentity.nlink'),
+    size: header[14],
+    mtimeNs: header[15], ctimeNs: header[16],
+    contentSha256: header[17],
+  }, finalWire, 'finalRecordIdentity');
+  return buildFinalResultFromPublication(
+    publication,
+    'COMMITTED',
+    finalRecord,
+    finalRecordIdentity
+  );
+}
+
+function buildFinalResultFromPublication(
+  rawPublication,
+  state,
+  rawFinalRecord = null,
+  rawFinalRecordIdentity = null
+) {
+  const publication = markerJournalSchema.assertExistingTerminalPublication(rawPublication);
+  if (!['COMMITTED', 'UNKNOWN'].includes(state)) fail('final result state invalid');
+  const finalRecord = state === 'COMMITTED'
+    ? buildFinalRecordFromPublication(publication)
+    : null;
+  const finalRecordIdentity = state === 'COMMITTED'
+    ? assertPrivateRecordIdentity(
+      rawFinalRecordIdentity,
+      encodeFinalRecordFromPublication(publication),
+      'finalRecordIdentity'
+    )
+    : null;
+  return immutable({
+    schema: SCHEMAS.FINAL_RESULT,
+    command: COMMANDS.FINALIZE,
+    state,
+    operationId: publication.operationId,
+    requestDigest: publication.requestDigest,
+    finalRecord: state === 'COMMITTED' ? finalRecord : null,
+    finalRecordIdentity,
+    errorCode: state === 'UNKNOWN' ? ERROR_CODES.UNKNOWN : null,
+  });
+}
+
+function encodeAckPublicationCommand(rawPublication, markerPhaseDigest) {
+  const publication = markerJournalSchema.assertExistingTerminalPublication(rawPublication);
+  const finalization = publication.finalization;
+  const identity = finalization.finalRecordIdentity;
+  return boundedWire([[
+    COMMANDS.FINALIZE, 'ACK', publication.operationId, publication.requestDigest,
+    finalization.finalBasename, finalization.finalRecordDigest,
+    digest(markerPhaseDigest, 'markerPhaseDigest'),
+    identity.dev, identity.ino, String(identity.uid), String(identity.mode),
+    String(identity.nlink), identity.size, identity.mtimeNs, identity.ctimeNs,
+    identity.contentSha256,
+  ].join('\t')], LIMITS.maxRequestBytes, 'publication ACK request');
+}
+
+function parseAckPublicationResponse(stdout, rawPublication) {
+  const publication = markerJournalSchema.assertExistingTerminalPublication(rawPublication);
+  const envelope = assertResponseEnvelope(stdout);
+  const lines = envelope.slice(0, -1).split('\n');
+  if (lines.shift() !== 'P\tOK' || lines.length === 0) fail('ACK response bind missing');
+  const header = lines.shift().split('\t');
+  if (header.length !== 6 || header[0] !== COMMANDS.FINALIZE || header[1] !== 'RESULT' ||
+      header[2] !== 'ACKED' || header[3] !== publication.operationId ||
+      header[4] !== publication.requestDigest ||
+      header[5] !== publication.finalization.finalRecordDigest) {
+    fail('ACK response header invalid');
+  }
+  return immutable({
+    schema: SCHEMAS.ACK_RESULT,
+    command: COMMANDS.FINALIZE,
+    state: 'ACKED',
+    operationId: publication.operationId,
+    requestDigest: publication.requestDigest,
+    finalRecordDigest: publication.finalization.finalRecordDigest,
+    errorCode: null,
+  });
+}
+
 // Parse the native EXISTING ACK (A) response.
 function parseAckResponse(stdout, rawAuthority, rawFinalizeRequest) {
   const authority = assertAuthority(rawAuthority);
@@ -1833,7 +1997,15 @@ module.exports = Object.freeze({
   encodeRunResponse,
   parseRunResponse,
   parseFinalizeResponse,
+  parseFinalizePublicationResponse,
   parseAckResponse,
+  buildFinalRecordFromPublication,
+  finalRecordNameFromPublication,
+  encodeFinalizePublicationCommand,
+  encodeFinalRecordFromPublication,
+  buildFinalResultFromPublication,
+  encodeAckPublicationCommand,
+  parseAckPublicationResponse,
   encodeControlRecord,
   encodeApplyReceiptRecord,
   encodeRollbackReceiptRecord,
