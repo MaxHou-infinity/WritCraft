@@ -1014,16 +1014,27 @@ function createPublicMarkdownNativeTransport(options = {}) {
       }
     }
 
-    function reconcileExisting(rawAuthority, rawDescriptors) {
+    function reconcileExisting(rawAuthority, rawDescriptors, rawReconcileIdentities, rawPublicationMarkerDigest, rawStoredRequestDigest) {
       const value = existingRestoreAuthority(rawAuthority, rawDescriptors);
       const { authority, descriptors } = value;
       try {
         const result = assertProcessSuccess(
-          invokeExisting(existingRestoreSchema.encodeReconcileCommand(authority), descriptors),
+          invokeExisting(
+            existingRestoreSchema.encodeReconcileCommand(
+              authority,
+              rawReconcileIdentities,
+              rawPublicationMarkerDigest,
+              rawStoredRequestDigest
+            ),
+            descriptors
+          ),
           'UNKNOWN'
         );
         return existingRestoreSchema.parseRunResponse(
-          result.stdout, authority, existingRestoreSchema.COMMANDS.RECONCILE
+          result.stdout,
+          authority,
+          existingRestoreSchema.COMMANDS.RECONCILE,
+          rawStoredRequestDigest
         );
       } catch (_) {
         return unknownExistingRunResult(authority, existingRestoreSchema.COMMANDS.RECONCILE);
@@ -1664,12 +1675,19 @@ function createPublicMarkdownNativeLifecycle(options = {}) {
               existingRestoreSchema.COMMANDS.EXECUTE
             );
           },
-          reconcile(rawAuthority, rawDescriptors) {
+          reconcile(rawAuthority, rawDescriptors, rawReconcileIdentities, rawPublicationMarkerDigest, rawStoredRequestDigest) {
             const authority = existingRestoreSchema.assertAuthority(rawAuthority);
             return existingRestoreSchema.assertRunResult(
-              existingRestore.reconcile(authority, rawDescriptors),
+              existingRestore.reconcile(
+                authority,
+                rawDescriptors,
+                rawReconcileIdentities,
+                rawPublicationMarkerDigest,
+                rawStoredRequestDigest
+              ),
               authority,
-              existingRestoreSchema.COMMANDS.RECONCILE
+              existingRestoreSchema.COMMANDS.RECONCILE,
+              rawStoredRequestDigest
             );
           },
           verify(rawAuthority, rawTerminalReceipt, rawDescriptors) {

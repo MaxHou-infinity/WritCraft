@@ -5469,6 +5469,13 @@ typedef struct {
   char ancestor[DIGEST_BYTES + 1U];
   char before_leaf[DIGEST_BYTES + 1U];
   char after_leaf[DIGEST_BYTES + 1U];
+  /* Fresh-R publication-time identities carried on the RECONCILE wire only.
+   * The executor never recaptures them from the current control/apply record;
+   * it reopens the stored records and requires their exact identity to match
+   * these publication identities, otherwise the fresh R is UNKNOWN. */
+  Identity control_stored;
+  Identity apply_stored;
+  bool stored_bound;
 #ifdef WRITCRAFT_TEST_EXISTING_CANONICAL
   RecordIdentity control_record_identity;
   RecordIdentity apply_record_identity;
@@ -5508,6 +5515,11 @@ typedef struct {
   char active_marker_canonical_sha256[DIGEST_BYTES + 1U];
   char root_identity[DIGEST_BYTES + 1U];
   char recovery_identity[DIGEST_BYTES + 1U];
+  /* Fresh-R only: the E-time marker digest stored in the publication. The
+   * control/apply records were built against it; the current journal binding
+   * (active_marker_digest) may have advanced to EXISTING_COMMITTED. */
+  char publication_marker_digest[DIGEST_BYTES + 1U];
+  bool reconcile;
   size_t count;
   ExistingExecuteItem *items;
 } ExistingExecuteRequest;
@@ -5521,13 +5533,45 @@ static bool valid_revision(const char *value) {
   return true;
 }
 
+static bool existing_identity_fields(char **fields, size_t offset, Identity *out) {
+  uint64_t dev = 0U;
+  uint64_t ino = 0U;
+  uint64_t uid = 0U;
+  uint64_t mode = 0U;
+  uint64_t nlink = 0U;
+  uint64_t size = 0U;
+  uint64_t mtime_ns = 0U;
+  uint64_t ctime_ns = 0U;
+  if (fields[offset] == NULL || strcmp(fields[offset], OBJECT_SCHEMA) != 0 ||
+      !parse_uint(fields[offset + 1U], UINT64_MAX, &dev) ||
+      !parse_uint(fields[offset + 2U], UINT64_MAX, &ino) ||
+      !parse_uint(fields[offset + 3U], UINT64_MAX, &uid) ||
+      !parse_uint(fields[offset + 4U], UINT64_MAX, &mode) ||
+      !parse_uint(fields[offset + 5U], UINT64_MAX, &nlink) ||
+      !parse_uint(fields[offset + 6U], UINT64_MAX, &size) ||
+      !parse_uint(fields[offset + 7U], INTMAX_MAX, &mtime_ns) ||
+      !parse_uint(fields[offset + 8U], INTMAX_MAX, &ctime_ns) ||
+      !valid_digest(fields[offset + 9U]) || uid != (uint64_t)geteuid() ||
+      mode != 0600U || nlink != 1U) return false;
+  out->dev = (uintmax_t)dev;
+  out->ino = (uintmax_t)ino;
+  out->uid = (uintmax_t)uid;
+  out->mode = (uintmax_t)(S_IFREG | mode);
+  out->nlink = (uintmax_t)nlink;
+  out->size = (uintmax_t)size;
+  out->mtime_ns = (intmax_t)mtime_ns;
+  out->ctime_ns = (intmax_t)ctime_ns;
+  return true;
+}
+
 static bool existing_execute_item_line(
   char *line, ExistingExecuteRequest *request, size_t index
 ) {
-  char *fields[14];
+  char *fields[36];
   size_t count = 0U;
   ExistingExecuteItem *item = &request->items[index];
-  if (!split_fields(line, fields, 14U, &count) || count != 13U ||
+  size_t expected = request->reconcile ? 34U : 13U;
+  if (!split_fields(line, fields, 36U, &count) || count != expected ||
       strcmp(fields[0], "I") != 0 || !valid_selected(fields[1]) ||
       !decode_hex(fields[2], item->path, sizeof(item->path)) ||
       !strict_utf8((const unsigned char *)item->path, strlen(item->path)) ||
@@ -5551,6 +5595,17 @@ static bool existing_execute_item_line(
   memcpy(item->after_content, fields[10], sizeof(item->after_content));
   memcpy(item->ancestor, fields[11], sizeof(item->ancestor));
   memcpy(item->before_leaf, fields[12], sizeof(item->before_leaf));
+  if (request->reconcile) {
+    /* Fresh R carries the stored publication identities (control then apply)
+     * plus the E-time publication marker digest; any foreign schema, malformed
+     * stat field or digest is rejected before any record is reopened. */
+    if (!existing_identity_fields(fields, 13U, &item->control_stored) ||
+        !existing_identity_fields(fields, 23U, &item->apply_stored) ||
+        !valid_digest(fields[33])) return false;
+    memcpy(request->publication_marker_digest, fields[33],
+      sizeof(request->publication_marker_digest));
+    item->stored_bound = true;
+  }
   for (size_t i = 0U; i < index; i += 1U) {
     ExistingExecuteItem *other = &request->items[i];
     if (strcmp(other->selected, item->selected) == 0 ||
@@ -5625,6 +5680,7 @@ static bool existing_execute_header(char *line, ExistingExecuteRequest *request)
   request->base_history_exists = strcmp(fields[29], "1") == 0;
   memcpy(request->base_history_content, fields[30], sizeof(request->base_history_content));
   memcpy(request->history_parent, fields[31], sizeof(request->history_parent));
+  request->reconcile = strcmp(fields[0], "R") == 0;
   request->count = (size_t)item_count;
   return true;
 }
@@ -6240,7 +6296,8 @@ static bool existing_canonical_control_digest(
     item->after_offset, item->after_length, item->after_content, item->after_revision,
     item->ancestor, request->artifact, request->artifact_identity, request->base_history,
     item->before_offset, item->before_length, item->before_content, item->before_leaf,
-    item->before_revision, request->created_phase, request->active_marker_digest,
+    item->before_revision, request->created_phase,
+    request->reconcile ? request->publication_marker_digest : request->active_marker_digest,
     request->operation, escaped, item->selected, request->selection);
   return length > 0 && (size_t)length < sizeof(canonical) &&
     digest_domain(EXISTING_CONTROL_SCHEMA, canonical, out);
@@ -6310,7 +6367,8 @@ static bool existing_control_record_build(
   int length = snprintf(out, MAX_RECORD_BYTES + 1U,
     EXISTING_CONTROL_SCHEMA "\t%s\t%s\t%s\t%s\t%s\t%s\t%s\t%s\t%s\t%s\t%s"
     "\t%" PRIu64 "\t%" PRIu64 "\t%s\t%" PRIu64 "\t%" PRIu64 "\t%s\t%s\t%s\t%s\n",
-    request->operation, item->selected, path_hex, request->active_marker_digest,
+    request->operation, item->selected, path_hex,
+    request->reconcile ? request->publication_marker_digest : request->active_marker_digest,
     request->artifact, request->artifact_identity, request->created_phase,
     request->selection, request->base_history, item->before_revision, item->after_revision,
     item->before_offset, item->before_length, item->before_content, item->after_offset,
@@ -6651,12 +6709,15 @@ static bool __attribute__((unused)) existing_output_committed(
       "\",\"selectionDigest\":\"%s\",\"state\":\"COMMITTED\"}",
       request->artifact, request->base_history, request->created_phase, token,
       request->items[0].after_content, commit->after_leaf, request->items[0].selected,
-      request->active_marker_digest, request->operation, set_digest, request->selection) ||
+      request->reconcile ? request->publication_marker_digest : request->active_marker_digest,
+      request->operation, set_digest, request->selection) ||
       !digest_domain(EXISTING_TERMINAL_SCHEMA, terminal, terminal_digest)) return false;
   int length = snprintf(line, sizeof(line),
     "%c\tRESULT\tCOMMITTED\t%s\t%s\t%s\t%s\t%s\t%s\t%s\t%s\t%s\t1\t-\n",
     command,
-    request->operation, request->request_digest, request->active_marker_digest, request->artifact,
+    request->operation, request->request_digest,
+    request->reconcile ? request->publication_marker_digest : request->active_marker_digest,
+    request->artifact,
     request->created_phase, request->selection, request->base_history, set_digest,
     terminal_digest);
   if (length <= 0 || (size_t)length >= sizeof(line) || !write_line(line)) return false;
@@ -6703,18 +6764,40 @@ static bool existing_reconcile_readonly(RootBinding *root, char *line) {
   char apply_digest[72];
   char apply_record[MAX_RECORD_BYTES + 1U];
   ExistingExecuteItem *item = &request.items[0];
-  if (valid && (!existing_control_record_build(&request, item, control_name, control_digest,
-      control_record) || !existing_record_names(&request, item, control_name, apply_name,
-      rollback_name, before_name, stage_name) ||
-      record_state(root->recovery_fd, rollback_name, "") != NAME_ABSENT ||
+  if (valid && (!item->stored_bound ||
+      !existing_control_record_build(&request, item, control_name, control_digest,
+      control_record))) {
+    valid = false;
+  }
+  if (valid && !existing_record_names(&request, item, control_name, apply_name,
+      rollback_name, before_name, stage_name)) {
+    valid = false;
+  }
+  if (valid && (record_state(root->recovery_fd, rollback_name, "") != NAME_ABSENT ||
       record_state(root->recovery_fd, before_name, "") != NAME_ABSENT ||
-      record_state(root->recovery_fd, stage_name, "") != NAME_ABSENT ||
-      !existing_execute_leaf_identity_after(root, item, after_leaf) ||
-      !existing_apply_record_build(&request, item, after_leaf, apply_digest, apply_record) ||
-      !capture_record_identity(root->recovery_fd, control_name, control_record,
-        &commit.control_record) ||
-      !capture_record_identity(root->recovery_fd, apply_name, apply_record,
-        &commit.apply_record_identity))) valid = false;
+      record_state(root->recovery_fd, stage_name, "") != NAME_ABSENT)) {
+    valid = false;
+  }
+  if (valid && !existing_execute_leaf_identity_after(root, item, after_leaf)) {
+    valid = false;
+  }
+  if (valid && !existing_apply_record_build(&request, item, after_leaf, apply_digest, apply_record)) {
+    valid = false;
+  }
+  if (valid && !capture_record_identity(root->recovery_fd, control_name, control_record,
+      &commit.control_record)) {
+    valid = false;
+  }
+  if (valid && !capture_record_identity(root->recovery_fd, apply_name, apply_record,
+      &commit.apply_record_identity)) {
+    valid = false;
+  }
+  if (valid && !same_file(&commit.control_record.identity, &item->control_stored)) {
+    valid = false;
+  }
+  if (valid && !same_file(&commit.apply_record_identity.identity, &item->apply_stored)) {
+    valid = false;
+  }
   if (valid) {
     commit.control_identity = commit.control_record.identity;
     commit.apply_identity = commit.apply_record_identity.identity;

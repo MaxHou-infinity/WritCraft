@@ -477,7 +477,9 @@ function createChangesHistoryTransaction(options = {}) {
     if (!prepared || prepared.mixedRestoreMode !== true ||
         prepared.kind !== 'snapshot_restore' || !marker ||
         marker.kind !== 'snapshot_restore' ||
-        marker.publicMarkdownPhase?.phase !== 'CREATED_RECEIPT') {
+        !['CREATED_RECEIPT', 'EXISTING_COMMITTED'].includes(
+          marker.publicMarkdownPhase?.phase
+        )) {
       const error = new Error('mixed EXISTING reconciliation is invalid');
       error.code = 'PUBLIC_MARKDOWN_PHASE_REQUIRED';
       throw error;

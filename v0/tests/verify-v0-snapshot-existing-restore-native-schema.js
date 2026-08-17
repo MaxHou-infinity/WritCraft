@@ -808,7 +808,16 @@ test('final record names and canonical authority are deterministic', () => {
 test('wire commands are bounded, command-tagged and never carry a decoded path/body', () => {
   const value = authority();
   const executeWire = schema.encodeExecuteCommand(value.bound);
-  const reconcileWire = schema.encodeReconcileCommand(value.bound);
+  const reconcileIdentities = value.applyTokens.map(token => ({
+    controlRecordIdentity: token.controlRecordIdentity,
+    applyRecordIdentity: token.receiptRecordIdentity,
+  }));
+  const reconcileWire = schema.encodeReconcileCommand(
+    value.bound,
+    reconcileIdentities,
+    value.committed.markerDigest,
+    schema.requestDigest(value.bound)
+  );
   const wires = [
     executeWire,
     reconcileWire,
@@ -816,11 +825,31 @@ test('wire commands are bounded, command-tagged and never carry a decoded path/b
     schema.encodeFinalizeCommand(value.bound, value.committed),
   ];
   assert.deepStrictEqual(wires.map(wire => wire[0]), ['E', 'R', 'V', 'F']);
-  assert.strictEqual(
-    reconcileWire,
-    `R${executeWire.slice(1)}`,
-    'R must carry the complete original E authority and ordered item lines'
-  );
+  const executeLines = executeWire.split('\n').filter(Boolean);
+  const reconcileLines = reconcileWire.split('\n').filter(Boolean);
+  assert.strictEqual(reconcileLines[0], `R${executeLines[0].slice(1)}`,
+    'R must carry the complete original E authority header');
+  assert.strictEqual(reconcileLines.length, executeLines.length,
+    'R must carry the same ordered item line count');
+  for (let index = 1; index < executeLines.length; index += 1) {
+    const executeItem = executeLines[index].split('\t');
+    const reconcileItem = reconcileLines[index].split('\t');
+    assert.deepStrictEqual(reconcileItem.slice(0, 13), executeItem,
+      'R item must carry the complete original E item fields');
+    assert.strictEqual(reconcileItem.length, 34,
+      'R item must append the stored control/apply publication identities and marker digest');
+    const token = value.applyTokens[index - 1];
+    assert.strictEqual(
+      reconcileItem[13],
+      evidence.assertObjectIdentity(token.controlRecordIdentity).schema
+    );
+    assert.strictEqual(
+      reconcileItem[23],
+      evidence.assertObjectIdentity(token.receiptRecordIdentity).schema
+    );
+    assert.strictEqual(reconcileItem[33], value.committed.markerDigest,
+      'R item must carry the E-time publication marker digest');
+  }
   const bindingValue = value.bound.request.journalMarkerBinding;
   const header = executeWire.split('\n', 1)[0];
   const request = value.bound.request;
@@ -870,7 +899,7 @@ test('wire commands are bounded, command-tagged and never carry a decoded path/b
       ...value.bound.request,
       items: [...value.bound.request.items].reverse(),
     },
-  }));
+  }, reconcileIdentities, value.committed.markerDigest, schema.requestDigest(value.bound)));
   invalid(() => schema.encodeReconcileCommand({
     ...value.bound,
     request: {
@@ -879,7 +908,25 @@ test('wire commands are bounded, command-tagged and never carry a decoded path/b
         ? item
         : { ...item, ancestorIdentityDigest: digest('foreign') }),
     },
-  }));
+  }, reconcileIdentities, value.committed.markerDigest, schema.requestDigest(value.bound)));
+  invalid(() => schema.encodeReconcileCommand(
+    value.bound, null, value.committed.markerDigest, schema.requestDigest(value.bound)
+  ));
+  invalid(() => schema.encodeReconcileCommand(
+    value.bound, [], value.committed.markerDigest, schema.requestDigest(value.bound)
+  ));
+  invalid(() => schema.encodeReconcileCommand(
+    value.bound,
+    reconcileIdentities.map(identity => ({ ...identity, controlRecordIdentity: null })),
+    value.committed.markerDigest,
+    schema.requestDigest(value.bound)
+  ));
+  invalid(() => schema.encodeReconcileCommand(
+    value.bound, reconcileIdentities, 'not-a-digest', schema.requestDigest(value.bound)
+  ));
+  invalid(() => schema.encodeReconcileCommand(
+    value.bound, reconcileIdentities, value.committed.markerDigest, 'not-a-digest'
+  ));
 });
 
 test('canonical production bundle binds names, control/apply wires and terminal digests', () => {

@@ -670,7 +670,7 @@ function runExistingProduction(helperPath, item) {
   }
 }
 
-function runExistingReconcileProduction(helperPath, item) {
+function runExistingReconcileProduction(helperPath, item, reconcileIdentities, publicationMarkerDigest, storedRequestDigest) {
   const rootFd = fs.openSync('/', fs.constants.O_RDONLY);
   try {
     const bind = schema.encodeRootBind({
@@ -682,7 +682,9 @@ function runExistingReconcileProduction(helperPath, item) {
       ),
     });
     return childProcess.spawnSync(helperPath, [], {
-      input: `${bind}${existingSchema.encodeReconcileCommand(item.bound)}`,
+      input: `${bind}${existingSchema.encodeReconcileCommand(
+        item.bound, reconcileIdentities, publicationMarkerDigest, storedRequestDigest
+      )}`,
       encoding: 'utf8',
       stdio: [
         'pipe', 'pipe', 'pipe', rootFd, item.descriptors.artifactFd,
@@ -692,6 +694,14 @@ function runExistingReconcileProduction(helperPath, item) {
   } finally {
     fs.closeSync(rootFd);
   }
+}
+
+function reconcileIdentitiesFromReceipt(receipt) {
+  assert.ok(receipt && Array.isArray(receipt.items));
+  return receipt.items.map(item => ({
+    controlRecordIdentity: item.applyToken.controlRecordIdentity,
+    applyRecordIdentity: item.applyToken.receiptRecordIdentity,
+  }));
 }
 
 function assertCommittedExistingProduction(item, result, authoritySnapshot = null) {
@@ -1682,9 +1692,22 @@ if (process.env.WRC_A1B_E3_R === '1') {
         }),
       });
       const freshScoped = freshLifecycle.forProject(item.rootPath);
-      const rawReconcile = runExistingReconcileProduction(helper, item);
+      const reconcileIdentities = reconcileIdentitiesFromReceipt(lostPrimary.terminalReceipt);
+      const rawReconcile = runExistingReconcileProduction(
+        helper,
+        item,
+        reconcileIdentities,
+        lostPrimary.terminalReceipt.markerDigest,
+        lostPrimary.requestDigest
+      );
       assert.strictEqual(rawReconcile.status, 0, rawReconcile.stderr || rawReconcile.stdout);
-      const reconciled = freshScoped.existingRestore.reconcile(item.bound, item.descriptors);
+      const reconciled = freshScoped.existingRestore.reconcile(
+        item.bound,
+        item.descriptors,
+        reconcileIdentities,
+        lostPrimary.terminalReceipt.markerDigest,
+        lostPrimary.requestDigest
+      );
       assert.strictEqual(reconciled.command, existingSchema.COMMANDS.RECONCILE);
       assert.strictEqual(reconciled.state, 'COMMITTED');
       assert.deepStrictEqual(reconciled.terminalReceipt, expectedTerminal);
@@ -1702,8 +1725,9 @@ if (process.env.WRC_A1B_E3_R === '1') {
       test(`A1b E-3 fresh R ${targetKind} ${mutation} returns UNKNOWN and preserves drift`, () => {
       const item = existingProductionFixture(helper);
       try {
-        assert.strictEqual(item.scoped.existingRestore.execute(item.bound, item.descriptors).state,
-          'COMMITTED');
+        const committed = item.scoped.existingRestore.execute(item.bound, item.descriptors);
+        assert.strictEqual(committed.state, 'COMMITTED');
+        const reconcileIdentities = reconcileIdentitiesFromReceipt(committed.terminalReceipt);
         const names = item.canonicalBundle.records[0].names;
         const recovery = path.join(item.rootPath, '.writcraft', 'recovery');
         const target = targetKind === 'public'
@@ -1727,7 +1751,11 @@ if (process.env.WRC_A1B_E3_R === '1') {
           transportLifecycle: lifecycle.createPublicMarkdownNativeTransport({ helperPath: helper }),
         });
         const result = freshLifecycle.forProject(item.rootPath).existingRestore.reconcile(
-          item.bound, item.descriptors
+          item.bound,
+          item.descriptors,
+          reconcileIdentities,
+          committed.terminalReceipt.markerDigest,
+          committed.requestDigest
         );
         assert.strictEqual(result.command, existingSchema.COMMANDS.RECONCILE);
         assert.strictEqual(result.state, 'UNKNOWN');
@@ -1745,8 +1773,9 @@ if (process.env.WRC_A1B_E3_R === '1') {
     test(`A1b E-3 fresh R preserves foreign ${locatorKind} transient as UNKNOWN`, () => {
       const item = existingProductionFixture(helper);
       try {
-        assert.strictEqual(item.scoped.existingRestore.execute(item.bound, item.descriptors).state,
-          'COMMITTED');
+        const committed = item.scoped.existingRestore.execute(item.bound, item.descriptors);
+        assert.strictEqual(committed.state, 'COMMITTED');
+        const reconcileIdentities = reconcileIdentitiesFromReceipt(committed.terminalReceipt);
         const transient = path.join(
           item.rootPath,
           '.writcraft',
@@ -1759,7 +1788,11 @@ if (process.env.WRC_A1B_E3_R === '1') {
           transportLifecycle: lifecycle.createPublicMarkdownNativeTransport({ helperPath: helper }),
         });
         const result = freshLifecycle.forProject(item.rootPath).existingRestore.reconcile(
-          item.bound, item.descriptors
+          item.bound,
+          item.descriptors,
+          reconcileIdentities,
+          committed.terminalReceipt.markerDigest,
+          committed.requestDigest
         );
         assert.strictEqual(result.command, existingSchema.COMMANDS.RECONCILE);
         assert.strictEqual(result.state, 'UNKNOWN');

@@ -563,7 +563,12 @@ function assertRequest(raw, rawMarkerAuthority, rawParent, rawCreatedReceiptPhas
   const marker = assertMarkerAuthority(rawMarkerAuthority);
   const parent = parentBinding(rawParent);
   const phase = createdReceiptPhase(rawCreatedReceiptPhase, parent);
-  if (parent.kind !== 'snapshot_restore' || phase.phase !== 'CREATED_RECEIPT') {
+  const phaseIsCreated = phase.phase === 'CREATED_RECEIPT';
+  // E requires the exact CREATED_RECEIPT phase; fresh R legitimately carries
+  // the evolved EXISTING_COMMITTED marker phase while still binding the
+  // original CREATED_RECEIPT phase digest stored in the publication.
+  if (parent.kind !== 'snapshot_restore' ||
+      (!phaseIsCreated && phase.phase !== 'EXISTING_COMMITTED')) {
     fail('existing restore requires the exact snapshot_restore CREATED_RECEIPT phase');
   }
   const expected = parent.selected.filter(item => item.action === 'EXISTING');
@@ -638,7 +643,8 @@ function assertRequest(raw, rawMarkerAuthority, rawParent, rawCreatedReceiptPhas
       request.baseHistoryContentDigest !== marker.baseHistoryContentDigest ||
       request.historyParentIdentityDigest !== marker.historyParentIdentityDigest ||
       request.selectionDigest !== phase.selectionDigest ||
-      request.createdReceiptPhaseDigest !== canonicalDigest(phaseSchema.SCHEMA, phase) ||
+      (phaseIsCreated &&
+       request.createdReceiptPhaseDigest !== canonicalDigest(phaseSchema.SCHEMA, phase)) ||
       items.some(item => item.beforeArtifactOffset + item.beforeByteLength >
         request.artifactByteLength || item.afterArtifactOffset + item.afterByteLength >
         request.artifactByteLength)) {
@@ -677,20 +683,20 @@ function requestDigest(rawAuthority) {
   return canonicalDigest(SCHEMAS.REQUEST, authority.request);
 }
 
-function recordKey(rawAuthority, index) {
+function recordKey(rawAuthority, index, requestDigestOverride = null) {
   const authority = assertAuthority(rawAuthority);
   const item = authority.request.items[index];
   if (!item) fail('record index invalid');
   return canonicalDigest(SCHEMAS.RECORD_KEY, {
     schema: SCHEMAS.RECORD_KEY,
     operationId: authority.request.operationId,
-    requestDigest: requestDigest(authority),
+    requestDigest: requestDigestOverride || requestDigest(authority),
     selectedId: item.selectedId,
   }).slice('sha256:'.length);
 }
 
-function recordNames(rawAuthority, index) {
-  const suffix = recordKey(rawAuthority, index);
+function recordNames(rawAuthority, index, requestDigestOverride = null) {
+  const suffix = recordKey(rawAuthority, index, requestDigestOverride);
   return immutable({
     controlBasename: `.changes-history-native-existing-control.${suffix}`,
     applyReceiptBasename: `.changes-history-native-existing-apply.${suffix}`,
@@ -864,12 +870,13 @@ function buildApplyToken(
   index,
   rawApplyReceipt,
   rawControlRecordIdentity,
-  rawReceiptRecordIdentity
+  rawReceiptRecordIdentity,
+  requestDigestOverride = null
 ) {
   const authority = assertAuthority(rawAuthority);
   const control = buildControl(authority, index);
   const receipt = assertApplyReceipt(rawApplyReceipt, authority, index);
-  const names = recordNames(authority, index);
+  const names = recordNames(authority, index, requestDigestOverride);
   return immutable({
     schema: SCHEMAS.APPLY_TOKEN,
     selectedId: control.selectedId,
@@ -891,7 +898,7 @@ function buildApplyToken(
   });
 }
 
-function assertApplyToken(raw, rawAuthority, index) {
+function assertApplyToken(raw, rawAuthority, index, requestDigestOverride = null) {
   const value = valuesOf(raw, KEYS.APPLY_TOKEN, 'apply token');
   const authority = assertAuthority(rawAuthority);
   const receipt = buildApplyReceipt(authority, index, value.afterLeafIdentityDigest);
@@ -900,7 +907,8 @@ function assertApplyToken(raw, rawAuthority, index) {
     index,
     receipt,
     value.controlRecordIdentity,
-    value.receiptRecordIdentity
+    value.receiptRecordIdentity,
+    requestDigestOverride
   );
   for (const key of KEYS.APPLY_TOKEN) {
     if (['controlRecordIdentity', 'receiptRecordIdentity'].includes(key)) continue;
@@ -999,7 +1007,7 @@ function assertRollbackToken(raw, rawAuthority, index) {
   return expected;
 }
 
-function receiptSet(rawAuthority, state, rawReceipts) {
+function receiptSet(rawAuthority, state, rawReceipts, requestDigestOverride = null) {
   const authority = assertAuthority(rawAuthority);
   if (!['COMMITTED', 'UNCOMMITTED'].includes(state)) fail('terminal state invalid');
   const receipts = arrayValues(
@@ -1011,7 +1019,7 @@ function receiptSet(rawAuthority, state, rawReceipts) {
   const items = receipts.map((raw, index) => {
     const item = authority.request.items[index];
     if (state === 'COMMITTED') {
-      const apply = assertApplyToken(raw, authority, index);
+      const apply = assertApplyToken(raw, authority, index, requestDigestOverride);
       return immutable({
         selectedId: item.selectedId,
         applyToken: apply,
@@ -1044,21 +1052,21 @@ function receiptSet(rawAuthority, state, rawReceipts) {
   return immutable(items);
 }
 
-function receiptSetDigest(rawAuthority, state, rawReceipts) {
+function receiptSetDigest(rawAuthority, state, rawReceipts, requestDigestOverride = null) {
   const authority = assertAuthority(rawAuthority);
-  const items = receiptSet(authority, state, rawReceipts);
+  const items = receiptSet(authority, state, rawReceipts, requestDigestOverride);
   return canonicalDigest(SCHEMAS.TERMINAL_RECEIPT, {
     schema: SCHEMAS.TERMINAL_RECEIPT,
     operationId: authority.request.operationId,
-    requestDigest: requestDigest(authority),
+    requestDigest: requestDigestOverride || requestDigest(authority),
     state,
     items,
   });
 }
 
-function buildTerminalReceipt(rawAuthority, state, rawReceipts) {
+function buildTerminalReceipt(rawAuthority, state, rawReceipts, requestDigestOverride = null) {
   const authority = assertAuthority(rawAuthority);
-  const items = receiptSet(authority, state, rawReceipts);
+  const items = receiptSet(authority, state, rawReceipts, requestDigestOverride);
   const base = {
     schema: SCHEMAS.TERMINAL_RECEIPT,
     operationId: authority.request.operationId,
@@ -1069,7 +1077,12 @@ function buildTerminalReceipt(rawAuthority, state, rawReceipts) {
     baseHistoryDigest: authority.request.baseHistoryDigest,
     state,
     items,
-    receiptSetDigest: receiptSetDigest(authority, state, rawReceipts),
+    receiptSetDigest: receiptSetDigest(
+      authority,
+      state,
+      rawReceipts,
+      requestDigestOverride
+    ),
     recoveryFsyncComplete: true,
   };
   return immutable({
@@ -1078,7 +1091,7 @@ function buildTerminalReceipt(rawAuthority, state, rawReceipts) {
   });
 }
 
-function assertTerminalReceipt(raw, rawAuthority) {
+function assertTerminalReceipt(raw, rawAuthority, requestDigestOverride = null) {
   const value = valuesOf(raw, KEYS.TERMINAL_RECEIPT, 'terminal receipt');
   const authority = assertAuthority(rawAuthority);
   if (!['COMMITTED', 'UNCOMMITTED'].includes(value.state)) fail('terminal receipt state invalid');
@@ -1093,7 +1106,7 @@ function assertTerminalReceipt(raw, rawAuthority) {
     const committed = value.state === 'COMMITTED';
     const apply = itemValue.applyToken === null
       ? null
-      : assertApplyToken(itemValue.applyToken, authority, index);
+      : assertApplyToken(itemValue.applyToken, authority, index, requestDigestOverride);
     const rollback = itemValue.rollbackToken === null
       ? null
       : assertRollbackToken(itemValue.rollbackToken, authority, index);
@@ -1102,7 +1115,7 @@ function assertTerminalReceipt(raw, rawAuthority) {
         schema: SCHEMAS.APPLY_TOKEN,
         selectedId: rollback.selectedId,
         controlBasename: rollback.controlBasename,
-        receiptBasename: recordNames(authority, index).applyReceiptBasename,
+        receiptBasename: recordNames(authority, index, requestDigestOverride).applyReceiptBasename,
         controlDigest: rollback.controlDigest,
         applyReceiptDigest: rollback.applyReceiptDigest,
         afterLeafIdentityDigest: rollback.afterLeafIdentityDigest,
@@ -1142,7 +1155,7 @@ function assertTerminalReceipt(raw, rawAuthority) {
   const canonicalSet = canonicalDigest(SCHEMAS.TERMINAL_RECEIPT, {
     schema: SCHEMAS.TERMINAL_RECEIPT,
     operationId: authority.request.operationId,
-    requestDigest: requestDigest(authority),
+    requestDigest: requestDigestOverride || requestDigest(authority),
     state: value.state,
     items,
   });
@@ -1179,33 +1192,34 @@ function assertTerminalReceipt(raw, rawAuthority) {
   return immutable({ ...base, terminalReceiptDigest: value.terminalReceiptDigest });
 }
 
-function buildRunResult(rawAuthority, command, state, rawTerminalReceipt = null) {
+function buildRunResult(rawAuthority, command, state, rawTerminalReceipt = null, requestDigestOverride = null) {
   const authority = assertAuthority(rawAuthority);
   if (![COMMANDS.EXECUTE, COMMANDS.RECONCILE].includes(command) || !STATES.includes(state)) {
     fail('run result command/state invalid');
   }
   const terminalReceipt = state === 'UNKNOWN'
     ? (rawTerminalReceipt === null ? null : fail('UNKNOWN cannot carry terminal authority'))
-    : assertTerminalReceipt(rawTerminalReceipt, authority);
+    : assertTerminalReceipt(rawTerminalReceipt, authority, requestDigestOverride);
   if (terminalReceipt && terminalReceipt.state !== state) fail('run result state mismatch');
   return immutable({
     schema: SCHEMAS.RUN_RESULT,
     command,
     state,
     operationId: authority.request.operationId,
-    requestDigest: requestDigest(authority),
+    requestDigest: requestDigestOverride || requestDigest(authority),
     terminalReceipt,
     errorCode: state === 'UNKNOWN' ? ERROR_CODES.UNKNOWN : null,
   });
 }
 
-function assertRunResult(raw, rawAuthority, expectedCommand) {
+function assertRunResult(raw, rawAuthority, expectedCommand, requestDigestOverride = null) {
   const value = valuesOf(raw, KEYS.RUN_RESULT, 'run result');
   const expected = buildRunResult(
     rawAuthority,
     expectedCommand,
     value.state,
-    value.terminalReceipt
+    value.terminalReceipt,
+    requestDigestOverride
   );
   for (const key of KEYS.RUN_RESULT) {
     if (key === 'terminalReceipt') continue;
@@ -1592,15 +1606,19 @@ function encodeRunResponse(rawResult, rawAuthority, expectedCommand) {
   return `P\tOK\n${boundedWire(lines, LIMITS.maxResponseBytes, 'run response')}`;
 }
 
-function parseRunResponse(stdout, rawAuthority, expectedCommand) {
+function parseRunResponse(stdout, rawAuthority, expectedCommand, rawStoredRequestDigest = null) {
   const authority = assertAuthority(rawAuthority);
+  const storedRequestDigest = expectedCommand === COMMANDS.RECONCILE
+    ? digest(rawStoredRequestDigest, 'fresh R stored request digest')
+    : null;
+  const expectedRequestDigest = storedRequestDigest || requestDigest(authority);
   const envelope = assertResponseEnvelope(stdout);
   const lines = envelope.slice(0, -1).split('\n');
   if (lines.shift() !== 'P\tOK' || lines.length === 0) fail('run response bind missing');
   const header = lines.shift().split('\t');
   if (header.length !== 14 || header[0] !== expectedCommand || header[1] !== 'RESULT' ||
       !STATES.includes(header[2]) || header[3] !== authority.request.operationId ||
-      header[4] !== requestDigest(authority) || !/^(0|[1-9][0-9]*)$/.test(header[12])) {
+      header[4] !== expectedRequestDigest || !/^(0|[1-9][0-9]*)$/.test(header[12])) {
     fail('run response header invalid');
   }
   const count = Number(header[12]);
@@ -1610,7 +1628,7 @@ function parseRunResponse(stdout, rawAuthority, expectedCommand) {
   if (header[2] === 'UNKNOWN') {
     if (count !== 0 || header.slice(5, 12).some(value => value !== '-') ||
         header[13] !== ERROR_CODES.UNKNOWN) fail('UNKNOWN response authority invalid');
-    return buildRunResult(authority, expectedCommand, 'UNKNOWN');
+    return buildRunResult(authority, expectedCommand, 'UNKNOWN', null, storedRequestDigest);
   }
   if (header[2] !== 'COMMITTED' || count !== authority.request.items.length ||
       header[13] !== '-') fail('terminal response state invalid');
@@ -1622,7 +1640,8 @@ function parseRunResponse(stdout, rawAuthority, expectedCommand) {
     const token = buildApplyToken(
       authority, index, receipt,
       identityFromWire(fields, 9, 'controlRecordIdentity'),
-      identityFromWire(fields, 19, 'receiptRecordIdentity')
+      identityFromWire(fields, 19, 'receiptRecordIdentity'),
+      storedRequestDigest
     );
     if (fields[1] !== authority.request.items[index].selectedId ||
         fields[2] !== authority.request.items[index].afterContentDigest ||
@@ -1631,16 +1650,20 @@ function parseRunResponse(stdout, rawAuthority, expectedCommand) {
         fields[7] !== token.applyReceiptDigest) fail('terminal response item is foreign');
     return token;
   });
-  const terminal = buildTerminalReceipt(authority, 'COMMITTED', tokens);
+  const terminal = buildTerminalReceipt(
+    authority, 'COMMITTED', tokens, storedRequestDigest
+  );
   if ([terminal.markerDigest, terminal.artifactDigest, terminal.createdReceiptPhaseDigest,
     terminal.selectionDigest, terminal.baseHistoryDigest, terminal.receiptSetDigest,
     terminal.terminalReceiptDigest].some((value, index) => value !== header[index + 5])) {
     fail('terminal response digest authority invalid');
   }
-  return buildRunResult(authority, expectedCommand, 'COMMITTED', terminal);
+  return buildRunResult(
+    authority, expectedCommand, 'COMMITTED', terminal, storedRequestDigest
+  );
 }
 
-function encodeExistingCommand(rawAuthority, command) {
+function encodeExistingCommand(rawAuthority, command, rawReconcileIdentities = null, rawPublicationMarkerDigest = null, rawStoredRequestDigest = null) {
   const authority = assertAuthority(rawAuthority);
   const request = authority.request;
   const binding = assertExistingJournalBinding(request.journalMarkerBinding);
@@ -1648,8 +1671,20 @@ function encodeExistingCommand(rawAuthority, command) {
   if (![COMMANDS.EXECUTE, COMMANDS.RECONCILE].includes(command)) {
     fail('existing command is invalid');
   }
+  const reconcile = command === COMMANDS.RECONCILE;
+  const wireRequestDigest = reconcile
+    ? digest(rawStoredRequestDigest, 'fresh R stored request digest')
+    : requestDigest(authority);
+  if (reconcile) {
+    if (!Array.isArray(rawReconcileIdentities) ||
+        rawReconcileIdentities.length !== request.items.length ||
+        typeof rawPublicationMarkerDigest !== 'string') {
+      fail('fresh R requires the stored publication identities and marker digest');
+    }
+    digest(rawPublicationMarkerDigest, 'fresh R publication marker digest');
+  }
   const lines = [[
-    command, request.operationId, requestDigest(authority), binding.bindingDigest,
+    command, request.operationId, wireRequestDigest, binding.bindingDigest,
     binding.journalBasename, binding.journalMagic, binding.activeSlot,
     head.journalId, head.generation, binding.previousValueDigest || '-', head.valueDigest,
     String(binding.frameByteLength), binding.frameSha256,
@@ -1670,14 +1705,31 @@ function encodeExistingCommand(rawAuthority, command) {
     request.historyParentIdentityDigest,
     String(request.items.length),
   ].join('\t')];
-  for (const item of request.items) {
-    lines.push([
+  for (let index = 0; index < request.items.length; index += 1) {
+    const item = request.items[index];
+    const itemLine = [
       'I', item.selectedId, hexUtf8(item.path), item.beforeRevision, item.afterRevision,
       String(item.beforeArtifactOffset), String(item.beforeByteLength),
       item.beforeContentDigest, String(item.afterArtifactOffset),
       String(item.afterByteLength), item.afterContentDigest,
       item.ancestorIdentityDigest, item.beforeLeafIdentityDigest,
-    ].join('\t'));
+    ];
+    if (reconcile) {
+      // Fresh R carries the E-time stored publication identities (control then
+      // apply) plus the E-time publication marker digest so the native reopen
+      // never recaptures identity or marker from current records; any same-byte
+      // new inode, same-inode rewrite or digest drift is UNKNOWN.
+      const stored = rawReconcileIdentities[index];
+      if (!stored || typeof stored !== 'object' || stored === null) {
+        fail('fresh R stored identity is invalid');
+      }
+      itemLine.push(
+        ...identityWireFields(stored.controlRecordIdentity, 'reconcile control identity'),
+        ...identityWireFields(stored.applyRecordIdentity, 'reconcile apply identity'),
+        rawPublicationMarkerDigest
+      );
+    }
+    lines.push(itemLine.join('\t'));
   }
   return boundedWire(
     lines,
@@ -1690,8 +1742,14 @@ function encodeExecuteCommand(rawAuthority) {
   return encodeExistingCommand(rawAuthority, COMMANDS.EXECUTE);
 }
 
-function encodeReconcileCommand(rawAuthority) {
-  return encodeExistingCommand(rawAuthority, COMMANDS.RECONCILE);
+function encodeReconcileCommand(rawAuthority, rawReconcileIdentities, rawPublicationMarkerDigest, rawStoredRequestDigest) {
+  return encodeExistingCommand(
+    rawAuthority,
+    COMMANDS.RECONCILE,
+    rawReconcileIdentities,
+    rawPublicationMarkerDigest,
+    rawStoredRequestDigest
+  );
 }
 
 function encodeVerifyCommand(rawAuthority, rawTerminalReceipt) {

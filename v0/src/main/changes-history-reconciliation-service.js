@@ -5094,6 +5094,7 @@ function createChangesHistoryReconciliationService(options = {}) {
   }
 
   function runExistingRestore(rootPath, projectId, operationId, command) {
+    const reconcile = command === existingRestoreSchema.COMMANDS.RECONCILE;
     projectIdentity(projectService, rootPath, projectId);
     const scopedJournal = markerJournalFor(rootPath, true);
     const current = journalCurrent(scopedJournal);
@@ -5101,16 +5102,25 @@ function createChangesHistoryReconciliationService(options = {}) {
         current.value.projectId !== projectId ||
         current.value.activeOperationId !== operationId ||
         current.value.activeKind !== 'snapshot_restore' ||
-        current.value.existingTerminalPublication !== null) {
+        (reconcile
+          ? current.value.existingTerminalPublication === null
+          : current.value.existingTerminalPublication !== null)) {
       fail('CHANGES_MANUAL_RECOVERY_REQUIRED',
-        'EXISTING journal authority is unavailable');
+        reconcile
+          ? 'EXISTING fresh R requires the stored publication'
+          : 'EXISTING journal authority is unavailable');
     }
     const value = current.value;
     const marker = validateMarker(value.activeMarker, projectService, historyService);
     if (marker.operationId !== operationId || marker.projectId !== projectId ||
         marker.kind !== 'snapshot_restore' ||
-        marker.publicMarkdownPhase?.phase !== 'CREATED_RECEIPT') {
-      fail('CHANGES_RECOVERY_CONFLICT', 'EXISTING execute requires CREATED_RECEIPT');
+        marker.publicMarkdownPhase?.phase !== (reconcile
+          ? 'EXISTING_COMMITTED'
+          : 'CREATED_RECEIPT')) {
+      fail('CHANGES_RECOVERY_CONFLICT',
+        reconcile
+          ? 'EXISTING fresh R requires EXISTING_COMMITTED'
+          : 'EXISTING execute requires CREATED_RECEIPT');
     }
     const verified = verifyPublicMarkdownPhaseArtifact(rootPath, marker);
     const baseHistory = captureHistoryAuthority(rootPath, marker.baseHistoryState);
@@ -5186,10 +5196,15 @@ function createChangesHistoryReconciliationService(options = {}) {
               artifactDigest: marker.artifact.sha256,
               artifactIdentityDigest: artifactIdentityDigest(marker),
               artifactByteLength: marker.artifact.byteLength,
-              createdReceiptPhaseDigest: evidenceDeliverySchema.digestObject(
-                publicMarkdownPhaseSchema.SCHEMA,
-                marker.publicMarkdownPhase
-              ),
+              markerDigest: reconcile
+                ? value.existingTerminalPublication.markerDigest
+                : binding.activeMarkerDigest,
+              createdReceiptPhaseDigest: reconcile
+                ? value.existingTerminalPublication.createdReceiptPhaseDigest
+                : evidenceDeliverySchema.digestObject(
+                  publicMarkdownPhaseSchema.SCHEMA,
+                  marker.publicMarkdownPhase
+                ),
               selectionDigest: marker.publicMarkdownPhase.selectionDigest,
               ...baseHistoryAuthority,
               historyParentIdentityDigest,
@@ -5223,19 +5238,62 @@ function createChangesHistoryReconciliationService(options = {}) {
               historyParentFd: baseHistory.directoryFd,
               historyFd: baseHistory.fd === null ? baseHistory.directoryFd : baseHistory.fd,
             });
-            const nativeRun = command === existingRestoreSchema.COMMANDS.EXECUTE
-              ? lifecycle.execute(authority, descriptors)
-              : lifecycle.reconcile(authority, descriptors);
+            const reconcileIdentities = reconcile
+              ? value.existingTerminalPublication.items.map(item => Object.freeze({
+                controlRecordIdentity: item.controlRecordIdentity,
+                applyRecordIdentity: item.applyRecordIdentity,
+              }))
+              : null;
+            const nativeRun = reconcile
+              ? lifecycle.reconcile(
+                authority,
+                descriptors,
+                reconcileIdentities,
+                value.existingTerminalPublication.markerDigest,
+                value.existingTerminalPublication.requestDigest
+              )
+              : lifecycle.execute(authority, descriptors);
             const result = existingRestoreSchema.assertRunResult(
               nativeRun,
               authority,
-              command
+              command,
+              reconcile ? value.existingTerminalPublication.requestDigest : null
             );
             if (result.state !== 'COMMITTED' || result.terminalReceipt === null) {
               fail('CHANGES_MANUAL_RECOVERY_REQUIRED',
                 'EXISTING terminal is not durably committed');
             }
             const terminal = result.terminalReceipt;
+            if (reconcile) {
+              // Fresh R is read-only: it must reproduce exactly the stored
+              // terminal and never re-CAS or advance the marker. Any digest
+              // mismatch with the journal-stored publication is UNKNOWN/manual.
+              const stored = markerJournalSchema.assertExistingTerminalPublication(
+                value.existingTerminalPublication
+              );
+              if (stored.receiptSetDigest !== terminal.receiptSetDigest ||
+                  stored.terminalReceiptDigest !== terminal.terminalReceiptDigest ||
+                  stored.requestDigest !== result.requestDigest ||
+                  stored.items.length !== terminal.items.length) {
+                fail('CHANGES_MANUAL_RECOVERY_REQUIRED',
+                  'EXISTING fresh R does not reproduce the stored terminal');
+              }
+              for (let index = 0; index < terminal.items.length; index += 1) {
+                const token = terminal.items[index].applyToken;
+                const storedItem = stored.items[index];
+                if (token === null || storedItem === undefined ||
+                    token.controlRecordIdentity.contentSha256 !==
+                      storedItem.controlRecordIdentity.contentSha256 ||
+                    token.receiptRecordIdentity.contentSha256 !==
+                      storedItem.applyRecordIdentity.contentSha256 ||
+                    token.controlRecordIdentity.ino !== storedItem.controlRecordIdentity.ino ||
+                    token.receiptRecordIdentity.ino !== storedItem.applyRecordIdentity.ino) {
+                  fail('CHANGES_MANUAL_RECOVERY_REQUIRED',
+                    'EXISTING fresh R stored identity mismatch');
+                }
+              }
+              return marker;
+            }
             const terminalItems = terminal.items.map((terminalItem, index) => {
               const source = authority.request.items[index];
               const finalLeaf = readExactLeaf(rootPath, {

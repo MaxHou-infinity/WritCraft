@@ -309,13 +309,15 @@ try {
     } finally { item.cleanup(); }
   });
 
-  test('lost EXISTING response converges through a fresh native R with the same terminal publication', () => {
+  test('lost raw E response before the journal CAS remains UNKNOWN/manual and never reconstructs from current records', () => {
     const item = mixedFixture({ helperPath, artifactHelperPath });
     try {
       // Replace the existing-restore lifecycle with the drop wrapper: the
       // reconciliation's executeExistingRestore runs the REAL helper but the
-      // E response never arrives; the transaction's reconcileExistingRestore
-      // then runs a REAL fresh R against the same journal + records.
+      // E response never arrives. Without a journal-stored publication the
+      // fresh R is unavailable and the transaction must stay UNKNOWN/manual
+      // with all residue preserved (E is never replayed, current records are
+      // never recaptured to invent success).
       const publicMarkdown = publicNative.createPublicMarkdownNativeLifecycle({
         helperPath,
         spawnSync(command, args, options) {
@@ -378,19 +380,49 @@ try {
           () => wrappedTransaction.commitExistingRestore(prepared2, marker),
           error => error?.code === 'CHANGES_MANUAL_RECOVERY_REQUIRED'
         );
-
-        marker = wrappedTransaction.reconcileExistingRestore(prepared2, marker);
-        assert.strictEqual(marker.publicMarkdownPhase.phase, 'EXISTING_COMMITTED');
-        const installed2 = journalValue(item2);
-        assert(installed2.existingTerminalPublication);
-        assert.strictEqual(
-          installed2.existingTerminalPublication.command,
-          'EXECUTE_EXISTING'
+        // No stored publication: fresh R is unavailable, so the transaction
+        // remains manual UNKNOWN with residue preserved.
+        assert.throws(
+          () => wrappedTransaction.reconcileExistingRestore(prepared2, marker),
+          error => error?.code === 'CHANGES_MANUAL_RECOVERY_REQUIRED'
         );
-        assert.strictEqual(installed2.existingTerminalPublication.state, 'COMMITTED');
+        // E is never replayed: a retried commit must fail the same way.
+        assert.throws(
+          () => wrappedTransaction.commitExistingRestore(prepared2, marker),
+          error => error?.code === 'CHANGES_MANUAL_RECOVERY_REQUIRED'
+        );
+        const value = journalValue(item2);
+        assert.strictEqual(value.state, 'ACTIVE');
+        assert.strictEqual(value.existingTerminalPublication, null);
+        assert.strictEqual(
+          value.activeMarker.publicMarkdownPhase.phase,
+          'CREATED_RECEIPT'
+        );
+        // The real E mutation and its private records remain on disk as
+        // residue; no cleanup or adoption happened.
         assert.deepStrictEqual(fs.readFileSync(path.join(item2.rootPath, 'existing.md')), item2.afterBytes);
         assert.deepStrictEqual(fs.readFileSync(path.join(item2.rootPath, 'new.md')), item2.createdBytes);
       } finally { item2.cleanup(); }
+    } finally { item.cleanup(); }
+  });
+
+  test('CAS-durable EXISTING publication reconstructs read-only through a fresh native R with the same terminal', () => {
+    const item = mixedFixture({ helperPath, artifactHelperPath });
+    try {
+      const { marker: committedMarker } = runMixedJourney(item);
+      assert.strictEqual(committedMarker.publicMarkdownPhase.phase, 'EXISTING_COMMITTED');
+      const before = journalValue(item);
+      const installed = before.existingTerminalPublication;
+      assert(installed);
+      // Fresh R consumes the stored publication identities, reproduces the
+      // same terminal read-only and never rewrites the journal.
+      const marker2 = item.transaction.reconcileExistingRestore(item.prepared, committedMarker);
+      assert.strictEqual(marker2.publicMarkdownPhase.phase, 'EXISTING_COMMITTED');
+      const after = journalValue(item);
+      assert.strictEqual(after.valueDigest, before.valueDigest, 'fresh R must not advance the journal');
+      assert.deepStrictEqual(after.existingTerminalPublication, installed);
+      assert.deepStrictEqual(fs.readFileSync(path.join(item.rootPath, 'existing.md')), item.afterBytes);
+      assert.deepStrictEqual(fs.readFileSync(path.join(item.rootPath, 'new.md')), item.createdBytes);
     } finally { item.cleanup(); }
   });
 
@@ -539,5 +571,5 @@ try {
   fs.rmSync(scratch, { recursive: true, force: true });
 }
 
-console.log(`\n${passed}/4 mixed production journey checks passed.`);
-if (passed !== 4) process.exitCode = 1;
+console.log(`\n${passed}/5 mixed production journey checks passed.`);
+if (passed !== 5) process.exitCode = 1;

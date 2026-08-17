@@ -623,6 +623,11 @@ function mixedTransactionFixture(calls, options = {}) {
     },
     reconcileExistingRestore() {
       calls.push('reconcile-existing');
+      if (options.reconcileUnavailable) {
+        const error = new Error('EXISTING fresh R requires the stored publication');
+        error.code = 'CHANGES_MANUAL_RECOVERY_REQUIRED';
+        throw error;
+      }
       marker = phaseValue('EXISTING_COMMITTED');
       return marker;
     },
@@ -669,7 +674,46 @@ test('mixed selection runs the all-or-nothing journey and commits both leaves', 
   assert.strictEqual(calls.filter(call => call === 'execute-native').length, 0);
 });
 
-test('lost EXISTING response during mixed journey reconciles with a fresh R and stays COMMITTED', async () => {
+test('lost raw E response before the journal CAS leaves the service UNKNOWN/manual', async () => {
+  const available = currentFile('selected_a', 'chapters/a.md', 'current A\n');
+  const missing = {
+    fileId: 'selected_b',
+    path: 'chapters/b.md',
+    state: 'missing',
+    byteLength: null,
+    sha256: null,
+    revision: null,
+    content: null,
+    ancestorIdentityDigest: ANCESTOR_DIGEST,
+    leafIdentityDigest: null,
+  };
+  const calls = [];
+  const state = fixture({
+    exactRestoreExecutor: () => { throw new Error('mixed must not run the existing-file executor'); },
+    readCurrentAuthority() { return currentAuthority([available, missing]); },
+    readSnapshotAuthority() { return snapshotAuthority([snapshotFile('selected_a'), snapshotFile('selected_b', 'chapters/b.md', 'snapshot B\n')]); },
+    capabilityStore: { consumeRestore(_owner, _request) { return multiConsumed([available, missing]); } },
+    transaction: mixedTransactionFixture(calls, {
+      loseExistingResponse: true,
+      reconcileUnavailable: true,
+    }),
+  });
+  const result = await state.service.restore(owner(), request());
+  schema.assertSnapshotRestoreResult(result);
+  // Without a journal-stored publication the fresh R is unavailable: the
+  // service must fail closed to UNKNOWN/manual and keep all residue.
+  assert.strictEqual(result.task.terminalTruth, 'UNKNOWN');
+  assert.strictEqual(result.task.errorCode, 'SNAPSHOT_RESTORE_UNKNOWN');
+  assert.strictEqual(result.history.recoveryRequired, true);
+  assert.strictEqual(result.history.responseRecovered, false);
+  const order = calls.filter(call => typeof call === 'string');
+  assert.deepStrictEqual(order, [
+    'prepare', 'prepare-marker', 'create-missing', 'commit-existing',
+    'reconcile-existing',
+  ]);
+});
+
+test('CAS-durable EXISTING publication reconciles through a fresh R and stays COMMITTED', async () => {
   const available = currentFile('selected_a', 'chapters/a.md', 'current A\n');
   const missing = {
     fileId: 'selected_b',
