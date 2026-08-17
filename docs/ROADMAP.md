@@ -2,8 +2,8 @@
 
 > 路线图版本：`RM-1.3`
 > 生效日期：2026-08-06
-> 当前公开产品版本：`writ-craft@0.3.0` Developer Preview（npm `preview`）
-> 当前实现目标：`writ-craft@0.4.0`（路线图 `WRC-0.4.0-R1`；阶段 0 已签收，当前阶段 A，代码版本仍为 0.3.0）
+> 当前公开产品版本：`writ-craft@0.3.1` Developer Preview（npm `preview`）
+> 当前实现目标：`writ-craft@0.4.0`（路线图 `WRC-0.4.0-R1`；阶段 0 已签收，当前阶段 A，代码版本仍为 0.3.1）
 > 下一目标版本：无；0.4.0 完成前不派发 1.0.0 或候选池工作
 > 上一候选：`writ-craft@0.2.0`（GitHub/App 候选已完成；npm preview 的 OTP 门禁仍按历史记录保留）
 > 状态：**当前开发顺序与版本边界的唯一权威**

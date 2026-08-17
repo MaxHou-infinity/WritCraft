@@ -1,10 +1,10 @@
 # 笔触 · WritCraft 当前开发状态
 
-> 最后更新：2026-08-16
+> 最后更新：2026-08-17
 > 当前公开/代码版本：`writ-craft@0.3.1`（npm `preview`）
 > 下一目标：`0.4.0` 证据与交付闭环（`WRC-0.4.0-R1`）
 > 当前 checkpoint：**Stage A / A1b mixed EXISTING + `ROLLBACK_CREATE` 开发中**
-> 当前结论：**P0=0；A1b 仍 NO-GO；A1c、A2、Stage B 重签与 Stage C/D/E 继续冻结**
+> 当前结论：**P0=0、P1=2；A1b 仍 NO-GO；A1c、A2、Stage B 重签与 Stage C/D/E 继续冻结**
 
 ## 1. 当前权威
 
@@ -12,54 +12,53 @@
 - 执行顺序：`docs/0.4.0-EXECUTION-PROTOCOL.md`。
 - A1b 状态/失败边界：`docs/0.4.0-A1B-EXISTING-STATE-MATRIX.md`。
 - 当前工程事实：源码与可复现测试优先于文档快照。
-- 2026-08-13 以前的完整轮次、测试数字与微 checkpoint 记录已逐字归档到
-  [`docs/archive/development/DEVELOPMENT-STATUS-THROUGH-2026-08-13.md`](../docs/archive/development/DEVELOPMENT-STATUS-THROUGH-2026-08-13.md)。它是历史账本，不拥有派工权。
+- A1b 本轮提交与 component 证据汇总见
+  [`docs/archive/engineering/A1B-INDEPENDENT-REVIEW-MATERIALS-2026-08-16.md`](../docs/archive/engineering/A1B-INDEPENDENT-REVIEW-MATERIALS-2026-08-16.md)；它不是签收记录，也不拥有派工权。
 
-## 2. 已签收基线
+## 2. 已完成边界
 
-- **A0**：0.4 测试清册、静态 orphan check 与 component 门禁已签收。
-- **A1a**：CREATE finalize/ACK cleanup 的 Main/native/permanent-journal 纵切已签收。
-- **A1b primary E**：one-leaf descriptor-bound EXISTING execute 已独立签收；不外推 R/V/F、rollback 或 mixed 总体。
-- **E3 pure journal authority**：`existingTerminalPublication`、双 publication cleanup 与
-  WRCCHRJ2 EXISTING journal-binding schema 已获得 P0=0、P1=0、P2=0 的独立证据。
-- 上述都是已完成的窄边界，不代表 A1b、Stage A 或 0.4.0 candidate 完成。
+- **A0** 与 **A1a** 已签收；A1b primary E 与 E3 pure journal authority 保留其既有窄层独立证据。
+- `dcc197c` 前后的 A1b 实现已完成 WRCCHRJ2 journal 单权威 E/R wire、native
+  `ROLLBACK_CREATE` Q/R/D/A、Main post-E terminal CAS，以及 mixed applied 主线：
+  `PRECREATE → CREATED_RECEIPT → EXISTING_COMMITTED → HISTORY_COMMITTED → FINALIZED → ACK_COMMITTED → IDLE`。
+- 以上是 A1b implementation/component evidence，不代表完整 rollback 出口或 A1b checkpoint 已签收。
 
-## 3. 当前真实生产红灯
+## 3. 当前两个 P1
 
-1. **Journal 物理绑定未接通**：现行 A1b 合同以 WRCCHRJ2 journal descriptor 为 E/R 权威；
-   production lifecycle 仍要求 legacy `markerFd`，C helper 仍解析旧 E/R wire 并校验 legacy marker bytes。
-2. **Main mixed publication CAS 未闭合**：post-E 的完整 terminal 尚未在 Main 中以单次
-   WRCCHRJ2 CAS 持久为 `existingTerminalPublication`，响应丢失与 old/new head 协调尚未形成生产纵切。
-3. **Mixed 事务出口未完成**：生产服务仍不能完成 mixed EXISTING + MISSING 的同事务
-   E/R/V/F、History、`ROLLBACK_CREATE` 与 terminal cleanup 收口。
+1. **Fresh R publication-time identity 未闭合**：`WRC_A1B_E3_R=1` 的
+   `control new-inode-exact` 场景仍把同内容新 inode 接受为 `COMMITTED`，预期必须是
+   `UNKNOWN`。R 不能从当前 control record 重铸 publication-time identity。
+2. **Main formal rollback 出口未接通**：native `ROLLBACK_CREATE` Q/R/D/A 已有组件证据，
+   但 Main mixed 事务尚未把 EXISTING formal `UNCOMMITTED` 编排为
+   `Q → fresh R → D → A` 并证明所有 EXISTING/MISSING leaf 与 raw History 回到 operation-before。
 
-以上为当前全部 P1 生产缺口；没有已知 P0。纯 schema、fake adapter、direct service 或 focused 绿灯不能关闭它们。
+没有已知 P0。Mixed applied 成功出口、journal physical binding 与 post-E CAS 不再列为开放红灯。
+`snapshot_restore_undo` journal-backed 属 A1c；LEGACY 移除属于后续迁移；Main/handler App 接线属于 A2，均不扩大本次 A1b 阻断清单。
 
-## 4. A1b 单一出口
+## 4. 当前可复现证据
 
-A1b 只在同一 production mixed 旅程同时证明以下事实后签收：
+- `node tests/check-v0-0-4-test-registration.js --check`：221 scripts，52 current，40 Stage A，exit 0。
+- `node tests/verify-v0-snapshot-restore-mixed-journey.js`：4/4，exit 0。
+- `node tests/verify-v0-snapshot-restore-service.js`：41/41，exit 0。
+- `node tests/verify-v0-public-markdown-native-lifecycle.js`：67/67，exit 0。
+- `node tests/verify-v0-public-markdown-native-rollback-create-lifecycle.js`：exit 0。
+- `WRC_A1B_E3_R=1 node tests/verify-v0-public-markdown-native-lifecycle.js`：在
+  `control new-inode-exact` 首红，actual `COMMITTED` / expected `UNKNOWN`。
 
-- EXISTING E 在 WRCCHRJ2 权威下完成，Main CAS 持久 terminal publication，不重放 E；
-- fresh R/V 只使用 journal-stored identity，漂移、部分记录或不明响应保持 `UNKNOWN`；
-- F/reconcileFinalize、History commit、ACK/cleanup 与 mixed terminal 完整收口；
-- formal UNCOMMITTED 只能通过 `ROLLBACK_CREATE` 完整回到 operation-before；
-- 生产 Main/native/filesystem 定向证据全绿，一次独立 A1b review 将 P0/P1 清零。
+Focused、schema、native 或 direct-service 绿灯不能覆盖该首红，也不能替代完整 A1b 独立复审。
 
 ## 5. 唯一下一动作
 
-**完成 A1b 生产纵切并一次性签收 A1b；不再创建 pure-schema/字段/线协议微 review。**
+**关闭上述两个 P1，补真实 formal mixed rollback production journey，形成一个 clean local A1b checkpoint commit/tree，再启动一次完整独立复审。**
 
-A1b 签收前，A1c Safe Undo、A2 App 接线、Stage A 总门禁、A→B 重签、Stage C/D/E、candidate、push/tag/release/publish/distribution 均冻结。
+A1b 签收前，A1c、A2a–A2d、A3、A→B、Stage C/D/E、candidate、push/tag/release/publish/distribution 均冻结。
 
 ## 6. 门禁执行清单（无 CI 时的显式步骤）
 
-0.4 主战场（marker/journal、snapshot、public-markdown native）的 39 个 Stage-A 组件测试
-**不在** `npm test` / `npm run verify` 默认链内（注册门禁强制排除），无 CI 时必须显式执行：
+- `npm run verify:syntax`
+- `npm run verify:0.4:registration`
+- `npm run verify:0.4:current-components`
+- `npm test` / `npm run verify`
 
-- `npm run verify:syntax` — 全仓 `node --check`（394 个文件）
-- `npm run verify:0.4:registration` — 测试清册 220/220 零漂移
-- `npm run verify:0.4:current-components` — Stage A 组件 + Stage B Node preflight
-- `npm test` / `npm run verify` — 默认 Node 行为套件（收尾共享 `verify:post-common`）
-
-CI（`.github/workflows/verify.yml`）已按同一顺序编排：registration → syntax →
-current-components → test → `npm audit --omit=dev`。
+CI（`.github/workflows/verify.yml`）按 registration → syntax → current-components → test →
+`npm audit --omit=dev` 编排；完整数字只在当前 checkpoint 出口重跑后更新。

@@ -1,6 +1,6 @@
 # A1b 独立复审材料（2026-08-16）
 
-> 目的：为 A1b mixed EXISTING + `ROLLBACK_CREATE` 的独立 reviewer 提供变更清单、证据链与待确认设计项。
+> 目的：为 A1b mixed EXISTING + `ROLLBACK_CREATE` 的独立 reviewer 提供变更清单、证据链与当前开放项。
 > 状态：A1b 仍未签收（NO-GO）。本材料不构成签收，仅整理当前可核验事实。
 > 关联：`docs/0.4.0-EXECUTION-PROTOCOL.md`、`v0/DEVELOPMENT-STATUS.md`、`docs/0.4.0-A1B-EXISTING-STATE-MATRIX.md`。
 
@@ -13,12 +13,15 @@
 | `2145ee3` | EXISTING production fixture 构造真实 WRCCHRJ2 journal + `journalMarkerBinding`；request.markerDigest = binding.activeMarkerDigest | JS 侧通过冻结 wire 契约；失败点移到 C 层 |
 | `8f49a6c` | **C 迁移**：EXISTING E/R wire 扩展为 33 字段（23 journal binding + artifact/selection/base-history/history-parent 权威字段）；`existing_execute_header` 重写；`existing_journal_marker_valid`（journal frame + active marker 切片 + root/recovery 身份）替代 legacy 整文件 hash；control/apply/terminal 记录改用 `active_marker_digest`；`maxJournalBindingHeaderBytes` 1024→4096 | `verify-v0-public-markdown-native-lifecycle` **67/67**（含 A1b production E）；schema 测试 23/23；全 native + changes/snapshot 套件 0 失败；`npm test` 全绿 |
 | `d5c1b07` | `create-journal-lifecycle` fixture 补 `existingTerminalPublication`（KEYS.VALUE 新键） | Stage A 门禁该项通过 |
+| `3f0208b` | 建立本 A1b 独立复审材料，汇总当时提交、证据链与开放设计项 | 文档记录；不构成签收 |
 | `381abd8` | snapshot-restore fake lifecycle 补 `createMissingJournal`/`verifyCreate`/`reconcileFinalize` | Stage A 门禁 `verify-v0-snapshot-restore-service` 通过 |
-| 本轮（rollback-create journal 迁移，见 §4 决策） | **ROLLBACK_CREATE 迁移到 WRCCHRJ2 journal 单权威**：① held binding 改为 journal 语义（`markerIdentity.contentSha256` = `journalFileIdentity.contentSha256`，markerByteLength = journal 文件长度，held fd = journal fd）；② rollback REQUEST 新增 `journalMarkerDigest`（held journal 整文件 sha，取自 `journalMarkerBinding.journalFileIdentity.contentSha256`），`markerDigest` 保持 EXISTING active-marker 域摘要；③ rollback wire 扩展：Q/R 30 字段、D 31 字段、A 44 字段（`journalMarkerDigest` 固定位于字段 29）；④ C `rollback_header`/`RollbackRequest` 解析 journal_digest；⑤ `rollback_held_authority` 用 `journal_digest` 对 HELD_MARKER_FD（= `changes-history-transaction.json`）整文件 hash 校验；⑥ **移除** `rollback_existing_request_digest` 重建（见 §4-1 决策） | `verify-v0-public-markdown-native-rollback-create-lifecycle` **23/23**（真实 journal fixture，含 marker-new-inode 期刊替换 CAS 拒绝）；`verify-v0-public-markdown-native-rollback-create-schema` **16/16**（冻结摘要/线长/sha256 全部更新）；Stage A 门禁 **39/39**；`npm test` exit 0 |
-| `a835a07`（mixed 生产纵切证据，见 §4-5） | **Main mixed 生产纵切**：① reconciliation 新增 `reconcileExistingRestore`（native R 重建终端 + journal CAS）并暴露 `reconcile`（`existingLifecycleFor`），transaction 新增包装；② `executeExistingRestore`/`reconcileExistingRestore` 合并为 `runExistingRestore(rootPath, projectId, operationId, command)`；held descriptors 契约修正（`markerFd` = journal fd，原传 `journalFd` 与 lifecycle 契约不符）；③ `snapshot-restore-service` mixed 编排落地（原 `SNAPSHOT_RESTORE_MIXED_SELECTION_UNAVAILABLE` 拒绝 → `runMixedJourney`）；④ **C EXISTING R dispatch 修复**：`existing_reconcile_header_shape` 15→33 字段（原 33 字段 R wire 落入 CREATE 语法 → status 3 → R 不可达）；⑤ `commitMissingRestoreHistoryJournal` 接受 `EXISTING_COMMITTED` 入口 phase；⑥ `precreatePhaseDigest` PRECREATE 重建清零 `existingReceiptSetDigest`/`rollbackReceiptDigest`；⑦ R 路径 before-leaf 摘要从磁盘 control record 恢复（`existingControlBeforeLeafDigest`） | **新测试 `verify-v0-snapshot-restore-mixed-journey` 3/3**（真实 helper + 真实 journal + 真实 Main transaction，无 fake adapter）：① mixed journey CAS-installs existingTerminalPublication；② lost EXISTING response → executeExistingRestore fail-closed → `reconcileExistingRestore`（fresh native R）收敛并 CAS 安装同一 terminal publication（E 不重放）；③ journal 在 EXISTING terminal CAS 前漂移 → fail-closed（publication 未安装、CREATE 侧保持、可恢复 UNKNOWN）。Stage A 门禁 **40/40**；`npm test` exit 0 |
+| `16b6614` | **ROLLBACK_CREATE 迁移到 WRCCHRJ2 journal 单权威**：held binding 改为 journal 语义；request/wire 增 `journalMarkerDigest`；C 按 held journal 整文件 SHA 校验；删除无法覆盖 journal binding 的 legacy request-digest 重建 | rollback lifecycle 与 schema 门禁全绿；Stage A 门禁与 `npm test` exit 0；当前注册数统一见 §2 的 40 项 |
+| `a835a07`（mixed 生产纵切证据，见 §4） | **Main mixed 生产纵切**：① reconciliation 新增 `reconcileExistingRestore`（native R 重建终端 + journal CAS）并暴露 `reconcile`（`existingLifecycleFor`），transaction 新增包装；② `executeExistingRestore`/`reconcileExistingRestore` 合并为 `runExistingRestore(rootPath, projectId, operationId, command)`；held descriptors 契约修正（`markerFd` = journal fd，原传 `journalFd` 与 lifecycle 契约不符）；③ `snapshot-restore-service` mixed 编排落地（原 `SNAPSHOT_RESTORE_MIXED_SELECTION_UNAVAILABLE` 拒绝 → `runMixedJourney`）；④ **C EXISTING R dispatch 修复**：`existing_reconcile_header_shape` 15→33 字段（原 33 字段 R wire 落入 CREATE 语法 → status 3 → R 不可达）；⑤ `commitMissingRestoreHistoryJournal` 接受 `EXISTING_COMMITTED` 入口 phase；⑥ `precreatePhaseDigest` PRECREATE 重建清零 `existingReceiptSetDigest`/`rollbackReceiptDigest`；⑦ R 路径 before-leaf 摘要从磁盘 control record 恢复（`existingControlBeforeLeafDigest`） | 新增真实 helper + journal + Main transaction 三项边界证据，随后由 `dcc197c` 扩展为当前 **4/4**；当时 Stage A **40/40**、`npm test` exit 0 |
 | `8912b8e`（service 编排覆盖） | `snapshot-restore-service.runMixedJourney` 顺序修正（MISSING CREATE 先到 CREATED_RECEIPT，EXISTING 后；applied 结果携带 operationId 与精确 applied/recovered 键形状）；`verify-v0-snapshot-restore-service` 增 mixed 全旅程调用序测试 + lost-EXISTING 响应测试 | **41/41**；`npm test` exit 0 |
-| 本轮（mixed 出口 Main 切片，见 §4-5） | **Main mixed finalization 完成**：① publication-based finalize/ack 路径（`buildFinalRecordFromPublication`/`finalRecordNameFromPublication`/`encodeFinalizePublicationCommand`/`encodeFinalRecordFromPublication`/`parseFinalizePublicationResponse` + `encodeAckPublicationCommand`/`parseAckPublicationResponse`）——marker phase 对象在转移后不可重建（updatedAt 移动），故由 CAS-installed publication 驱动（requestDigest/terminalReceiptDigest/receiptSetDigest 即 journal 真值）；② lifecycle `finalizePublication`/`ackPublication`（descriptor 绑定 publication.artifactIdentityDigest）；③ reconciliation `finalizeExistingRestore`（原生 F + EXISTING_FINALIZATION 构建 + publication COMMITTED→FINALIZED，与 marker FINALIZED 同一次 append——journal 要求 publication 状态绑定 marker phase）与 `acknowledgeExistingRestore`（原生 A + FINALIZED→ACK_COMMITTED，在 artifact 清理前运行）；④ `clearSnapshotRestoreJournal` mixed 分支（terminalCleanup 携带 ACK_COMMITTED 状态与 digest，journal 可回 IDLE）；⑤ **journal 契约修正**（`assertExistingFinalization` line 1007：删除 `finalRecordIdentity.contentSha256 === finalRecordDigest` 错误相等——身份绑定 final record 文件原始 sha，finalRecordDigest 是记录域摘要，二者本不同） | **`verify-v0-snapshot-restore-mixed-journey` 4/4**（新增 full-exit：EXISTING publication FINALIZED + final record 落盘逐字节对账 + ACK_COMMITTED + journal 回 IDLE + 双 leaf + history 1 条）；journal schema 26/26；E-4 门禁 69 项 ✓；Stage A 门禁 **40/40**；`npm test` exit 0 |
-| `a1db6f9`（EXISTING finalize/ack 原生切片，见 §4-5） | **C EXISTING finalize(F) + ack(A)**：`existing_finalize` 将 CAS-installed terminal 密封为 owner-private final record（`.changes-history-native-existing-final.<hex>`，0600/nlink 1，重建 FINAL_RECORD canonical 并捕获精确身份）；`existing_ack` 校验 final record 仍为精确密封文件并确认；dispatch `F\tPUBLISH`/`F\tACK`（与 CREATE finalize 的 `F\t<operationId>` 区分），itemCount 0 fail-closed；JS `parseFinalizeResponse`/`parseAckResponse` 校验 envelope、重建 FINAL_RECORD、绑定身份；lifecycle `finalizeExisting`/`ackExisting` 解析 COMMITTED 响应 | **E-4 门禁（`WRC_A1B_E4_FA=1`）2/2**：finalize 密封 + ACK 确认精确记录；空 terminal wire 拒绝。`npm test` exit 0；helper 重建 |
+| `f18d1b3` | 将 mixed production journey 的初始三项证据写入本材料；当前证据已由后续提交扩展为 4/4 | 文档记录；不构成签收 |
+| `a1db6f9`（EXISTING finalize/ack 原生切片，见 §4） | **C EXISTING finalize(F) + ack(A)**：`existing_finalize` 将 CAS-installed terminal 密封为 owner-private final record（`.changes-history-native-existing-final.<hex>`，0600/nlink 1，重建 FINAL_RECORD canonical 并捕获精确身份）；`existing_ack` 校验 final record 仍为精确密封文件并确认；dispatch `F\tPUBLISH`/`F\tACK`（与 CREATE finalize 的 `F\t<operationId>` 区分），itemCount 0 fail-closed；JS `parseFinalizeResponse`/`parseAckResponse` 校验 envelope、重建 FINAL_RECORD、绑定身份；lifecycle `finalizeExisting`/`ackExisting` 解析 COMMITTED 响应 | **E-4 门禁（`WRC_A1B_E4_FA=1`）2/2**：finalize 密封 + ACK 确认精确记录；空 terminal wire 拒绝。`npm test` exit 0；helper 重建 |
+| `a79c895` | 记录 EXISTING finalize/ack 组件证据和 Main mixed applied 出口设计 | 文档记录；不构成签收 |
+| `dcc197c` | **Main mixed applied finalization**：publication 驱动 F/A；publication COMMITTED→FINALIZED 与 marker FINALIZED 同次 append；ACK_COMMITTED 后 mixed cleanup 回 IDLE；修正 final-record raw SHA 与 domain digest 的错误等同约束 | mixed production journey **4/4**；journal schema 26/26；E-4 门禁 69 项；当时 Stage A 40/40、`npm test` exit 0 |
 
 ## 2. 证据链（边界 → 证据）
 
@@ -27,50 +30,52 @@
 | Main 混合事务路径（Research apply → durable.review） | `verify-v0-research-apply-transaction` 12/12（`production injection commits Research` 通过） | 生产 mixed 直接服务路径 |
 | Main 装配（existingRestoreLifecycle 接线） | `verify-v0-changes-history-production-wiring` | 静态装配证据 |
 | native EXISTING E（journal 单权威） | `verify-v0-public-markdown-native-lifecycle` 67/67（A1b production E：真实 journal frame → active marker 切片 → COMMITTED + terminal receipt 逐字节对账） | 生产 native 边界 |
-| native ROLLBACK_CREATE Q/R/D/A（journal 单权威） | `verify-v0-public-markdown-native-rollback-create-lifecycle` 23/23（真实 journal fixture；`journalMarkerDigest` 整文件 sha 锚定 HELD_MARKER_FD；marker-new-inode 替换在 R 终态/公共 rename 前/收据后三处被 CAS 拒绝） | 生产 native 边界 |
-| **Main mixed 生产纵切（无 fake adapter）** | **`verify-v0-snapshot-restore-mixed-journey` 3/3**（真实 public-markdown + changes-history-artifact helper、真实 Main transaction/reconciliation：① mixed CAS 持久 existingTerminalPublication；② lost E response → fresh native R 收敛 + CAS 安装；③ journal 漂移 fail-closed） | 生产 mixed 直接服务路径 |
+| native ROLLBACK_CREATE Q/R/D/A（journal 单权威） | `verify-v0-public-markdown-native-rollback-create-lifecycle` exit 0（真实 journal fixture；`journalMarkerDigest` 整文件 sha 锚定 HELD_MARKER_FD；marker-new-inode 替换在 R 终态/公共 rename 前/收据后三处被 CAS 拒绝） | 生产 native 边界 |
+| **Main mixed applied 生产纵切（无 fake adapter）** | **`verify-v0-snapshot-restore-mixed-journey` 4/4**（真实 public-markdown + changes-history-artifact helper、真实 Main transaction/reconciliation：terminal CAS、lost-E fresh R、F/ACK/IDLE、journal drift fail-closed） | 生产 mixed applied 直接服务路径；不覆盖 formal UNCOMMITTED rollback 出口 |
 | EXISTING wire 契约 | `verify-v0-snapshot-existing-restore-native-schema` 23/23（33 字段 + sha256 冻结） | schema/wire 契约 |
 | ROLLBACK_CREATE wire 契约 | `verify-v0-public-markdown-native-rollback-create-schema` 16/16（Q/R 30 / D 31 / A 44 字段；冻结摘要、线长、sha256；独立重建 wire 权威） | schema/wire 契约 |
 | journal 物理帧 | `verify-v0-changes-history-marker-journal-native-lifecycle` 10/10、`marker-journal` 12/12、`marker-journal-schema` 26/26 | native 物理帧 |
-| 默认套件 | `npm test` exit 0（0 失败）；Stage A 门禁 39/39 | 回归基线 |
+| 当前定向复现 | registration 221（52 current / 40 Stage A）；mixed 4/4；service 41/41；native 67/67；rollback lifecycle exit 0 | 当前 component/integration 基线；不覆盖下述 E3_R 首红 |
 
 ## 3. 三条红灯当前状态
 
 | 红灯 | 状态 |
 |---|---|
-| #1 journal 物理绑定单权威化 | **EXISTING E/R 路径已完成**（C wire + journal frame 校验 + active marker 切片）。**ROLLBACK_CREATE 路径已完成**（§4-1 决策落地；23/23 + 16/16 全绿）。`snapshot_restore_undo` 仍 fail-closed（reconciliation:4572-4576 "not yet journal-backed"）；LEGACY 回落路径仍在（persist:4520-4540） |
-| #2 Main mixed publication CAS 持久化接线 | **生产纵切证据已补齐（§4-5）**：`verify-v0-snapshot-restore-mixed-journey` 3/3——真实 helper + 真实 journal，mixed CAS 持久 `existingTerminalPublication`（COMMITTED）、lost E response 经 fresh native R 收敛、journal 漂移 fail-closed。遗留：snapshot-restore-service 的 mixed 编排已实现但**未接入 main.js/handler**（该服务本身未接线，独立接线切片） |
-| #3 mixed EXISTING+MISSING 事务出口 | **已完成**：mixed journey 全链证据（`verify-v0-snapshot-restore-mixed-journey` 4/4，无 fake adapter）——PRECREATE → CREATE → EXISTING E/R + CAS → HISTORY_COMMITTED → FINALIZED（EXISTING publication FINALIZED + final record）→ ACK_COMMITTED → IDLE；双公共 leaf 落盘 + History 1 条。journal 契约修正见 §4-5 |
+| #1 journal 物理绑定单权威化 | **E/R wire 与 native rollback bridge 已完成；仍有 1 个 A1b P1**：`WRC_A1B_E3_R=1` 的 control new-inode-exact 场景实际返回 `COMMITTED`，预期为 `UNKNOWN`。Fresh R 仍从当前 control record 捕获身份，未绑定 publication-time inode identity。 |
+| #2 Main mixed publication CAS 持久化接线 | **Applied 分支已完成**：真实 helper + journal 已证明 terminal CAS、lost-E fresh R、old/new head drift fail-closed。Main/handler App 暴露归 A2，不作为本 A1b 后端红灯。 |
+| #3 mixed EXISTING+MISSING 事务出口 | **成功出口已完成，rollback 出口仍有 1 个 A1b P1**：4/4 已证明 `PRECREATE→CREATE→EXISTING_COMMITTED→HISTORY_COMMITTED→FINALIZED→ACK_COMMITTED→IDLE`；但 Main 尚未把 formal EXISTING `UNCOMMITTED` 编排为 `ROLLBACK_CREATE Q→fresh R→D→A` 并证明 operation-before。 |
 
-## 4. 待确认设计项（需 owner/合同决策，阻止机械继续）
+## 4. 当前开放项与后续归属
 
-1. **ROLLBACK_CREATE 的 marker 语义 —— 已决策（本轮落地，记录如下）**：EXISTING REQUEST 强制 `journalMarkerBinding`（markerDigest = `activeMarkerDigest` 域摘要）。rollback held binding 迁移为 journal 语义（组合原候选 A + C）：
-   - `buildRollbackCreateHeldBinding` 不变式改为 `markerIdentity.contentSha256 === journalMarkerBinding.journalFileIdentity.contentSha256`（held marker = journal 文件整内容），markerByteLength = journal 文件长度，held fd = journal fd。
-   - rollback REQUEST 新增 `journalMarkerDigest`（= held journal 整文件 sha）；`markerDigest` 保持 EXISTING active-marker 域摘要（C 用它重建 EXISTING control/rollback/terminal 记录）。
-   - rollback wire 扩展：Q/R 30 字段、D 31 字段、A 44 字段，`journalMarkerDigest` 固定字段 29；`rollback_held_authority` 用 `journal_digest` 对 HELD_MARKER_FD（= `changes-history-transaction.json`）整文件 hash 校验。
-   - **移除 `rollback_existing_request_digest` 重建**：legacy 11 字段 canonical 无法覆盖 journal binding（重建需在 rollback wire 上携带全部 binding 字段，重复 E/R 33 字段线且无新增 ground truth）；EXISTING E/R 路径从不重建请求摘要（`EXISTING_REQUEST_SCHEMA` 仅被该已删函数使用）——EXISTING 权威改由磁盘记录锚定（recordKey 嵌入 requestDigest，`rollback_existing_records` 逐字节核对 on-disk control/rollback 文件）+ held journal 整文件 sha 锚定。
-2. **`snapshot_restore_undo` journal-backed**（reconciliation:4572-4576 目前 fail-closed）：需要实现完整 undo 旅程（quarantine/reconcile/finalize/ack 的 journal 状态机），是独立大切片。
-3. **LEGACY 回落移除**（persist:4520-4540 `current.status !== 'LEGACY'` 才走 journal）：全部路径 journal-backed 后移除 legacy marker 文件写入。
-4. **mixed 生产纵切 —— 已补齐（本轮，见 §2 证据链）**：`verify-v0-snapshot-restore-mixed-journey` 3/3（真实边界 fault-injection：CAS 持久 / 响应丢失 / journal 漂移）。
-5. **mixed 事务出口 —— 已完成**：
-   - **C EXISTING `finalize`/`ack`**（`a1db6f9`）：`existing_finalize` 密封 terminal（重建 FINAL_RECORD canonical、写 owner-private final record、捕获身份）；`existing_ack` 校验 final record 并确认；E-4 门禁 2/2。
-   - **Main finalization**（本轮）：**publication 驱动**（marker phase 对象转移后不可重建——updatedAt 移动——故不重建 authority，`requestDigest`/terminal digests 取 CAS-installed publication 真值）；`finalizeExistingRestore` 原生 F + `EXISTING_FINALIZATION`（finalizeRequestDigest = finalize wire sha、historyCommitted/markerFinalizedPhaseDigest = 当前 marker phase digest——审计参考值，格式校验）+ publication COMMITTED→FINALIZED **与 marker FINALIZED 同一次 journal append**（journal 要求 publication 状态绑定 marker phase）；`acknowledgeExistingRestore` 原生 A + FINALIZED→ACK_COMMITTED（artifact 清理前）；`clearSnapshotRestoreJournal` terminalCleanup 携带 ACK_COMMITTED 状态与 digest → journal 回 IDLE。
-   - **journal 契约修正**（`assertExistingFinalization`）：删除 `finalRecordIdentity.contentSha256 === finalRecordDigest` 错误相等——final record 身份绑定真实文件（原始 sha），finalRecordDigest 是记录 canonical 的域摘要，二者本不同；finalization 经自身 digest 绑定两者。
-   - 遗留：E-3 门禁（`WRC_A1B_E3_R`）fresh R 路径 6/7，剩 **control new-inode-exact** 漂移检测缺口（R 对"同内容新 inode"的 control record 接受为 COMMITTED——身份锚定需设计决策）。
-6. **snapshot-restore-service 接线到 main.js/handler**：mixed 编排已在服务层落地（本轮），但 `createSnapshotRestoreService` 尚未被 main.js/handler 引用（独立接线切片）。
+### 4.1 A1b 必须关闭的两个 P1
+
+1. **Fresh R identity**：R 必须消费 E 时持久化的 control publication identity；同内容新 inode、same-inode rewrite 或缺失 identity 均为 `UNKNOWN`，不得从当前记录重铸。
+2. **Formal mixed rollback**：Main 必须只在 formal EXISTING `UNCOMMITTED` 后进入已冻结的 `ROLLBACK_CREATE` domain，按 Q/fresh-R/D/A 收敛并证明所有 selected public leaf 与 raw History 精确回到 operation-before；任何不明状态保持 journal/residue，禁止复用 applied 出口。
+
+### 4.2 已决策/已完成的 A1b 组件
+
+- `16b6614` 已冻结 rollback journal held binding、`journalMarkerDigest` 与 Q/R/D/A wire；不再重开 marker 语义决策。
+- `dcc197c` 已完成 publication-driven F/A、EXISTING finalization、ACK_COMMITTED 与 applied cleanup/IDLE；不再把 applied mixed 出口列为待决策项。
+
+### 4.3 不属于 A1b 的后续工作
+
+- `snapshot_restore_undo` journal-backed 属 **A1c**。
+- snapshot restore service 的 Main/handler/IPC/Renderer 暴露属 **A2 App 接线**。
+- LEGACY 回落移除在全部对应 journal-backed 路径完成后单独迁移，不作为当前 A1b 出口 blocker。
 
 ## 5. 复审者核对清单
 
 - [ ] `npm test` 全绿（基线）
-- [ ] `npm run verify:0.4:registration`（221/221，40 Stage A current）
+- [ ] `npm run verify:0.4:registration`（221 scripts，52 current，40 Stage A current）
 - [ ] `verify-v0-public-markdown-native-lifecycle` 67/67（journal 单权威 EXISTING）
-- [ ] `verify-v0-public-markdown-native-rollback-create-lifecycle` 23/23（journal 单权威 ROLLBACK_CREATE）
+- [ ] `verify-v0-public-markdown-native-rollback-create-lifecycle` exit 0（journal 单权威 ROLLBACK_CREATE）
 - [ ] `verify-v0-public-markdown-native-rollback-create-schema` 16/16（Q/R 30 / D 31 / A 44 字段冻结）
-- [ ] **`verify-v0-snapshot-restore-mixed-journey` 3/3（真实 helper + 真实 journal + 真实 Main transaction，无 fake adapter）**
+- [ ] **`verify-v0-snapshot-restore-mixed-journey` 4/4（真实 helper + 真实 journal + 真实 Main transaction，无 fake adapter）**
 - [ ] `verify-v0-research-apply-transaction` 12/12（mixed 直接服务路径）
 - [ ] C wire 33 字段与 `encodeExistingCommand` 逐字段核对
 - [ ] rollback wire：`journalMarkerDigest`（字段 29）与 JS `rollbackCreateAuthorityHeaderFields` 逐字段核对；`rollback_held_authority` 用 `journal_digest` 校验 HELD_MARKER_FD 整文件 sha
-- [ ] §4-1 决策核验：`buildRollbackCreateHeldBinding` 不变式 = journalFileIdentity.contentSha256；`rollback_existing_request_digest` 已删除（无残留引用）
-- [ ] §4-5 核验：`reconcileExistingRestore`（fresh native R + CAS）、`existing_reconcile_header_shape` 33 字段 dispatch、`existingControlBeforeLeafDigest`（R 路径 before-leaf 从 control record 恢复）、snapshot-restore-service `runMixedJourney`
-- [ ] §4 剩余设计项决策后：mixed 出口（EXISTING finalize/ack + EXISTING_FINALIZATION 转移）/ undo journal-backed / LEGACY 移除 / service 接线
+- [ ] §4.2 rollback journal binding 核验：`buildRollbackCreateHeldBinding` 不变式 = journalFileIdentity.contentSha256；`rollback_existing_request_digest` 已删除（无残留引用）
+- [ ] §4 applied 核验：`reconcileExistingRestore`（fresh native R + CAS）、33 字段 R dispatch、publication-driven F/A、snapshot-restore-service `runMixedJourney`
+- [ ] 修复并复跑 `WRC_A1B_E3_R=1`：control new-inode-exact 必须 `UNKNOWN`
+- [ ] 新增真实 formal mixed `UNCOMMITTED→Q/R/D/A→operation-before` production journey
 - [ ] 本材料归档后：按执行协议绑定 clean commit 做完整 finding batch（P0/P1 清零）
