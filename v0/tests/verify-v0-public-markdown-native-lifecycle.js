@@ -1505,38 +1505,35 @@ if (process.env.WRC_A1B_CANONICAL_ONLY !== '1') {
         }
 
         for (const { label, helper: faultHelper } of existingApplyFaultHelpers) {
-          test(`A1b E-2b apply fault (${label}) preserves exact committed-risk authority`, () => {
+          test(`A1b E-2b apply fault (${label}) self-rolls-back to a formal UNCOMMITTED terminal`, () => {
             const item = existingProductionFixture(faultHelper);
             const names = item.canonicalBundle.records[0].names;
             const recoveryPath = path.join(item.rootPath, recoveryRelative);
             const applyPath = path.join(recoveryPath, names.applyReceiptBasename);
             const controlPath = path.join(recoveryPath, names.controlBasename);
             const beforePath = path.join(recoveryPath, names.beforeQuarantineBasename);
+            const rollbackPath = path.join(recoveryPath, names.rollbackReceiptBasename);
             try {
               const result = runExistingProduction(faultHelper, item);
-              assert.notStrictEqual(result.status, 0, result.stdout);
-              assert.ok(!/E\tRESULT\t(?:UNKNOWN|COMMITTED|UNCOMMITTED)/.test(result.stdout));
-              assert.deepStrictEqual(fs.readFileSync(item.chapterPaths[0]), item.afterBytes[0]);
+              assert.strictEqual(result.status, 0,
+                `status=${result.status} stderr=${JSON.stringify(String(result.stderr || ''))} stdout=${JSON.stringify(result.stdout)}`);
+              // Formal self-rollback: the apply publication failed, the public
+              // leaf is restored exactly to operation-before, the partial
+              // apply residue is removed, and a rollback receipt proves it.
+              assert.match(
+                result.stdout,
+                /^P\tOK\nE\tRESULT\tUNCOMMITTED\t/,
+                `stdout: ${JSON.stringify(result.stdout)}`
+              );
+              assert.deepStrictEqual(fs.readFileSync(item.chapterPaths[0]), item.beforeBytes[0]);
               assert.strictEqual(fs.existsSync(controlPath), true);
-              assert.strictEqual(fs.existsSync(beforePath), true);
-              assert.strictEqual(fs.existsSync(applyPath), true);
-              const applyBytes = fs.readFileSync(applyPath);
-              if (label === 'partial-write') {
-                assert.strictEqual(applyBytes.length, 1);
-              } else {
-                assert.strictEqual(applyBytes.toString('utf8'), applyExpected(item, (() => {
-                  const stat = fs.statSync(item.chapterPaths[0], { bigint: true });
-                  return {
-                    dev: stat.dev.toString(), ino: stat.ino.toString(), uid: Number(stat.uid),
-                    mode: Number(stat.mode & 0o7777n), nlink: Number(stat.nlink),
-                    size: stat.size.toString(), mtimeNs: stat.mtimeNs.toString(),
-                    ctimeNs: stat.ctimeNs.toString(),
-                  };
-                })()));
-              }
-              assert.strictEqual(fs.existsSync(path.join(
-                recoveryPath, names.rollbackReceiptBasename
-              )), false);
+              assert.strictEqual(fs.existsSync(beforePath), false);
+              assert.strictEqual(fs.existsSync(applyPath), false);
+              assert.strictEqual(fs.existsSync(rollbackPath), true);
+              assert.strictEqual(
+                fs.readFileSync(rollbackPath).toString('utf8').split('\t')[0],
+                'writcraft.changes-history-native-existing-rollback-receipt/v1'
+              );
             } finally { item.close(); }
           });
         }

@@ -1630,8 +1630,41 @@ function parseRunResponse(stdout, rawAuthority, expectedCommand, rawStoredReques
         header[13] !== ERROR_CODES.UNKNOWN) fail('UNKNOWN response authority invalid');
     return buildRunResult(authority, expectedCommand, 'UNKNOWN', null, storedRequestDigest);
   }
-  if (header[2] !== 'COMMITTED' || count !== authority.request.items.length ||
-      header[13] !== '-') fail('terminal response state invalid');
+  if (!['COMMITTED', 'UNCOMMITTED'].includes(header[2]) ||
+      count !== authority.request.items.length || header[13] !== '-') {
+    fail('terminal response state invalid');
+  }
+  if (header[2] === 'UNCOMMITTED') {
+    const rollbackTokens = lines.map((line, index) => {
+      const fields = line.split('\t');
+      if (Buffer.byteLength(`${line}\n`, 'ascii') > LIMITS.maxRunItemBytes ||
+          fields.length !== 31 || fields[0] !== 'T') fail('rollback terminal item invalid');
+      const rollback = buildRollbackToken(
+        authority,
+        index,
+        buildRollbackReceipt(authority, index, fields[3]),
+        identityFromWire(fields, 9, 'controlRecordIdentity'),
+        identityFromWire(fields, 19, 'rollbackReceiptRecordIdentity')
+      );
+      if (fields[1] !== authority.request.items[index].selectedId ||
+          fields[2] !== authority.request.items[index].beforeContentDigest ||
+          fields[3] !== rollback.restoredLeafIdentityDigest ||
+          fields[4] !== rollback.controlBasename ||
+          fields[5] !== rollback.receiptBasename ||
+          fields[6] !== rollback.controlDigest ||
+          fields[7] !== rollback.rollbackReceiptDigest) {
+        fail('rollback terminal item is foreign');
+      }
+      return rollback;
+    });
+    const terminal = buildTerminalReceipt(authority, 'UNCOMMITTED', rollbackTokens);
+    if ([terminal.markerDigest, terminal.artifactDigest, terminal.createdReceiptPhaseDigest,
+      terminal.selectionDigest, terminal.baseHistoryDigest, terminal.receiptSetDigest,
+      terminal.terminalReceiptDigest].some((value, index) => value !== header[index + 5])) {
+      fail('rollback terminal digest authority invalid');
+    }
+    return buildRunResult(authority, expectedCommand, 'UNCOMMITTED', terminal);
+  }
   const tokens = lines.map((line, index) => {
     const fields = line.split('\t');
     if (Buffer.byteLength(`${line}\n`, 'ascii') > LIMITS.maxRunItemBytes ||

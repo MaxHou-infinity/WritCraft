@@ -1477,13 +1477,13 @@ static bool unlink_attempted_record_owned(
   exact = fstatat(directory, name, &ignored, AT_SYMLINK_NOFOLLOW) != 0 && errno == ENOENT &&
     quarantine_fd >= 0 && fstat(quarantine_fd, &held_stat) == 0 &&
     identity_from_stat(&held_stat, &quarantine_identity) &&
-    same_file(&quarantine_identity, &attempt->identity) &&
+    same_bound_record(&quarantine_identity, &attempt->identity) &&
     count == (ssize_t)attempt->bytes_written &&
     memcmp(bytes, expected, attempt->bytes_written) == 0 &&
     record_path_matches_fd(directory, quarantine, quarantine_fd) &&
     fstat(attempt->fd, &created_stat) == 0 &&
     identity_from_stat(&created_stat, &created_identity) &&
-    same_file(&created_identity, &attempt->identity);
+    same_bound_record(&created_identity, &attempt->identity);
   if (!exact || unlinkat(directory, quarantine, 0) != 0) {
     if (quarantine_fd >= 0) (void)close(quarantine_fd);
     (void)close(held_fd);
@@ -5942,7 +5942,7 @@ static bool existing_execute_authority_valid(
 }
 
 static bool __attribute__((unused)) existing_execute_leaf_restored_exact(
-  RootBinding *root, const ExistingExecuteItem *item
+  RootBinding *root, const ExistingExecuteItem *item, Identity *identity_out
 ) {
   Ancestor ancestors[MAX_ROOT_COMPONENTS];
   memset(ancestors, 0, sizeof(ancestors));
@@ -5963,6 +5963,7 @@ static bool __attribute__((unused)) existing_execute_leaf_restored_exact(
     identity.size == item->before_length && identity.nlink == 1U &&
     strcmp(content, item->before_content) == 0 &&
     record_path_matches_fd(parent, leaf, fd) && revalidate_parent(root, ancestors, depth);
+  if (exact && identity_out != NULL) *identity_out = identity;
   if (fd >= 0) (void)close(fd);
   close_parent(ancestors, depth, parent);
   return exact;
@@ -6090,7 +6091,20 @@ typedef struct {
   Identity apply_identity;
   RecordIdentity control_record;
   RecordIdentity apply_record_identity;
+  /* Formal self-rollback (UNCOMMITTED) output: the rollback receipt
+   * replaces the apply receipt and the restored before leaf replaces the
+   * after leaf. apply_name/apply_digest/apply_record/after_leaf/apply_identity
+   * then describe the rollback receipt and the restored leaf. */
+  bool uncommitted;
 } ExistingCommitOutput;
+
+static bool __attribute__((unused)) existing_rollback_receipt_build(
+  const ExistingExecuteRequest *request,
+  const ExistingExecuteItem *item,
+  const char restored_leaf[72],
+  char rollback_digest[72],
+  char out[MAX_RECORD_BYTES + 1U]
+);
 
 static bool __attribute__((unused)) existing_swap_and_rollback(
   RootBinding *root,
@@ -6189,7 +6203,11 @@ static bool __attribute__((unused)) existing_swap_and_rollback(
   char apply_digest[72];
   char apply_record[MAX_RECORD_BYTES + 1U];
   Identity apply_identity;
-  if (ok) ok = existing_held_path_exact(parent, leaf, staged_fd,
+  RecordAttempt apply_attempt;
+  memset(&apply_attempt, 0, sizeof(apply_attempt));
+  apply_attempt.fd = -1;
+  bool apply_published = ok &&
+    existing_held_path_exact(parent, leaf, staged_fd,
       &published_after_identity, item->after_content, item->after_length, NULL) &&
     existing_held_path_exact(root->recovery_fd, before_name, before_fd,
       &quarantined_before_identity, item->before_content, item->before_length, NULL) &&
@@ -6199,7 +6217,62 @@ static bool __attribute__((unused)) existing_swap_and_rollback(
       item, &published_after_identity, item->after_content, after_leaf
     ) && existing_apply_record_build(
       request, item, after_leaf, apply_digest, apply_record
-    ) && write_record(root->recovery_fd, apply_name, apply_record, &apply_identity, NULL);
+    ) && write_record(root->recovery_fd, apply_name, apply_record, &apply_identity,
+      &apply_attempt);
+  if (ok && !apply_published) {
+    /* Formal self-rollback: the apply publication failed, so the after stage
+     * is swapped back onto the before leaf, the partial apply residue is
+     * removed, and a durable rollback receipt proves the exact restored leaf.
+     * The E command then reports UNCOMMITTED (zero public mutation). */
+    char restored_leaf[72];
+    char rollback_digest[72];
+    char rollback_record[MAX_RECORD_BYTES + 1U];
+    Identity rollback_identity;
+    Identity restored_identity;
+    ok =
+      existing_held_path_exact(parent, leaf, staged_fd, &published_after_identity,
+        item->after_content, item->after_length, NULL) &&
+      existing_held_path_exact(root->recovery_fd, before_name, before_fd,
+        &quarantined_before_identity, item->before_content, item->before_length, NULL) &&
+      revalidate_parent(root, ancestors, depth) &&
+      renameatx_np(parent, leaf, root->recovery_fd, before_name, RENAME_SWAP) == 0 &&
+      fsync(parent) == 0 && fsync(root->recovery_fd) == 0 &&
+      record_path_matches_fd(parent, leaf, before_fd) &&
+      record_path_matches_fd(root->recovery_fd, before_name, staged_fd) &&
+      revalidate_parent(root, ancestors, depth) &&
+      existing_stage_remove_exact(root->recovery_fd, before_name,
+        &staged_identity, item->after_content, item->after_length) &&
+      existing_execute_nonpublic_authority_valid(root, request) &&
+      existing_execute_leaf_restored_exact(root, item, &restored_identity) &&
+      existing_leaf_identity_digest_observed(item, &restored_identity,
+        item->before_content, restored_leaf) &&
+      unlink_attempted_record_owned(root->recovery_fd, apply_name, apply_record,
+        &apply_attempt) &&
+      existing_rollback_receipt_build(request, item, restored_leaf,
+        rollback_digest, rollback_record) &&
+      write_record(root->recovery_fd, rollback_name, rollback_record,
+        &rollback_identity, NULL) &&
+      record_identity_matches(root->recovery_fd, rollback_name, rollback_record,
+        &rollback_identity) &&
+      commit != NULL;
+    if (ok && commit != NULL) {
+      memcpy(commit->control_name, control_name, strlen(control_name) + 1U);
+      memcpy(commit->control_digest, control_digest, sizeof(commit->control_digest));
+      memcpy(commit->apply_name, rollback_name, strlen(rollback_name) + 1U);
+      memcpy(commit->apply_digest, rollback_digest, sizeof(commit->apply_digest));
+      memcpy(commit->apply_record, rollback_record, sizeof(commit->apply_record));
+      memcpy(commit->after_leaf, restored_leaf, sizeof(commit->after_leaf));
+      commit->control_identity = *control_identity;
+      commit->apply_identity = rollback_identity;
+      commit->control_record.identity = *control_identity;
+      sha256_prefixed((const unsigned char *)control_record, strlen(control_record),
+        commit->control_record.content);
+      commit->apply_record_identity.identity = rollback_identity;
+      sha256_prefixed((const unsigned char *)rollback_record, strlen(rollback_record),
+        commit->apply_record_identity.content);
+      commit->uncommitted = true;
+    }
+  }
 #ifdef WRITCRAFT_TEST_PAUSE_EXISTING_AFTER_APPLY
   if (ok) ok = test_sync_point("existing-after-apply");
 #endif
@@ -6223,7 +6296,7 @@ static bool __attribute__((unused)) existing_swap_and_rollback(
       existing_stage_remove_exact(root->recovery_fd, before_name,
         &staged_identity, item->after_content, item->after_length) &&
       existing_execute_nonpublic_authority_valid(root, request) &&
-      existing_execute_leaf_restored_exact(root, item) &&
+      existing_execute_leaf_restored_exact(root, item, NULL) &&
       unlink_exact_record_owned(root->recovery_fd, apply_name,
         apply_record, &apply_identity, -1);
   }
@@ -6231,7 +6304,10 @@ static bool __attribute__((unused)) existing_swap_and_rollback(
 #if !defined(WRITCRAFT_TEST_PAUSE_EXISTING_AFTER_SWAP) && \
     !defined(WRITCRAFT_TEST_PAUSE_EXISTING_AFTER_BEFORE_QUARANTINE) && \
     !defined(WRITCRAFT_TEST_PAUSE_EXISTING_AFTER_APPLY)
-  if (ok) {
+  /* The formal COMMITTED path applies only when the apply publication
+   * succeeded; a failed apply publication already ran the self-rollback above
+   * and filled the UNCOMMITTED commit. */
+  if (ok && apply_published) {
     ok = record_identity_matches(root->recovery_fd, control_name, control_record,
         control_identity) &&
       record_identity_matches(root->recovery_fd, apply_name, apply_record,
@@ -6400,6 +6476,38 @@ static bool __attribute__((unused)) existing_apply_record_build(
     EXISTING_APPLY_SCHEMA "\t%s\t%s\t%s\t%s\t%s\t1\t1\t1\t%s\n",
     request->operation, item->selected, control_digest, item->after_content,
     after_leaf, apply_digest);
+  return length > 0 && length <= (int)MAX_RECORD_BYTES;
+}
+
+/* Formal self-rollback receipt: proves the exact before content and the
+ * newly observed restored-leaf identity with all three durability truths,
+ * matching the frozen schema writcraft.changes-history-native-existing-
+ * rollback-receipt/v1 (canonical JSON digest + tab wire, apply slot null). */
+static bool __attribute__((unused)) existing_rollback_receipt_build(
+  const ExistingExecuteRequest *request,
+  const ExistingExecuteItem *item,
+  const char restored_leaf[72],
+  char rollback_digest[72],
+  char out[MAX_RECORD_BYTES + 1U]
+) {
+  char control_digest[72];
+  char canonical[MAX_RECORD_BYTES + 1U];
+  if (!existing_canonical_control_digest(request, item, control_digest) ||
+      !valid_digest(restored_leaf)) return false;
+  int length = snprintf(canonical, sizeof(canonical),
+    "{\"applyReceiptDigest\":null,\"beforeContentDigest\":\"%s\""
+    ",\"controlDigest\":\"%s\",\"fileFsyncComplete\":true"
+    ",\"operationId\":\"%s\",\"parentFsyncComplete\":true"
+    ",\"recoveryFsyncComplete\":true,\"restoredLeafIdentityDigest\":\"%s\""
+    ",\"schema\":\"" EXISTING_ROLLBACK_SCHEMA "\",\"selectedId\":\"%s\"}",
+    item->before_content, control_digest, request->operation, restored_leaf,
+    item->selected);
+  if (length <= 0 || (size_t)length >= sizeof(canonical) ||
+      !digest_domain(EXISTING_ROLLBACK_SCHEMA, canonical, rollback_digest)) return false;
+  length = snprintf(out, MAX_RECORD_BYTES + 1U,
+    EXISTING_ROLLBACK_SCHEMA "\t%s\t%s\t%s\t-\t%s\t%s\t1\t1\t1\t%s\n",
+    request->operation, item->selected, control_digest, item->before_content,
+    restored_leaf, rollback_digest);
   return length > 0 && length <= (int)MAX_RECORD_BYTES;
 }
 
@@ -6723,6 +6831,84 @@ static bool __attribute__((unused)) existing_output_committed(
   if (length <= 0 || (size_t)length >= sizeof(line) || !write_line(line)) return false;
   length = snprintf(line, sizeof(line), "T\t%s\t%s\t%s\t%s\t%s\t%s\t%s\t%s\t%s",
     request->items[0].selected, request->items[0].after_content, commit->after_leaf,
+    commit->control_name, commit->apply_name, commit->control_digest,
+    commit->apply_digest, commit->after_leaf, OBJECT_SCHEMA);
+  if (length <= 0 || (size_t)length >= sizeof(line)) return false;
+  used = (size_t)length;
+  if (!append_identity(line, sizeof(line), &used, &commit->control_record) ||
+      !rollback_append(line, sizeof(line), &used, "\t%s", OBJECT_SCHEMA) ||
+      !append_identity(line, sizeof(line), &used, &commit->apply_record_identity) ||
+      !rollback_append(line, sizeof(line), &used, "\n")) return false;
+  return write_line(line);
+}
+
+/* Formal self-rollback output (UNCOMMITTED): the receipt set carries one
+ * rollback token (apply slot null) binding the restored before leaf; the
+ * terminal reproduces the same authority shape as the COMMITTED terminal but
+ * with state UNCOMMITTED and the rollback receipt identity. */
+static bool __attribute__((unused)) existing_output_uncommitted(
+  char command,
+  const ExistingExecuteRequest *request,
+  const ExistingCommitOutput *commit
+) {
+  char token[MAX_RECORD_BYTES + 1U];
+  static char set[MAX_INPUT_BYTES + 1U];
+  static char terminal[MAX_INPUT_BYTES + 1U];
+  static char line[MAX_EXISTING_OUTPUT_BYTES + 1U];
+  char token_digest[72];
+  char set_digest[72];
+  char terminal_digest[72];
+  size_t used = 0U;
+  if (request == NULL || commit == NULL || request->count != 1U ||
+      !rollback_append(token, sizeof(token), &used,
+        "{\"afterLeafIdentityDigest\":null,\"applyReceiptDigest\":null,"
+        "\"controlBasename\":\"%s\",\"controlDigest\":\"%s\","
+        "\"controlRecordIdentity\":", commit->control_name, commit->control_digest) ||
+      !rollback_identity_json(token, sizeof(token), &used, &commit->control_record) ||
+      !rollback_append(token, sizeof(token), &used,
+        ",\"receiptBasename\":\"%s\",\"receiptRecordIdentity\":",
+        commit->apply_name) ||
+      !rollback_identity_json(token, sizeof(token), &used, &commit->apply_record_identity) ||
+      !rollback_append(token, sizeof(token), &used,
+        ",\"restoredLeafIdentityDigest\":\"%s\",\"rollbackReceiptDigest\":\"%s\","
+        "\"schema\":\"" EXISTING_ROLLBACK_TOKEN_SCHEMA "\",\"selectedId\":\"%s\"}",
+        commit->after_leaf, commit->apply_digest, request->items[0].selected) ||
+      !digest_domain(EXISTING_ROLLBACK_TOKEN_SCHEMA, token, token_digest)) return false;
+  used = 0U;
+  if (!rollback_append(set, sizeof(set), &used,
+      "{\"items\":[{\"applyToken\":null,\"finalContentDigest\":\"%s\","
+      "\"finalLeafIdentityDigest\":\"%s\",\"rollbackToken\":%s,"
+      "\"selectedId\":\"%s\"}],\"operationId\":\"%s\",\"requestDigest\":\"%s\","
+      "\"schema\":\"" EXISTING_TERMINAL_SCHEMA "\",\"state\":\"UNCOMMITTED\"}",
+      request->items[0].before_content, commit->after_leaf, token,
+      request->items[0].selected, request->operation, request->request_digest) ||
+      !digest_domain(EXISTING_TERMINAL_SCHEMA, set, set_digest)) return false;
+  used = 0U;
+  if (!rollback_append(terminal, sizeof(terminal), &used,
+      "{\"artifactDigest\":\"%s\",\"baseHistoryDigest\":\"%s\","
+      "\"createdReceiptPhaseDigest\":\"%s\",\"items\":[{\"applyToken\":null,"
+      "\"finalContentDigest\":\"%s\",\"finalLeafIdentityDigest\":\"%s\","
+      "\"rollbackToken\":%s,\"selectedId\":\"%s\"}],\"markerDigest\":\"%s\","
+      "\"operationId\":\"%s\",\"receiptSetDigest\":\"%s\","
+      "\"recoveryFsyncComplete\":true,\"schema\":\"" EXISTING_TERMINAL_SCHEMA
+      "\",\"selectionDigest\":\"%s\",\"state\":\"UNCOMMITTED\"}",
+      request->artifact, request->base_history, request->created_phase,
+      request->items[0].before_content, commit->after_leaf, token,
+      request->items[0].selected,
+      request->reconcile ? request->publication_marker_digest : request->active_marker_digest,
+      request->operation, set_digest, request->selection) ||
+      !digest_domain(EXISTING_TERMINAL_SCHEMA, terminal, terminal_digest)) return false;
+  int length = snprintf(line, sizeof(line),
+    "%c\tRESULT\tUNCOMMITTED\t%s\t%s\t%s\t%s\t%s\t%s\t%s\t%s\t%s\t1\t-\n",
+    command,
+    request->operation, request->request_digest,
+    request->reconcile ? request->publication_marker_digest : request->active_marker_digest,
+    request->artifact,
+    request->created_phase, request->selection, request->base_history, set_digest,
+    terminal_digest);
+  if (length <= 0 || (size_t)length >= sizeof(line) || !write_line(line)) return false;
+  length = snprintf(line, sizeof(line), "T\t%s\t%s\t%s\t%s\t%s\t%s\t%s\t%s\t%s",
+    request->items[0].selected, request->items[0].before_content, commit->after_leaf,
     commit->control_name, commit->apply_name, commit->control_digest,
     commit->apply_digest, commit->after_leaf, OBJECT_SCHEMA);
   if (length <= 0 || (size_t)length >= sizeof(line)) return false;
@@ -7070,7 +7256,7 @@ static bool existing_execute_unknown(RootBinding *root, char *line) {
     defined(WRITCRAFT_TEST_PAUSE_EXISTING_AFTER_BEFORE_QUARANTINE) || \
     defined(WRITCRAFT_TEST_PAUSE_EXISTING_AFTER_APPLY)
     if (!existing_execute_nonpublic_authority_valid(root, &request) ||
-        !existing_execute_leaf_restored_exact(root, &request.items[0]) ||
+        !existing_execute_leaf_restored_exact(root, &request.items[0], NULL) ||
         !unlink_exact_record_owned(root->recovery_fd, control_name,
           control_record, &control_identity, -1) ||
         record_state(root->recovery_fd, control_name, "") != NAME_ABSENT ||
@@ -7086,12 +7272,20 @@ static bool existing_execute_unknown(RootBinding *root, char *line) {
     if (!existing_execute_nonpublic_authority_valid(root, &request) ||
         !record_identity_matches(root->recovery_fd, control_name, control_record,
           &control_identity) ||
-        !record_identity_matches(root->recovery_fd, apply_name, commit.apply_record,
-          &commit.apply_identity) ||
-        record_state(root->recovery_fd, rollback_name, "") != NAME_ABSENT ||
+        (commit.uncommitted
+          ? !record_identity_matches(root->recovery_fd, rollback_name,
+            commit.apply_record, &commit.apply_identity) ||
+            record_state(root->recovery_fd, apply_name, "") != NAME_ABSENT
+          : !record_identity_matches(root->recovery_fd, apply_name, commit.apply_record,
+            &commit.apply_identity)) ||
+        (commit.uncommitted
+          ? record_state(root->recovery_fd, rollback_name, "") == NAME_ABSENT
+          : record_state(root->recovery_fd, rollback_name, "") != NAME_ABSENT) ||
         record_state(root->recovery_fd, before_name, "") != NAME_ABSENT ||
         record_state(root->recovery_fd, stage_name, "") != NAME_ABSENT ||
-        !existing_output_committed('E', &request, &commit)) goto done;
+        (commit.uncommitted
+          ? !existing_output_uncommitted('E', &request, &commit)
+          : !existing_output_committed('E', &request, &commit))) goto done;
     result = true;
     goto done;
 #endif
