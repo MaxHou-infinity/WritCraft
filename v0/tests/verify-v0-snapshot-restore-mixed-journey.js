@@ -139,6 +139,10 @@ function mixedFixture(options = {}) {
         cleanupCreate: scoped.cleanupCreate,
         reconcileCreateCleanup: scoped.reconcileCreateCleanup,
         ackCreateCleanup: scoped.ackCreateCleanup,
+        quarantineCreateRollback: scoped.quarantineCreateRollback,
+        reconcileCreateRollback: scoped.reconcileCreateRollback,
+        deleteCreateRollback: scoped.deleteCreateRollback,
+        ackCreateRollback: scoped.ackCreateRollback,
       });
     },
   });
@@ -287,6 +291,11 @@ try {
     'changes-history-artifact-helper.c',
     'changes-history-artifact-helper'
   );
+  const rollbackHelperPath = compileHelper(
+    'public-markdown-create-helper.c',
+    'public-markdown-create-helper-rollback',
+    ['WRITCRAFT_TEST_EXISTING_APPLY_PARTIAL_WRITE']
+  );
 
   test('mixed journey CAS-installs existingTerminalPublication after EXISTING E and MISSING CREATE', () => {
     const item = mixedFixture({ helperPath, artifactHelperPath });
@@ -350,6 +359,10 @@ try {
               cleanupCreate: scoped.cleanupCreate,
               reconcileCreateCleanup: scoped.reconcileCreateCleanup,
               ackCreateCleanup: scoped.ackCreateCleanup,
+              quarantineCreateRollback: scoped.quarantineCreateRollback,
+              reconcileCreateRollback: scoped.reconcileCreateRollback,
+              deleteCreateRollback: scoped.deleteCreateRollback,
+              ackCreateRollback: scoped.ackCreateRollback,
             });
           },
         }),
@@ -523,6 +536,10 @@ try {
               cleanupCreate: scoped.cleanupCreate,
               reconcileCreateCleanup: scoped.reconcileCreateCleanup,
               ackCreateCleanup: scoped.ackCreateCleanup,
+              quarantineCreateRollback: scoped.quarantineCreateRollback,
+              reconcileCreateRollback: scoped.reconcileCreateRollback,
+              deleteCreateRollback: scoped.deleteCreateRollback,
+              ackCreateRollback: scoped.ackCreateRollback,
             });
           },
         }),
@@ -567,9 +584,40 @@ try {
       assert(current.value.nativePublication !== null);
     } finally { item.cleanup(); }
   });
+
+  test('mixed journey formal self-rollback runs ROLLBACK_CREATE Q/R/D/A to ROLLED_BACK', () => {
+    const item = mixedFixture({ helperPath: rollbackHelperPath, artifactHelperPath });
+    try {
+      let marker = item.transaction.preparePublicMarkdownMarker(item.prepared);
+      marker = item.transaction.createMissingLeaves(item.prepared, marker);
+      assert.strictEqual(marker.publicMarkdownPhase.phase, 'CREATED_RECEIPT');
+      // Native E self-rolls-back (apply publication fails) -> formal EXISTING
+      // UNCOMMITTED terminal; Main then runs the frozen ROLLBACK_CREATE domain
+      // (Q -> fresh R -> D -> A) and advances the marker to ROLLED_BACK with
+      // zero public mutation.
+      marker = item.transaction.commitExistingRestore(item.prepared, marker);
+      assert.strictEqual(marker.publicMarkdownPhase.phase, 'ROLLED_BACK');
+      // The ROLLED_BACK phase seals the exact rollback final record digest.
+      assert.match(marker.publicMarkdownPhase.rollbackReceiptDigest, /^sha256:[a-f0-9]{64}$/);
+      // Every EXISTING leaf and raw History are exactly operation-before; the
+      // MISSING leaf was quarantined and deleted.
+      assert.deepStrictEqual(
+        fs.readFileSync(path.join(item.rootPath, 'existing.md')),
+        item.beforeBytes
+      );
+      assert.strictEqual(fs.existsSync(path.join(item.rootPath, 'new.md')), false);
+      assert.strictEqual(changeHistoryService.listHistory(item.rootPath).length, 0);
+      const value = journalValue(item);
+      assert.strictEqual(value.activeMarker.publicMarkdownPhase.phase, 'ROLLED_BACK');
+      // The EXISTING terminal was never installed; the CREATE publication is
+      // retained until the transaction-level cleanup.
+      assert.strictEqual(value.existingTerminalPublication, null);
+      assert.strictEqual(value.nativePublication.command, 'CREATE_MISSING');
+    } finally { item.cleanup(); }
+  });
 } finally {
   fs.rmSync(scratch, { recursive: true, force: true });
 }
 
-console.log(`\n${passed}/5 mixed production journey checks passed.`);
-if (passed !== 5) process.exitCode = 1;
+console.log(`\n${passed}/6 mixed production journey checks passed.`);
+if (passed !== 6) process.exitCode = 1;

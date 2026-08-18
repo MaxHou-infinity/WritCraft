@@ -3,8 +3,8 @@
 > 最后更新：2026-08-17
 > 当前公开/代码版本：`writ-craft@0.3.1`（npm `preview`）
 > 下一目标：`0.4.0` 证据与交付闭环（`WRC-0.4.0-R1`）
-> 当前 checkpoint：**Stage A / A1b mixed EXISTING + `ROLLBACK_CREATE` 开发中**
-> 当前结论：**P0=0、P1=2；A1b 仍 NO-GO；A1c、A2、Stage B 重签与 Stage C/D/E 继续冻结**
+> 当前 checkpoint：**Stage A / A1b mixed EXISTING + `ROLLBACK_CREATE` 实现完成，待独立复审**
+> 当前结论：**P0=0、P1=0；A1b 需一次完整独立复审后签收；A1c、A2、Stage B 重签与 Stage C/D/E 继续冻结**
 
 ## 1. 当前权威
 
@@ -21,16 +21,22 @@
 - `dcc197c` 前后的 A1b 实现已完成 WRCCHRJ2 journal 单权威 E/R wire、native
   `ROLLBACK_CREATE` Q/R/D/A、Main post-E terminal CAS，以及 mixed applied 主线：
   `PRECREATE → CREATED_RECEIPT → EXISTING_COMMITTED → HISTORY_COMMITTED → FINALIZED → ACK_COMMITTED → IDLE`。
-- 以上是 A1b implementation/component evidence，不代表完整 rollback 出口或 A1b checkpoint 已签收。
+- 两个 P1 已关闭：fresh R 绑定 stored publication identity（`WRC_A1B_E3_R` 全绿），
+  Main 已把 EXISTING formal `UNCOMMITTED` 编排为 `Q → fresh R → D → A → ROLLED_BACK`
+  （真实 native production mixed journey，6/6 全绿，零 public mutation）。
+- 以上是 A1b implementation/component evidence；checkpoint 签收仍需一次完整独立复审（P0/P1=0）。
 
-## 3. 当前两个 P1
+## 3. 当前 P1
 
-1. **Fresh R publication-time identity 未闭合**：`WRC_A1B_E3_R=1` 的
-   `control new-inode-exact` 场景仍把同内容新 inode 接受为 `COMMITTED`，预期必须是
-   `UNKNOWN`。R 不能从当前 control record 重铸 publication-time identity。
-2. **Main formal rollback 出口未接通**：native `ROLLBACK_CREATE` Q/R/D/A 已有组件证据，
-   但 Main mixed 事务尚未把 EXISTING formal `UNCOMMITTED` 编排为
-   `Q → fresh R → D → A` 并证明所有 EXISTING/MISSING leaf 与 raw History 回到 operation-before。
+两个 A1b P1 均已关闭：
+
+1. **Fresh R publication-time identity 已闭合**：`WRC_A1B_E3_R=1` 全绿；R 从 stored
+   publication 读取 control/apply identity 并以 `same_file` 校验，同内容新 inode 返回
+   `UNKNOWN`，不再从当前 record 重铸 publication-time identity。
+2. **Main formal rollback 出口已接通**：native E apply 失败后 self-rollback 到 formal
+   EXISTING `UNCOMMITTED`，Main 编排 `Q → fresh R → D → A`，D 仅删除精确 quarantine
+   identity 并写 final record，A 校验 ROLLED_BACK phase 后清理私有记录；marker 到达
+   `ROLLED_BACK`，所有 EXISTING/MISSING leaf 与 raw History 回到 operation-before。
 
 没有已知 P0。Mixed applied 成功出口、journal physical binding 与 post-E CAS 不再列为开放红灯。
 `snapshot_restore_undo` journal-backed 属 A1c；LEGACY 移除属于后续迁移；Main/handler App 接线属于 A2，均不扩大本次 A1b 阻断清单。
@@ -38,18 +44,21 @@
 ## 4. 当前可复现证据
 
 - `node tests/check-v0-0-4-test-registration.js --check`：221 scripts，52 current，40 Stage A，exit 0。
-- `node tests/verify-v0-snapshot-restore-mixed-journey.js`：4/4，exit 0。
-- `node tests/verify-v0-snapshot-restore-service.js`：41/41，exit 0。
+- `node tests/verify-v0-snapshot-restore-mixed-journey.js`：6/6，exit 0（含 formal rollback journey）。
+- `node tests/verify-v0-snapshot-restore-service.js`：42/42，exit 0。
 - `node tests/verify-v0-public-markdown-native-lifecycle.js`：67/67，exit 0。
+- `WRC_A1B_E3_R=1 node tests/verify-v0-public-markdown-native-lifecycle.js`：78/78，exit 0。
+- `WRC_A1B_E4_FA=1 node tests/verify-v0-public-markdown-native-lifecycle.js`：69/69，exit 0。
+- `WRC_A1B_E2B_CONTROL=1 WRC_A1B_E2B_STAGE=1 WRC_A1B_E2B_APPLY=1 node tests/verify-v0-public-markdown-native-lifecycle.js`：89/89，exit 0。
 - `node tests/verify-v0-public-markdown-native-rollback-create-lifecycle.js`：exit 0。
-- `WRC_A1B_E3_R=1 node tests/verify-v0-public-markdown-native-lifecycle.js`：在
-  `control new-inode-exact` 首红，actual `COMMITTED` / expected `UNKNOWN`。
+- `node tests/verify-v0-public-markdown-native-rollback-create-schema.js`：16/16，exit 0。
+- `npm test`：exit 0。
 
-Focused、schema、native 或 direct-service 绿灯不能覆盖该首红，也不能替代完整 A1b 独立复审。
+Focused、schema、native 或 direct-service 绿灯是 component evidence；A1b 签收仍需一次完整独立复审。
 
 ## 5. 唯一下一动作
 
-**关闭上述两个 P1，补真实 formal mixed rollback production journey，形成一个 clean local A1b checkpoint commit/tree，再启动一次完整独立复审。**
+**对当前 clean local A1b tree（P0=0、P1=0）启动一次完整独立复审；复审通过后签收 A1b checkpoint。**
 
 A1b 签收前，A1c、A2a–A2d、A3、A→B、Stage C/D/E、candidate、push/tag/release/publish/distribution 均冻结。
 

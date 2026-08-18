@@ -368,6 +368,10 @@ const snapshotRestorePublicMarkdownLifecycle = Object.freeze({
       cleanupCreate: scoped.cleanupCreate,
       reconcileCreateCleanup: scoped.reconcileCreateCleanup,
       ackCreateCleanup: scoped.ackCreateCleanup,
+      quarantineCreateRollback: scoped.quarantineCreateRollback,
+      reconcileCreateRollback: scoped.reconcileCreateRollback,
+      deleteCreateRollback: scoped.deleteCreateRollback,
+      ackCreateRollback: scoped.ackCreateRollback,
     });
   },
 });

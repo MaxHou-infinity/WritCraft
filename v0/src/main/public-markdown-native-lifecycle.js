@@ -1593,6 +1593,10 @@ function createPublicMarkdownNativeLifecycle(options = {}) {
         restoreQuarantine: descriptorMethod(rawScoped, 'restoreQuarantine'),
         finalizeUndo: descriptorMethod(rawScoped, 'finalizeUndo'),
         ackUndo: descriptorMethod(rawScoped, 'ackUndo'),
+        quarantineCreateRollback: descriptorMethod(rawScoped, 'quarantineCreateRollback'),
+        reconcileCreateRollback: descriptorMethod(rawScoped, 'reconcileCreateRollback'),
+        deleteCreateRollback: descriptorMethod(rawScoped, 'deleteCreateRollback'),
+        ackCreateRollback: descriptorMethod(rawScoped, 'ackCreateRollback'),
       });
       const existingRestore = Object.freeze({
         execute: descriptorMethod(rawScoped, 'executeExisting'),
@@ -1879,6 +1883,71 @@ function createPublicMarkdownNativeLifecycle(options = {}) {
             rawFinalRecordIdentity,
             value.authority,
             expectedCommand
+          );
+        },
+        quarantineCreateRollback(rawAuthority, rawDescriptors) {
+          const authority = nativeSchema.assertRollbackCreateAuthority(rawAuthority);
+          const rawResult = scoped.quarantineCreateRollback(authority, rawDescriptors);
+          try {
+            return nativeSchema.assertRollbackCreateResult(
+              rawResult,
+              authority,
+              nativeSchema.ROLLBACK_CREATE_COMMANDS.QUARANTINE
+            );
+          } catch (primaryError) {
+            try {
+              return nativeSchema.assertRollbackCreateResult(
+                rawResult,
+                authority,
+                nativeSchema.ROLLBACK_CREATE_COMMANDS.RECONCILE
+              );
+            } catch (_) {
+              throw primaryError;
+            }
+          }
+        },
+        reconcileCreateRollback(rawAuthority, rawDescriptors) {
+          const authority = nativeSchema.assertRollbackCreateAuthority(rawAuthority);
+          return nativeSchema.assertRollbackCreateResult(
+            scoped.reconcileCreateRollback(authority, rawDescriptors),
+            authority,
+            nativeSchema.ROLLBACK_CREATE_COMMANDS.RECONCILE
+          );
+        },
+        deleteCreateRollback(rawSettle, rawAuthority, rawDescriptors) {
+          const authority = nativeSchema.assertRollbackCreateAuthority(rawAuthority);
+          const settle = nativeSchema.assertRollbackCreateSettleRequest(rawSettle, authority);
+          return nativeSchema.assertRollbackCreateSettleResult(
+            scoped.deleteCreateRollback(settle, authority, rawDescriptors),
+            authority,
+            settle
+          );
+        },
+        ackCreateRollback(
+          rawAck,
+          rawSettle,
+          rawRolledBackPhase,
+          rawAuthority,
+          rawDescriptors
+        ) {
+          const authority = nativeSchema.assertRollbackCreateAuthority(rawAuthority);
+          const settle = nativeSchema.assertRollbackCreateSettleRequest(rawSettle, authority);
+          const ack = nativeSchema.assertRollbackCreateAckRequest(
+            rawAck,
+            authority,
+            settle,
+            rawRolledBackPhase
+          );
+          return nativeSchema.assertRollbackCreateAckResult(
+            scoped.ackCreateRollback(
+              ack,
+              settle,
+              rawRolledBackPhase,
+              authority,
+              rawDescriptors
+            ),
+            authority,
+            settle
           );
         },
       });

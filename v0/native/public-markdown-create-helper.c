@@ -4582,7 +4582,8 @@ static bool rollback_namespace_clean(
       has_prefix(name, ".changes-history-native-rollback-create-quarantine.") ||
       has_prefix(name, ".changes-history-native-rollback-create-final.");
     if (!rollback_name) continue;
-    bool expected = false;
+    bool expected = request->final_name[0] != '\0' &&
+      strcmp(name, request->final_name) == 0;
     for (size_t i = 0U; i < request->count && !expected; i += 1U) {
       const UndoItem *item = &request->items[i].quarantine;
       expected = (item->control_name[0] != '\0' && strcmp(name, item->control_name) == 0) ||
@@ -4659,14 +4660,47 @@ static bool rollback_quarantine_one(
   int parent = -1;
   int leaf_fd = -1;
   char leaf[MAX_PATH_BYTES + 1U];
+  char ancestor_digest[72];
   Identity public_identity;
-  NameState state = undo_public_state(root, item, &public_identity, &leaf_fd,
-    &parent, ancestors, &depth, leaf);
-  if (state != NAME_EXACT) {
+  /* The ROLLBACK_CREATE publication carries the journal-captured created
+   * identity (OBJECT digest), so the public MISSING leaf must be verified
+   * with the object identity digest, matching rollback_missing_public_state. */
+  if (!open_parent(root, item->path, ancestors, &depth, &parent, leaf, ancestor_digest) ||
+      strcmp(ancestor_digest, item->ancestor) != 0 ||
+      !revalidate_parent(root, ancestors, depth)) {
+    close_parent(ancestors, depth, parent);
+    return false;
+  }
+  leaf_fd = openat(parent, leaf, O_RDONLY | O_NOFOLLOW | O_CLOEXEC);
+  if (leaf_fd < 0) {
+    (void)close(leaf_fd);
+    close_parent(ancestors, depth, parent);
+    return false;
+  }
+  Identity identity;
+  char content[72];
+  char object_created[72];
+  char schema_created[72];
+  bool exact = hash_fd(leaf_fd, &identity, content, item->length) &&
+    identity.nlink == 1U && identity.size == item->length &&
+    strcmp(content, item->content) == 0 &&
+    record_path_matches_fd(parent, leaf, leaf_fd) &&
+    revalidate_parent(root, ancestors, depth);
+  if (exact) {
+    /* Accept the journal-captured OBJECT digest or the legacy CREATED_SCHEMA
+     * digest, matching rollback_missing_public_state. */
+    bool object_match = object_identity_digest(&identity, content, object_created) &&
+      strcmp(object_created, item->created) == 0;
+    bool schema_match = created_identity_digest(&identity, item->ancestor, leaf,
+      content, schema_created) && strcmp(schema_created, item->created) == 0;
+    exact = object_match || schema_match;
+  }
+  if (!exact) {
     if (leaf_fd >= 0) (void)close(leaf_fd);
     close_parent(ancestors, depth, parent);
     return false;
   }
+  public_identity = identity;
   struct stat ignored;
   bool moved = fstatat(root->recovery_fd, item->quarantine_name,
       &ignored, AT_SYMLINK_NOFOLLOW) != 0 && errno == ENOENT &&
@@ -4680,15 +4714,15 @@ static bool rollback_quarantine_one(
   int quarantine_fd = openat(root->recovery_fd, item->quarantine_name,
     O_RDONLY | O_NOFOLLOW | O_CLOEXEC);
   Identity quarantine_identity;
-  char content[72];
+  char quarantine_content[72];
   char quarantine_digest[72];
   bool valid = public_absent && quarantine_fd >= 0 &&
-    hash_fd(quarantine_fd, &quarantine_identity, content, item->length) &&
+    hash_fd(quarantine_fd, &quarantine_identity, quarantine_content, item->length) &&
     same_bound_record(&public_identity, &quarantine_identity) &&
-    strcmp(content, item->content) == 0 &&
+    strcmp(quarantine_content, item->content) == 0 &&
     record_path_matches_fd(root->recovery_fd, item->quarantine_name, quarantine_fd) &&
     revalidate_parent(root, ancestors, depth) &&
-    object_identity_digest(&quarantine_identity, content, quarantine_digest);
+    object_identity_digest(&quarantine_identity, quarantine_content, quarantine_digest);
   if (quarantine_fd >= 0) (void)close(quarantine_fd);
   (void)close(leaf_fd);
   if (!valid || fsync(parent) != 0 || fsync(root->recovery_fd) != 0 ||
@@ -4848,10 +4882,44 @@ static bool rollback_missing_public_state(
   int parent = -1;
   int fd = -1;
   char leaf[MAX_PATH_BYTES + 1U];
-  Identity identity;
-  NameState state = undo_public_state(root, &item->quarantine, &identity, &fd,
-    &parent, ancestors, &depth, leaf);
-  if (fd >= 0) (void)close(fd);
+  char ancestor_digest[72];
+  UndoItem *quarantine = &item->quarantine;
+  NameState state;
+  if (!open_parent(root, quarantine->path, ancestors, &depth, &parent, leaf, ancestor_digest) ||
+      strcmp(ancestor_digest, quarantine->ancestor) != 0 ||
+      !revalidate_parent(root, ancestors, depth)) {
+    state = NAME_ERROR;
+  } else {
+    fd = openat(parent, leaf, O_RDONLY | O_NOFOLLOW | O_CLOEXEC);
+    if (fd < 0) {
+      state = errno == ENOENT ? NAME_ABSENT : NAME_ERROR;
+    } else {
+      Identity identity;
+      char content[72];
+      char object_created[72];
+      char schema_created[72];
+      /* The ROLLBACK_CREATE publication carries the created leaf identity that
+       * the CREATE authority captured: the journal path captures the OBJECT
+       * digest of the created leaf, while the legacy create command captures
+       * the CREATED_SCHEMA digest (parent + leaf name). The public MISSING leaf
+       * must reproduce whichever digest the publication binds, so both
+       * canonical schemes are accepted and the exact stored digest must match. */
+      bool exact = hash_fd(fd, &identity, content, quarantine->length) &&
+        identity.nlink == 1U && identity.size == quarantine->length &&
+        strcmp(content, quarantine->content) == 0 &&
+        record_path_matches_fd(parent, leaf, fd) &&
+        revalidate_parent(root, ancestors, depth);
+      if (exact) {
+        bool object_match = object_identity_digest(&identity, content, object_created) &&
+          strcmp(object_created, quarantine->created) == 0;
+        bool schema_match = created_identity_digest(&identity, quarantine->ancestor, leaf,
+          content, schema_created) && strcmp(schema_created, quarantine->created) == 0;
+        exact = object_match || schema_match;
+      }
+      (void)close(fd);
+      state = exact ? NAME_EXACT : NAME_FOREIGN;
+    }
+  }
   close_parent(ancestors, depth, parent);
   return state == expected;
 }
@@ -5102,7 +5170,7 @@ static bool rollback_header(char *line, RollbackRequest *request) {
   if (expected == 0U || !split_fields(line, fields, 44U, &field_count) ||
       field_count != expected || strcmp(fields[1], "CREATE_ROLLBACK") != 0 ||
       !valid_operation(fields[2]) || !valid_digest(fields[3]) || !valid_digest(fields[4]) ||
-      !parse_uint(fields[5], 96ULL * 1024ULL * 1024ULL, &request->marker_length) ||
+      !parse_uint(fields[5], 2ULL * 96ULL * 1024ULL * 1024ULL, &request->marker_length) ||
       request->marker_length == 0U || !valid_digest(fields[6]) || !valid_digest(fields[7]) ||
       !valid_digest(fields[8]) || !parse_uint(fields[9], MAX_ARTIFACT_BYTES,
         &request->create_request.artifact_length) || request->create_request.artifact_length == 0U ||
@@ -5287,6 +5355,300 @@ static bool rollback_token_line(char *line, RollbackRequest *request, size_t ind
   return true;
 }
 
+/* D (delete): the exact quarantined identities are the private MISSING
+ * leaves. Main has already settled on the quarantine tokens; D verifies the
+ * full committed quarantine state (control/receipt records + quarantined leaf
+ * + public ABSENT), unlinks each quarantined leaf (the MISSING file is gone),
+ * writes the final record, and returns FINALIZED with the final record and its
+ * private identity. Any drift is UNKNOWN (manual recovery). */
+static bool rollback_delete_output(
+  const RollbackRequest *request, const char *state, const char *error
+) {
+  char line[MAX_LINE_BYTES + 1U];
+  size_t count = strcmp(state, "FINALIZED") == 0 ? 1U : 0U;
+  int length = snprintf(line, sizeof(line), "D\tRESULT\t%s\t%s\t%s\t%zu\t%s\n",
+    state, request->create_request.operation, request->request_digest, count, error);
+  if (length <= 0 || (size_t)length >= sizeof(line) || !write_line(line)) return false;
+  if (count == 0U) return true;
+  size_t used = (size_t)snprintf(line, sizeof(line), "V\t%s\t%s",
+    request->final_name, request->final_digest);
+  if (used >= sizeof(line) || !append_identity(line, sizeof(line), &used, &request->final_record) ||
+      used + 2U > sizeof(line)) return false;
+  line[used++] = '\n'; line[used] = '\0';
+  return write_line(line);
+}
+
+static bool rollback_private_records_absent(RootBinding *root, const RollbackRequest *request) {
+  struct stat ignored;
+  for (size_t i = 0U; i < request->count; i += 1U) {
+    const UndoItem *item = &request->items[i].quarantine;
+    if (fstatat(root->recovery_fd, item->control_name,
+          &ignored, AT_SYMLINK_NOFOLLOW) == 0 || errno != ENOENT ||
+        fstatat(root->recovery_fd, item->receipt_name,
+          &ignored, AT_SYMLINK_NOFOLLOW) == 0 || errno != ENOENT ||
+        fstatat(root->recovery_fd, item->quarantine_name,
+          &ignored, AT_SYMLINK_NOFOLLOW) == 0 || errno != ENOENT) return false;
+  }
+  return fstatat(root->recovery_fd, request->final_name,
+    &ignored, AT_SYMLINK_NOFOLLOW) != 0 && errno == ENOENT;
+}
+
+/* The rolled-back phase (the marker's ROLLED_BACK phase consumed by ACK). The
+ * wire carries rolledBackPhaseDigest; the ack handler rebuilds this canonical
+ * and requires an exact match so the consuming phase cannot be forged. */
+static bool rollback_rolled_back_phase_digest(
+  const RollbackRequest *request, const char final_digest[72], char out[72]
+) {
+  char *canonical = calloc(MAX_INPUT_BYTES + 1U, 1U);
+  if (canonical == NULL) return false;
+  size_t used = 0U;
+  bool ok = rollback_append(canonical, MAX_INPUT_BYTES + 1U, &used,
+    "{\"artifactDigest\":\"%s\",\"existingReceiptSetDigest\":\"%s\""
+    ",\"finalReceiptDigest\":null,\"items\":[", request->create_request.artifact,
+    request->existing_receipt_set);
+  for (size_t i = 0U; ok && i < request->count; i += 1U) {
+    const RollbackItem *item = &request->items[i];
+    char escaped[MAX_PATH_BYTES * 2U + 1U];
+    ok = json_escape(item->create.path, escaped, sizeof(escaped)) &&
+      rollback_append(canonical, MAX_INPUT_BYTES + 1U, &used,
+        "%s{\"afterRevision\":\"%s\",\"ancestorIdentityDigest\":\"%s\""
+        ",\"createdIdentityDigest\":\"%s\",\"creationReceiptDigest\":\"%s\""
+        ",\"path\":\"%s\",\"quarantineReceiptDigest\":\"%s\",\"selectedId\":\"%s\"}",
+        i == 0U ? "" : ",", item->create.content + 7U, item->create.ancestor,
+        item->create.created_digest, item->create_receipt_digest, escaped,
+        item->quarantine.receipt_digest, item->create.selected);
+  }
+  ok = ok && rollback_append(canonical, MAX_INPUT_BYTES + 1U, &used,
+    "],\"kind\":\"snapshot_restore\",\"operationId\":\"%s\",\"phase\":\"ROLLED_BACK\""
+    ",\"preparedHistoryDigest\":\"%s\",\"rollbackReceiptDigest\":\"%s\""
+    ",\"schema\":\"" PHASE_SCHEMA "\",\"selectionDigest\":\"%s\",\"updatedAt\":\"%s\"}",
+    request->create_request.operation, request->prepared_history, final_digest,
+    request->create_request.selection, request->rolled_updated_at) &&
+    digest_domain(PHASE_SCHEMA, canonical, out);
+  free(canonical);
+  return ok;
+}
+
+static bool rollback_ack_output(const RollbackRequest *request, const char *state, const char *error) {
+  char line[1024];
+  int length = snprintf(line, sizeof(line), "A\tRESULT\t%s\t%s\t%s\t%s\t%s\n",
+    state, request->create_request.operation, request->request_digest,
+    request->final_digest, error);
+  return length > 0 && (size_t)length < sizeof(line) && write_line(line);
+}
+
+/* Rebuild the ROLLBACK_CREATE final record (canonical receipt-set + final
+ * record + final-key name) exactly as the frozen schema does, so the D and A
+ * handlers can verify and reproduce the wire/on-disk record. */
+static bool rollback_build_final_record(const RollbackRequest *request, char out[MAX_RECORD_BYTES + 1U]) {
+  char set_digest[72];
+  char final_digest[72];
+  char key_digest[72];
+  char *canonical = calloc(MAX_INPUT_BYTES + 1U, 1U);
+  if (canonical == NULL) return false;
+  size_t used = 0U;
+  bool ok = rollback_append(canonical, MAX_INPUT_BYTES + 1U, &used,
+    "{\"items\":[");
+  for (size_t i = 0U; ok && i < request->count; i += 1U) {
+    const UndoItem *item = &request->items[i].quarantine;
+    char control_identity[72];
+    char receipt_identity[72];
+    char control_json[512];
+    char receipt_json[512];
+    size_t control_used = 0U;
+    size_t receipt_used = 0U;
+    ok = rollback_identity_json(control_json, sizeof(control_json), &control_used,
+      &item->control_record) &&
+      rollback_identity_json(receipt_json, sizeof(receipt_json), &receipt_used,
+        &item->receipt_record) &&
+      digest_domain(OBJECT_SCHEMA, control_json, control_identity) &&
+      digest_domain(OBJECT_SCHEMA, receipt_json, receipt_identity) &&
+      rollback_append(canonical, MAX_INPUT_BYTES + 1U, &used,
+        "%s{\"controlDigest\":\"%s\",\"controlRecordIdentityDigest\":\"%s\""
+        ",\"createdIdentityDigest\":\"%s\",\"quarantineIdentityDigest\":\"%s\""
+        ",\"receiptDigest\":\"%s\",\"receiptRecordIdentityDigest\":\"%s\""
+        ",\"selectedId\":\"%s\"}", i == 0U ? "" : ",", item->control_digest,
+        control_identity, item->created, item->quarantine_digest, item->receipt_digest,
+        receipt_identity, item->selected);
+  }
+  ok = ok && rollback_append(canonical, MAX_INPUT_BYTES + 1U, &used,
+    "],\"operationId\":\"%s\",\"requestDigest\":\"%s\",\"schema\":\""
+    ROLLBACK_RECEIPT_SET_SCHEMA "\"}",
+    request->create_request.operation, request->request_digest) &&
+    digest_domain(ROLLBACK_RECEIPT_SET_SCHEMA, canonical, set_digest);
+  free(canonical);
+  if (!ok) return false;
+  canonical = calloc(MAX_INPUT_BYTES + 1U, 1U);
+  if (canonical == NULL) return false;
+  used = 0U;
+  ok = rollback_append(canonical, MAX_INPUT_BYTES + 1U, &used,
+    "{\"baseHistoryDigest\":\"%s\",\"command\":\"DELETE_CREATE_ROLLBACK\""
+    ",\"createdReceiptPhaseDigest\":\"%s\",\"existingTerminalReceiptDigest\":\"%s\""
+    ",\"itemCount\":%zu,\"operationId\":\"%s\",\"publicParentFsyncComplete\":true"
+    ",\"receiptSetDigest\":\"%s\",\"recoveryFsyncComplete\":true"
+    ",\"requestDigest\":\"%s\",\"schema\":\"" ROLLBACK_FINAL_SCHEMA "\"}",
+    request->base_history, request->created_phase, request->existing_terminal,
+    request->count, request->create_request.operation, set_digest,
+    request->request_digest) &&
+    digest_domain(ROLLBACK_FINAL_SCHEMA, canonical, final_digest);
+  free(canonical);
+  if (!ok) return false;
+  canonical = calloc(MAX_INPUT_BYTES + 1U, 1U);
+  if (canonical == NULL) return false;
+  used = 0U;
+  ok = rollback_append(canonical, MAX_INPUT_BYTES + 1U, &used,
+    "{\"finalRecordDigest\":\"%s\",\"operationId\":\"%s\""
+    ",\"requestDigest\":\"%s\",\"schema\":\"" ROLLBACK_FINAL_KEY_SCHEMA "\"}",
+    final_digest, request->create_request.operation, request->request_digest);
+  ok = ok && digest_domain(ROLLBACK_FINAL_KEY_SCHEMA, canonical, key_digest);
+  free(canonical);
+  if (!ok) return false;
+  int length = snprintf((char *)request->final_name, sizeof(request->final_name),
+    ".changes-history-native-rollback-create-final.%s", key_digest + 7U);
+  if (length <= 0 || (size_t)length >= sizeof(request->final_name)) return false;
+  memcpy((char *)request->final_digest, final_digest, sizeof(request->final_digest));
+  length = snprintf(out, MAX_RECORD_BYTES + 1U,
+    ROLLBACK_FINAL_SCHEMA "\t%s\t%s\t%s\t%s\t%s\t%s\t%s\t%zu\t1\t1\t%s\n",
+    "DELETE_CREATE_ROLLBACK", request->create_request.operation, request->request_digest,
+    request->existing_terminal, request->base_history, request->created_phase,
+    set_digest, request->count, final_digest);
+  return length > 0 && length <= (int)MAX_RECORD_BYTES;
+}
+
+static bool rollback_ack(RootBinding *root, RollbackRequest *request) {
+  char supplied_final_name[128]; char supplied_final_digest[72];
+  RecordIdentity supplied_final_identity = request->final_record;
+  memcpy(supplied_final_name, request->final_name, sizeof(supplied_final_name));
+  memcpy(supplied_final_digest, request->final_digest, sizeof(supplied_final_digest));
+  char (*controls)[MAX_RECORD_BYTES + 1U] = calloc(request->count, sizeof(*controls));
+  char (*receipts)[MAX_RECORD_BYTES + 1U] = calloc(request->count, sizeof(*receipts));
+  char final_record[MAX_RECORD_BYTES + 1U];
+  if (controls == NULL || receipts == NULL ||
+      !rollback_held_authority(root, request) ||
+      !rollback_build_final_record(request, final_record) ||
+      strcmp(request->final_name, supplied_final_name) != 0 ||
+      strcmp(request->final_digest, supplied_final_digest) != 0 ||
+      !record_identity_describes_bytes(&supplied_final_identity, final_record)) goto unknown;
+  char rolled_back[72];
+  if (!rollback_rolled_back_phase_digest(request, request->final_digest, rolled_back) ||
+      strcmp(rolled_back, request->rolled_phase) != 0) goto unknown;
+  if (rollback_private_records_absent(root, request)) {
+    bool result = rollback_ack_output(request, "ACKED", "-");
+    free(controls); free(receipts); return result;
+  }
+  for (size_t i = 0U; i < request->count; i += 1U) {
+    RollbackItem *item = &request->items[i];
+    if (!rollback_build_control(request, item, controls[i]) ||
+        !rollback_build_receipt(request, item, receipts[i]) ||
+        !record_identity_exact(root->recovery_fd, item->quarantine.control_name,
+          controls[i], &item->quarantine.control_record) ||
+        !record_identity_exact(root->recovery_fd, item->quarantine.receipt_name,
+          receipts[i], &item->quarantine.receipt_record) ||
+        !rollback_missing_public_state(root, item, NAME_ABSENT)) goto unknown;
+  }
+  if (!record_identity_exact(root->recovery_fd, request->final_name, final_record,
+      &supplied_final_identity)) goto unknown;
+  if (!rollback_namespace_clean(root->recovery_fd, request, controls, receipts)) goto unknown;
+  for (size_t i = 0U; i < request->count; i += 1U) {
+    if (!unlink_exact_record_owned(root->recovery_fd, request->items[i].quarantine.receipt_name,
+          receipts[i], &request->items[i].quarantine.receipt_record.identity, -1) ||
+        !unlink_exact_record_owned(root->recovery_fd, request->items[i].quarantine.control_name,
+          controls[i], &request->items[i].quarantine.control_record.identity, -1)) goto unknown;
+  }
+  if (!unlink_exact_record_owned(root->recovery_fd, request->final_name, final_record,
+      &supplied_final_identity.identity, -1)) goto unknown;
+  if (fsync(root->recovery_fd) != 0 ||
+      !rollback_private_records_absent(root, request) || !open_recovery(root, false)) goto unknown;
+  {
+    bool result = rollback_ack_output(request, "ACKED", "-");
+    free(controls); free(receipts); return result;
+  }
+unknown:
+  free(controls); free(receipts);
+  return rollback_ack_output(request, "UNKNOWN", "UNKNOWN");
+}
+
+static bool rollback_delete(RootBinding *root, RollbackRequest *request) {
+  char (*controls)[MAX_RECORD_BYTES + 1U] = calloc(request->count, sizeof(*controls));
+  char (*receipts)[MAX_RECORD_BYTES + 1U] = calloc(request->count, sizeof(*receipts));
+  if (controls == NULL || receipts == NULL ||
+      !rollback_held_authority(root, request) ||
+      !rollback_private_authority_exact(root, request)) goto unknown;
+  for (size_t i = 0U; i < request->count; i += 1U) {
+    RollbackItem *item = &request->items[i];
+    if (!rollback_build_control(request, item, controls[i]) ||
+        !rollback_build_receipt(request, item, receipts[i]) ||
+        !record_identity_exact(root->recovery_fd, item->quarantine.control_name,
+          controls[i], &item->quarantine.control_record) ||
+        !record_identity_exact(root->recovery_fd, item->quarantine.receipt_name,
+          receipts[i], &item->quarantine.receipt_record) ||
+        undo_quarantine_state(root, &item->quarantine, &(Identity){0}) != NAME_EXACT ||
+        !rollback_missing_public_state(root, item, NAME_ABSENT)) goto unknown;
+  }
+  if (!rollback_namespace_clean(root->recovery_fd, request, controls, receipts)) goto unknown;
+  /* Delete the exact quarantined leaves: verify the quarantine file matches the
+   * token (content + quarantine identity digest), move to a random name, and
+   * unlink it. The public MISSING leaf is already ABSENT (quarantined). */
+  for (size_t i = 0U; i < request->count; i += 1U) {
+    UndoItem *item = &request->items[i].quarantine;
+    int held = openat(root->recovery_fd, item->quarantine_name,
+      O_RDONLY | O_NOFOLLOW | O_CLOEXEC);
+    Identity before; char content[72]; char digest[72]; char temporary[128]; struct stat ignored;
+    bool valid = held >= 0 && hash_fd(held, &before, content, item->length) &&
+      strcmp(content, item->content) == 0 && object_identity_digest(&before, content, digest) &&
+      strcmp(digest, item->quarantine_digest) == 0 &&
+      record_path_matches_fd(root->recovery_fd, item->quarantine_name, held) &&
+      random_private_quarantine(".changes-history-native-rollback-create-quarantine.",
+        temporary) &&
+      fstatat(root->recovery_fd, temporary, &ignored, AT_SYMLINK_NOFOLLOW) != 0 &&
+      errno == ENOENT &&
+      renameatx_np(root->recovery_fd, item->quarantine_name,
+        root->recovery_fd, temporary, RENAME_EXCL) == 0;
+    if (!valid) { if (held >= 0) (void)close(held); goto unknown; }
+    int moved = openat(root->recovery_fd, temporary, O_RDONLY | O_NOFOLLOW | O_CLOEXEC);
+    Identity after;
+    valid = moved >= 0 && hash_fd(moved, &after, content, item->length) &&
+      same_bound_record(&before, &after) && strcmp(content, item->content) == 0 &&
+      record_path_matches_fd(root->recovery_fd, temporary, moved) &&
+      fstatat(root->recovery_fd, item->quarantine_name, &ignored, AT_SYMLINK_NOFOLLOW) != 0 &&
+      errno == ENOENT && unlinkat(root->recovery_fd, temporary, 0) == 0;
+    if (moved >= 0) (void)close(moved); (void)close(held);
+    if (!valid || fsync(root->recovery_fd) != 0) goto unknown;
+  }
+  /* Sealed: every exact quarantined identity is gone. Write the final record. */
+  {
+    char final_record[MAX_RECORD_BYTES + 1U];
+    char final_name[128];
+    char final_digest[72];
+    if (!rollback_build_final_record(request, final_record)) goto unknown;
+    memcpy(final_name, request->final_name, sizeof(final_name));
+    memcpy(final_digest, request->final_digest, sizeof(final_digest));
+    NameState final_state = record_state(root->recovery_fd, final_name, final_record);
+    if (final_state == NAME_ABSENT) {
+      if (!write_record(root->recovery_fd, final_name, final_record,
+          &request->final_record.identity, NULL)) goto unknown;
+      sha256_prefixed((const unsigned char *)final_record, strlen(final_record),
+        request->final_record.content);
+      if (!record_identity_exact(root->recovery_fd, final_name, final_record,
+          &request->final_record)) goto unknown;
+      if (!rollback_namespace_clean(root->recovery_fd, request, controls, receipts) ||
+          !open_recovery(root, false)) goto unknown;
+      bool result = rollback_delete_output(request, "FINALIZED", "-");
+      free(controls); free(receipts); return result;
+    }
+    if (final_state != NAME_EXACT) goto unknown;
+    if (!capture_record_identity(root->recovery_fd, final_name, final_record,
+          &request->final_record)) goto unknown;
+    if (!rollback_namespace_clean(root->recovery_fd, request, controls, receipts) ||
+        !open_recovery(root, false)) goto unknown;
+    bool result = rollback_delete_output(request, "FINALIZED", "-");
+    free(controls); free(receipts); return result;
+  }
+unknown:
+  free(controls); free(receipts);
+  return rollback_delete_output(request, "UNKNOWN", "UNKNOWN");
+}
+
 static bool rollback_unknown_output(const RollbackRequest *request) {
   char line[512];
   int length;
@@ -5362,7 +5724,7 @@ static bool rollback_held_authority(RootBinding *root, RollbackRequest *request)
   char marker_content[72];
   char marker_identity[72];
   if (!rollback_fd_readonly(HELD_MARKER_FD) ||
-      !hash_fd(HELD_MARKER_FD, &marker, marker_content, 96ULL * 1024ULL * 1024ULL) ||
+      !hash_fd(HELD_MARKER_FD, &marker, marker_content, 2ULL * 96ULL * 1024ULL * 1024ULL) ||
       marker.uid != (uintmax_t)geteuid() || permission_mode(marker.mode) != 0600U ||
       marker.nlink != 1U || marker.size != request->marker_length ||
       strcmp(marker_content, request->journal_digest) != 0 ||
@@ -5449,6 +5811,8 @@ static bool rollback_parse_and_run(RootBinding *root, char *line) {
   }
   if (valid && request->command == 'Q') result = rollback_quarantine(root, request);
   else if (valid && request->command == 'R') result = rollback_reconcile(root, request);
+  else if (valid && request->command == 'D') result = rollback_delete(root, request);
+  else if (valid && request->command == 'A') result = rollback_ack(root, request);
   else if (valid) result = rollback_unknown_output(request);
 done:
   free(request);
@@ -5973,6 +6337,7 @@ static bool existing_leaf_identity_digest_observed(
   const ExistingExecuteItem *item,
   const Identity *identity,
   const char *content,
+  const char *revision,
   char out[72]
 ) {
   char escaped[MAX_PATH_BYTES * 2U + 1U];
@@ -5989,7 +6354,7 @@ static bool existing_leaf_identity_digest_observed(
     "\",\"uid\":%" PRIuMAX "}", item->ancestor, content,
     (uintmax_t)identity->ctime_ns, identity->dev, identity->ino,
     permission_mode(identity->mode), (uintmax_t)identity->mtime_ns, identity->nlink,
-    escaped, item->after_revision, item->selected, identity->size, identity->uid);
+    escaped, revision, item->selected, identity->size, identity->uid);
   return length > 0 && (size_t)length < sizeof(canonical) &&
     digest_domain(EXISTING_LEAF_SCHEMA, canonical, out);
 }
@@ -6018,7 +6383,8 @@ static bool __attribute__((unused)) existing_execute_leaf_after_exact(
     strcmp(content, item->after_content) == 0 &&
     record_path_matches_fd(parent, leaf, fd) &&
     revalidate_parent(root, ancestors, depth) &&
-    existing_leaf_identity_digest_observed(item, &identity, content, observed_leaf) &&
+    existing_leaf_identity_digest_observed(item, &identity, content,
+      item->after_revision, observed_leaf) &&
     strcmp(observed_leaf, expected_leaf) == 0;
   if (fd >= 0) (void)close(fd);
   close_parent(ancestors, depth, parent);
@@ -6047,7 +6413,8 @@ static bool existing_execute_leaf_identity_after(
     identity.size == item->after_length && identity.nlink == 1U &&
     strcmp(content, item->after_content) == 0 && record_path_matches_fd(parent, leaf, fd) &&
     revalidate_parent(root, ancestors, depth) &&
-    existing_leaf_identity_digest_observed(item, &identity, content, out);
+    existing_leaf_identity_digest_observed(item, &identity, content,
+      item->after_revision, out);
   if (fd >= 0) (void)close(fd);
   close_parent(ancestors, depth, parent);
   return valid;
@@ -6177,7 +6544,8 @@ static bool __attribute__((unused)) existing_swap_and_rollback(
     revalidate_parent(root, ancestors, depth);
   char observed_after_leaf[72];
   ok = ok && existing_leaf_identity_digest_observed(
-    item, &swapped_after_identity, item->after_content, observed_after_leaf);
+    item, &swapped_after_identity, item->after_content, item->after_revision,
+    observed_after_leaf);
 #ifdef WRITCRAFT_TEST_PAUSE_EXISTING_AFTER_SWAP
   if (ok) ok = test_sync_point("existing-after-swap");
 #endif
@@ -6214,7 +6582,8 @@ static bool __attribute__((unused)) existing_swap_and_rollback(
     revalidate_parent(root, ancestors, depth) &&
     existing_execute_nonpublic_authority_valid(root, request) &&
     existing_leaf_identity_digest_observed(
-      item, &published_after_identity, item->after_content, after_leaf
+      item, &published_after_identity, item->after_content, item->after_revision,
+      after_leaf
     ) && existing_apply_record_build(
       request, item, after_leaf, apply_digest, apply_record
     ) && write_record(root->recovery_fd, apply_name, apply_record, &apply_identity,
@@ -6245,7 +6614,7 @@ static bool __attribute__((unused)) existing_swap_and_rollback(
       existing_execute_nonpublic_authority_valid(root, request) &&
       existing_execute_leaf_restored_exact(root, item, &restored_identity) &&
       existing_leaf_identity_digest_observed(item, &restored_identity,
-        item->before_content, restored_leaf) &&
+        item->before_content, item->before_revision, restored_leaf) &&
       unlink_attempted_record_owned(root->recovery_fd, apply_name, apply_record,
         &apply_attempt) &&
       existing_rollback_receipt_build(request, item, restored_leaf,
@@ -6318,7 +6687,7 @@ static bool __attribute__((unused)) existing_swap_and_rollback(
         &quarantined_before_identity, item->before_content, item->before_length, NULL) &&
       existing_execute_nonpublic_authority_valid(root, request) &&
       existing_leaf_identity_digest_observed(item, &published_after_identity,
-        item->after_content, after_leaf) &&
+        item->after_content, item->after_revision, after_leaf) &&
       existing_stage_remove_exact(root->recovery_fd, before_name,
         &quarantined_before_identity, item->before_content, item->before_length) &&
       record_state(root->recovery_fd, before_name, "") == NAME_ABSENT &&
@@ -6862,17 +7231,20 @@ static bool __attribute__((unused)) existing_output_uncommitted(
   if (request == NULL || commit == NULL || request->count != 1U ||
       !rollback_append(token, sizeof(token), &used,
         "{\"afterLeafIdentityDigest\":null,\"applyReceiptDigest\":null,"
+        "\"applyReceiptRecordIdentity\":null,"
         "\"controlBasename\":\"%s\",\"controlDigest\":\"%s\","
         "\"controlRecordIdentity\":", commit->control_name, commit->control_digest) ||
       !rollback_identity_json(token, sizeof(token), &used, &commit->control_record) ||
       !rollback_append(token, sizeof(token), &used,
-        ",\"receiptBasename\":\"%s\",\"receiptRecordIdentity\":",
-        commit->apply_name) ||
-      !rollback_identity_json(token, sizeof(token), &used, &commit->apply_record_identity) ||
+        ",\"receiptBasename\":\"%s\"", commit->apply_name) ||
       !rollback_append(token, sizeof(token), &used,
         ",\"restoredLeafIdentityDigest\":\"%s\",\"rollbackReceiptDigest\":\"%s\","
-        "\"schema\":\"" EXISTING_ROLLBACK_TOKEN_SCHEMA "\",\"selectedId\":\"%s\"}",
-        commit->after_leaf, commit->apply_digest, request->items[0].selected) ||
+        "\"rollbackReceiptRecordIdentity\":",
+        commit->after_leaf, commit->apply_digest) ||
+      !rollback_identity_json(token, sizeof(token), &used, &commit->apply_record_identity) ||
+      !rollback_append(token, sizeof(token), &used,
+        ",\"schema\":\"" EXISTING_ROLLBACK_TOKEN_SCHEMA "\",\"selectedId\":\"%s\"}",
+        request->items[0].selected) ||
       !digest_domain(EXISTING_ROLLBACK_TOKEN_SCHEMA, token, token_digest)) return false;
   used = 0U;
   if (!rollback_append(set, sizeof(set), &used,

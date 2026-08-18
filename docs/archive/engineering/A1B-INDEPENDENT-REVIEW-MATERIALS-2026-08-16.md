@@ -41,21 +41,22 @@
 
 | 红灯 | 状态 |
 |---|---|
-| #1 journal 物理绑定单权威化 | **E/R wire 与 native rollback bridge 已完成；仍有 1 个 A1b P1**：`WRC_A1B_E3_R=1` 的 control new-inode-exact 场景实际返回 `COMMITTED`，预期为 `UNKNOWN`。Fresh R 仍从当前 control record 捕获身份，未绑定 publication-time inode identity。 |
-| #2 Main mixed publication CAS 持久化接线 | **Applied 分支已完成**：真实 helper + journal 已证明 terminal CAS、lost-E fresh R、old/new head drift fail-closed。Main/handler App 暴露归 A2，不作为本 A1b 后端红灯。 |
-| #3 mixed EXISTING+MISSING 事务出口 | **成功出口已完成，rollback 出口仍有 1 个 A1b P1**：4/4 已证明 `PRECREATE→CREATE→EXISTING_COMMITTED→HISTORY_COMMITTED→FINALIZED→ACK_COMMITTED→IDLE`；但 Main 尚未把 formal EXISTING `UNCOMMITTED` 编排为 `ROLLBACK_CREATE Q→fresh R→D→A` 并证明 operation-before。 |
+| #1 journal 物理绑定单权威化 | **已关闭**：`WRC_A1B_E3_R=1` 78/78 全绿；fresh R 从 stored publication 读取 control/apply publication-time identity 并以 `same_file` 校验，同内容新 inode 返回 `UNKNOWN`，不再从当前 record 重铸。 |
+| #2 Main mixed publication CAS 持久化接线 | **已完成**：真实 helper + journal 已证明 terminal CAS、lost-E fresh R、old/new head drift fail-closed。Main/handler App 暴露归 A2，不作为本 A1b 后端红灯。 |
+| #3 mixed EXISTING+MISSING 事务出口 | **成功出口 + formal rollback 出口均已完成**：6/6 mixed journey 证明 `PRECREATE→CREATE→EXISTING_COMMITTED→HISTORY_COMMITTED→FINALIZED→ACK_COMMITTED→IDLE`，以及 formal EXISTING `UNCOMMITTED` → `ROLLBACK_CREATE Q→fresh R→D→A→ROLLED_BACK`（真实 native D/A 实现，零 public mutation）。 |
 
 ## 4. 当前开放项与后续归属
 
-### 4.1 A1b 必须关闭的两个 P1
+### 4.1 A1b 两个 P1 —— 均已关闭
 
-1. **Fresh R identity**：R 必须消费 E 时持久化的 control publication identity；同内容新 inode、same-inode rewrite 或缺失 identity 均为 `UNKNOWN`，不得从当前记录重铸。
-2. **Formal mixed rollback**：Main 必须只在 formal EXISTING `UNCOMMITTED` 后进入已冻结的 `ROLLBACK_CREATE` domain，按 Q/fresh-R/D/A 收敛并证明所有 selected public leaf 与 raw History 精确回到 operation-before；任何不明状态保持 journal/residue，禁止复用 applied 出口。
+1. **Fresh R identity**（00c6276 已提交）：R 消费 E 时持久化的 control publication identity；同内容新 inode、same-inode rewrite 或缺失 identity 均为 `UNKNOWN`，不从当前记录重铸。`WRC_A1B_E3_R=1` 78/78。
+2. **Formal mixed rollback**（本轮 P1-2，未提交 → 随本 checkpoint commit）：Main 只在 formal EXISTING `UNCOMMITTED` 后进入已冻结的 `ROLLBACK_CREATE` domain，按 Q/fresh-R/D/A 收敛并证明所有 selected public leaf 与 raw History 精确回到 operation-before。native C 补充 D/A 实现：D 仅删除精确 quarantine identity 并写 final record（FINALIZED + final identity），A 校验 ROLLED_BACK phase 后清理私有记录（ACKED）；任何不明状态保持 journal/residue。
 
 ### 4.2 已决策/已完成的 A1b 组件
 
 - `16b6614` 已冻结 rollback journal held binding、`journalMarkerDigest` 与 Q/R/D/A wire；不再重开 marker 语义决策。
 - `dcc197c` 已完成 publication-driven F/A、EXISTING finalization、ACK_COMMITTED 与 applied cleanup/IDLE；不再把 applied mixed 出口列为待决策项。
+- 本轮 P1-2（Main 编排 + native D/A）：formalRollbackCreate 在 EXISTING `UNCOMMITTED` terminal 上重建 CREATE publication、held binding、precreate phase，执行 Q（失败走 fresh R）→ D → A，marker 到 `ROLLED_BACK` 并 CAS journal；C helper 补 rollback_delete/rollback_ack、dual digest scheme（journal OBJECT + legacy CREATED_SCHEMA）、restored-leaf before_revision 修正。
 
 ### 4.3 不属于 A1b 的后续工作
 
@@ -68,14 +69,16 @@
 - [ ] `npm test` 全绿（基线）
 - [ ] `npm run verify:0.4:registration`（221 scripts，52 current，40 Stage A current）
 - [ ] `verify-v0-public-markdown-native-lifecycle` 67/67（journal 单权威 EXISTING）
-- [ ] `verify-v0-public-markdown-native-rollback-create-lifecycle` exit 0（journal 单权威 ROLLBACK_CREATE）
+- [ ] `WRC_A1B_E3_R=1 verify-v0-public-markdown-native-lifecycle` 78/78（fresh R publication identity）
+- [ ] `WRC_A1B_E4_FA=1 verify-v0-public-markdown-native-lifecycle` 69/69（EXISTING finalize/ack）
+- [ ] `WRC_A1B_E2B_CONTROL=1 WRC_A1B_E2B_STAGE=1 WRC_A1B_E2B_APPLY=1 verify-v0-public-markdown-native-lifecycle` 89/89（self-rollback/UNCOMMITTED）
+- [ ] `verify-v0-public-markdown-native-rollback-create-lifecycle` exit 0（journal 单权威 ROLLBACK_CREATE Q/R/D/A）
 - [ ] `verify-v0-public-markdown-native-rollback-create-schema` 16/16（Q/R 30 / D 31 / A 44 字段冻结）
-- [ ] **`verify-v0-snapshot-restore-mixed-journey` 4/4（真实 helper + 真实 journal + 真实 Main transaction，无 fake adapter）**
+- [ ] **`verify-v0-snapshot-restore-mixed-journey` 6/6（真实 helper + 真实 journal + 真实 Main transaction，无 fake adapter；含 formal rollback Q/R/D/A→ROLLED_BACK）**
 - [ ] `verify-v0-research-apply-transaction` 12/12（mixed 直接服务路径）
 - [ ] C wire 33 字段与 `encodeExistingCommand` 逐字段核对
 - [ ] rollback wire：`journalMarkerDigest`（字段 29）与 JS `rollbackCreateAuthorityHeaderFields` 逐字段核对；`rollback_held_authority` 用 `journal_digest` 校验 HELD_MARKER_FD 整文件 sha
 - [ ] §4.2 rollback journal binding 核验：`buildRollbackCreateHeldBinding` 不变式 = journalFileIdentity.contentSha256；`rollback_existing_request_digest` 已删除（无残留引用）
 - [ ] §4 applied 核验：`reconcileExistingRestore`（fresh native R + CAS）、33 字段 R dispatch、publication-driven F/A、snapshot-restore-service `runMixedJourney`
-- [ ] 修复并复跑 `WRC_A1B_E3_R=1`：control new-inode-exact 必须 `UNKNOWN`
-- [ ] 新增真实 formal mixed `UNCOMMITTED→Q/R/D/A→operation-before` production journey
+- [ ] **native D/A 核验**：`rollback_delete` 仅删除精确 quarantine identity 并写 final record；`rollback_ack` 校验 final identity + ROLLED_BACK phase 后清理；`rollback_missing_public_state`/`rollback_quarantine_one` 同时接受 journal OBJECT 与 legacy CREATED_SCHEMA created digest
 - [ ] 本材料归档后：按执行协议绑定 clean commit 做完整 finding batch（P0/P1 清零）

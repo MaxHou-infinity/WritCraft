@@ -5259,7 +5259,28 @@ function createChangesHistoryReconciliationService(options = {}) {
               command,
               reconcile ? value.existingTerminalPublication.requestDigest : null
             );
-            if (result.state !== 'COMMITTED' || result.terminalReceipt === null) {
+            if (reconcile) {
+              if (result.state !== 'COMMITTED' || result.terminalReceipt === null) {
+                fail('CHANGES_MANUAL_RECOVERY_REQUIRED',
+                  'EXISTING fresh R is not durably committed');
+              }
+            } else if (result.state === 'UNCOMMITTED' && result.terminalReceipt !== null) {
+              // Formal self-rollback: native E proved every EXISTING leaf and
+              // raw History are exactly operation-before. Main now runs the
+              // frozen ROLLBACK_CREATE domain (Q -> fresh R -> D -> A) to
+              // quarantine and delete the MISSING leaves, then advances the
+              // marker to ROLLED_BACK (zero public mutation).
+              return formalRollbackCreate(rootPath, projectId, operationId, {
+                marker,
+                verified,
+                baseHistory,
+                authority,
+                descriptors,
+                binding,
+                value,
+                terminalReceipt: result.terminalReceipt,
+              });
+            } else if (result.state !== 'COMMITTED' || result.terminalReceipt === null) {
               fail('CHANGES_MANUAL_RECOVERY_REQUIRED',
                 'EXISTING terminal is not durably committed');
             }
@@ -5405,6 +5426,217 @@ function createChangesHistoryReconciliationService(options = {}) {
     } finally {
       closeHistoryAuthority(baseHistory);
     }
+  }
+
+  function rollbackLifecycleFor(rootPath) {
+    const method = (raw, name) => {
+      if (!raw || typeof raw !== 'object' || Array.isArray(raw) ||
+          Object.getPrototypeOf(raw) !== Object.prototype) return null;
+      const descriptor = Object.getOwnPropertyDescriptor(raw, name);
+      return descriptor && descriptor.enumerable === true &&
+        Object.hasOwn(descriptor, 'value') && !descriptor.get && !descriptor.set &&
+        typeof descriptor.value === 'function'
+        ? descriptor.value
+        : null;
+    };
+    const factory = method(publicMarkdownLifecycle, 'forProject');
+    const scoped = factory ? factory(rootPath) : publicMarkdownLifecycle;
+    const quarantine = method(scoped, 'quarantineCreateRollback');
+    const reconcile = method(scoped, 'reconcileCreateRollback');
+    const deleteCreate = method(scoped, 'deleteCreateRollback');
+    const ackCreate = method(scoped, 'ackCreateRollback');
+    if (quarantine === null || reconcile === null || deleteCreate === null ||
+        ackCreate === null) {
+      fail('SNAPSHOT_RESTORE_EXISTING_LIFECYCLE_UNAVAILABLE',
+        'native ROLLBACK_CREATE lifecycle is unavailable');
+    }
+    return Object.freeze({ quarantine, reconcile, deleteCreate, ackCreate });
+  }
+
+  /* Formal mixed rollback: native E self-rolled-back to a formal EXISTING
+   * UNCOMMITTED terminal (every EXISTING leaf and raw History exactly
+   * operation-before). Main runs the frozen ROLLBACK_CREATE domain over the
+   * same operation/artifact/selection/History/journal authority: Q moves only
+   * receipt-owned MISSING leaves to private quarantine (fresh R on response
+   * loss), D deletes only the exact quarantined identities, and A
+   * acknowledges the rollback final record. The marker advances to
+   * ROLLED_BACK with zero public mutation. */
+  function formalRollbackCreate(rootPath, projectId, operationId, ctx) {
+    return formalRollbackCreateInner(rootPath, projectId, operationId, ctx);
+  }
+
+  function formalRollbackCreateInner(rootPath, projectId, operationId, ctx) {
+    const {
+      marker,
+      verified,
+      baseHistory,
+      authority,
+      descriptors,
+      binding,
+      value,
+      terminalReceipt,
+    } = ctx;
+    if (terminalReceipt.state !== 'UNCOMMITTED') {
+      fail('CHANGES_MANUAL_RECOVERY_REQUIRED',
+        'formal rollback requires the EXISTING UNCOMMITTED terminal');
+    }
+    const createRequest = nativeCreateAuthority(marker, verified);
+    const publication = value.nativePublication;
+    if (!publication || publication.command !== 'CREATE_MISSING' ||
+        publication.state !== 'COMMITTED') {
+      fail('CHANGES_MANUAL_RECOVERY_REQUIRED',
+        'formal rollback requires the committed CREATE publication');
+    }
+    const capture = publicMarkdownNativeSchema.assertStoredCreateCapture(
+      publication.createCapture,
+      createRequest
+    );
+    const createPublications = capture.items.map((item, index) => {
+      const control = publicMarkdownNativeSchema.buildControl(createRequest, index);
+      const receipt = publicMarkdownNativeSchema.buildReceipt(
+        control,
+        evidenceDeliverySchema.digestObjectIdentity(item.createdLeafIdentity)
+      );
+      return Object.freeze({
+        schema: publicMarkdownNativeSchema.SCHEMAS.ROLLBACK_CREATE_PUBLICATION,
+        token: publicMarkdownNativeSchema.buildToken(createRequest, index, receipt),
+        controlRecordIdentity: item.control.recordIdentity,
+        receiptRecordIdentity: item.receipt.recordIdentity,
+      });
+    });
+    const rootBind = {
+      schema: publicMarkdownNativeSchema.SCHEMAS.ROOT_BIND,
+      canonicalRoot: rootPath,
+      expectedRootIdentityDigest: binding.rootIdentityDigest,
+      expectedRecoveryIdentityDigest: binding.recoveryDirectoryIdentityDigest,
+    };
+    const precreate = publicMarkdownPhaseSchema.assertPhaseRecord({
+      ...marker.publicMarkdownPhase,
+      phase: 'PRECREATE',
+      items: marker.publicMarkdownPhase.items.map(item => Object.freeze({
+        ...item,
+        createdIdentityDigest: null,
+        creationReceiptDigest: null,
+        quarantineReceiptDigest: null,
+      })),
+      preparedHistoryDigest: null,
+      finalReceiptDigest: null,
+      existingReceiptSetDigest: null,
+      rollbackReceiptDigest: null,
+      updatedAt: marker.createdAt,
+    }, marker.parentSelectionBinding);
+    const held = publicMarkdownNativeSchema.buildRollbackCreateHeldBinding(
+      Number(binding.journalFileIdentity.size),
+      evidenceDeliverySchema.assertObjectIdentity(binding.journalFileIdentity),
+      authority.request.historyParentIdentityDigest,
+      baseHistory.expected.exists,
+      baseHistory.expected.exists
+        ? `sha256:${baseHistory.expected.digest}`
+        : null,
+      baseHistory.fd === null
+        ? null
+        : identityFromStat(baseHistory.stat, `sha256:${baseHistory.expected.digest}`),
+      authority
+    );
+    const request = publicMarkdownNativeSchema.buildRollbackCreateRequest(
+      rootBind,
+      marker.parentSelectionBinding,
+      precreate,
+      marker.publicMarkdownPhase,
+      createRequest,
+      createPublications,
+      authority,
+      terminalReceipt,
+      held
+    );
+    const rollbackAuthority = publicMarkdownNativeSchema.buildRollbackCreateAuthority(
+      rootBind,
+      marker.parentSelectionBinding,
+      precreate,
+      marker.publicMarkdownPhase,
+      createRequest,
+      createPublications,
+      authority,
+      terminalReceipt,
+      held,
+      request
+    );
+    const lifecycle = rollbackLifecycleFor(rootPath);
+    let quarantined = lifecycle.quarantine(rollbackAuthority, descriptors);
+    if (quarantined.state !== 'COMMITTED') {
+      const reconciled = lifecycle.reconcile(rollbackAuthority, descriptors);
+      if (reconciled.state !== 'COMMITTED') {
+        fail('CHANGES_MANUAL_RECOVERY_REQUIRED',
+          'ROLLBACK_CREATE Q/R did not reach COMMITTED');
+      }
+      quarantined = reconciled;
+    }
+    const tokens = quarantined.tokens;
+    if (!Array.isArray(tokens) || tokens.length !== createPublications.length ||
+        tokens.some(token => token.quarantineIdentityDigest === null)) {
+      fail('CHANGES_MANUAL_RECOVERY_REQUIRED',
+        'ROLLBACK_CREATE quarantine tokens are incomplete');
+    }
+    const settle = publicMarkdownNativeSchema.buildRollbackCreateSettleRequest(
+      rollbackAuthority,
+      tokens
+    );
+    const deleted = lifecycle.deleteCreate(settle, rollbackAuthority, descriptors);
+    if (deleted.state !== 'FINALIZED' || deleted.finalRecordIdentity === null) {
+      fail('CHANGES_MANUAL_RECOVERY_REQUIRED',
+        'ROLLBACK_CREATE delete did not seal the final record');
+    }
+    const rolledBackPhase = publicMarkdownPhaseSchema.assertPhaseRecord({
+      ...marker.publicMarkdownPhase,
+      phase: 'ROLLED_BACK',
+      items: marker.publicMarkdownPhase.items.map((item, index) => Object.freeze({
+        ...item,
+        quarantineReceiptDigest: tokens[index].receiptDigest,
+      })),
+      finalReceiptDigest: null,
+      existingReceiptSetDigest: terminalReceipt.receiptSetDigest,
+      rollbackReceiptDigest: deleted.finalRecord.finalRecordDigest,
+      updatedAt: now(),
+    }, marker.parentSelectionBinding);
+    const ackRequest = publicMarkdownNativeSchema.buildRollbackCreateAckRequest(
+      rollbackAuthority,
+      settle,
+      deleted.finalRecordIdentity,
+      rolledBackPhase
+    );
+    const acked = lifecycle.ackCreate(ackRequest, settle, rolledBackPhase,
+      rollbackAuthority, descriptors);
+    if (acked.state !== 'ACKED') {
+      fail('CHANGES_MANUAL_RECOVERY_REQUIRED',
+        'ROLLBACK_CREATE ack did not reach ACKED');
+    }
+    const nextMarker = journalMarker(marker, {
+      publicMarkdownPhase: rolledBackPhase,
+      updatedAt: rolledBackPhase.updatedAt,
+    });
+    const nextValue = journalNextValue(value, {
+      activeMarker: nextMarker,
+      activeMarkerDigest: markerJournalSchema.activeMarkerDigest(nextMarker),
+    });
+    const appendState = appendSnapshotPreparedJournal(
+      markerJournalFor(rootPath, true),
+      value,
+      nextValue,
+      () => {
+        projectIdentity(projectService, rootPath, projectId);
+        assertHistoryAuthority(baseHistory);
+        const latest = journalCurrent(markerJournalFor(rootPath, true));
+        if (latest.status !== 'VALUE' || canonical(latest.value) !== canonical(value)) {
+          fail('CHANGES_RECOVERY_STALE',
+            'rollback journal changed before ROLLED_BACK CAS');
+        }
+      }
+    );
+    if (appendState !== 'COMMITTED') {
+      fail('CHANGES_MANUAL_RECOVERY_REQUIRED',
+        'ROLLED_BACK journal CAS is uncommitted');
+    }
+    return nextMarker;
   }
 
   function executeExistingRestore(rootPath, projectId, operationId) {

@@ -93,7 +93,7 @@ const LIMITS = Object.freeze({
   maxRootBytes: 4096,
   maxSelectedIdBytes: 256,
   maxArtifactBytes: 384 * 1024 * 1024,
-  maxMarkerBytes: 96 * 1024 * 1024,
+  maxMarkerBytes: 2 * 96 * 1024 * 1024,
   maxHistoryBytes: 192 * 1024 * 1024,
   maxLineBytes: 16 * 1024,
   maxRequestBytes: 4 * 1024 * 1024,

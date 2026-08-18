@@ -1638,7 +1638,7 @@ function parseRunResponse(stdout, rawAuthority, expectedCommand, rawStoredReques
     const rollbackTokens = lines.map((line, index) => {
       const fields = line.split('\t');
       if (Buffer.byteLength(`${line}\n`, 'ascii') > LIMITS.maxRunItemBytes ||
-          fields.length !== 31 || fields[0] !== 'T') fail('rollback terminal item invalid');
+          fields.length !== 29 || fields[0] !== 'T') fail('rollback terminal item invalid');
       const rollback = buildRollbackToken(
         authority,
         index,

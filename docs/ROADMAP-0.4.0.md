@@ -5,7 +5,7 @@
 > 版本主题：证据与交付闭环
 > 起草日期：2026-08-06
 > 批准日期：2026-08-06
-> 当前状态：**阶段 0 已签收；阶段 A 当前推进 A1b，mixed applied 主线已形成但仍有 2 个 P1，A1b 尚未签收；阶段 B App 交付预检已完成并等待 A→B 重签，代码版本仍为 0.3.1。**
+> 当前状态：**阶段 0 已签收；阶段 A 当前推进 A1b，两个 P1 已关闭（fresh R publication identity、Main formal mixed rollback 出口），A1b 待一次完整独立复审后签收；阶段 B App 交付预检已完成并等待 A→B 重签，代码版本仍为 0.3.1。**
 >
 > **历史 focused 证据（不作为当前集成签收）**：production snapshot create、public-Markdown CREATE/RECONCILE/FINALIZE helper、Safe Undo Q/R/B/D/A native lifecycle、Safe Undo transaction 的 entryId→PRECREATE→Q/fresh-R→QUARANTINED query、B restart settlement 合同/schema、B→RESTORED transaction/restart、immutable undone-History template/materializer、QUARANTINED→HISTORY_COMMITTED、D/A restart finalization 合同/schema及其 production lifecycle/transaction/restart 编排、Changes/History artifact lifecycle、Main comparison、existing-leaf Restore、Main safe-delete service、full-missing Restore transaction/service、missing restore 的 exact-marker 合同/schema、Safe Undo private合同/schema、mixed Restore 高层 phase合同/schema、formal EXISTING executor 与 fd-rebuildable leaf identity 合同/schema、独立 `ROLLBACK_CREATE` 合同/schema、以及 Snapshot History ancestor + Safe Undo `RESTORED` phase 均为 P0=0、P1=0、P2=0；committed read/list、safe-delete storage、public-Markdown production adapter bridge 与 missing-leaf/SafeUndo 高层合同/phase schema 均为 P0=0、P1=0、P2=1；production exact-marker source/lifecycle 为 P0=0、P1=0、P2=4。同一 marker/WRCCHRA2 的 PRECREATE 与完整 HISTORY_COMMITTED transaction 层均为 P0=0、P1=0、P2=0。旧 exact-marker `CREATED_RECEIPT` P0=0、P1=0、P2=1 仅是 delegated checkpoint 未先执行首红的历史证据纪律记录，已由下方 permanent-journal CREATE 至 `CREATED_RECEIPT` 的当前签收取代，不再作为当前实现分级。详细项数、首红与 P2 见 `v0/DEVELOPMENT-STATUS.md`；当前基线以本页后面的“当前基线冻结”段为准。
 >
@@ -29,7 +29,7 @@
 
 > **Stage B 后续边界**：上述 40 图/40Mpx worker 压力、storage-held bundle entry 绑定、native corrupt-draw 拒绝、footnote token/source-offset authority、Graph stale current locator、correction artifact fail-closed 与同一图片多引用逐一 token 绑定均已通过当前专项与 Electron 证据。当前只回到 Stage A，先完成 A0、A1a–A1c、A2a–A2d、A3，再以 App 创建的真实 snapshot 重签 A→B；只有这条连续链签收后才解锁 Stage C，Stage D/E 继续按顺序等待。capability consume 随 Stage C 导出事务接线。
 
-> **仍未完成**：A1a CREATE finalize/ACK cleanup 已签收；A1b mixed applied 主线已经实现，但 fresh R 对 control 同内容新 inode 仍错误接受为 `COMMITTED`，Main formal `UNCOMMITTED→ROLLBACK_CREATE Q/R/D/A` 出口也尚未接通。关闭这 2 个 P1 并完成一次 A1b 独立复审后，才可进入 A1c Safe Undo；A2 App 接线、96MiB实载、Snapshot helper package、A→B 重签以及 Stage C/D/E 仍按顺序等待。因此阶段 A 与 0.4.0 候选均未完成。
+> **仍未完成**：A1a CREATE finalize/ACK cleanup 已签收；A1b mixed applied 主线已经实现，两个 P1 已关闭：fresh R 消费 E 持久化的 control publication identity（`WRC_A1B_E3_R` 78/78），Main formal `UNCOMMITTED→ROLLBACK_CREATE Q/fresh-R/D/A→ROLLED_BACK` 出口已以真实 native production journey 接通（mixed journey 6/6）。完成一次 A1b 独立复审后，才可进入 A1c Safe Undo；A2 App 接线、96MiB实载、Snapshot helper package、A→B 重签以及 Stage C/D/E 仍按顺序等待。因此阶段 A 与 0.4.0 候选均未完成。
 
 > **2026-08-11 封版恢复控制**：独立差距审计确认 Stage B 在 Stage A App 未完成时先形成纵切，现有 Electron 证据使用预制 committed snapshot，不能证明真实 A→B 用户链；Stage C/D/E 仍未开始，当前工作树也尚未形成 implementation candidate。执行方式切换为 [`WRC-0.4.0-EXEC-R1`](0.4.0-EXECUTION-PROTOCOL.md)：只推进 Stage A 的事务收口→App 纵切→顶级门禁→真实 A→B 重签；在这些门禁完成前冻结 Stage B 扩展并禁止 C/D/E 开工。该控制不改变本合同范围或已签收的 Stage B 纯层。
 
@@ -138,7 +138,7 @@ V1 只冻结以下类型：
 | 阶段 | 交付 | 退出条件 |
 |---|---|---|
 | 0 | ✅ 合同冻结与基线盘点（仅文档，已完成） | [`EVIDENCE-DELIVERY-V1-CONTRACT.md`](EVIDENCE-DELIVERY-V1-CONTRACT.md) 已冻结 DOCX 子集、snapshot copy/publish 三态事务、snapshot 删除事务、allowlist/容量、恢复不删除原则、delivery authority、导出 manifest、健康类型、真实渲染基准、失败矩阵和媒体范围；活动文档派工权已清理。独立复审 P0=0/P1=0、P2=4，详见 [`0.4.0-STAGE-0-INDEPENDENT-REVIEW.md`](0.4.0-STAGE-0-INDEPENDENT-REVIEW.md)；阶段 0 未改产品版本或实现代码 |
-| A | ▶️ Main 项目快照、比较与恢复权威（当前；A1a 已签收，A1b P1=2） | 完成独立 snapshot service/handler、窄 IPC、私有存储、容量/权限/损坏处理、列表/显式删除、比较和 Markdown 选择性恢复；取消/失败/冲突/项目切换零写入，提交后 History/recovery/Safe Undo 真相一致；二进制图片只冻结/比较，不借 Markdown History 恢复。当前先关闭 A1b fresh R identity 与 formal mixed rollback 出口并独立复审，再按执行协议进入 A1c、A2 与 A3；历史 A-R1.1–A-R1.4 只保留为组件证据 |
+| A | ▶️ Main 项目快照、比较与恢复权威（当前；A1a 已签收，A1b P1=0 待复审） | 完成独立 snapshot service/handler、窄 IPC、私有存储、容量/权限/损坏处理、列表/显式删除、比较和 Markdown 选择性恢复；取消/失败/冲突/项目切换零写入，提交后 History/recovery/Safe Undo 真相一致；二进制图片只冻结/比较，不借 Markdown History 恢复。A1b 两个 P1（fresh R identity、formal mixed rollback 出口）已关闭，当前等待一次完整独立复审；复审通过后再按执行协议进入 A1c、A2 与 A3；历史 A-R1.1–A-R1.4 只保留为组件证据 |
 | B | ✅ 导出预检与引用健康度（独立纵切已完成；等待 A→B 重签） | Main 从 exact snapshot 生成目录、标题层级、脚注、引用、图片、资源和健康 manifest；五类健康项有稳定 evidence，stale/partial/budget 状态明确，完全离线且不写正文。Stage A 签收后必须以 App 创建的真实 snapshot 重跑连续旅程；direct seed 只保留为纯层 fixture |
 | C | DOCX 编译、验证与安全保存 | 单一 DOCX exporter 覆盖冻结 Markdown 子集；私有临时构建、OOXML 结构校验、Main 保存对话框、no-clobber 和 committed reconciliation 完成；真实渲染检查通过，不把文件存在当作成功 |
 | D | Graph 多视图与连续交付体验 | 关系图、时间线、实体表、论点—证据表共享一个 Graph v2 快照和筛选；从健康/Graph evidence 可回正文或发起可审阅 Diff；快照→预检→修复→导出在同一项目上下文中连续可理解 |
