@@ -399,9 +399,72 @@ function wrongRollbackRecord(value, kind) {
   return basename;
 }
 
+function seedRollbackQuarantine(value) {
+  const quarantineBasename =
+    `.changes-history-native-rollback-create-quarantine.${'a'.repeat(32)}`;
+  const quarantinePath = path.join(value.recoveryPath, quarantineBasename);
+  fs.renameSync(value.createdPath, quarantinePath);
+  const quarantineDigest = evidence.digestObjectIdentity(
+    objectIdentity(quarantinePath, sha(value.createdBytes))
+  );
+  const control = schema.buildRollbackCreateControl(
+    value.authority,
+    0,
+    quarantineBasename
+  );
+  const receipt = schema.buildRollbackCreateReceipt(
+    value.authority,
+    0,
+    control,
+    quarantineDigest
+  );
+  const names = schema.rollbackCreateRecordNames(value.authority, 0);
+  const controlPath = path.join(value.recoveryPath, names.controlBasename);
+  const receiptPath = path.join(value.recoveryPath, names.receiptBasename);
+  const controlIdentity = writePrivate(
+    controlPath,
+    schema.encodeRollbackCreateControlRecord(control, value.authority, 0)
+  );
+  const receiptIdentity = writePrivate(
+    receiptPath,
+    schema.encodeRollbackCreateReceiptRecord(receipt, value.authority, 0, control)
+  );
+  const token = schema.buildRollbackCreateToken(
+    value.authority,
+    0,
+    control,
+    receipt,
+    controlIdentity,
+    receiptIdentity
+  );
+  return {
+    token,
+    settle: schema.buildRollbackCreateSettleRequest(value.authority, [token]),
+    quarantinePath,
+    controlPath,
+    receiptPath,
+  };
+}
+
 function rollbackWire(value, command) {
   return `${schema.encodeRootBind(value.authority.rootBind)}` +
     schema.encodeRollbackCreateCommand(command, value.authority);
+}
+
+function runRawRollback(value, helperPath, input) {
+  const rootFd = fs.openSync('/', fs.constants.O_RDONLY);
+  try {
+    return childProcess.spawnSync(helperPath, [], {
+      input,
+      stdio: [
+        'pipe', 'pipe', 'pipe', rootFd, value.fds.artifactFd, value.fds.markerFd,
+        value.fds.historyParentFd, value.fds.historyFd,
+      ],
+      maxBuffer: schema.LIMITS.maxRollbackCreateResponseBytes,
+    });
+  } finally {
+    fs.closeSync(rootFd);
+  }
 }
 
 function runPaused(value, helperPath, command, syncName, mutation) {
@@ -516,6 +579,224 @@ try {
   console.log('PASS production lifecycle exposes domain-separated CREATE_ROLLBACK Q/R/D/A');
 
   const helper = compileHelper();
+  {
+    const dRed = mixedFixture(helper);
+    try {
+      const seeded = seedRollbackQuarantine(dRed);
+      const result = dRed.scoped.deleteCreateRollback(
+        seeded.settle,
+        dRed.authority,
+        dRed.fds
+      );
+      assert.strictEqual(result.state, 'FINALIZED');
+      assert.strictEqual(fs.existsSync(seeded.quarantinePath), false);
+      assert.strictEqual(fs.existsSync(seeded.controlPath), true);
+      assert.strictEqual(fs.existsSync(seeded.receiptPath), true);
+      const finalPath = path.join(
+        dRed.recoveryPath,
+        schema.rollbackCreateFinalRecordName(seeded.settle, dRed.authority)
+      );
+      assert.strictEqual(fs.existsSync(finalPath), true);
+      assert.deepStrictEqual(
+        result.finalRecord,
+        schema.buildRollbackCreateFinalRecord(seeded.settle, dRed.authority)
+      );
+    } finally {
+      closeMixed(dRed);
+    }
+
+    const dDrift = mixedFixture(helper);
+    try {
+      const seeded = seedRollbackQuarantine(dDrift);
+      const quarantineBytes = fs.readFileSync(seeded.quarantinePath);
+      const heldQuarantine = `${seeded.quarantinePath}.held`;
+      fs.renameSync(seeded.quarantinePath, heldQuarantine);
+      fs.writeFileSync(seeded.quarantinePath, quarantineBytes, { flag: 'wx', mode: 0o600 });
+      const drift = dDrift.scoped.deleteCreateRollback(
+        seeded.settle,
+        dDrift.authority,
+        dDrift.fds
+      );
+      assert.strictEqual(drift.state, 'UNKNOWN');
+      assert.strictEqual(fs.existsSync(heldQuarantine), true);
+      assert.deepStrictEqual(fs.readFileSync(seeded.quarantinePath), quarantineBytes);
+      console.log('PASS D exact-deletes quarantine, publishes FINALIZED and preserves replacement');
+    } finally {
+      closeMixed(dDrift);
+    }
+  }
+
+  {
+    const aPhaseDrift = mixedFixture(helper);
+    try {
+      const seeded = seedRollbackQuarantine(aPhaseDrift);
+      fs.unlinkSync(seeded.quarantinePath);
+      const finalRecord = schema.buildRollbackCreateFinalRecord(
+        seeded.settle,
+        aPhaseDrift.authority
+      );
+      const finalPath = path.join(
+        aPhaseDrift.recoveryPath,
+        schema.rollbackCreateFinalRecordName(seeded.settle, aPhaseDrift.authority)
+      );
+      const finalIdentity = writePrivate(
+        finalPath,
+        schema.encodeRollbackCreateFinalRecord(
+          finalRecord,
+          seeded.settle,
+          aPhaseDrift.authority
+        )
+      );
+      const rolledBack = phase(
+        aPhaseDrift.authority.parentSelection,
+        aPhaseDrift.authority.request.operationId,
+        aPhaseDrift.authority.request.artifactDigest,
+        'ROLLED_BACK',
+        aPhaseDrift.authority.createdReceiptPhase.items.map(item => ({
+          ...item,
+          quarantineReceiptDigest: seeded.token.receiptDigest,
+        })),
+        {
+          existingReceiptSetDigest: aPhaseDrift.authority.request.existingReceiptSetDigest,
+          rollbackReceiptDigest: finalRecord.finalRecordDigest,
+        }
+      );
+      const ack = schema.buildRollbackCreateAckRequest(
+        aPhaseDrift.authority,
+        seeded.settle,
+        finalIdentity,
+        rolledBack
+      );
+      const lines = (`${schema.encodeRootBind(aPhaseDrift.authority.rootBind)}` +
+        schema.encodeRollbackCreateAckCommand(
+          ack,
+          aPhaseDrift.authority,
+          seeded.settle,
+          rolledBack
+        )).trimEnd().split('\n');
+      const header = lines[1].split('\t');
+      const rolledBackPhaseIndex = header.indexOf(ack.rolledBackPhaseDigest);
+      assert.ok(rolledBackPhaseIndex >= 0, 'ACK wire must contain the consuming phase digest');
+      header[rolledBackPhaseIndex] = `sha256:${'f'.repeat(64)}`;
+      lines[1] = header.join('\t');
+      const result = runRawRollback(aPhaseDrift, helper, `${lines.join('\n')}\n`);
+      assert.strictEqual(result.status, 0);
+      assert.match(String(result.stdout), /A\tRESULT\tUNKNOWN\t/u);
+      assert.strictEqual(fs.existsSync(finalPath), true);
+      assert.strictEqual(fs.existsSync(seeded.controlPath), true);
+      assert.strictEqual(fs.existsSync(seeded.receiptPath), true);
+      console.log('PASS A independently rejects a forged ROLLED_BACK phase digest');
+    } finally {
+      closeMixed(aPhaseDrift);
+    }
+
+    const aRed = mixedFixture(helper);
+    try {
+      const seeded = seedRollbackQuarantine(aRed);
+      fs.unlinkSync(seeded.quarantinePath);
+      const finalRecord = schema.buildRollbackCreateFinalRecord(
+        seeded.settle,
+        aRed.authority
+      );
+      const finalPath = path.join(
+        aRed.recoveryPath,
+        schema.rollbackCreateFinalRecordName(seeded.settle, aRed.authority)
+      );
+      const finalIdentity = writePrivate(
+        finalPath,
+        schema.encodeRollbackCreateFinalRecord(finalRecord, seeded.settle, aRed.authority)
+      );
+      const rolledBack = phase(
+        aRed.authority.parentSelection,
+        aRed.authority.request.operationId,
+        aRed.authority.request.artifactDigest,
+        'ROLLED_BACK',
+        aRed.authority.createdReceiptPhase.items.map(item => ({
+          ...item,
+          quarantineReceiptDigest: seeded.token.receiptDigest,
+        })),
+        {
+          existingReceiptSetDigest: aRed.authority.request.existingReceiptSetDigest,
+          rollbackReceiptDigest: finalRecord.finalRecordDigest,
+        }
+      );
+      const ack = schema.buildRollbackCreateAckRequest(
+        aRed.authority,
+        seeded.settle,
+        finalIdentity,
+        rolledBack
+      );
+      const result = aRed.scoped.ackCreateRollback(
+        ack,
+        seeded.settle,
+        rolledBack,
+        aRed.authority,
+        aRed.fds
+      );
+      assert.strictEqual(result.state, 'ACKED');
+      assert.strictEqual(fs.existsSync(finalPath), false);
+      assert.strictEqual(fs.existsSync(seeded.controlPath), false);
+      assert.strictEqual(fs.existsSync(seeded.receiptPath), false);
+    } finally {
+      closeMixed(aRed);
+    }
+
+    const aDrift = mixedFixture(helper);
+    try {
+      const seeded = seedRollbackQuarantine(aDrift);
+      fs.unlinkSync(seeded.quarantinePath);
+      const finalRecord = schema.buildRollbackCreateFinalRecord(
+        seeded.settle,
+        aDrift.authority
+      );
+      const finalPath = path.join(
+        aDrift.recoveryPath,
+        schema.rollbackCreateFinalRecordName(seeded.settle, aDrift.authority)
+      );
+      const finalIdentity = writePrivate(
+        finalPath,
+        schema.encodeRollbackCreateFinalRecord(finalRecord, seeded.settle, aDrift.authority)
+      );
+      const rolledBack = phase(
+        aDrift.authority.parentSelection,
+        aDrift.authority.request.operationId,
+        aDrift.authority.request.artifactDigest,
+        'ROLLED_BACK',
+        aDrift.authority.createdReceiptPhase.items.map(item => ({
+          ...item,
+          quarantineReceiptDigest: seeded.token.receiptDigest,
+        })),
+        {
+          existingReceiptSetDigest: aDrift.authority.request.existingReceiptSetDigest,
+          rollbackReceiptDigest: finalRecord.finalRecordDigest,
+        }
+      );
+      const ack = schema.buildRollbackCreateAckRequest(
+        aDrift.authority,
+        seeded.settle,
+        finalIdentity,
+        rolledBack
+      );
+      const finalBytes = fs.readFileSync(finalPath);
+      const heldFinal = `${finalPath}.held`;
+      fs.renameSync(finalPath, heldFinal);
+      fs.writeFileSync(finalPath, finalBytes, { flag: 'wx', mode: 0o600 });
+      const drift = aDrift.scoped.ackCreateRollback(
+        ack,
+        seeded.settle,
+        rolledBack,
+        aDrift.authority,
+        aDrift.fds
+      );
+      assert.strictEqual(drift.state, 'UNKNOWN');
+      assert.strictEqual(fs.existsSync(heldFinal), true);
+      assert.deepStrictEqual(fs.readFileSync(finalPath), finalBytes);
+      console.log('PASS A exact-ACKs stored ROLLED_BACK records and preserves replacement');
+    } finally {
+      closeMixed(aDrift);
+    }
+  }
+
   const mixed = mixedFixture(helper);
   try {
     const quarantined = mixed.scoped.quarantineCreateRollback(mixed.authority, mixed.fds);
