@@ -53,6 +53,36 @@ Maintain one primary checkpoint and at most one support task that does not modif
 
 Only Stage A may receive implementation work. Stage B remains frozen pending the real A→B journey; Stage C/D/E remain blocked. Push, Tag, Release, publication, and distribution remain separately authorized actions.
 
+## PDCA Development Discipline
+
+Treat every checkpoint as one PDCA loop with explicit stop conditions:
+
+- **Plan gate:** before the first production edit or delegation, record scope, authority,
+  exit criteria, current red, and branch/worktree preflight. Inspect `git worktree list
+  --porcelain`, `git branch -vv --all`, `git log --all -- <affected files>`, and
+  `git log --all -S'<affected symbol>' -- <affected files>`. Classify each hit as reuse/
+  port, reference only, superseded, or later-checkpoint candidate. No authority may be
+  reimplemented before this classification exists; an unclassified parallel branch blocks
+  the start of work.
+- **Do gate:** keep one primary checkpoint and at most one non-overlapping support task.
+  Close one feature slice with its source, tests, and necessary control documentation in
+  one self-consistent change. Do not create status/docs commits between every debugging
+  round, and do not leave a cross-layer implementation as a reviewable-looking WIP.
+- **Check gate:** every round records the first red, exact command, result, evidence
+  boundary, and remaining blocker. Component/schema/focused green is never a checkpoint,
+  Stage, candidate, author, or release sign-off. If the same failure class recurs twice,
+  pause implementation and re-open the state matrix and authority assumptions.
+- **Act gate:** update status, contracts, archive, and Nowledge Mem only at checkpoint
+  opening, independent close, Stage exit, or a scope/owner decision. A clean exact tree
+  and independent review are required before a local checkpoint commit; no WIP commit,
+  push, tag, release, or publication is allowed.
+
+For project memories, retain history but prevent stale claims from dispatching work. Every
+new or corrected memory must state its date, scope, evidence boundary, status, superseded
+memory/decision, and next decision. A memory that says “implemented” without a clean
+checkpoint and independent review is historical/component-only and cannot override current
+source, status, contract, or review evidence.
+
 ## Documentation and Delegation
 
 Update roadmap, status, contracts, README, and Nowledge Mem only at a checkpoint opening, independently verified checkpoint close, Stage exit, or scope decision—not after mechanical edits or internal component greens. The current status control block stays concise; detailed rounds and superseded totals go to archive.
