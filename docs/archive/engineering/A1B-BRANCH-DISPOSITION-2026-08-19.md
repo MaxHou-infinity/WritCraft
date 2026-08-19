@@ -18,7 +18,7 @@
 
 | 分支提交/范围 | 当前分类 | 处置 |
 |---|---|---|
-| `37e67e7` A1b mixed recovery / D/A | main 生产实现已取代；测试意图可复用 | 不合并旧生产代码。将 main 缺失的 D 精确删除、A forged-phase、A exact-ACK replacement-preserve 三类 native 对抗测试适配到当前 schema |
+| `37e67e7` A1b mixed recovery / D/A | 当前 schema 的生产 authority 设计参考；不能整体合并 | 已将三类 D/A native 对抗测试适配到 main；其 durable Q、ROLLED_BACK、ACK_COMMITTED publication/CAS 仍是 P1-3 修复候选，在定点复核前不得删除 |
 | `649279c` A1c Safe Undo | 后续 checkpoint 候选 | A1b 签收前冻结；A1c 开启时先以该提交为既有实现基线，重新对照当前 authority、合同和测试后决定移植或拒绝 |
 | `8880709` A2a create/list | 后续 checkpoint 候选 | A2a 开启前不得进入 main；届时按 production IPC/preload/Renderer 与 real Electron 要求重新评估 |
 | `8fada06` 至 `e3411f1` compare/UI | A2b 候选 | 不以旧分支的“close A2b”文档签收当前 checkpoint；当前协议下重新独立验收 |
@@ -37,7 +37,9 @@ main 已包含 D/A 生产实现和真实 mixed `Q → fresh R → D → A → RO
 
 适配后的测试直接进入现有
 `tests/verify-v0-public-markdown-native-rollback-create-lifecycle.js` 默认执行路径，
-不新增脚本，因此既有 0.4 测试清册条目继续覆盖它。focused 结果为 exit 0；未发现需要移植的旧生产实现。
+不新增脚本，因此既有 0.4 测试清册条目继续覆盖它。focused 结果为 exit 0。后续独立
+review 证明 `37e67e7` 仍含当前 main 缺失的分阶段 durable rollback publication 设计；
+该逻辑只能按当前 WRCCHRJ2 schema 适配，不能直接 cherry-pick 或标为已取代。
 
 ## 4. 后续边界
 

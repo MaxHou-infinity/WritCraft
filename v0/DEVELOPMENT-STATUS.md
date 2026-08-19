@@ -1,10 +1,10 @@
 # 笔触 · WritCraft 当前开发状态
 
-> 最后更新：2026-08-17
+> 最后更新：2026-08-19
 > 当前公开/代码版本：`writ-craft@0.3.1`（npm `preview`）
 > 下一目标：`0.4.0` 证据与交付闭环（`WRC-0.4.0-R1`）
-> 当前 checkpoint：**Stage A / A1b mixed EXISTING + `ROLLBACK_CREATE` 实现完成，待独立复审**
-> 当前结论：**P0=0、P1=0；A1b 需一次完整独立复审后签收；A1c、A2、Stage B 重签与 Stage C/D/E 继续冻结**
+> 当前 checkpoint：**Stage A / A1b 独立复审 NO-GO，修复 mixed EXISTING + `ROLLBACK_CREATE` 的 5 个 P1**
+> 当前结论：**P0=0、P1=5、P2=1；A1b 未签收；A1c、A2、Stage B 重签与 Stage C/D/E 继续冻结**
 
 ## 1. 当前权威
 
@@ -14,6 +14,8 @@
 - 当前工程事实：源码与可复现测试优先于文档快照。
 - A1b 本轮提交与 component 证据汇总见
   [`docs/archive/engineering/A1B-INDEPENDENT-REVIEW-MATERIALS-2026-08-16.md`](../docs/archive/engineering/A1B-INDEPENDENT-REVIEW-MATERIALS-2026-08-16.md)；它不是签收记录，也不拥有派工权。
+- 当前完整 finding batch 见
+  [`docs/0.4.0-A1B-INDEPENDENT-REVIEW.md`](../docs/0.4.0-A1B-INDEPENDENT-REVIEW.md)。
 
 ## 2. 已完成边界
 
@@ -21,25 +23,26 @@
 - `dcc197c` 前后的 A1b 实现已完成 WRCCHRJ2 journal 单权威 E/R wire、native
   `ROLLBACK_CREATE` Q/R/D/A、Main post-E terminal CAS，以及 mixed applied 主线：
   `PRECREATE → CREATED_RECEIPT → EXISTING_COMMITTED → HISTORY_COMMITTED → FINALIZED → ACK_COMMITTED → IDLE`。
-- 两个 P1 已关闭：fresh R 绑定 stored publication identity（`WRC_A1B_E3_R` 全绿），
-  Main 已把 EXISTING formal `UNCOMMITTED` 编排为 `Q → fresh R → D → A → ROLLED_BACK`
-  （真实 native production mixed journey，6/6 全绿，零 public mutation）。
-- 以上是 A1b implementation/component evidence；checkpoint 签收仍需一次完整独立复审（P0/P1=0）。
+- fresh R stored-publication identity 与单项 `Q → fresh R → D → A → ROLLED_BACK`
+  是已通过的 component/integration evidence，但独立复审证明它们没有闭合完整 checkpoint。
+- `e24bd51` 补入 D 精确删除、A forged-phase、A exact-ACK replacement-preserve
+  三类 native 对抗测试；测试全绿，未改变下面的 5 个生产 P1。
 
 ## 3. 当前 P1
 
-两个 A1b P1 均已关闭：
+完整独立复审绑定 `e24bd51`，结论 P0=0、P1=5、P2=1：
 
-1. **Fresh R publication-time identity 已闭合**：`WRC_A1B_E3_R=1` 全绿；R 从 stored
-   publication 读取 control/apply identity 并以 `same_file` 校验，同内容新 inode 返回
-   `UNKNOWN`，不再从当前 record 重铸 publication-time identity。
-2. **Main formal rollback 出口已接通**：native E apply 失败后 self-rollback 到 formal
-   EXISTING `UNCOMMITTED`，Main 编排 `Q → fresh R → D → A`，D 仅删除精确 quarantine
-   identity 并写 final record，A 校验 ROLLED_BACK phase 后清理私有记录；marker 到达
-   `ROLLED_BACK`，所有 EXISTING/MISSING leaf 与 raw History 回到 operation-before。
+1. Native E/R 只实现单个 EXISTING；合法的多 EXISTING mixed selection 固定为 `UNKNOWN`。
+2. Native `V verify` 仍为空操作，Main 也未在接受 E/R terminal 前强制 fresh V。
+3. `ROLLBACK_CREATE` Q/D/A 缺少分阶段 WRCCHRJ2 publication；A 在 `ROLLED_BACK`
+   CAS 前删除恢复记录，崩溃窗口不可恢复。
+4. Snapshot restore service 不消费 `ROLLED_BACK`，已证明的零净写回滚被外推为
+   `UNKNOWN`/manual。
+5. EXISTING ACK 没有 exact-remove control/apply/final records，却发布
+   `ACK_COMMITTED` 并清到 IDLE。
 
-没有已知 P0。Mixed applied 成功出口、journal physical binding 与 post-E CAS 不再列为开放红灯。
-`snapshot_restore_undo` journal-backed 属 A1c；LEGACY 移除属于后续迁移；Main/handler App 接线属于 A2，均不扩大本次 A1b 阻断清单。
+P2：`37e67e7` 含当前 main 缺失的 durable rollback publication 设计参考，不能标为已被
+main 完全取代，也不能在 P1 修复前删除分支。A1c/A2/Stage B–E 继续冻结。
 
 ## 4. 当前可复现证据
 
@@ -52,13 +55,14 @@
 - `WRC_A1B_E2B_CONTROL=1 WRC_A1B_E2B_STAGE=1 WRC_A1B_E2B_APPLY=1 node tests/verify-v0-public-markdown-native-lifecycle.js`：89/89，exit 0。
 - `node tests/verify-v0-public-markdown-native-rollback-create-lifecycle.js`：exit 0。
 - `node tests/verify-v0-public-markdown-native-rollback-create-schema.js`：16/16，exit 0。
-- `npm test`：exit 0。
+- `npm run verify:0.4:current-components`：40/40 Stage A + 9/9 Stage B preflight，exit 0。
+- `npm test`：受限沙箱首红为 Electron `code=null`；真实 Electron 权限重跑 exit 0。
 
-Focused、schema、native 或 direct-service 绿灯是 component evidence；A1b 签收仍需一次完整独立复审。
+以上绿灯没有覆盖或推翻独立复审的 5 个合同/生产边界 P1。
 
 ## 5. 唯一下一动作
 
-**对当前 clean local A1b tree（P0=0、P1=0）启动一次完整独立复审；复审通过后签收 A1b checkpoint。**
+**按 authority 依赖顺序修复 5 个 P1，运行 focused production gates，并由同一独立 reviewer 对原 finding batch 定点确认。**
 
 A1b 签收前，A1c、A2a–A2d、A3、A→B、Stage C/D/E、candidate、push/tag/release/publish/distribution 均冻结。
 
