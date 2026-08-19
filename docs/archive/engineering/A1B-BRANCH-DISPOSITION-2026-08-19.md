@@ -1,6 +1,6 @@
 # A1b 并行分支处置记录（2026-08-19）
 
-> 状态：一次性治理与追溯证据；不拥有派工权，不签收 A1b，也不解锁 A1c/A2。
+> 状态：所有者已确认归档；一次性治理与追溯证据；不拥有派工权，不签收 A1b，也不解锁 A1c/A2。
 > 当前派工仍以 `docs/0.4.0-EXECUTION-PROTOCOL.md` 与 `v0/DEVELOPMENT-STATUS.md` 为准。
 
 ## 1. 对账边界
@@ -45,4 +45,4 @@ review 证明 `37e67e7` 仍含当前 main 缺失的分阶段 durable rollback pu
 
 - A1b 仍须绑定 clean exact tree 完成一次独立 review；上述测试绿灯只是补强 checkpoint evidence。
 - 在 A1b 独立签收前，A1c、A2a–A2d、A3、A→B、Stage C/D/E 继续冻结。
-- `codex/a1b-complete` 保留到其中各提交完成当前 checkpoint 重新分类；任何删除或归档动作由所有者另行授权。
+- 所有者已确认将 `codex/a1b-complete` 归档：保留现有 branch ref 作为只读参考，不整体合并、不删除、不推送；A1c/A2 开工时按提交逐项复核、移植或拒绝。
