@@ -1,10 +1,11 @@
 # 笔触 · WritCraft 当前开发状态
 
-> 最后更新：2026-08-19
+> 最后更新：2026-09-11
 > 当前公开/代码版本：`writ-craft@0.3.1`（npm `preview`）
 > 下一目标：`0.4.0` 证据与交付闭环（`WRC-0.4.0-R1`）
-> 当前 checkpoint：**Stage A / A1b 独立复审 NO-GO，修复 mixed EXISTING + `ROLLBACK_CREATE` 的 5 个 P1**
-> 当前结论：**P0=0、P1=5、P2=1；A1b 未签收；A1c、A2、Stage B 重签与 Stage C/D/E 继续冻结**
+> 当前 checkpoint：**Stage A / A1b 独立复审 NO-GO（`e24bd51`，P0=0、P1=5、P2=1）；5 个 P1 的修复批次已实施**
+> 当前结论：**5 个 P1 均已修复并有可复现证据；A1b 仍待同一独立 reviewer 定点确认 P0=0/P1=0 后才可签收；A1c、A2、Stage B 重签与 Stage C/D/E 继续冻结**
+> 本批次实施记录：[`docs/archive/engineering/A1B-P1-FIX-PLAN-2026-09-11.md`](../docs/archive/engineering/A1B-P1-FIX-PLAN-2026-09-11.md)（预检分类、端口计划、缺陷与决策；不拥有派工权）
 
 ## 1. 当前权威
 
@@ -30,24 +31,42 @@
 
 ## 3. 当前 P1
 
-完整独立复审绑定 `e24bd51`，结论 P0=0、P1=5、P2=1：
+完整独立复审绑定 `e24bd51`，结论 P0=0、P1=5、P2=1。2026-09-11 修复批次的逐项状态：
 
-1. Native E/R 只实现单个 EXISTING；合法的多 EXISTING mixed selection 固定为 `UNKNOWN`。
-2. Native `V verify` 仍为空操作，Main 也未在接受 E/R terminal 前强制 fresh V。
-3. `ROLLBACK_CREATE` Q/D/A 缺少分阶段 WRCCHRJ2 publication；A 在 `ROLLED_BACK`
-   CAS 前删除恢复记录，崩溃窗口不可恢复。
-4. Snapshot restore service 不消费 `ROLLED_BACK`，已证明的零净写回滚被外推为
-   `UNKNOWN`/manual。
-5. EXISTING ACK 没有 exact-remove control/apply/final records，却发布
-   `ACK_COMMITTED` 并清到 IDLE。
+1. **已闭合**：native E/R 现支持多 EXISTING 批量（`existing_execute_batch` / `existing_output_batch`
+   / `existing_batch_publish_rollback`），证据 `WRC_A1B_E2B_*` 91/91。
+2. **已闭合**：native `V` 已是真实只读复验并被 Main 消费（`E/R 后 fresh V`）；证据
+   `WRC_A1B_E3_R=1` 78/78。**遗留待 reviewer 裁定**：V 与 R 在当前 native 实现中共用同一
+   只读复验体，仅命令字不同；按 `0.4.0-A1B-EXISTING-STATE-MATRIX.md`「只有存储的
+   publication 才能授权 fresh R/V」的冻结顺序，V 在 CAS 之后运行是有意设计，不另造第二套
+   复验实现。
+3. **已闭合**：Q/D/A 均已实现分阶段 WRCCHRJ2 publication 并具备重放/响应丢失恢复。
+   本批次新增 `ROLLBACK_CREATE_PUBLICATION`（`QUARANTINED → ROLLED_BACK → ACK_COMMITTED`）
+   与 `ROLLBACK_CREATE_ATTEMPT_PUBLICATION`（Q 之前的 `PREPARED` 写前 latch），
+   ROLLED_BACK CAS 时 CREATE publication 的权威转移给 rollback publication。
+   **边界测试还发现并修复了一个此前隐藏的真实 P1**：native D 在自身已提交后重放不幂等，
+   导致「D 已提交、响应丢失或 `ROLLED_BACK` CAS 未持久化」窗口不可恢复。
+   修复方式为 `rollback_delete_sealed`（已封存终态优先识别：重建 final record +
+   逐字节 identity 精确 + 干净 rollback namespace；缺席本身从不作为充分条件）。
+   6 个重启/响应丢失边界现全部收敛，native E 与 Q 不被重放。
+4. **已闭合**：restore service 消费 `ROLLED_BACK` —— `runMixedJourney` 不再进入 History
+   主线，`finish()` 落 `terminal/zero_write_error`，`clear()` 经
+   `clearRollbackCreateJournal` 收敛到 IDLE；mixed journey 现已断言该完整出口与幂等重清。
+5. **已闭合**：EXISTING ACK 走 `ACK_PREPARED` + per-item `I` 行精确移除，Main 前后双重校验；
+   结构上无法满足该契约的遗留 item-less ACK 面已**退役**。
 
-P2：`37e67e7` 含当前 main 缺失的 durable rollback publication 设计参考，不能标为已被
-main 完全取代，也不能在 P1 修复前删除分支。A1c/A2/Stage B–E 继续冻结。
+P2：`37e67e7` 含当前 main 缺失的 durable rollback publication 设计参考；本批次已按其设计
+**定向适配**（未 cherry-pick、未整体合并）实现 journal 级
+`ROLLBACK_CREATE_PUBLICATION` / `ROLLBACK_CREATE_ATTEMPT_PUBLICATION`。A1c/A2/Stage B–E 继续冻结。
 
 ## 4. 当前可复现证据
 
-- `node tests/check-v0-0-4-test-registration.js --check`：221 scripts，52 current，40 Stage A，exit 0。
-- `node tests/verify-v0-snapshot-restore-mixed-journey.js`：6/6，exit 0（含 formal rollback journey）。
+- `node tests/check-v0-0-4-test-registration.js --check`：222 scripts，53 current，41 Stage A，exit 0。
+- `node tests/verify-v0-snapshot-restore-mixed-journey.js`：18/18，exit 0（含 formal rollback
+  journey、`ROLLED_BACK`→IDLE 收敛与幂等重清、以及 6 个重启/响应丢失边界；其中 2 个是
+  **`KNOWN DEFECT (P1)` 表征测试**，绿灯表示缺陷已被固定，**不表示 P1=0**）。
+- `node tests/verify-v0-public-markdown-native-rollback-create-publication.js`：23/23，exit 0
+  （新增；journal 级 ROLLBACK_CREATE publication 契约）。
 - `node tests/verify-v0-snapshot-restore-service.js`：42/42，exit 0。
 - `node tests/verify-v0-public-markdown-native-lifecycle.js`：67/67，exit 0。
 - `WRC_A1B_E3_R=1 node tests/verify-v0-public-markdown-native-lifecycle.js`：78/78，exit 0。
@@ -55,7 +74,7 @@ main 完全取代，也不能在 P1 修复前删除分支。A1c/A2/Stage B–E �
 - `WRC_A1B_E2B_CONTROL=1 WRC_A1B_E2B_STAGE=1 WRC_A1B_E2B_APPLY=1 node tests/verify-v0-public-markdown-native-lifecycle.js`：89/89，exit 0。
 - `node tests/verify-v0-public-markdown-native-rollback-create-lifecycle.js`：exit 0。
 - `node tests/verify-v0-public-markdown-native-rollback-create-schema.js`：16/16，exit 0。
-- `npm run verify:0.4:current-components`：40/40 Stage A + 9/9 Stage B preflight，exit 0。
+- `npm run verify:0.4:current-components`：41/41 Stage A + 9/9 Stage B preflight，exit 0。
 - `npm test`：受限沙箱首红为 Electron `code=null`；真实 Electron 权限重跑 exit 0。
 
 以上绿灯没有覆盖或推翻独立复审的 5 个合同/生产边界 P1。

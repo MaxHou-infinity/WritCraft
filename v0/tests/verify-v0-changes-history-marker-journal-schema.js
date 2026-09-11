@@ -64,6 +64,7 @@ function initialValue() {
     activeMarkerDigest: null,
     nativePublication: null,
     existingTerminalPublication: null,
+    rollbackCreatePublication: null,
     terminalCleanup: null,
     terminalCleanupDigest: null,
   });
@@ -404,9 +405,11 @@ function existingTerminalItems(count) {
       controlBasename: `.changes-history-native-existing-control.${suffix}`,
       controlDigest: sha(((index + 1) % 15 + 1).toString(16)),
       controlRecordIdentity: identity(3000 + index * 2, sha(hex)),
+      controlCleanupState: 'PUBLISHED',
       applyBasename: `.changes-history-native-existing-apply.${suffix}`,
       applyReceiptDigest: sha(((index + 2) % 15 + 1).toString(16)),
       applyRecordIdentity: identity(3001 + index * 2, sha(hex)),
+      applyCleanupState: 'PUBLISHED',
     };
   });
 }
@@ -454,6 +457,7 @@ function existingFinalization() {
     finalRecordDigest,
     finalRecordIdentity: identity(4000, finalRecordDigest),
     markerFinalizedPhaseDigest: sha('7'),
+    cleanupState: 'PUBLISHED',
     finalizationDigest: null,
   };
   finalization.finalizationDigest = journal.existingFinalizationDigest(finalization);
@@ -464,6 +468,28 @@ function advanceExistingPublication(previous, patch) {
   const publication = {
     ...previous,
     ...patch,
+    publicationDigest: null,
+  };
+  publication.publicationDigest = journal.existingTerminalPublicationDigest(publication);
+  return journal.assertExistingTerminalPublication(publication);
+}
+
+function advanceExistingCleanup(previous, state, cleanupState) {
+  const finalization = {
+    ...previous.finalization,
+    cleanupState,
+    finalizationDigest: null,
+  };
+  finalization.finalizationDigest = journal.existingFinalizationDigest(finalization);
+  const publication = {
+    ...previous,
+    state,
+    items: previous.items.map(item => ({
+      ...item,
+      controlCleanupState: cleanupState,
+      applyCleanupState: cleanupState,
+    })),
+    finalization,
     publicationDigest: null,
   };
   publication.publicationDigest = journal.existingTerminalPublicationDigest(publication);
@@ -502,11 +528,11 @@ test('initial IDLE and canonical A/B frames have a hard independent golden', () 
     bytesB: frameB.length,
     shaB: crypto.createHash('sha256').update(frameB).digest('hex'),
   }, {
-    valueDigest: 'sha256:2b9f55bf364fb0100d01b7f25aa844a1513a0ad90a3576a49d7c03b8351bec02',
-    bytesA: 734,
-    shaA: 'b9518ab46066344546d6fb03d4ff8f452f55113f0d15c1dc5e60d555cf1f9896',
-    bytesB: 734,
-    shaB: '8407625cce247d80997be7c59d75d68a0e09a01d3077cf347c0828f3d4aeb4d8',
+    valueDigest: 'sha256:15bc9cdee34f4f58442df433b92481c7e8262e34c4d3e83fcc003bb7ed19e48b',
+    bytesA: 767,
+    shaA: '0900d3b4e670fc8c417c57c84fa429136fccd17007c5fa1eaa54b1be0b36a9d6',
+    bytesB: 767,
+    shaB: '885029b30d6e2259708522bb190645072f3166549c44cc08d48da9bda583f239',
   });
   assert.deepStrictEqual(journal.parseSlotFrame(frameA), { slot: 'A', value: idle });
   assert.deepStrictEqual(journal.parseSlotFrame(frameB), { slot: 'B', value: idle });
@@ -608,13 +634,24 @@ test('EXISTING terminal publication finalizes, ACKs and binds the ordered cleanu
     activeMarkerDigest: journal.activeMarkerDigest(finalizedMarker),
     existingTerminalPublication: finalizedPublication,
   });
-  const ackedPublication = advanceExistingPublication(finalizedPublication, {
-    state: 'ACK_COMMITTED',
+  const storedAckPrepared = advanceExistingCleanup(
+    finalizedPublication,
+    'ACK_PREPARED',
+    'CLEANUP_ARMED'
+  );
+  const ackPrepared = advance(finalized, {
+    existingTerminalPublication: storedAckPrepared,
   });
-  const acked = advance(finalized, { existingTerminalPublication: ackedPublication });
+  const storedAcked = advanceExistingCleanup(
+    storedAckPrepared,
+    'ACK_COMMITTED',
+    'REMOVED'
+  );
+  const acked = advance(ackPrepared, { existingTerminalPublication: storedAcked });
   assert.deepStrictEqual(journal.assertTransition(committed, history), history);
   assert.deepStrictEqual(journal.assertTransition(history, finalized), finalized);
-  assert.deepStrictEqual(journal.assertTransition(finalized, acked), acked);
+  assert.deepStrictEqual(journal.assertTransition(finalized, ackPrepared), ackPrepared);
+  assert.deepStrictEqual(journal.assertTransition(ackPrepared, acked), acked);
 
   const cleanup = journal.buildTerminalCleanup({
     schema: journal.SCHEMAS.CLEANUP,
@@ -627,24 +664,24 @@ test('EXISTING terminal publication finalizes, ACKs and binds the ordered cleanu
     publicationState: 'ACK_COMMITTED',
     publicationDigest: sha('c'),
     existingTerminalPublicationState: 'ACK_COMMITTED',
-    existingTerminalPublicationDigest: ackedPublication.publicationDigest,
+    existingTerminalPublicationDigest: storedAcked.publicationDigest,
     recoveryDirectoryFsyncComplete: true,
   });
   assert.strictEqual(cleanup.publicationSetDigest, journal.publicationSetDigest(
     operationId,
     'snapshot_restore',
     cleanup.publicationDigest,
-    ackedPublication.publicationDigest
+    storedAcked.publicationDigest
   ));
   invalid(() => journal.assertTerminalCleanup({
     ...cleanup,
     existingTerminalPublicationDigest: sha('f'),
   }));
   invalid(() => journal.assertExistingTerminalPublication({
-    ...ackedPublication,
+    ...storedAcked,
     items: [{
-      ...ackedPublication.items[0],
-      controlRecordIdentity: ackedPublication.items[0].applyRecordIdentity,
+      ...storedAcked.items[0],
+      controlRecordIdentity: storedAcked.items[0].applyRecordIdentity,
     }],
   }));
 });
@@ -1332,8 +1369,8 @@ test('maximum 901-record publication has a persisted canonical budget golden', (
     bytes: Buffer.byteLength(canonical, 'utf8'),
     sha256: crypto.createHash('sha256').update(canonical).digest('hex'),
   }, {
-    bytes: 625881,
-    sha256: '1c8e1fca994311afda39cd6f7d5925c2e0d8b234cf524154f369ed481406caf1',
+    bytes: 625914,
+    sha256: '1d60b1985a17f4444c311b1b29c54890ad31380fbcf467bea53a0c469704fe72',
   });
   assert(Buffer.byteLength(canonical, 'utf8') < journal.MAX_VALUE_BYTES);
 });

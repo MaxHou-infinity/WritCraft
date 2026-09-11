@@ -48,6 +48,7 @@ function initialValue() {
     activeMarkerDigest: null,
     nativePublication: null,
     existingTerminalPublication: null,
+    rollbackCreatePublication: null,
     terminalCleanup: null,
     terminalCleanupDigest: null,
     valueDigest: null,
@@ -111,9 +112,9 @@ test('small INIT, READ and APPEND commands have independent byte and SHA goldens
   assert.deepStrictEqual(
     [init.length, sha(init), read.length, sha(read), append.length, sha(append)],
     [
-      1020, 'sha256:e55d10a3ff013e23495323a6b3427c731a409eb5b8d747c31e3d4cfe2a197511',
-      344, 'sha256:fd9fa52c2a0c12de5bdab5e915b8a4df8c8fb25a7cf1231aef62124747850912',
-      2256, 'sha256:152b886fa88f06850231037c26a08580f6c10084e44c7dfc5cf6fce84ce0da22',
+      1053, 'sha256:9c129be765b5cb094ad439ccfd26bbe06cb402e0dfa85612d78e8d298ea88834',
+      344, 'sha256:aba3332ca717570c3d4ee9d5e54302bbd7350efd62f73141a644c4de99074c6f',
+      2289, 'sha256:a29c9ba9a090523d1ae9eea891281bd1e5775f7e1bdf5f5e00da89e31e3a4538',
     ]
   );
   const parsedInit = native.parseCommand(init);
@@ -189,8 +190,8 @@ test('DISCOVER freezes one empty request and BASE or two-step PAIR restart autho
     [command.length, sha(command), baseBytes.length, sha(baseBytes), pairBytes.length, sha(pairBytes)],
     [
       90, 'sha256:8f982bd5c5070ec6b699da4f8e4e822c6c94e4851fabef923a436cbd3c1104a3',
-      826, 'sha256:bf354ab38071e1f7066c859e4e4b7c267807c3e8f95940859c5a7460b15af38f',
-      1018, 'sha256:609efe9fa5963afc20c2f02b2e2d866594644eea264d3670c84f3ea05d00c11c',
+      859, 'sha256:60dee96b41f04984bae15af028dffa86b3705d6f46be2b2540b54701549441cf',
+      1051, 'sha256:9f55362319ac718fb17d9ed892628a81e65e8cc5302ac15288b96f83526b1345',
     ]
   );
   const base = native.parseDiscoverResult(baseBytes, discoverRequest);
@@ -587,7 +588,7 @@ test('stable error envelopes contain only command and a frozen path-free code', 
   }, errorRequest);
   assert.strictEqual(
     sha(bytes),
-    'sha256:08db091635eadf46c7e21cb132d03cac0aa8a26154cf6cb27fd333778ccfa516'
+    'sha256:bb4593b96c79bec0a8408fd6d47f71d0f2ffa91b75a2cd6f9bcf0bb0887c3638'
   );
   assert.deepStrictEqual(native.parseError(bytes, errorRequest, 'APPEND'), {
     schema: native.SCHEMAS.ERROR,

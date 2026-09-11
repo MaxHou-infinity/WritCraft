@@ -40,7 +40,6 @@ const SCHEMAS = Object.freeze({
   FINALIZE_REQUEST: 'writcraft.changes-history-native-existing-finalize-request/v1',
   FINAL_RECORD: 'writcraft.changes-history-native-existing-final-record/v1',
   FINAL_RESULT: 'writcraft.changes-history-native-existing-final-result/v1',
-  ACK_REQUEST: 'writcraft.changes-history-native-existing-ack-request/v1',
   ACK_RESULT: 'writcraft.changes-history-native-existing-ack-result/v1',
   RECORD_KEY: 'writcraft.changes-history-native-existing-record-key/v1',
   FINAL_KEY: 'writcraft.changes-history-native-existing-final-key/v1',
@@ -165,10 +164,6 @@ const KEYS = Object.freeze({
   FINAL_RESULT: Object.freeze([
     'schema', 'command', 'state', 'operationId', 'requestDigest',
     'finalRecord', 'finalRecordIdentity', 'errorCode',
-  ]),
-  ACK_REQUEST: Object.freeze([
-    'schema', 'command', 'operationId', 'requestDigest', 'finalBasename',
-    'finalRecordDigest', 'finalRecordIdentity', 'markerPhaseDigest',
   ]),
   ACK_RESULT: Object.freeze([
     'schema', 'command', 'state', 'operationId', 'requestDigest',
@@ -1194,7 +1189,8 @@ function assertTerminalReceipt(raw, rawAuthority, requestDigestOverride = null) 
 
 function buildRunResult(rawAuthority, command, state, rawTerminalReceipt = null, requestDigestOverride = null) {
   const authority = assertAuthority(rawAuthority);
-  if (![COMMANDS.EXECUTE, COMMANDS.RECONCILE].includes(command) || !STATES.includes(state)) {
+  if (![COMMANDS.EXECUTE, COMMANDS.RECONCILE, COMMANDS.VERIFY].includes(command) ||
+      !STATES.includes(state)) {
     fail('run result command/state invalid');
   }
   const terminalReceipt = state === 'UNKNOWN'
@@ -1228,14 +1224,21 @@ function assertRunResult(raw, rawAuthority, expectedCommand, requestDigestOverri
   return expected;
 }
 
-function buildVerifyRequest(rawAuthority, rawTerminalReceipt) {
+function buildVerifyRequest(rawAuthority, rawTerminalReceipt, requestDigestOverride = null) {
   const authority = assertAuthority(rawAuthority);
+  const boundRequestDigest = requestDigestOverride === null
+    ? requestDigest(authority)
+    : digest(requestDigestOverride, 'verify stored request digest');
   return immutable({
     schema: SCHEMAS.VERIFY_REQUEST,
     command: COMMANDS.VERIFY,
     operationId: authority.request.operationId,
-    requestDigest: requestDigest(authority),
-    terminalReceipt: assertTerminalReceipt(rawTerminalReceipt, authority),
+    requestDigest: boundRequestDigest,
+    terminalReceipt: assertTerminalReceipt(
+      rawTerminalReceipt,
+      authority,
+      requestDigestOverride
+    ),
   });
 }
 
@@ -1249,27 +1252,44 @@ function assertVerifyRequest(raw, rawAuthority) {
   return expected;
 }
 
-function buildVerifyResult(rawAuthority, state, rawTerminalReceipt = null) {
+function buildVerifyResult(
+  rawAuthority,
+  state,
+  rawTerminalReceipt = null,
+  requestDigestOverride = null
+) {
   const authority = assertAuthority(rawAuthority);
   if (!STATES.includes(state)) fail('verify state invalid');
   const terminal = state === 'UNKNOWN'
     ? (rawTerminalReceipt === null ? null : fail('UNKNOWN verify cannot carry terminal authority'))
-    : assertTerminalReceipt(rawTerminalReceipt, authority);
+    : assertTerminalReceipt(rawTerminalReceipt, authority, requestDigestOverride);
   if (terminal && terminal.state !== state) fail('verify state mismatch');
   return immutable({
     schema: SCHEMAS.VERIFY_RESULT,
     command: COMMANDS.VERIFY,
     state,
     operationId: authority.request.operationId,
-    requestDigest: requestDigest(authority),
+    requestDigest: requestDigestOverride === null
+      ? requestDigest(authority)
+      : digest(requestDigestOverride, 'verify stored request digest'),
     terminalReceiptDigest: terminal?.terminalReceiptDigest || null,
     errorCode: state === 'UNKNOWN' ? ERROR_CODES.UNKNOWN : null,
   });
 }
 
-function assertVerifyResult(raw, rawAuthority, rawTerminalReceipt = null) {
+function assertVerifyResult(
+  raw,
+  rawAuthority,
+  rawTerminalReceipt = null,
+  requestDigestOverride = null
+) {
   const value = valuesOf(raw, KEYS.VERIFY_RESULT, 'verify result');
-  const expected = buildVerifyResult(rawAuthority, value.state, rawTerminalReceipt);
+  const expected = buildVerifyResult(
+    rawAuthority,
+    value.state,
+    value.state === 'UNKNOWN' ? null : rawTerminalReceipt,
+    requestDigestOverride
+  );
   for (const key of KEYS.VERIFY_RESULT) {
     if (value[key] !== expected[key]) fail('verify result is foreign');
   }
@@ -1444,50 +1464,6 @@ function assertFinalResult(raw, rawAuthority, rawFinalizeRequest) {
   return expected;
 }
 
-function buildAckRequest(
-  rawAuthority,
-  rawFinalizeRequest,
-  rawFinalRecordIdentity,
-  markerPhaseDigest
-) {
-  const authority = assertAuthority(rawAuthority);
-  const finalRecord = buildFinalRecord(rawFinalizeRequest, authority);
-  return immutable({
-    schema: SCHEMAS.ACK_REQUEST,
-    command: COMMANDS.FINALIZE,
-    operationId: authority.request.operationId,
-    requestDigest: requestDigest(authority),
-    finalBasename: finalRecordName(rawFinalizeRequest, authority),
-    finalRecordDigest: finalRecord.finalRecordDigest,
-    finalRecordIdentity: assertPrivateRecordIdentity(
-      rawFinalRecordIdentity,
-      encodeFinalRecord(finalRecord, rawFinalizeRequest, authority),
-      'finalRecordIdentity'
-    ),
-    markerPhaseDigest: digest(markerPhaseDigest, 'markerPhaseDigest'),
-  });
-}
-
-function assertAckRequest(
-  raw,
-  rawAuthority,
-  rawFinalizeRequest,
-  expectedMarkerPhaseDigest
-) {
-  const value = valuesOf(raw, KEYS.ACK_REQUEST, 'ACK request');
-  const expected = buildAckRequest(
-    rawAuthority,
-    rawFinalizeRequest,
-    value.finalRecordIdentity,
-    expectedMarkerPhaseDigest
-  );
-  for (const key of KEYS.ACK_REQUEST) {
-    if (key === 'finalRecordIdentity') continue;
-    if (value[key] !== expected[key]) fail('ACK request is foreign');
-  }
-  return expected;
-}
-
 function buildAckResult(rawAuthority, rawFinalizeRequest, state) {
   const authority = assertAuthority(rawAuthority);
   if (!['ACKED', 'UNKNOWN'].includes(state)) fail('ACK state invalid');
@@ -1608,8 +1584,8 @@ function encodeRunResponse(rawResult, rawAuthority, expectedCommand) {
 
 function parseRunResponse(stdout, rawAuthority, expectedCommand, rawStoredRequestDigest = null) {
   const authority = assertAuthority(rawAuthority);
-  const storedRequestDigest = expectedCommand === COMMANDS.RECONCILE
-    ? digest(rawStoredRequestDigest, 'fresh R stored request digest')
+  const storedRequestDigest = [COMMANDS.RECONCILE, COMMANDS.VERIFY].includes(expectedCommand)
+    ? digest(rawStoredRequestDigest, 'fresh read-only stored request digest')
     : null;
   const expectedRequestDigest = storedRequestDigest || requestDigest(authority);
   const envelope = assertResponseEnvelope(stdout);
@@ -1701,10 +1677,10 @@ function encodeExistingCommand(rawAuthority, command, rawReconcileIdentities = n
   const request = authority.request;
   const binding = assertExistingJournalBinding(request.journalMarkerBinding);
   const head = binding.head;
-  if (![COMMANDS.EXECUTE, COMMANDS.RECONCILE].includes(command)) {
+  if (![COMMANDS.EXECUTE, COMMANDS.RECONCILE, COMMANDS.VERIFY].includes(command)) {
     fail('existing command is invalid');
   }
-  const reconcile = command === COMMANDS.RECONCILE;
+  const reconcile = [COMMANDS.RECONCILE, COMMANDS.VERIFY].includes(command);
   const wireRequestDigest = reconcile
     ? digest(rawStoredRequestDigest, 'fresh R stored request digest')
     : requestDigest(authority);
@@ -1785,13 +1761,67 @@ function encodeReconcileCommand(rawAuthority, rawReconcileIdentities, rawPublica
   );
 }
 
-function encodeVerifyCommand(rawAuthority, rawTerminalReceipt) {
-  const request = buildVerifyRequest(rawAuthority, rawTerminalReceipt);
-  return boundedWire([[
-    COMMANDS.VERIFY, request.operationId, request.requestDigest,
-    request.terminalReceipt.state, request.terminalReceipt.terminalReceiptDigest,
-    request.terminalReceipt.receiptSetDigest, String(request.terminalReceipt.items.length),
-  ].join('\t')], LIMITS.maxRequestBytes, 'verify request');
+function encodeVerifyCommand(rawAuthority, rawTerminalReceipt, requestDigestOverride = null) {
+  const request = buildVerifyRequest(
+    rawAuthority,
+    rawTerminalReceipt,
+    requestDigestOverride
+  );
+  const identities = request.terminalReceipt.items.map(item => {
+    const token = request.terminalReceipt.state === 'COMMITTED'
+      ? item.applyToken
+      : item.rollbackToken;
+    return Object.freeze({
+      controlRecordIdentity: token.controlRecordIdentity,
+      applyRecordIdentity: request.terminalReceipt.state === 'COMMITTED'
+        ? token.receiptRecordIdentity
+        : token.rollbackReceiptRecordIdentity,
+    });
+  });
+  return encodeExistingCommand(
+    rawAuthority,
+    COMMANDS.VERIFY,
+    identities,
+    request.terminalReceipt.markerDigest,
+    request.requestDigest
+  );
+}
+
+function parseVerifyResponse(
+  stdout,
+  rawAuthority,
+  rawTerminalReceipt,
+  requestDigestOverride = null
+) {
+  const authority = assertAuthority(rawAuthority);
+  const expected = assertTerminalReceipt(
+    rawTerminalReceipt,
+    authority,
+    requestDigestOverride
+  );
+  const expectedRequestDigest = requestDigestOverride === null
+    ? requestDigest(authority)
+    : digest(requestDigestOverride, 'verify stored request digest');
+  const run = parseRunResponse(
+    stdout,
+    authority,
+    COMMANDS.VERIFY,
+    expectedRequestDigest
+  );
+  if (run.state === 'UNKNOWN') {
+    return buildVerifyResult(authority, 'UNKNOWN', null, requestDigestOverride);
+  }
+  if (run.state !== expected.state || run.terminalReceipt === null ||
+      run.terminalReceipt.terminalReceiptDigest !== expected.terminalReceiptDigest ||
+      run.terminalReceipt.receiptSetDigest !== expected.receiptSetDigest) {
+    fail('verify response does not reproduce the stored terminal');
+  }
+  return buildVerifyResult(
+    authority,
+    expected.state,
+    expected,
+    requestDigestOverride
+  );
 }
 
 function encodeFinalizeCommand(rawAuthority, rawTerminalReceipt) {
@@ -1801,24 +1831,6 @@ function encodeFinalizeCommand(rawAuthority, rawTerminalReceipt) {
     request.terminalReceipt.state, request.terminalReceipt.terminalReceiptDigest,
     request.terminalReceipt.receiptSetDigest, String(request.terminalReceipt.items.length),
   ].join('\t')], LIMITS.maxRequestBytes, 'finalize request');
-}
-
-function encodeAckCommand(rawAckRequest, rawAuthority, rawFinalizeRequest, markerPhaseDigest) {
-  const request = assertAckRequest(
-    rawAckRequest,
-    rawAuthority,
-    rawFinalizeRequest,
-    markerPhaseDigest
-  );
-  return boundedWire([[
-    COMMANDS.FINALIZE, 'ACK', request.operationId, request.requestDigest,
-    request.finalBasename, request.finalRecordDigest, request.markerPhaseDigest,
-    request.finalRecordIdentity.dev, request.finalRecordIdentity.ino,
-    String(request.finalRecordIdentity.uid), String(request.finalRecordIdentity.mode),
-    String(request.finalRecordIdentity.nlink), request.finalRecordIdentity.size,
-    request.finalRecordIdentity.mtimeNs, request.finalRecordIdentity.ctimeNs,
-    request.finalRecordIdentity.contentSha256,
-  ].join('\t')], LIMITS.maxRequestBytes, 'ACK request');
 }
 
 // One descriptor-exact production bundle keeps the canonical record inputs and
@@ -1971,18 +1983,34 @@ function buildFinalResultFromPublication(
   });
 }
 
+// The EXISTING ACK wire is publication-only. An item-less ACK would let Main
+// publish ACK_COMMITTED and clear to IDLE without proving the exact
+// control/apply/final removals, so no such encoder exists here.
 function encodeAckPublicationCommand(rawPublication, markerPhaseDigest) {
   const publication = markerJournalSchema.assertExistingTerminalPublication(rawPublication);
+  if (publication.state !== 'ACK_PREPARED') {
+    fail('publication ACK requires durable ACK_PREPARED authority');
+  }
   const finalization = publication.finalization;
   const identity = finalization.finalRecordIdentity;
-  return boundedWire([[
+  const lines = [[
     COMMANDS.FINALIZE, 'ACK', publication.operationId, publication.requestDigest,
     finalization.finalBasename, finalization.finalRecordDigest,
     digest(markerPhaseDigest, 'markerPhaseDigest'),
     identity.dev, identity.ino, String(identity.uid), String(identity.mode),
     String(identity.nlink), identity.size, identity.mtimeNs, identity.ctimeNs,
-    identity.contentSha256,
-  ].join('\t')], LIMITS.maxRequestBytes, 'publication ACK request');
+    identity.contentSha256, String(publication.items.length),
+  ].join('\t')];
+  for (const item of publication.items) {
+    lines.push([
+      'I', item.selectedId,
+      item.controlBasename, item.controlDigest,
+      ...identityWireFields(item.controlRecordIdentity, 'ACK control identity'),
+      item.applyBasename, item.applyReceiptDigest,
+      ...identityWireFields(item.applyRecordIdentity, 'ACK apply identity'),
+    ].join('\t'));
+  }
+  return boundedWire(lines, LIMITS.maxRequestBytes, 'publication ACK request');
 }
 
 function parseAckPublicationResponse(stdout, rawPublication) {
@@ -2006,23 +2034,6 @@ function parseAckPublicationResponse(stdout, rawPublication) {
     finalRecordDigest: publication.finalization.finalRecordDigest,
     errorCode: null,
   });
-}
-
-// Parse the native EXISTING ACK (A) response.
-function parseAckResponse(stdout, rawAuthority, rawFinalizeRequest) {
-  const authority = assertAuthority(rawAuthority);
-  const request = assertFinalizeRequest(rawFinalizeRequest, authority);
-  const envelope = assertResponseEnvelope(stdout);
-  const lines = envelope.slice(0, -1).split('\n');
-  if (lines.shift() !== 'P\tOK' || lines.length === 0) fail('ACK response bind missing');
-  const header = lines.shift().split('\t');
-  if (header.length !== 6 || header[0] !== COMMANDS.FINALIZE || header[1] !== 'RESULT' ||
-      header[2] !== 'ACKED' || header[3] !== authority.request.operationId ||
-      header[4] !== requestDigest(authority) ||
-      header[5] !== buildFinalRecord(request, authority).finalRecordDigest) {
-    fail('ACK response header invalid');
-  }
-  return buildAckResult(authority, request, 'ACKED');
 }
 
 module.exports = Object.freeze({
@@ -2074,22 +2085,19 @@ module.exports = Object.freeze({
   finalRecordName,
   buildFinalResult,
   assertFinalResult,
-  buildAckRequest,
-  assertAckRequest,
   buildAckResult,
   assertAckResult,
   encodeExecuteCommand,
   encodeReconcileCommand,
   encodeVerifyCommand,
+  parseVerifyResponse,
   encodeFinalizeCommand,
-  encodeAckCommand,
   buildCanonicalBundle,
   assertResponseEnvelope,
   encodeRunResponse,
   parseRunResponse,
   parseFinalizeResponse,
   parseFinalizePublicationResponse,
-  parseAckResponse,
   buildFinalRecordFromPublication,
   finalRecordNameFromPublication,
   encodeFinalizePublicationCommand,

@@ -733,7 +733,7 @@ test('V fresh terminal verification is exact and UNKNOWN stays locked', () => {
   ));
 });
 
-test('F final record and ACK bind full terminal authority, marker phase and identity', () => {
+test('F final record and ACK result bind full terminal authority and identity', () => {
   const value = authority();
   const finalize = schema.buildFinalizeRequest(value.bound, value.committed);
   const record = schema.buildFinalRecord(finalize, value.bound);
@@ -749,15 +749,27 @@ test('F final record and ACK bind full terminal authority, marker phase and iden
     recordIdentity
   );
   schema.assertFinalResult(result, value.bound, finalize);
-  const ack = schema.buildAckRequest(value.bound, finalize, recordIdentity, digest('8'));
-  schema.assertAckRequest(ack, value.bound, finalize, digest('8'));
   schema.assertAckResult(schema.buildAckResult(value.bound, finalize, 'ACKED'), value.bound, finalize);
-  invalid(() => schema.assertAckRequest({ ...ack, markerPhaseDigest: digest('7') },
-    value.bound, finalize, digest('8')));
   invalid(() => schema.assertAckResult({
     ...schema.buildAckResult(value.bound, finalize, 'ACKED'),
     errorCode: schema.ERROR_CODES.UNKNOWN,
   }, value.bound, finalize));
+  // P1-5: an EXISTING ACK may only follow a durable ACK_PREPARED publication,
+  // because that publication is the only proof of the exact control/apply/final
+  // removals. The item-less FINALIZED-only ACK surface is retired rather than
+  // merely unused, so no encoder, request validator or parser may exist for it,
+  // and anything that is not a publication fails closed.
+  for (const retired of [
+    'buildAckRequest', 'assertAckRequest', 'encodeAckCommand', 'parseAckResponse',
+  ]) {
+    assert.strictEqual(schema[retired], undefined, `${retired} must stay retired`);
+  }
+  for (const notAPublication of [null, Object.freeze({}), finalize]) {
+    assert.throws(
+      () => schema.encodeAckPublicationCommand(notAPublication, digest('8')),
+      error => error?.code === 'INVALID_CHANGES_HISTORY_MARKER_JOURNAL'
+    );
+  }
 });
 
 test('final record names and canonical authority are deterministic', () => {

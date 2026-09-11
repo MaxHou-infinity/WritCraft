@@ -225,6 +225,7 @@ function mixedFixture(helperPath) {
     activeMarkerDigest: journal.activeMarkerDigest(marker),
     nativePublication: null,
     existingTerminalPublication: null,
+    rollbackCreatePublication: null,
     terminalCleanup: null,
     terminalCleanupDigest: null,
     valueDigest: null,
@@ -347,8 +348,11 @@ function mixedFixture(helperPath) {
     expectedRootIdentityDigest: rootIdentityDigest(rootPath),
     expectedRecoveryIdentityDigest: rootIdentityDigest(recoveryPath),
   };
+  // The held binding now carries the STRUCTURED journal binding rather than the
+  // raw whole-file byte image, so the rollback request digest no longer moves
+  // when the journal frame advances (required for the staged rollback CAS).
   const held = schema.buildRollbackCreateHeldBinding(
-    journalFrame.length, objectIdentity(markerPath, sha(journalFileBytes)),
+    journalMarkerBinding,
     rootIdentityDigest(privatePath), true, sha(historyBytes),
     objectIdentity(historyPath, sha(historyBytes)), existingAuthority
   );

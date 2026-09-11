@@ -861,6 +861,38 @@ function createSnapshotRestoreService(options = {}) {
             throw existingError;
           }
         }
+        if (marker.publicMarkdownPhase?.phase === 'ROLLED_BACK') {
+          // Formal zero-net-write rollback. The durable ROLLED_BACK phase is the
+          // proof that every EXISTING leaf and the raw History are exactly
+          // operation-before, and that the MISSING leaves were quarantined and
+          // deleted by the rollback domain's own ACK terminal. That is a proven
+          // zero-write result, so it must terminalize as such and must NEVER
+          // enter the History mainline, which is what previously degraded it to
+          // UNKNOWN/manual.
+          const rolledBack = transaction.reconciliation.finish(
+            preparedTransaction.rootPath,
+            marker.operationId
+          );
+          if (rolledBack.state !== 'terminal' ||
+              rolledBack.outcome !== 'zero_write_error' ||
+              rolledBack.publicMarkdownPhase?.phase !== 'ROLLED_BACK') {
+            fail('SNAPSHOT_RESTORE_TRANSACTION_INVALID',
+              'Mixed restore rollback terminal authority is invalid');
+          }
+          transaction.reconciliation.clear(
+            preparedTransaction.rootPath,
+            preparedTransaction.projectId,
+            marker.operationId
+          );
+          return Object.freeze({
+            ok: true,
+            operationId: rolledBack.operationId,
+            outcome: 'zero_write_error',
+            status: 'zero_write_error',
+            affectedPaths: Object.freeze(rolledBack.files.map(file => file.path)),
+            recoveryRequired: false,
+          });
+        }
         marker = transaction.commitMissingRestoreHistory(preparedTransaction, marker);
         marker = transaction.finalizeMissingRestore(preparedTransaction, marker);
         const terminal = transaction.reconciliation.finish(

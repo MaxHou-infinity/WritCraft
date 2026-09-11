@@ -73,7 +73,8 @@ const base = {
   previousValueDigest: null, state: 'IDLE', projectId: activeMarker.projectId,
   activeOperationId: null,
   activeKind: null, activeMarker: null, activeMarkerDigest: null, nativePublication: null,
-  existingTerminalPublication: null, terminalCleanup: null, terminalCleanupDigest: null, valueDigest: null,
+  existingTerminalPublication: null, rollbackCreatePublication: null,
+  terminalCleanup: null, terminalCleanupDigest: null, valueDigest: null,
 };
 base.valueDigest = journal.valueDigest(base);
 const baseValue = journal.assertJournalValue(base);

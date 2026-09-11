@@ -304,7 +304,7 @@ const KEYS = Object.freeze({
     'existingTerminalReceipt', 'heldBinding', 'request',
   ]),
   ROLLBACK_CREATE_HELD_BINDING: Object.freeze([
-    'schema', 'markerByteLength', 'markerIdentity',
+    'schema', 'journalMarkerBinding',
     'historyParentIdentityDigest', 'baseHistoryExists',
     'baseHistoryContentDigest', 'baseHistoryIdentity',
   ]),
@@ -318,10 +318,10 @@ const KEYS = Object.freeze({
     'createdReceiptPhaseDigest', 'selectionDigest', 'preparedHistoryDigest',
     'originalPrecreateUpdatedAt', 'originalCreatedReceiptUpdatedAt',
     'existingTerminalReceiptDigest', 'existingReceiptSetDigest',
-    'existingRequestDigest', 'markerByteLength', 'markerIdentityDigest',
+    'existingRequestDigest', 'existingJournalMarkerBinding',
     'historyParentIdentityDigest', 'baseHistoryDigest', 'baseHistoryByteLength',
     'baseHistoryExists', 'baseHistoryContentDigest', 'baseHistoryIdentityDigest',
-    'journalMarkerDigest', 'items',
+    'items',
   ]),
   ROLLBACK_CREATE_ITEM: Object.freeze([
     'selectedId', 'path', 'artifactOffset', 'byteLength', 'contentDigest',
@@ -3706,8 +3706,7 @@ function rollbackCreateExistingTerminal(raw, authority) {
 }
 
 function buildRollbackCreateHeldBinding(
-  markerByteLength,
-  rawMarkerIdentity,
+  rawJournalMarkerBinding,
   historyParentIdentityDigest,
   baseHistoryExists,
   baseHistoryContentDigest,
@@ -3715,26 +3714,13 @@ function buildRollbackCreateHeldBinding(
   rawExistingAuthority
 ) {
   const existingAuthority = rollbackCreateExistingAuthority(rawExistingAuthority);
-  const markerIdentity = assertRecordIdentityStructure(
-    rawMarkerIdentity,
-    'rollback-create held marker identity'
+  // WRCCHRJ2 single-authority journal: the held marker IS the journal file. The
+  // held binding carries the journal's structured frame descriptor instead of
+  // the raw whole-file byte image, so the request digest no longer moves with
+  // the live journal byte image.
+  const journalMarkerBinding = existingRestoreSchema.assertExistingJournalBinding(
+    rawJournalMarkerBinding
   );
-  const markerLength = safeInteger(
-    markerByteLength,
-    'rollback-create markerByteLength',
-    1,
-    LIMITS.maxMarkerBytes
-  );
-  // WRCCHRJ2 single-authority journal: the held marker IS the journal file.
-  // Its whole-content sha must equal the journal file identity the EXISTING
-  // sub-request binds, not the active-marker domain digest.
-  const journalContentSha256 =
-    existingAuthority.request.journalMarkerBinding.journalFileIdentity.contentSha256;
-  if (markerIdentity.mode !== 0o600 || markerIdentity.nlink !== 1 ||
-      markerIdentity.size !== String(markerLength) ||
-      markerIdentity.contentSha256 !== journalContentSha256) {
-    fail('rollback-create held marker identity is foreign');
-  }
   const parentDigest = digest(
     historyParentIdentityDigest,
     'rollback-create historyParentIdentityDigest'
@@ -3765,8 +3751,7 @@ function buildRollbackCreateHeldBinding(
   }
   return immutable({
     schema: SCHEMAS.ROLLBACK_CREATE_HELD_BINDING,
-    markerByteLength: markerLength,
-    markerIdentity,
+    journalMarkerBinding,
     historyParentIdentityDigest: parentDigest,
     baseHistoryExists,
     baseHistoryContentDigest: historyContent,
@@ -3784,8 +3769,7 @@ function assertRollbackCreateHeldBinding(raw, rawExistingAuthority) {
     fail('rollback-create held binding schema is invalid');
   }
   const expected = buildRollbackCreateHeldBinding(
-    value.markerByteLength,
-    value.markerIdentity,
+    value.journalMarkerBinding,
     value.historyParentIdentityDigest,
     value.baseHistoryExists,
     value.baseHistoryContentDigest,
@@ -3900,7 +3884,11 @@ function rollbackCreateRequestContext(
       existingRequest.artifactByteLength !== createRequest.artifactByteLength ||
       existingAuthority.parentSelection.selected.length !== parentSelection.selected.length ||
       phaseSchema.digestSelection(existingAuthority.parentSelection) !==
-        phaseSchema.digestSelection(parentSelection)) {
+        phaseSchema.digestSelection(parentSelection) ||
+      heldBinding.journalMarkerBinding.rootIdentityDigest !==
+        rootBind.expectedRootIdentityDigest ||
+      heldBinding.journalMarkerBinding.recoveryDirectoryIdentityDigest !==
+        rootBind.expectedRecoveryIdentityDigest) {
     fail('rollback-create create/existing/phase authorities do not share one transaction');
   }
   return immutable({
@@ -3939,19 +3927,15 @@ function buildRollbackCreateRequest(
     rawHeldBinding
   );
   const existingRequest = context.existingAuthority.request;
-  // WRCCHRJ2 single-authority journal. Two distinct marker digests:
-  // - markerDigest stays the EXISTING sub-request's active-marker domain digest
-  //   (the native rebuilds the EXISTING records/terminal with it);
-  // - journalMarkerDigest is the whole-content sha of the held journal file,
-  //   which the native rollback_held_authority recomputes over HELD_MARKER_FD
-  //   (the changes-history-transaction.json descriptor).
-  const journalMarkerDigest =
-    existingRequest.journalMarkerBinding.journalFileIdentity.contentSha256;
+  // WRCCHRJ2 single-authority journal. The request binds the journal frame
+  // through the EXISTING sub-request's structured journal binding, not through
+  // the held journal's raw byte image (size / whole-content sha / object
+  // identity), so a later journal frame does not move the request digest that
+  // names the Q control/receipt records.
   return immutable({
     schema: SCHEMAS.ROLLBACK_CREATE_REQUEST,
     operationId: context.createdReceiptPhase.operationId,
     markerDigest: existingRequest.markerDigest,
-    journalMarkerDigest,
     artifactDigest: context.createRequest.artifactDigest,
     artifactIdentityDigest: context.createRequest.artifactIdentityDigest,
     artifactByteLength: context.createRequest.artifactByteLength,
@@ -3970,10 +3954,7 @@ function buildRollbackCreateRequest(
       context.existingTerminalReceipt.terminalReceiptDigest,
     existingReceiptSetDigest: context.existingTerminalReceipt.receiptSetDigest,
     existingRequestDigest: existingRestoreSchema.requestDigest(context.existingAuthority),
-    markerByteLength: context.heldBinding.markerByteLength,
-    markerIdentityDigest: evidenceSchema.digestObjectIdentity(
-      context.heldBinding.markerIdentity
-    ),
+    existingJournalMarkerBinding: context.existingAuthority.request.journalMarkerBinding,
     historyParentIdentityDigest: context.heldBinding.historyParentIdentityDigest,
     baseHistoryDigest: existingRequest.baseHistoryDigest,
     baseHistoryByteLength: existingRequest.baseHistoryByteLength,
@@ -4036,6 +4017,13 @@ function assertRollbackCreateRequest(
   const normalized = { ...value, items };
   for (const key of KEYS.ROLLBACK_CREATE_REQUEST) {
     if (key === 'items') continue;
+    if (key === 'existingJournalMarkerBinding') {
+      if (evidenceSchema.canonicalJson(normalized[key]) !==
+          evidenceSchema.canonicalJson(expected[key])) {
+        fail('rollback-create original journal authority is foreign');
+      }
+      continue;
+    }
     if (normalized[key] !== expected[key]) fail('rollback-create request authority is foreign');
   }
   items.forEach((rawItem, index) => {
@@ -4632,9 +4620,11 @@ function nullableIdentityWireFields(identity) {
 function rollbackCreateAuthorityHeaderFields(rawAuthority) {
   const authority = assertRollbackCreateAuthority(rawAuthority);
   const request = authority.request;
+  const binding = authority.heldBinding.journalMarkerBinding;
+  const head = binding.head;
   return [
     request.operationId, rollbackCreateRequestDigest(authority),
-    request.markerDigest, String(request.markerByteLength), request.markerIdentityDigest,
+    request.markerDigest,
     request.artifactDigest, request.artifactIdentityDigest,
     String(request.artifactByteLength), request.rootIdentityDigest,
     request.recoveryIdentityDigest, request.createPrecreatePhaseDigest,
@@ -4642,13 +4632,25 @@ function rollbackCreateAuthorityHeaderFields(rawAuthority) {
     request.preparedHistoryDigest, hexUtf8(request.originalPrecreateUpdatedAt),
     hexUtf8(request.originalCreatedReceiptUpdatedAt),
     request.existingRequestDigest,
+    // The original journal authority is carried as canonical JSON hex so the
+    // native can rebuild the exact request-digest preimage without owning the
+    // descriptor rules; the structured fields below are what it revalidates
+    // against the held journal descriptor.
+    hexUtf8(evidenceSchema.canonicalJson(request.existingJournalMarkerBinding)),
     request.existingTerminalReceiptDigest, request.existingReceiptSetDigest,
     request.baseHistoryDigest, String(request.baseHistoryByteLength),
     request.baseHistoryExists ? '1' : '0', request.baseHistoryContentDigest || '-',
     request.baseHistoryIdentityDigest || '-', request.historyParentIdentityDigest,
+    binding.bindingDigest, binding.journalBasename, binding.journalMagic,
+    binding.activeSlot, head.journalId, head.generation,
+    binding.previousValueDigest || '-', head.valueDigest,
+    String(binding.frameByteLength), binding.frameSha256,
+    String(binding.payloadOffset), String(binding.payloadByteLength), binding.payloadSha256,
+    String(binding.activeMarkerOffset), String(binding.activeMarkerByteLength),
+    binding.activeMarkerDigest, binding.activeMarkerCanonicalSha256,
+    binding.rootIdentityDigest, binding.recoveryDirectoryIdentityDigest,
     String(authority.existingAuthority.request.items.length),
     String(request.items.length),
-    request.journalMarkerDigest,
   ];
 }
 

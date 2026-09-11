@@ -696,6 +696,8 @@ function validateMarker(raw, projectService, historyService, options = {}) {
   const safeCleanupPhase = phaseBacked && raw.state === 'terminal' && (
     (raw.kind === 'snapshot_restore' && raw.outcome === 'applied' &&
       publicMarkdownPhase.phase === 'FINALIZED') ||
+    (raw.kind === 'snapshot_restore' && raw.outcome === 'zero_write_error' &&
+      publicMarkdownPhase.phase === 'ROLLED_BACK') ||
     (raw.kind === 'snapshot_restore_undo' && raw.outcome === 'zero_write_error' &&
       publicMarkdownPhase.phase === 'RESTORED' && undoSettlementBacked) ||
     (raw.kind === 'snapshot_restore_undo' && raw.outcome === 'undone' &&
@@ -937,6 +939,7 @@ function createChangesHistoryReconciliationService(options = {}) {
       activeMarkerDigest: null,
       nativePublication: null,
       existingTerminalPublication: null,
+      rollbackCreatePublication: null,
       terminalCleanup: null,
       terminalCleanupDigest: null,
       valueDigest: null,
@@ -1971,6 +1974,18 @@ function createChangesHistoryReconciliationService(options = {}) {
     if (!['CREATED_RECEIPT', 'EXISTING_COMMITTED', 'HISTORY_COMMITTED']
       .includes(marker.publicMarkdownPhase?.phase)) {
       fail('CHANGES_RECOVERY_CONFLICT', 'Snapshot History journal phase is invalid');
+    }
+
+    if (marker.publicMarkdownPhase.phase === 'EXISTING_COMMITTED') {
+      reconcileExistingRestore(rootPath, projectId, operationId);
+      const refreshed = journalCurrent(scoped);
+      if (refreshed.status !== 'VALUE' || refreshed.value?.state !== 'ACTIVE' ||
+          refreshed.value.activeOperationId !== operationId) {
+        fail('CHANGES_MANUAL_RECOVERY_REQUIRED',
+          'Snapshot History lost EXISTING verification authority');
+      }
+      value = refreshed.value;
+      marker = validateMarker(value.activeMarker, projectService, historyService);
     }
 
     const verified = verifyPublicMarkdownPhaseArtifact(rootPath, marker);
@@ -4393,6 +4408,44 @@ function createChangesHistoryReconciliationService(options = {}) {
     return ack;
   }
 
+  // A durable ROLLED_BACK phase is the formal proof that the ROLLBACK_CREATE
+  // domain (quarantine -> fresh reconcile -> exact delete -> ACK) reached its own
+  // ACK terminal before the CAS: every EXISTING leaf and the raw History are
+  // exactly operation-before, and the MISSING leaves were quarantined and
+  // deleted. That is a proven zero-net-write outcome, so it terminalizes as
+  // zero_write_error and must never be degraded to UNKNOWN/manual, nor fall
+  // through to the CREATE reconciler that owns the pre-rollback phases.
+  function terminalizeRolledBackMarker(rootPath, marker) {
+    const scopedJournal = markerJournalFor(rootPath, true);
+    const current = journalCurrent(scopedJournal);
+    if (current.status !== 'VALUE' || current.value?.state !== 'ACTIVE' ||
+        current.value.activeOperationId !== marker.operationId ||
+        current.value.activeKind !== 'snapshot_restore' ||
+        canonical(current.value.activeMarker) !== canonical(marker)) {
+      fail('CHANGES_MANUAL_RECOVERY_REQUIRED',
+        'ROLLED_BACK journal authority is unavailable');
+    }
+    if (marker.state === 'terminal') {
+      if (marker.outcome !== 'zero_write_error') {
+        fail('CHANGES_MANUAL_RECOVERY_REQUIRED', 'ROLLED_BACK terminal outcome is invalid');
+      }
+      return marker;
+    }
+    const value = current.value;
+    const nextMarker = journalMarker(marker, {
+      state: 'terminal',
+      outcome: 'zero_write_error',
+      recoveryWritePending: false,
+      updatedAt: now(),
+    });
+    const nextValue = journalNextValue(value, {
+      activeMarker: nextMarker,
+      activeMarkerDigest: markerJournalSchema.activeMarkerDigest(nextMarker),
+    });
+    appendJournal(scopedJournal, value, nextValue);
+    return nextMarker;
+  }
+
   function terminalizeFinalizedMarker(rootPath, marker) {
     marker = acknowledgePublicMarkdownMarkerDurability(rootPath, marker, 'FINALIZED');
     verifyFinalizedReceipt(rootPath, marker);
@@ -4926,14 +4979,15 @@ function createChangesHistoryReconciliationService(options = {}) {
       : rawScoped;
     const execute = method(scoped, 'execute');
     const reconcile = method(scoped, 'reconcile');
+    const verify = method(scoped, 'verify');
     const finalizePublication = method(scoped, 'finalizePublication');
     const ackPublication = method(scoped, 'ackPublication');
-    if (execute === null || reconcile === null || finalizePublication === null ||
+    if (execute === null || reconcile === null || verify === null || finalizePublication === null ||
         ackPublication === null) {
       fail('SNAPSHOT_RESTORE_EXISTING_LIFECYCLE_UNAVAILABLE',
         'formal existing Markdown lifecycle is unavailable');
     }
-    return Object.freeze({ execute, reconcile, finalizePublication, ackPublication });
+    return Object.freeze({ execute, reconcile, verify, finalizePublication, ackPublication });
   }
 
   function identityFromStat(stat, contentSha256) {
@@ -5098,6 +5152,19 @@ function createChangesHistoryReconciliationService(options = {}) {
     projectIdentity(projectService, rootPath, projectId);
     const scopedJournal = markerJournalFor(rootPath, true);
     const current = journalCurrent(scopedJournal);
+    // A staged rollback owns this operation once its publication (or its
+    // CREATE_ROLLBACK_QUARANTINED/ROLLED_BACK marker phase) exists. Native E
+    // must never be replayed from that point; dispatch to the durable router.
+    if (current.status === 'VALUE' && current.value?.state === 'ACTIVE' &&
+        current.value.projectId === projectId &&
+        current.value.activeKind === 'snapshot_restore' &&
+        current.value.activeOperationId === operationId &&
+        (current.value.rollbackCreatePublication !== null ||
+         ['CREATE_ROLLBACK_QUARANTINED', 'ROLLED_BACK'].includes(
+           current.value.activeMarker?.publicMarkdownPhase?.phase
+         ))) {
+      return rollbackUncommittedExistingRestore(rootPath, projectId, operationId);
+    }
     if (current.status !== 'VALUE' || current.value?.state !== 'ACTIVE' ||
         current.value.projectId !== projectId ||
         current.value.activeOperationId !== operationId ||
@@ -5265,6 +5332,21 @@ function createChangesHistoryReconciliationService(options = {}) {
                   'EXISTING fresh R is not durably committed');
               }
             } else if (result.state === 'UNCOMMITTED' && result.terminalReceipt !== null) {
+              const verifiedTerminal = existingRestoreSchema.assertVerifyResult(
+                lifecycle.verify(
+                  authority,
+                  result.terminalReceipt,
+                  descriptors
+                ),
+                authority,
+                result.terminalReceipt
+              );
+              if (verifiedTerminal.state !== 'UNCOMMITTED' ||
+                  verifiedTerminal.terminalReceiptDigest !==
+                    result.terminalReceipt.terminalReceiptDigest) {
+                fail('CHANGES_MANUAL_RECOVERY_REQUIRED',
+                  'EXISTING UNCOMMITTED terminal failed fresh V');
+              }
               // Formal self-rollback: native E proved every EXISTING leaf and
               // raw History are exactly operation-before. Main now runs the
               // frozen ROLLBACK_CREATE domain (Q -> fresh R -> D -> A) to
@@ -5313,6 +5395,22 @@ function createChangesHistoryReconciliationService(options = {}) {
                     'EXISTING fresh R stored identity mismatch');
                 }
               }
+              const verifiedTerminal = existingRestoreSchema.assertVerifyResult(
+                lifecycle.verify(
+                  authority,
+                  terminal,
+                  descriptors,
+                  stored.requestDigest
+                ),
+                authority,
+                terminal,
+                stored.requestDigest
+              );
+              if (verifiedTerminal.state !== 'COMMITTED' ||
+                  verifiedTerminal.terminalReceiptDigest !== terminal.terminalReceiptDigest) {
+                fail('CHANGES_MANUAL_RECOVERY_REQUIRED',
+                  'EXISTING stored terminal failed fresh V');
+              }
               return marker;
             }
             const terminalItems = terminal.items.map((terminalItem, index) => {
@@ -5338,9 +5436,11 @@ function createChangesHistoryReconciliationService(options = {}) {
                 controlBasename: terminalItem.applyToken.controlBasename,
                 controlDigest: terminalItem.applyToken.controlDigest,
                 controlRecordIdentity: terminalItem.applyToken.controlRecordIdentity,
+                controlCleanupState: 'PUBLISHED',
                 applyBasename: terminalItem.applyToken.receiptBasename,
                 applyReceiptDigest: terminalItem.applyToken.applyReceiptDigest,
                 applyRecordIdentity: terminalItem.applyToken.receiptRecordIdentity,
+                applyCleanupState: 'PUBLISHED',
               });
             });
             const nextPhase = publicMarkdownPhaseSchema.assertTransition(
@@ -5412,7 +5512,7 @@ function createChangesHistoryReconciliationService(options = {}) {
               fail('CHANGES_MANUAL_RECOVERY_REQUIRED',
                 'EXISTING terminal CAS is uncommitted after execute');
             }
-            return nextMarker;
+            return reconcileExistingRestore(rootPath, projectId, operationId);
           }
         ));
     } catch (error) {
@@ -5461,8 +5561,204 @@ function createChangesHistoryReconciliationService(options = {}) {
    * loss), D deletes only the exact quarantined identities, and A
    * acknowledges the rollback final record. The marker advances to
    * ROLLED_BACK with zero public mutation. */
+  // The ROLLBACK_CREATE publication is the durable authority for the
+  // zero-net-write branch. Q quarantines the created leaves, D deletes the
+  // quarantine and seals a final record, A removes the recovered records. Each
+  // stage publishes its exact result before the next destructive step, so a
+  // crash or a lost response at any boundary is recoverable from the journal
+  // instead of becoming unrecoverable residue.
+  function rollbackPublication(state, authority, quarantine, settle = null) {
+    const publication = {
+      schema: markerJournalSchema.SCHEMAS.ROLLBACK_CREATE_PUBLICATION,
+      state,
+      operationId: authority.request.operationId,
+      requestDigest: publicMarkdownNativeSchema.rollbackCreateRequestDigest(authority),
+      authorityBase64: Buffer.from(canonical(authority), 'utf8').toString('base64'),
+      quarantineResultBase64: Buffer.from(canonical(quarantine), 'utf8').toString('base64'),
+      settleResultBase64: settle === null
+        ? null
+        : Buffer.from(canonical(settle), 'utf8').toString('base64'),
+      publicationDigest: null,
+    };
+    publication.publicationDigest = markerJournalSchema.rollbackCreatePublicationDigest(
+      publication
+    );
+    return markerJournalSchema.assertRollbackCreatePublication(publication);
+  }
+
+  // The attempt latch is published before Q. Q is destructive: it moves the
+  // receipt-owned MISSING leaves into private quarantine. Without this latch a
+  // crash after Q but before the QUARANTINED CAS would leave those leaves moved
+  // with no journal record of why, which is exactly the unrecoverable window
+  // this publication exists to close. It binds the exact predecessor value and
+  // generation it was born from, so a restart can prove which journal state the
+  // latched attempt belongs to.
+  function rollbackAttemptPublication(value, authority) {
+    const publication = {
+      schema: markerJournalSchema.SCHEMAS.ROLLBACK_CREATE_ATTEMPT_PUBLICATION,
+      state: 'PREPARED',
+      operationId: authority.request.operationId,
+      requestDigest: publicMarkdownNativeSchema.rollbackCreateRequestDigest(authority),
+      authorityBase64: Buffer.from(canonical(authority), 'utf8').toString('base64'),
+      predecessorValueDigest: value.valueDigest,
+      installedGeneration: markerJournalSchema.nextGeneration(value.generation),
+      publicationDigest: null,
+    };
+    publication.publicationDigest =
+      markerJournalSchema.rollbackCreateAttemptPublicationDigest(publication);
+    return markerJournalSchema.assertRollbackCreateAttemptPublication(publication);
+  }
+
+  // Decoding re-proves the stored authority: the rebuilt authority must still
+  // reproduce the stored request digest. That digest derives the rollback record
+  // basenames, so it must not drift while the journal advances.
+  function decodeRollbackAuthority(stored) {
+    let authority;
+    try {
+      authority = publicMarkdownNativeSchema.assertRollbackCreateAuthority(JSON.parse(
+        Buffer.from(stored.authorityBase64, 'base64').toString('utf8')
+      ));
+    } catch (error) {
+      const wrapped = new ChangesHistoryRecoveryError(
+        'CHANGES_MANUAL_RECOVERY_REQUIRED',
+        'stored rollback-create authority is invalid'
+      );
+      wrapped.cause = error;
+      throw wrapped;
+    }
+    if (publicMarkdownNativeSchema.rollbackCreateRequestDigest(authority) !==
+        stored.requestDigest) {
+      fail('CHANGES_MANUAL_RECOVERY_REQUIRED',
+        'stored rollback-create authority does not reproduce its request digest');
+    }
+    return authority;
+  }
+
+  function decodeRollbackPublication(publication) {
+    const stored = markerJournalSchema.assertRollbackCreatePublication(publication);
+    let authority;
+    let quarantine;
+    let settle = null;
+    try {
+      authority = decodeRollbackAuthority(stored);
+      quarantine = publicMarkdownNativeSchema.assertRollbackCreateResult(
+        JSON.parse(Buffer.from(stored.quarantineResultBase64, 'base64').toString('utf8')),
+        authority,
+        publicMarkdownNativeSchema.ROLLBACK_CREATE_COMMANDS.RECONCILE
+      );
+      if (stored.settleResultBase64 !== null) {
+        const request = publicMarkdownNativeSchema.buildRollbackCreateSettleRequest(
+          authority,
+          quarantine.tokens
+        );
+        settle = publicMarkdownNativeSchema.assertRollbackCreateSettleResult(
+          JSON.parse(Buffer.from(stored.settleResultBase64, 'base64').toString('utf8')),
+          authority,
+          request
+        );
+      }
+    } catch (error) {
+      if (error instanceof ChangesHistoryRecoveryError) throw error;
+      const wrapped = new ChangesHistoryRecoveryError(
+        'CHANGES_MANUAL_RECOVERY_REQUIRED',
+        'stored rollback-create truth is invalid'
+      );
+      wrapped.cause = error;
+      throw wrapped;
+    }
+    if (quarantine.state !== 'COMMITTED') {
+      fail('CHANGES_MANUAL_RECOVERY_REQUIRED', 'stored rollback-create truth is foreign');
+    }
+    return Object.freeze({ stored, authority, quarantine, settle });
+  }
+
   function formalRollbackCreate(rootPath, projectId, operationId, ctx) {
     return formalRollbackCreateInner(rootPath, projectId, operationId, ctx);
+  }
+
+  function decodeRollbackAttempt(publication) {
+    const stored = markerJournalSchema.assertRollbackCreateAttemptPublication(publication);
+    return Object.freeze({
+      stored,
+      authority: decodeRollbackAuthority(stored),
+      quarantine: null,
+      settle: null,
+    });
+  }
+
+  // Staged rollback CAS: after the attempt latch (and every later append) the
+  // live journal frame moves, but the logical rollback authority must not. The
+  // stored publication is the authority of record; this re-reads the current
+  // journal frame, rebuilds ONLY the held journal binding from it, rebuilds the
+  // authority around the stored request, and re-proves that the request digest
+  // (which names the Q/D records) is unchanged. Anything else is manual.
+  function withFreshRollbackCreateAuthority(rootPath, value, marker, callback) {
+    const stored = value.rollbackCreatePublication?.schema ===
+      markerJournalSchema.SCHEMAS.ROLLBACK_CREATE_ATTEMPT_PUBLICATION
+      ? decodeRollbackAttempt(value.rollbackCreatePublication)
+      : decodeRollbackPublication(value.rollbackCreatePublication);
+    const historyAuthority = captureHistoryAuthority(rootPath, marker.baseHistoryState);
+    try {
+      assertHistoryAuthority(historyAuthority);
+      return withExistingJournalBinding(rootPath, value, ({ binding, journalFd }) =>
+        withPublicMarkdownArtifactFd(
+          markerLocation(rootPath, false, fileSystem).directory,
+          marker,
+          artifactFd => {
+            const historyBytes = historyAuthority.fd === null
+              ? null
+              : fileSystem.readFileSync(historyAuthority.fd);
+            const held = publicMarkdownNativeSchema.buildRollbackCreateHeldBinding(
+              binding,
+              existingRestoreSchema.digestHistoryParentIdentity({
+                dev: historyAuthority.directoryStat.dev.toString(),
+                ino: historyAuthority.directoryStat.ino.toString(),
+                uid: Number(historyAuthority.directoryStat.uid),
+                mode: Number(historyAuthority.directoryStat.mode & 0o7777n),
+              }),
+              marker.baseHistoryState.exists,
+              historyBytes === null ? null : sha256(historyBytes),
+              historyBytes === null
+                ? null
+                : identityFromStat(historyAuthority.stat, sha256(historyBytes)),
+              stored.authority.existingAuthority
+            );
+            const authority = publicMarkdownNativeSchema.buildRollbackCreateAuthority(
+              stored.authority.rootBind,
+              stored.authority.parentSelection,
+              stored.authority.precreatePhase,
+              stored.authority.createdReceiptPhase,
+              stored.authority.createRequest,
+              stored.authority.createPublications,
+              stored.authority.existingAuthority,
+              stored.authority.existingTerminalReceipt,
+              held,
+              stored.authority.request
+            );
+            if (publicMarkdownNativeSchema.rollbackCreateRequestDigest(authority) !==
+                stored.stored.requestDigest) {
+              fail('CHANGES_MANUAL_RECOVERY_REQUIRED',
+                'fresh rollback-create logical authority changed');
+            }
+            return callback(Object.freeze({
+              ...stored,
+              originalAuthority: stored.authority,
+              authority,
+              descriptors: Object.freeze({
+                artifactFd,
+                markerFd: journalFd,
+                historyParentFd: historyAuthority.directoryFd,
+                historyFd: historyAuthority.fd === null
+                  ? historyAuthority.directoryFd
+                  : historyAuthority.fd,
+              }),
+            }));
+          }
+        )
+      );
+    } finally {
+      closeHistoryAuthority(historyAuthority);
+    }
   }
 
   function formalRollbackCreateInner(rootPath, projectId, operationId, ctx) {
@@ -5471,12 +5767,13 @@ function createChangesHistoryReconciliationService(options = {}) {
       verified,
       baseHistory,
       authority,
-      descriptors,
       binding,
       value,
       terminalReceipt,
     } = ctx;
-    if (terminalReceipt.state !== 'UNCOMMITTED') {
+    projectIdentity(projectService, rootPath, projectId);
+    if (terminalReceipt.state !== 'UNCOMMITTED' ||
+        terminalReceipt.terminalReceiptDigest === null) {
       fail('CHANGES_MANUAL_RECOVERY_REQUIRED',
         'formal rollback requires the EXISTING UNCOMMITTED terminal');
     }
@@ -5486,6 +5783,23 @@ function createChangesHistoryReconciliationService(options = {}) {
         publication.state !== 'COMMITTED') {
       fail('CHANGES_MANUAL_RECOVERY_REQUIRED',
         'formal rollback requires the committed CREATE publication');
+    }
+    // Main has no EXISTING_ATTEMPT_PUBLICATION schema: rollback is reached only
+    // from native E UNCOMMITTED with no installed EXISTING terminal. The latch
+    // embeds the EXISTING receipt set (the durable E-terminal proof) and the
+    // CREATE_MISSING publication remains the created-leaf authority until the
+    // QUARANTINED CAS takes it over.
+    if (value.existingTerminalPublication !== null) {
+      fail('CHANGES_MANUAL_RECOVERY_REQUIRED',
+        'formal rollback requires the uninstalled EXISTING terminal');
+    }
+    if (value.rollbackCreatePublication !== null) {
+      fail('CHANGES_MANUAL_RECOVERY_REQUIRED',
+        'formal rollback requires a fresh rollback-create slot');
+    }
+    if (marker.projectId !== projectId || marker.operationId !== operationId ||
+        marker.publicMarkdownPhase?.phase !== 'CREATED_RECEIPT') {
+      fail('CHANGES_RECOVERY_CONFLICT', 'formal rollback requires CREATED_RECEIPT');
     }
     const capture = publicMarkdownNativeSchema.assertStoredCreateCapture(
       publication.createCapture,
@@ -5526,8 +5840,7 @@ function createChangesHistoryReconciliationService(options = {}) {
       updatedAt: marker.createdAt,
     }, marker.parentSelectionBinding);
     const held = publicMarkdownNativeSchema.buildRollbackCreateHeldBinding(
-      Number(binding.journalFileIdentity.size),
-      evidenceDeliverySchema.assertObjectIdentity(binding.journalFileIdentity),
+      binding,
       authority.request.historyParentIdentityDigest,
       baseHistory.expected.exists,
       baseHistory.expected.exists
@@ -5561,82 +5874,365 @@ function createChangesHistoryReconciliationService(options = {}) {
       held,
       request
     );
-    const lifecycle = rollbackLifecycleFor(rootPath);
-    let quarantined = lifecycle.quarantine(rollbackAuthority, descriptors);
-    if (quarantined.state !== 'COMMITTED') {
-      const reconciled = lifecycle.reconcile(rollbackAuthority, descriptors);
-      if (reconciled.state !== 'COMMITTED') {
-        fail('CHANGES_MANUAL_RECOVERY_REQUIRED',
-          'ROLLBACK_CREATE Q/R did not reach COMMITTED');
-      }
-      quarantined = reconciled;
-    }
-    const tokens = quarantined.tokens;
-    if (!Array.isArray(tokens) || tokens.length !== createPublications.length ||
-        tokens.some(token => token.quarantineIdentityDigest === null)) {
-      fail('CHANGES_MANUAL_RECOVERY_REQUIRED',
-        'ROLLBACK_CREATE quarantine tokens are incomplete');
-    }
-    const settle = publicMarkdownNativeSchema.buildRollbackCreateSettleRequest(
-      rollbackAuthority,
-      tokens
+    return installRollbackCreateAttempt(
+      rootPath,
+      projectId,
+      operationId,
+      rollbackAuthority
     );
-    const deleted = lifecycle.deleteCreate(settle, rollbackAuthority, descriptors);
-    if (deleted.state !== 'FINALIZED' || deleted.finalRecordIdentity === null) {
+  }
+
+  // The attempt latch is the first durable write and the only thing that makes
+  // the following destructive Q single-shot. The CAS binds the exact
+  // predecessor value and generation, and preserves the CREATE_MISSING
+  // publication until the QUARANTINED CAS takes over its authority.
+  function installRollbackCreateAttempt(rootPath, projectId, operationId, authority) {
+    const scoped = markerJournalFor(rootPath, true);
+    const current = journalCurrent(scoped);
+    if (current.status !== 'VALUE' || current.value?.state !== 'ACTIVE' ||
+        current.value.projectId !== projectId ||
+        current.value.activeOperationId !== operationId ||
+        current.value.activeKind !== 'snapshot_restore' ||
+        current.value.nativePublication?.command !== 'CREATE_MISSING' ||
+        current.value.nativePublication?.state !== 'COMMITTED' ||
+        current.value.existingTerminalPublication !== null ||
+        current.value.rollbackCreatePublication !== null ||
+        current.value.activeMarker?.publicMarkdownPhase?.phase !== 'CREATED_RECEIPT') {
       fail('CHANGES_MANUAL_RECOVERY_REQUIRED',
-        'ROLLBACK_CREATE delete did not seal the final record');
+        'rollback-create attempt predecessor is unavailable');
     }
-    const rolledBackPhase = publicMarkdownPhaseSchema.assertPhaseRecord({
-      ...marker.publicMarkdownPhase,
-      phase: 'ROLLED_BACK',
-      items: marker.publicMarkdownPhase.items.map((item, index) => Object.freeze({
-        ...item,
-        quarantineReceiptDigest: tokens[index].receiptDigest,
-      })),
-      finalReceiptDigest: null,
-      existingReceiptSetDigest: terminalReceipt.receiptSetDigest,
-      rollbackReceiptDigest: deleted.finalRecord.finalRecordDigest,
-      updatedAt: now(),
-    }, marker.parentSelectionBinding);
-    const ackRequest = publicMarkdownNativeSchema.buildRollbackCreateAckRequest(
-      rollbackAuthority,
-      settle,
-      deleted.finalRecordIdentity,
-      rolledBackPhase
+    const publication = rollbackAttemptPublication(current.value, authority);
+    const nextValue = journalNextValue(current.value, {
+      rollbackCreatePublication: publication,
+    });
+    if (appendSnapshotPreparedJournal(scoped, current.value, nextValue) !== 'COMMITTED') {
+      fail('CHANGES_MANUAL_RECOVERY_REQUIRED', 'rollback-create attempt latch is uncommitted');
+    }
+    return executeLatchedRollbackCreate(rootPath, projectId, operationId, nextValue);
+  }
+
+  function executeLatchedRollbackCreate(rootPath, projectId, operationId, expectedValue) {
+    const current = journalCurrent(markerJournalFor(rootPath, true));
+    if (current.status !== 'VALUE' || canonical(current.value) !== canonical(expectedValue) ||
+        current.value.rollbackCreatePublication?.schema !==
+          markerJournalSchema.SCHEMAS.ROLLBACK_CREATE_ATTEMPT_PUBLICATION) {
+      fail('CHANGES_MANUAL_RECOVERY_REQUIRED',
+        'rollback-create attempt latch requires reconciliation');
+    }
+    return reconcileRollbackCreateAttempt(
+      rootPath,
+      projectId,
+      operationId,
+      current.value,
+      true
     );
-    const acked = lifecycle.ackCreate(ackRequest, settle, rolledBackPhase,
-      rollbackAuthority, descriptors);
-    if (acked.state !== 'ACKED') {
+  }
+
+  // Q is destructive and replay-unsafe. At most one Q is issued per latch; the
+  // durable PREPARED latch, not the native response, decides whether Q already
+  // ran. Committed truth is always taken from a fresh R afterwards, and an
+  // UNKNOWN R leaves the latch in place for manual recovery instead of
+  // re-running Q.
+  function reconcileRollbackCreateAttempt(
+    rootPath,
+    projectId,
+    operationId,
+    value,
+    allowQuarantine
+  ) {
+    if (value?.state !== 'ACTIVE' || value.projectId !== projectId ||
+        value.activeOperationId !== operationId ||
+        value.activeKind !== 'snapshot_restore' ||
+        value.rollbackCreatePublication?.schema !==
+          markerJournalSchema.SCHEMAS.ROLLBACK_CREATE_ATTEMPT_PUBLICATION) {
       fail('CHANGES_MANUAL_RECOVERY_REQUIRED',
-        'ROLLBACK_CREATE ack did not reach ACKED');
+        'rollback-create attempt authority is unavailable');
     }
-    const nextMarker = journalMarker(marker, {
-      publicMarkdownPhase: rolledBackPhase,
-      updatedAt: rolledBackPhase.updatedAt,
-    });
-    const nextValue = journalNextValue(value, {
-      activeMarker: nextMarker,
-      activeMarkerDigest: markerJournalSchema.activeMarkerDigest(nextMarker),
-    });
-    const appendState = appendSnapshotPreparedJournal(
-      markerJournalFor(rootPath, true),
-      value,
-      nextValue,
-      () => {
-        projectIdentity(projectService, rootPath, projectId);
-        assertHistoryAuthority(baseHistory);
-        const latest = journalCurrent(markerJournalFor(rootPath, true));
-        if (latest.status !== 'VALUE' || canonical(latest.value) !== canonical(value)) {
-          fail('CHANGES_RECOVERY_STALE',
-            'rollback journal changed before ROLLED_BACK CAS');
+    const marker = validateMarker(value.activeMarker, projectService, historyService);
+    if (marker.projectId !== projectId || marker.operationId !== operationId ||
+        marker.publicMarkdownPhase?.phase !== 'CREATED_RECEIPT') {
+      fail('CHANGES_MANUAL_RECOVERY_REQUIRED', 'rollback-create attempt marker is foreign');
+    }
+    return withFreshRollbackCreateAuthority(rootPath, value, marker, fresh => {
+      const lifecycle = rollbackLifecycleFor(rootPath);
+      if (allowQuarantine) {
+        try {
+          lifecycle.quarantine(fresh.authority, fresh.descriptors);
+        } catch (_) {
+          // The durable PREPARED latch makes Q single-shot; only fresh R owns truth.
         }
       }
-    );
-    if (appendState !== 'COMMITTED') {
+      const quarantine = publicMarkdownNativeSchema.assertRollbackCreateResult(
+        lifecycle.reconcile(fresh.authority, fresh.descriptors),
+        fresh.authority,
+        publicMarkdownNativeSchema.ROLLBACK_CREATE_COMMANDS.RECONCILE
+      );
+      if (quarantine.state !== 'COMMITTED') {
+        fail('CHANGES_MANUAL_RECOVERY_REQUIRED',
+          'rollback-create attempt truth is unknown; Q will not be replayed');
+      }
+      return commitRollbackCreateQuarantine(
+        rootPath,
+        projectId,
+        operationId,
+        fresh.originalAuthority,
+        quarantine
+      );
+    });
+  }
+
+  // The QUARANTINED CAS is the single point where the CREATE_MISSING
+  // publication hands its created-leaf authority to the rollback publication.
+  // Before this append the rollback owns nothing durable; after it the exact Q
+  // result is sealed before D may delete anything.
+  function commitRollbackCreateQuarantine(
+    rootPath,
+    projectId,
+    operationId,
+    authority,
+    quarantine
+  ) {
+    const scoped = markerJournalFor(rootPath, true);
+    const current = journalCurrent(scoped);
+    if (current.status !== 'VALUE' || current.value?.state !== 'ACTIVE' ||
+        current.value.projectId !== projectId ||
+        current.value.activeOperationId !== operationId ||
+        current.value.rollbackCreatePublication?.schema !==
+          markerJournalSchema.SCHEMAS.ROLLBACK_CREATE_ATTEMPT_PUBLICATION) {
       fail('CHANGES_MANUAL_RECOVERY_REQUIRED',
-        'ROLLED_BACK journal CAS is uncommitted');
+        'rollback-create journal predecessor is unavailable');
     }
-    return nextMarker;
+    const marker = validateMarker(current.value.activeMarker, projectService, historyService);
+    const attempt = markerJournalSchema.assertRollbackCreateAttemptPublication(
+      current.value.rollbackCreatePublication
+    );
+    if (marker.projectId !== projectId ||
+        marker.publicMarkdownPhase?.phase !== 'CREATED_RECEIPT' ||
+        attempt.requestDigest !== publicMarkdownNativeSchema.rollbackCreateRequestDigest(
+          authority
+        )) {
+      fail('CHANGES_MANUAL_RECOVERY_REQUIRED',
+        'rollback-create marker predecessor is foreign');
+    }
+    const tokens = quarantine.tokens;
+    if (!Array.isArray(tokens) ||
+        tokens.length !== marker.publicMarkdownPhase.items.length ||
+        tokens.some(token => token.quarantineIdentityDigest === null)) {
+      fail('CHANGES_MANUAL_RECOVERY_REQUIRED',
+        'rollback-create quarantine tokens are incomplete');
+    }
+    const nextPhase = publicMarkdownPhaseSchema.assertTransition(
+      marker.publicMarkdownPhase,
+      {
+        ...marker.publicMarkdownPhase,
+        phase: 'CREATE_ROLLBACK_QUARANTINED',
+        items: marker.publicMarkdownPhase.items.map((item, index) => ({
+          ...item,
+          quarantineReceiptDigest: tokens[index].receiptDigest,
+        })),
+        existingReceiptSetDigest: authority.existingTerminalReceipt.receiptSetDigest,
+        updatedAt: now(),
+      },
+      marker.parentSelectionBinding
+    );
+    const nextMarker = journalMarker(marker, {
+      publicMarkdownPhase: nextPhase,
+      updatedAt: nextPhase.updatedAt,
+    });
+    const publication = rollbackPublication('QUARANTINED', authority, quarantine);
+    const nextValue = journalNextValue(current.value, {
+      activeMarker: nextMarker,
+      activeMarkerDigest: markerJournalSchema.activeMarkerDigest(nextMarker),
+      nativePublication: null,
+      rollbackCreatePublication: publication,
+    });
+    if (appendSnapshotPreparedJournal(scoped, current.value, nextValue) !== 'COMMITTED') {
+      fail('CHANGES_MANUAL_RECOVERY_REQUIRED',
+        'rollback-create quarantine CAS is unknown');
+    }
+    return settleRollbackCreate(rootPath, projectId, operationId);
+  }
+
+  // D deletes exactly the quarantined identities. The exact D result is sealed
+  // in the ROLLED_BACK CAS before A is allowed to consume the final record.
+  function settleRollbackCreate(rootPath, projectId, operationId) {
+    const scoped = markerJournalFor(rootPath, true);
+    const current = journalCurrent(scoped);
+    if (current.status !== 'VALUE' || current.value?.state !== 'ACTIVE' ||
+        current.value.projectId !== projectId ||
+        current.value.activeOperationId !== operationId ||
+        current.value.rollbackCreatePublication?.state !== 'QUARANTINED') {
+      fail('CHANGES_MANUAL_RECOVERY_REQUIRED',
+        'rollback-create settlement predecessor is unavailable');
+    }
+    const marker = validateMarker(current.value.activeMarker, projectService, historyService);
+    if (marker.projectId !== projectId ||
+        marker.publicMarkdownPhase?.phase !== 'CREATE_ROLLBACK_QUARANTINED') {
+      fail('CHANGES_MANUAL_RECOVERY_REQUIRED',
+        'rollback-create settlement marker is foreign');
+    }
+    return withFreshRollbackCreateAuthority(rootPath, current.value, marker, fresh => {
+      const request = publicMarkdownNativeSchema.buildRollbackCreateSettleRequest(
+        fresh.authority,
+        fresh.quarantine.tokens
+      );
+      const result = publicMarkdownNativeSchema.assertRollbackCreateSettleResult(
+        rollbackLifecycleFor(rootPath).deleteCreate(
+          request,
+          fresh.authority,
+          fresh.descriptors
+        ),
+        fresh.authority,
+        request
+      );
+      if (result.state !== 'FINALIZED' || result.finalRecord === null ||
+          result.finalRecordIdentity === null) {
+        fail('CHANGES_MANUAL_RECOVERY_REQUIRED',
+          'rollback-create delete truth is unknown');
+      }
+      const nextPhase = publicMarkdownPhaseSchema.assertTransition(
+        marker.publicMarkdownPhase,
+        {
+          ...marker.publicMarkdownPhase,
+          phase: 'ROLLED_BACK',
+          rollbackReceiptDigest: result.finalRecord.finalRecordDigest,
+          updatedAt: now(),
+        },
+        marker.parentSelectionBinding
+      );
+      const nextMarker = journalMarker(marker, {
+        publicMarkdownPhase: nextPhase,
+        updatedAt: nextPhase.updatedAt,
+      });
+      const publication = rollbackPublication(
+        'ROLLED_BACK',
+        fresh.originalAuthority,
+        fresh.quarantine,
+        result
+      );
+      const nextValue = journalNextValue(current.value, {
+        activeMarker: nextMarker,
+        activeMarkerDigest: markerJournalSchema.activeMarkerDigest(nextMarker),
+        nativePublication: null,
+        rollbackCreatePublication: publication,
+      });
+      if (appendSnapshotPreparedJournal(scoped, current.value, nextValue) !== 'COMMITTED') {
+        fail('CHANGES_MANUAL_RECOVERY_REQUIRED',
+          'rollback-create ROLLED_BACK CAS is unknown');
+      }
+      return acknowledgeRollbackCreate(rootPath, projectId, operationId);
+    });
+  }
+
+  // A consumes the sealed final record. The terminal CAS leaves the value at
+  // marker terminal + rollbackCreatePublication ACK_COMMITTED; journal clear is
+  // the next phase and is not performed here.
+  function acknowledgeRollbackCreate(rootPath, projectId, operationId) {
+    const scoped = markerJournalFor(rootPath, true);
+    const current = journalCurrent(scoped);
+    if (current.status !== 'VALUE' || current.value?.state !== 'ACTIVE' ||
+        current.value.projectId !== projectId ||
+        current.value.activeOperationId !== operationId ||
+        current.value.rollbackCreatePublication?.state !== 'ROLLED_BACK') {
+      fail('CHANGES_MANUAL_RECOVERY_REQUIRED',
+        'rollback-create ACK predecessor is unavailable');
+    }
+    const marker = validateMarker(current.value.activeMarker, projectService, historyService);
+    if (marker.projectId !== projectId ||
+        marker.publicMarkdownPhase?.phase !== 'ROLLED_BACK') {
+      fail('CHANGES_MANUAL_RECOVERY_REQUIRED', 'rollback-create ACK marker is foreign');
+    }
+    return withFreshRollbackCreateAuthority(rootPath, current.value, marker, fresh => {
+      if (fresh.settle?.state !== 'FINALIZED' ||
+          fresh.settle.finalRecordIdentity === null) {
+        fail('CHANGES_MANUAL_RECOVERY_REQUIRED',
+          'rollback-create ACK lacks exact finalization truth');
+      }
+      const request = publicMarkdownNativeSchema.buildRollbackCreateSettleRequest(
+        fresh.authority,
+        fresh.quarantine.tokens
+      );
+      const ack = publicMarkdownNativeSchema.buildRollbackCreateAckRequest(
+        fresh.authority,
+        request,
+        fresh.settle.finalRecordIdentity,
+        marker.publicMarkdownPhase
+      );
+      const result = publicMarkdownNativeSchema.assertRollbackCreateAckResult(
+        rollbackLifecycleFor(rootPath).ackCreate(
+          ack,
+          request,
+          marker.publicMarkdownPhase,
+          fresh.authority,
+          fresh.descriptors
+        ),
+        fresh.authority,
+        request
+      );
+      if (result.state !== 'ACKED') {
+        fail('CHANGES_MANUAL_RECOVERY_REQUIRED', 'rollback-create ACK truth is unknown');
+      }
+      const publication = rollbackPublication(
+        'ACK_COMMITTED',
+        fresh.originalAuthority,
+        fresh.quarantine,
+        fresh.settle
+      );
+      const terminal = journalMarker(marker, {
+        state: 'terminal',
+        outcome: 'zero_write_error',
+        recoveryWritePending: false,
+        updatedAt: now(),
+      });
+      const nextValue = journalNextValue(current.value, {
+        activeMarker: terminal,
+        activeMarkerDigest: markerJournalSchema.activeMarkerDigest(terminal),
+        rollbackCreatePublication: publication,
+      });
+      if (appendSnapshotPreparedJournal(scoped, current.value, nextValue) !== 'COMMITTED') {
+        fail('CHANGES_MANUAL_RECOVERY_REQUIRED', 'rollback-create ACK CAS is unknown');
+      }
+      return terminal;
+    });
+  }
+
+  // Restart router. It dispatches on the stored publication state and never
+  // replays E or Q: an ATTEMPT latch re-drives only fresh R, QUARANTINED
+  // re-drives D, ROLLED_BACK re-drives A, and ACK_COMMITTED returns the stored
+  // terminal. A rollback marker phase without its publication fails closed.
+  function rollbackUncommittedExistingRestore(rootPath, projectId, operationId) {
+    projectIdentity(projectService, rootPath, projectId);
+    const scoped = markerJournalFor(rootPath, true);
+    const current = journalCurrent(scoped);
+    if (current.status !== 'VALUE' || current.value?.state !== 'ACTIVE' ||
+        current.value.projectId !== projectId ||
+        current.value.activeKind !== 'snapshot_restore' ||
+        current.value.activeOperationId !== operationId) {
+      fail('CHANGES_MANUAL_RECOVERY_REQUIRED',
+        'rollback-create restart authority is unavailable');
+    }
+    const publication = current.value.rollbackCreatePublication;
+    if (publication?.schema ===
+        markerJournalSchema.SCHEMAS.ROLLBACK_CREATE_ATTEMPT_PUBLICATION) {
+      return reconcileRollbackCreateAttempt(
+        rootPath,
+        projectId,
+        operationId,
+        current.value,
+        false
+      );
+    }
+    if (publication?.state === 'QUARANTINED') {
+      return settleRollbackCreate(rootPath, projectId, operationId);
+    }
+    if (publication?.state === 'ROLLED_BACK') {
+      return acknowledgeRollbackCreate(rootPath, projectId, operationId);
+    }
+    if (publication?.state === 'ACK_COMMITTED') {
+      return validateMarker(current.value.activeMarker, projectService, historyService);
+    }
+    fail('CHANGES_MANUAL_RECOVERY_REQUIRED',
+      'rollback-create restart requires exact durable publication truth');
   }
 
   function executeExistingRestore(rootPath, projectId, operationId) {
@@ -5743,6 +6339,7 @@ function createChangesHistoryReconciliationService(options = {}) {
                 publicMarkdownPhaseSchema.SCHEMA,
                 marker.publicMarkdownPhase
               ),
+              cleanupState: 'PUBLISHED',
               finalizationDigest: null,
             };
             const finalizedPhase = markerJournalSchema.assertExistingFinalization({
@@ -5785,9 +6382,124 @@ function createChangesHistoryReconciliationService(options = {}) {
     }
   }
 
-  // Mixed transaction exit: acknowledges the FINALIZED EXISTING terminal with
-  // the native ACK (A) and transitions its publication FINALIZED ->
-  // ACK_COMMITTED so the journal may return to IDLE.
+  function existingCleanupPublication(publication, state, cleanupState) {
+    const finalization = {
+      ...publication.finalization,
+      cleanupState,
+      finalizationDigest: null,
+    };
+    finalization.finalizationDigest = markerJournalSchema.existingFinalizationDigest(
+      finalization
+    );
+    const next = {
+      ...publication,
+      state,
+      items: publication.items.map(item => ({
+        ...item,
+        controlCleanupState: cleanupState,
+        applyCleanupState: cleanupState,
+      })),
+      finalization,
+      publicationDigest: null,
+    };
+    next.publicationDigest = markerJournalSchema.existingTerminalPublicationDigest(next);
+    return markerJournalSchema.assertExistingTerminalPublicationTransition(
+      publication,
+      markerJournalSchema.assertExistingTerminalPublication(next)
+    );
+  }
+
+  function captureExistingPrivateIdentity(directory, basename, label) {
+    let fd;
+    try {
+      fd = fileSystem.openSync(
+        path.join(directory, basename),
+        fs.constants.O_RDONLY | (fs.constants.O_NOFOLLOW || 0)
+      );
+      const before = fileSystem.fstatSync(fd, { bigint: true });
+      if ((before.mode & 0o170000n) !== 0o100000n || before.nlink !== 1n ||
+          Number(before.uid) !== process.geteuid() || Number(before.mode & 0o777n) !== 0o600) {
+        fail('CHANGES_MANUAL_RECOVERY_REQUIRED', `${label} identity is unsafe`);
+      }
+      const bytes = fileSystem.readFileSync(fd);
+      const after = fileSystem.fstatSync(fd, { bigint: true });
+      if (!sameMarkerIdentity(before, after) || BigInt(bytes.length) !== before.size) {
+        fail('CHANGES_MANUAL_RECOVERY_REQUIRED', `${label} changed during capture`);
+      }
+      return Object.freeze({
+        schema: evidenceDeliverySchema.SCHEMAS.OBJECT_IDENTITY,
+        dev: before.dev.toString(),
+        ino: before.ino.toString(),
+        uid: Number(before.uid),
+        mode: Number(before.mode & 0o7777n),
+        nlink: Number(before.nlink),
+        size: before.size.toString(),
+        mtimeNs: before.mtimeNs.toString(),
+        ctimeNs: before.ctimeNs.toString(),
+        contentSha256: evidenceDeliverySchema.sha256(bytes),
+      });
+    } catch (error) {
+      if (error instanceof ChangesHistoryRecoveryError) throw error;
+      const wrapped = new ChangesHistoryRecoveryError(
+        'CHANGES_MANUAL_RECOVERY_REQUIRED',
+        `${label} identity cannot be captured`
+      );
+      wrapped.cause = error;
+      throw wrapped;
+    } finally {
+      if (fd !== undefined) try { fileSystem.closeSync(fd); } catch (_) {}
+    }
+  }
+
+  function assertExistingCleanupPublished(rootPath, publication) {
+    const directory = markerLocation(rootPath, false, fileSystem).directory;
+    for (const item of publication.items) {
+      if (canonical(captureExistingPrivateIdentity(
+        directory,
+        item.controlBasename,
+        'EXISTING control record'
+      )) !== canonical(item.controlRecordIdentity) ||
+          canonical(captureExistingPrivateIdentity(
+            directory,
+            item.applyBasename,
+            'EXISTING apply record'
+          )) !== canonical(item.applyRecordIdentity)) {
+        fail('CHANGES_MANUAL_RECOVERY_REQUIRED',
+          'EXISTING cleanup publication identity drifted');
+      }
+    }
+    if (canonical(captureExistingPrivateIdentity(
+      directory,
+      publication.finalization.finalBasename,
+      'EXISTING final record'
+    )) !== canonical(publication.finalization.finalRecordIdentity)) {
+      fail('CHANGES_MANUAL_RECOVERY_REQUIRED',
+        'EXISTING final cleanup publication identity drifted');
+    }
+  }
+
+  function assertExistingCleanupAbsent(rootPath, publication) {
+    const directory = markerLocation(rootPath, false, fileSystem).directory;
+    const basenames = publication.items.flatMap(item => [
+      item.controlBasename,
+      item.applyBasename,
+    ]).concat([publication.finalization.finalBasename]);
+    for (const basename of basenames) {
+      try {
+        fileSystem.lstatSync(path.join(directory, basename));
+      } catch (error) {
+        if (error?.code === 'ENOENT') continue;
+        throw error;
+      }
+      fail('CHANGES_MANUAL_RECOVERY_REQUIRED',
+        'EXISTING ACK returned before every exact private record was absent');
+    }
+  }
+
+  // Mixed transaction exit first installs durable ACK_PREPARED cleanup intent,
+  // then native A removes only the exact publication-time control/apply/final
+  // identities. ACK_COMMITTED is journaled only after the complete set is
+  // observed absent, so response loss resumes from stored cleanup authority.
   function acknowledgeExistingRestore(rootPath, projectId, operationId) {
     projectIdentity(projectService, rootPath, projectId);
     const scopedJournal = markerJournalFor(rootPath, true);
@@ -5800,20 +6512,21 @@ function createChangesHistoryReconciliationService(options = {}) {
       fail('CHANGES_MANUAL_RECOVERY_REQUIRED',
         'EXISTING ack journal authority is unavailable');
     }
-    const value = current.value;
+    let value = current.value;
     const marker = validateMarker(value.activeMarker, projectService, historyService);
     if (marker.operationId !== operationId || marker.projectId !== projectId ||
         marker.kind !== 'snapshot_restore' ||
         marker.publicMarkdownPhase?.phase !== 'FINALIZED') {
       fail('CHANGES_RECOVERY_CONFLICT', 'EXISTING ack requires a FINALIZED terminal');
     }
-    const publication = markerJournalSchema.assertExistingTerminalPublication(
+    let publication = markerJournalSchema.assertExistingTerminalPublication(
       value.existingTerminalPublication
     );
     if (publication.state === 'ACK_COMMITTED') {
       return publication;
     }
-    if (publication.state !== 'FINALIZED' || publication.finalization === null) {
+    if (!['FINALIZED', 'ACK_PREPARED'].includes(publication.state) ||
+        publication.finalization === null) {
       fail('CHANGES_MANUAL_RECOVERY_REQUIRED',
         'EXISTING terminal ack state is invalid');
     }
@@ -5826,6 +6539,28 @@ function createChangesHistoryReconciliationService(options = {}) {
     const lifecycle = existingLifecycleFor(rootPath);
     try {
       assertHistoryAuthority(baseHistory);
+      if (publication.state === 'FINALIZED') {
+        assertExistingCleanupPublished(rootPath, publication);
+        const preparedPublication = existingCleanupPublication(
+          publication,
+          'ACK_PREPARED',
+          'CLEANUP_ARMED'
+        );
+        const preparedValue = journalNextValue(value, {
+          existingTerminalPublication: preparedPublication,
+        });
+        if (appendSnapshotPreparedJournal(
+          scopedJournal,
+          value,
+          preparedValue,
+          () => assertExistingCleanupPublished(rootPath, publication)
+        ) !== 'COMMITTED') {
+          fail('CHANGES_MANUAL_RECOVERY_REQUIRED',
+            'EXISTING terminal cleanup preparation is unknown');
+        }
+        value = preparedValue;
+        publication = preparedPublication;
+      }
       return withExistingJournalBinding(rootPath, value, ({ journalFd }) =>
         withPublicMarkdownArtifactFd(
           markerLocation(rootPath, false, fileSystem).directory,
@@ -5850,24 +6585,17 @@ function createChangesHistoryReconciliationService(options = {}) {
               fail('CHANGES_MANUAL_RECOVERY_REQUIRED',
                 'EXISTING terminal ACK is not acknowledged');
             }
-            const ackBase = {
-              ...publication,
-              state: 'ACK_COMMITTED',
-              publicationDigest: null,
-            };
-            const ackWithDigest = {
-              ...ackBase,
-              publicationDigest: markerJournalSchema.existingTerminalPublicationDigest(ackBase),
-            };
-            const storedAck = markerJournalSchema.assertExistingTerminalPublicationTransition(
+            const storedAck = existingCleanupPublication(
               publication,
-              markerJournalSchema.assertExistingTerminalPublication(ackWithDigest)
+              'ACK_COMMITTED',
+              'REMOVED'
             );
             const nextValue = journalNextValue(value, {
               existingTerminalPublication: storedAck,
             });
             const beforeAppend = () => {
               assertHistoryAuthority(baseHistory);
+              assertExistingCleanupAbsent(rootPath, publication);
               const latest = journalCurrent(scopedJournal);
               if (latest.status !== 'VALUE' || canonical(latest.value) !== canonical(value)) {
                 fail('CHANGES_RECOVERY_STALE',
@@ -6039,6 +6767,10 @@ function createChangesHistoryReconciliationService(options = {}) {
         }
         return terminalizeFinalizedMarker(rootPath, marker);
       }
+      if (marker.kind === 'snapshot_restore' &&
+          marker.publicMarkdownPhase.phase === 'ROLLED_BACK') {
+        return terminalizeRolledBackMarker(rootPath, marker);
+      }
       if (marker.kind === 'snapshot_restore_undo' &&
           marker.publicMarkdownPhase.phase === 'RESTORED') {
         return terminalizeRestoredUndoMarker(rootPath, marker);
@@ -6159,6 +6891,8 @@ function createChangesHistoryReconciliationService(options = {}) {
     const exactPublicTerminal = marker.state === 'terminal' && (
       (marker.kind === 'snapshot_restore' &&
         marker.publicMarkdownPhase?.phase === 'FINALIZED') ||
+      (marker.kind === 'snapshot_restore' && marker.outcome === 'zero_write_error' &&
+        marker.publicMarkdownPhase?.phase === 'ROLLED_BACK') ||
       (marker.kind === 'snapshot_restore_undo' && marker.outcome === 'zero_write_error' &&
         marker.publicMarkdownPhase?.phase === 'RESTORED') ||
       (marker.kind === 'snapshot_restore_undo' && marker.outcome === 'undone' &&
@@ -6779,6 +7513,132 @@ function createChangesHistoryReconciliationService(options = {}) {
     return { ok: true, operationId };
   }
 
+  // A durable ROLLED_BACK terminal carries its own cleanup authority: the
+  // staged rollback already consumed the CREATE publication at the QUARANTINED
+  // CAS and never installed an EXISTING terminal, so the only surviving residue
+  // is the recovery artifact. The journal clears through the same two-CAS shape
+  // as a finalized snapshot: value -> terminal cleanup -> IDLE.
+  function clearRollbackCreateJournal(rootPath, projectId, operationId, initialCurrent) {
+    const scoped = markerJournalFor(rootPath, true);
+    let value = initialCurrent.value;
+    if (initialCurrent.status !== 'VALUE' || value?.state !== 'ACTIVE' ||
+        value.activeOperationId !== operationId || value.activeKind !== 'snapshot_restore' ||
+        value.nativePublication !== null || value.existingTerminalPublication !== null ||
+        value.rollbackCreatePublication?.state !== 'ACK_COMMITTED') {
+      fail('CHANGES_MANUAL_RECOVERY_REQUIRED',
+        'rollback-create terminal journal authority is unavailable');
+    }
+    let marker = validateMarker(value.activeMarker, projectService, historyService);
+    if (marker.projectId !== projectId || marker.operationId !== operationId ||
+        marker.state !== 'terminal' || marker.outcome !== 'zero_write_error' ||
+        marker.publicMarkdownPhase?.phase !== 'ROLLED_BACK') {
+      fail('CHANGES_MANUAL_RECOVERY_REQUIRED',
+        'rollback-create terminal marker is incomplete');
+    }
+    const currentHistory = historyService.loadHistoryState(rootPath);
+    if (!sameHistoryState(currentHistory, marker.baseHistoryState)) {
+      fail('CHANGES_MANUAL_RECOVERY_REQUIRED',
+        'rollback-create base History truth is foreign');
+    }
+    const stored = decodeRollbackPublication(value.rollbackCreatePublication);
+    if (stored.settle?.state !== 'FINALIZED' ||
+        stored.settle.finalRecord.finalRecordDigest !==
+          marker.publicMarkdownPhase.rollbackReceiptDigest) {
+      fail('CHANGES_MANUAL_RECOVERY_REQUIRED',
+        'rollback-create final record truth is foreign');
+    }
+    const artifactLifecycle = artifactLifecycleFor(rootPath);
+    if (!artifactLifecycle || typeof artifactLifecycle.reconcile !== 'function' ||
+        typeof artifactLifecycle.verify !== 'function' ||
+        typeof artifactLifecycle.acknowledge !== 'function') {
+      fail('ARTIFACT_CLEANUP_UNAVAILABLE',
+        'durable artifact cleanup lifecycle is unavailable');
+    }
+    let token;
+    if (marker.artifactCleanup) {
+      token = verifiedArtifactCleanupToken(
+        artifactLifecycle,
+        marker,
+        marker.artifactCleanup.token
+      );
+    } else {
+      token = artifactLifecycle.reconcile(marker.artifact);
+      if (token) token = verifiedArtifactCleanupToken(artifactLifecycle, marker, token);
+      if (!token) {
+        token = recoveryArtifact.removeArtifact(
+          markerLocation(rootPath, false, fileSystem).directory,
+          marker.artifact,
+          artifactLifecycle
+        );
+        token = verifiedArtifactCleanupToken(artifactLifecycle, marker, token);
+      }
+      marker = journalMarker(marker, {
+        artifactCleanup: cleanupAuthority(marker, token),
+        updatedAt: now(),
+      });
+      const cleanupMarkerValue = journalNextValue(value, {
+        activeMarker: marker,
+        activeMarkerDigest: markerJournalSchema.activeMarkerDigest(marker),
+      });
+      appendJournal(scoped, value, cleanupMarkerValue);
+      value = cleanupMarkerValue;
+    }
+    try {
+      artifactLifecycle.acknowledge(marker.artifact.basename, token);
+    } catch (error) {
+      const wrapped = new ChangesHistoryRecoveryError(
+        'CHANGES_RECOVERY_WRITE_FAILED',
+        'rollback-create artifact cleanup receipt requires reconciliation'
+      );
+      wrapped.cause = error;
+      throw wrapped;
+    }
+    const publicRecordDigests = stored.quarantine.tokens.flatMap(item => [
+      item.controlDigest,
+      item.receiptDigest,
+    ]);
+    publicRecordDigests.push(stored.settle.finalRecord.finalRecordDigest);
+    const cleanup = markerJournalSchema.buildTerminalCleanup({
+      schema: markerJournalSchema.SCHEMAS.CLEANUP,
+      operationId,
+      kind: marker.kind,
+      terminalPhaseDigest: evidenceDeliverySchema.digestObject(
+        publicMarkdownPhaseSchema.SCHEMA,
+        marker.publicMarkdownPhase
+      ),
+      historyStateDigest: historyService.digestHistoryState(currentHistory),
+      artifactCleanupDigest: evidenceDeliverySchema.digestObject(
+        ARTIFACT_CLEANUP_AUTHORITY_SCHEMA,
+        marker.artifactCleanup
+      ),
+      publicRecordDigests,
+      publicationState: 'NONE',
+      publicationDigest: null,
+      existingTerminalPublicationState: 'NONE',
+      existingTerminalPublicationDigest: null,
+      recoveryDirectoryFsyncComplete: true,
+    });
+    const cleanupValue = journalNextValue(value, {
+      terminalCleanup: cleanup,
+      terminalCleanupDigest: cleanup.cleanupDigest,
+    });
+    appendJournal(scoped, value, cleanupValue);
+    const idle = journalNextValue(cleanupValue, {
+      state: 'IDLE',
+      activeOperationId: null,
+      activeKind: null,
+      activeMarker: null,
+      activeMarkerDigest: null,
+      nativePublication: null,
+      existingTerminalPublication: null,
+      rollbackCreatePublication: null,
+      terminalCleanup: null,
+      terminalCleanupDigest: null,
+    });
+    appendJournal(scoped, cleanupValue, idle);
+    return { ok: true, operationId };
+  }
+
   function clearSnapshotRestoreJournalRetry(rootPath, projectId, operationId) {
     const scoped = markerJournalFor(rootPath, true);
     const pair = discoverJournalPair(scoped);
@@ -6808,6 +7668,36 @@ function createChangesHistoryReconciliationService(options = {}) {
     return { ok: true, operationId };
   }
 
+  // Crash-recovery arm for the window between the terminal-cleanup append and
+  // the IDLE append of a rollback-create clear. The pair must be exactly a
+  // ROLLED_BACK terminal value carrying the matching terminal cleanup followed
+  // by its IDLE successor; anything less is not proof that this operation's
+  // cleanup was durably recorded.
+  function clearRollbackCreateJournalRetry(rootPath, projectId, operationId) {
+    const scoped = markerJournalFor(rootPath, true);
+    const pair = discoverJournalPair(scoped);
+    const older = pair.older;
+    const current = pair.current;
+    if (current.state !== 'IDLE' || current.projectId !== projectId ||
+        older.state !== 'ACTIVE' || older.projectId !== projectId ||
+        older.activeOperationId !== operationId || older.nativePublication !== null ||
+        older.existingTerminalPublication !== null ||
+        older.rollbackCreatePublication?.state !== 'ACK_COMMITTED' ||
+        older.terminalCleanup === null) return null;
+    const marker = validateMarker(older.activeMarker, projectService, historyService);
+    const cleanup = markerJournalSchema.assertTerminalCleanup(older.terminalCleanup);
+    if (marker.state !== 'terminal' || marker.outcome !== 'zero_write_error' ||
+        marker.publicMarkdownPhase?.phase !== 'ROLLED_BACK' ||
+        cleanup.operationId !== operationId || cleanup.kind !== 'snapshot_restore' ||
+        cleanup.publicationState !== 'NONE' ||
+        cleanup.existingTerminalPublicationState !== 'NONE' ||
+        cleanup.cleanupDigest !== older.terminalCleanupDigest) {
+      fail('CHANGES_MANUAL_RECOVERY_REQUIRED',
+        'rollback-create terminal clear retry authority is foreign');
+    }
+    return { ok: true, operationId };
+  }
+
   function clear(rootPath, projectId, operationId) {
     projectIdentity(projectService, rootPath, projectId);
     if (markerJournalLifecycle !== null) {
@@ -6815,6 +7705,12 @@ function createChangesHistoryReconciliationService(options = {}) {
       const current = journalCurrent(scoped);
       if (current.status !== 'LEGACY') {
         if (current.status === 'VALUE' && current.value?.state === 'IDLE') {
+          const rollbackRetry = clearRollbackCreateJournalRetry(
+            rootPath,
+            projectId,
+            operationId
+          );
+          if (rollbackRetry !== null) return rollbackRetry;
           const snapshotRetry = clearSnapshotRestoreJournalRetry(
             rootPath,
             projectId,
@@ -6824,6 +7720,9 @@ function createChangesHistoryReconciliationService(options = {}) {
         }
         if (current.status === 'VALUE' &&
             current.value?.activeKind === 'snapshot_restore') {
+          if (current.value.rollbackCreatePublication !== null) {
+            return clearRollbackCreateJournal(rootPath, projectId, operationId, current);
+          }
           return clearSnapshotRestoreJournal(rootPath, projectId, operationId, current);
         }
         return clearOrdinaryJournal(rootPath, projectId, operationId, current);

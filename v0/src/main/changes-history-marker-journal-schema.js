@@ -25,6 +25,10 @@ const SCHEMAS = Object.freeze({
     'writcraft.changes-history-existing-terminal-item/v1',
   EXISTING_FINALIZATION:
     'writcraft.changes-history-existing-terminal-finalization/v1',
+  ROLLBACK_CREATE_PUBLICATION:
+    'writcraft.changes-history-rollback-create-publication/v1',
+  ROLLBACK_CREATE_ATTEMPT_PUBLICATION:
+    'writcraft.changes-history-rollback-create-attempt-publication/v1',
   CLEANUP: 'writcraft.changes-history-terminal-cleanup-authority/v1',
   PUBLIC_RECORD_SET: 'writcraft.changes-history-terminal-public-record-set/v1',
   PUBLICATION_SET: 'writcraft.changes-history-terminal-publication-set/v1',
@@ -39,6 +43,9 @@ const PUBLICATION_STATES = Object.freeze([
 ]);
 const RECORD_STATES = Object.freeze(['ARMED', 'PUBLISHED', 'CLEANUP_ARMED', 'REMOVED']);
 const MUTATION_STATES = Object.freeze(['UNARMED', 'ARMED', 'COMMITTED']);
+const EXISTING_CLEANUP_STATES = Object.freeze([
+  'PUBLISHED', 'CLEANUP_ARMED', 'REMOVED',
+]);
 const KINDS = Object.freeze([
   'apply', 'review', 'undo', 'snapshot_restore', 'snapshot_restore_undo',
 ]);
@@ -97,7 +104,7 @@ const KEYS = Object.freeze({
   VALUE: Object.freeze([
     'schema', 'journalId', 'generation', 'previousValueDigest', 'state',
     'projectId', 'activeOperationId', 'activeKind', 'activeMarker', 'activeMarkerDigest',
-    'nativePublication', 'existingTerminalPublication',
+    'nativePublication', 'existingTerminalPublication', 'rollbackCreatePublication',
     'terminalCleanup', 'terminalCleanupDigest', 'valueDigest',
   ]),
   HEAD: Object.freeze(['schema', 'journalId', 'generation', 'valueDigest']),
@@ -147,7 +154,8 @@ const KEYS = Object.freeze({
   EXISTING_TERMINAL_ITEM: Object.freeze([
     'schema', 'ordinal', 'selectedId', 'finalContentDigest', 'finalLeafIdentity',
     'controlBasename', 'controlDigest', 'controlRecordIdentity',
-    'applyBasename', 'applyReceiptDigest', 'applyRecordIdentity',
+    'controlCleanupState', 'applyBasename', 'applyReceiptDigest',
+    'applyRecordIdentity', 'applyCleanupState',
   ]),
   EXISTING_LEAF_IDENTITY: Object.freeze([
     'schema', 'selectedId', 'path', 'revision', 'ancestorIdentityDigest',
@@ -157,7 +165,15 @@ const KEYS = Object.freeze({
   EXISTING_FINALIZATION: Object.freeze([
     'schema', 'finalizeRequestDigest', 'historyCommittedPhaseDigest',
     'finalBasename', 'finalRecordDigest', 'finalRecordIdentity',
-    'markerFinalizedPhaseDigest', 'finalizationDigest',
+    'markerFinalizedPhaseDigest', 'cleanupState', 'finalizationDigest',
+  ]),
+  ROLLBACK_CREATE_PUBLICATION: Object.freeze([
+    'schema', 'state', 'operationId', 'requestDigest', 'authorityBase64',
+    'quarantineResultBase64', 'settleResultBase64', 'publicationDigest',
+  ]),
+  ROLLBACK_CREATE_ATTEMPT_PUBLICATION: Object.freeze([
+    'schema', 'state', 'operationId', 'requestDigest', 'authorityBase64',
+    'predecessorValueDigest', 'installedGeneration', 'publicationDigest',
   ]),
   CLEANUP: Object.freeze([
     'schema', 'operationId', 'kind', 'terminalPhaseDigest', 'historyStateDigest',
@@ -943,6 +959,10 @@ function assertExistingTerminalItem(raw, index) {
     fail(`${label} identity or record name is invalid`);
   }
   const finalContentDigest = digest(value.finalContentDigest, `${label}.finalContentDigest`);
+  if (!EXISTING_CLEANUP_STATES.includes(value.controlCleanupState) ||
+      !EXISTING_CLEANUP_STATES.includes(value.applyCleanupState)) {
+    fail(`${label} cleanup state is invalid`);
+  }
   const finalLeafIdentity = assertExistingLeafIdentity(
     value.finalLeafIdentity,
     selectedId,
@@ -970,16 +990,19 @@ function assertExistingTerminalItem(raw, index) {
     controlBasename: value.controlBasename,
     controlDigest: digest(value.controlDigest, `${label}.controlDigest`),
     controlRecordIdentity,
+    controlCleanupState: value.controlCleanupState,
     applyBasename: value.applyBasename,
     applyReceiptDigest: digest(value.applyReceiptDigest, `${label}.applyReceiptDigest`),
     applyRecordIdentity,
+    applyCleanupState: value.applyCleanupState,
   });
 }
 
 function assertExistingFinalization(raw, operationId) {
   const value = valuesOf(raw, KEYS.EXISTING_FINALIZATION, 'EXISTING terminal finalization');
   if (value.schema !== SCHEMAS.EXISTING_FINALIZATION ||
-      !EXISTING_FINAL_BASENAME_RE.test(value.finalBasename || '')) {
+      !EXISTING_FINAL_BASENAME_RE.test(value.finalBasename || '') ||
+      !EXISTING_CLEANUP_STATES.includes(value.cleanupState)) {
     fail('EXISTING terminal finalization identity is invalid');
   }
   let finalRecordIdentity;
@@ -1002,6 +1025,7 @@ function assertExistingFinalization(raw, operationId) {
       value.markerFinalizedPhaseDigest,
       'markerFinalizedPhaseDigest'
     ),
+    cleanupState: value.cleanupState,
     finalizationDigest: digest(value.finalizationDigest, 'finalizationDigest'),
   });
   // The final record identity describes the actual owner-private final record
@@ -1032,6 +1056,161 @@ function existingTerminalPublicationDigest(raw) {
   );
 }
 
+function rollbackCreateAttemptPublicationDigest(raw) {
+  const source = valuesOf(
+    raw,
+    KEYS.ROLLBACK_CREATE_ATTEMPT_PUBLICATION,
+    'rollback-create attempt publication digest input'
+  );
+  const value = Object.fromEntries(KEYS.ROLLBACK_CREATE_ATTEMPT_PUBLICATION.map(key => [
+    key,
+    key === 'publicationDigest' ? null : source[key],
+  ]));
+  return evidence.digestObject(
+    SCHEMAS.ROLLBACK_CREATE_ATTEMPT_PUBLICATION,
+    value,
+    'publicationDigest'
+  );
+}
+
+// The attempt latch is the write-ahead record for the rollback quarantine. Q is
+// destructive: it moves the receipt-owned MISSING leaves into private
+// quarantine. Without this latch a crash after Q but before the QUARANTINED CAS
+// would leave those leaves moved with no journal record of why, which is exactly
+// the unrecoverable window this publication exists to close. The latch records
+// the full native authority and the exact predecessor/generation it was born
+// from, so a restart can reconcile Q's truth without ever replaying Q.
+function assertRollbackCreateAttemptPublication(raw) {
+  const value = valuesOf(
+    raw,
+    KEYS.ROLLBACK_CREATE_ATTEMPT_PUBLICATION,
+    'rollback-create attempt publication'
+  );
+  const valid = Object.freeze({
+    schema: SCHEMAS.ROLLBACK_CREATE_ATTEMPT_PUBLICATION,
+    state: value.state,
+    operationId: value.operationId,
+    requestDigest: digest(value.requestDigest, 'rollback-create attempt requestDigest'),
+    authorityBase64: canonicalBase64(value.authorityBase64, 'rollback-create attempt authority'),
+    predecessorValueDigest: digest(
+      value.predecessorValueDigest,
+      'rollback-create attempt predecessorValueDigest'
+    ),
+    installedGeneration: generation(
+      value.installedGeneration,
+      'rollback-create attempt installedGeneration'
+    ),
+    publicationDigest: digest(
+      value.publicationDigest,
+      'rollback-create attempt publicationDigest'
+    ),
+  });
+  if (valid.schema !== SCHEMAS.ROLLBACK_CREATE_ATTEMPT_PUBLICATION ||
+      valid.state !== 'PREPARED' || !OPERATION_ID_RE.test(valid.operationId || '') ||
+      valid.publicationDigest !== rollbackCreateAttemptPublicationDigest(valid)) {
+    fail('rollback-create attempt publication is invalid');
+  }
+  return valid;
+}
+
+const ROLLBACK_CREATE_PUBLICATION_STATES = Object.freeze([
+  'QUARANTINED', 'ROLLED_BACK', 'ACK_COMMITTED',
+]);
+
+function canonicalBase64(raw, label) {
+  const encoded = boundedString(raw, label, MAX_EXISTING_TERMINAL_PUBLICATION_BYTES);
+  if (!/^(?:[A-Za-z0-9+/]{4})*(?:[A-Za-z0-9+/]{2}==|[A-Za-z0-9+/]{3}=)?$/u.test(encoded)) {
+    fail(`${label} is not canonical base64`);
+  }
+  const bytes = Buffer.from(encoded, 'base64');
+  if (bytes.length === 0 || bytes.length > MAX_EXISTING_TERMINAL_PUBLICATION_BYTES ||
+      bytes.toString('base64') !== encoded) {
+    fail(`${label} budget or encoding is invalid`);
+  }
+  return encoded;
+}
+
+function rollbackCreatePublicationDigest(raw) {
+  const source = valuesOf(
+    raw,
+    KEYS.ROLLBACK_CREATE_PUBLICATION,
+    'rollback-create publication digest input'
+  );
+  const value = Object.fromEntries(KEYS.ROLLBACK_CREATE_PUBLICATION.map(key => [
+    key,
+    key === 'publicationDigest' ? null : source[key],
+  ]));
+  return evidence.digestObject(
+    SCHEMAS.ROLLBACK_CREATE_PUBLICATION,
+    value,
+    'publicationDigest'
+  );
+}
+
+// The ROLLBACK_CREATE publication is the durable authority for the zero-net-write
+// branch. It exists because the rollback domain destroys the MISSING leaves: Q
+// quarantines them, D deletes the quarantine, A removes the recovered records.
+// Publishing the exact Q result before D, and the exact D result before A, is
+// what makes a crash or a lost response at any of those boundaries recoverable
+// from the journal instead of unrecoverable residue.
+function assertRollbackCreatePublication(raw) {
+  const value = valuesOf(
+    raw,
+    KEYS.ROLLBACK_CREATE_PUBLICATION,
+    'rollback-create publication'
+  );
+  if (value.schema !== SCHEMAS.ROLLBACK_CREATE_PUBLICATION ||
+      !ROLLBACK_CREATE_PUBLICATION_STATES.includes(value.state) ||
+      !OPERATION_ID_RE.test(value.operationId || '')) {
+    fail('rollback-create publication identity is invalid');
+  }
+  const exactBase64 = (rawValue, label, nullable = false) => {
+    if (nullable && rawValue === null) return null;
+    return canonicalBase64(rawValue, label);
+  };
+  const valid = Object.freeze({
+    schema: SCHEMAS.ROLLBACK_CREATE_PUBLICATION,
+    state: value.state,
+    operationId: value.operationId,
+    requestDigest: digest(value.requestDigest, 'rollback-create requestDigest'),
+    authorityBase64: exactBase64(value.authorityBase64, 'rollback-create authority'),
+    quarantineResultBase64: exactBase64(
+      value.quarantineResultBase64,
+      'rollback-create quarantine result'
+    ),
+    settleResultBase64: exactBase64(
+      value.settleResultBase64,
+      'rollback-create settle result',
+      true
+    ),
+    publicationDigest: digest(value.publicationDigest, 'rollback-create publicationDigest'),
+  });
+  if ((valid.state === 'QUARANTINED') !== (valid.settleResultBase64 === null) ||
+      valid.publicationDigest !== rollbackCreatePublicationDigest(valid)) {
+    fail('rollback-create publication state or digest is invalid');
+  }
+  return valid;
+}
+
+function assertRollbackCreatePublicationTransition(rawPrevious, rawNext) {
+  const previous = assertRollbackCreatePublication(rawPrevious);
+  const next = assertRollbackCreatePublication(rawNext);
+  if (previous.publicationDigest === next.publicationDigest) return next;
+  if (previous.operationId !== next.operationId ||
+      previous.requestDigest !== next.requestDigest ||
+      previous.authorityBase64 !== next.authorityBase64 ||
+      previous.quarantineResultBase64 !== next.quarantineResultBase64 ||
+      (previous.settleResultBase64 !== next.settleResultBase64 &&
+        previous.state !== 'QUARANTINED')) {
+    fail('rollback-create publication immutable authority changed');
+  }
+  if ((previous.state === 'QUARANTINED' && next.state === 'ROLLED_BACK' &&
+       next.settleResultBase64 !== null) ||
+      (previous.state === 'ROLLED_BACK' && next.state === 'ACK_COMMITTED' &&
+       previous.settleResultBase64 === next.settleResultBase64)) return next;
+  fail('rollback-create publication transition is invalid');
+}
+
 function assertExistingTerminalPublication(raw) {
   const value = valuesOf(
     raw,
@@ -1040,7 +1219,7 @@ function assertExistingTerminalPublication(raw) {
   );
   if (value.schema !== SCHEMAS.EXISTING_TERMINAL_PUBLICATION ||
       value.command !== 'EXECUTE_EXISTING' ||
-      !['COMMITTED', 'FINALIZED', 'ACK_COMMITTED'].includes(value.state) ||
+      !['COMMITTED', 'FINALIZED', 'ACK_PREPARED', 'ACK_COMMITTED'].includes(value.state) ||
       !OPERATION_ID_RE.test(value.operationId || '') ||
       value.recoveryFsyncComplete !== true || typeof value.baseHistoryExists !== 'boolean' ||
       !Number.isSafeInteger(value.baseHistoryByteLength) || value.baseHistoryByteLength < 0) {
@@ -1078,6 +1257,21 @@ function assertExistingTerminalPublication(raw) {
     : assertExistingFinalization(value.finalization, value.operationId);
   if ((value.state === 'COMMITTED') !== (finalization === null)) {
     fail('EXISTING terminal finalization state is invalid');
+  }
+  const cleanupStates = items.flatMap(item => [
+    item.controlCleanupState,
+    item.applyCleanupState,
+  ]).concat(finalization === null ? [] : [finalization.cleanupState]);
+  if (['COMMITTED', 'FINALIZED'].includes(value.state) &&
+      cleanupStates.some(state => state !== 'PUBLISHED')) {
+    fail('EXISTING pre-ACK publication cannot claim cleanup progress');
+  }
+  if (value.state === 'ACK_PREPARED' && cleanupStates.some(state =>
+    !['CLEANUP_ARMED', 'REMOVED'].includes(state))) {
+    fail('EXISTING ACK_PREPARED requires exact cleanup authority');
+  }
+  if (value.state === 'ACK_COMMITTED' && cleanupStates.some(state => state !== 'REMOVED')) {
+    fail('EXISTING ACK_COMMITTED requires every private record removed');
   }
   const valid = Object.freeze({
     schema: SCHEMAS.EXISTING_TERMINAL_PUBLICATION,
@@ -1333,6 +1527,12 @@ function assertJournalValue(raw) {
   const existingTerminalPublication = value.existingTerminalPublication === null
     ? null
     : assertExistingTerminalPublication(value.existingTerminalPublication);
+  const rollbackCreatePublication = value.rollbackCreatePublication === null
+    ? null
+    : (value.rollbackCreatePublication.schema ===
+        SCHEMAS.ROLLBACK_CREATE_ATTEMPT_PUBLICATION
+      ? assertRollbackCreateAttemptPublication(value.rollbackCreatePublication)
+      : assertRollbackCreatePublication(value.rollbackCreatePublication));
   const terminalCleanup = value.terminalCleanup === null
     ? null
     : assertTerminalCleanup(value.terminalCleanup);
@@ -1343,7 +1543,7 @@ function assertJournalValue(raw) {
   );
   if (idle && (activeOperationId !== null || activeKind !== null ||
       activeMarker !== null || activeMarkerDigestValue !== null || nativePublication !== null ||
-      existingTerminalPublication !== null ||
+      existingTerminalPublication !== null || rollbackCreatePublication !== null ||
       terminalCleanup !== null || terminalCleanupDigest !== null)) {
     fail('IDLE journal retains active authority');
   }
@@ -1369,6 +1569,21 @@ function assertJournalValue(raw) {
       : phase === 'FINALIZED';
     if (!phaseValid) {
       fail('EXISTING terminal publication state does not bind marker phase authority');
+    }
+  }
+  if (rollbackCreatePublication && (activeKind !== 'snapshot_restore' ||
+      rollbackCreatePublication.operationId !== activeOperationId)) {
+    fail('rollback-create publication does not bind ACTIVE Snapshot value');
+  }
+  if (rollbackCreatePublication) {
+    const phase = activeMarker?.publicMarkdownPhase?.phase;
+    const expectedPhase = rollbackCreatePublication.state === 'PREPARED'
+      ? 'CREATED_RECEIPT'
+      : (rollbackCreatePublication.state === 'QUARANTINED'
+        ? 'CREATE_ROLLBACK_QUARANTINED'
+        : 'ROLLED_BACK');
+    if (phase !== expectedPhase) {
+      fail('rollback-create publication state does not bind marker phase authority');
     }
   }
   if (nativePublication && nativePublication.createFinalization !== null &&
@@ -1409,6 +1624,7 @@ function assertJournalValue(raw) {
     activeMarkerDigest: activeMarkerDigestValue,
     nativePublication,
     existingTerminalPublication,
+    rollbackCreatePublication,
     terminalCleanup,
     terminalCleanupDigest,
     valueDigest: digest(value.valueDigest, 'valueDigest'),
@@ -1645,6 +1861,27 @@ function assertPublicationTransition(rawPrevious, rawNext) {
 function immutableExistingTerminalPublicationEqual(previous, next, options = {}) {
   const ignoreState = options.ignoreState === true;
   const ignoreFinalization = options.ignoreFinalization === true;
+  const ignoreCleanupState = options.ignoreCleanupState === true;
+  const existingItems = ignoreCleanupState
+    ? previous.items.map(item => ({
+      ...item,
+      controlCleanupState: null,
+      applyCleanupState: null,
+    }))
+    : previous.items;
+  const nextItems = ignoreCleanupState
+    ? next.items.map(item => ({
+      ...item,
+      controlCleanupState: null,
+      applyCleanupState: null,
+    }))
+    : next.items;
+  const existingFinalization = ignoreCleanupState && previous.finalization !== null
+    ? { ...previous.finalization, cleanupState: null }
+    : previous.finalization;
+  const nextFinalization = ignoreCleanupState && next.finalization !== null
+    ? { ...next.finalization, cleanupState: null }
+    : next.finalization;
   return (ignoreState || previous.state === next.state) &&
     previous.command === next.command && previous.operationId === next.operationId &&
     previous.requestDigest === next.requestDigest &&
@@ -1665,9 +1902,48 @@ function immutableExistingTerminalPublicationEqual(previous, next, options = {})
     previous.receiptSetDigest === next.receiptSetDigest &&
     previous.terminalReceiptDigest === next.terminalReceiptDigest &&
     previous.recoveryFsyncComplete === next.recoveryFsyncComplete &&
-    evidence.canonicalJson(previous.items) === evidence.canonicalJson(next.items) &&
-    (ignoreFinalization || evidence.canonicalJson(previous.finalization) ===
-      evidence.canonicalJson(next.finalization));
+    evidence.canonicalJson(existingItems) === evidence.canonicalJson(nextItems) &&
+    (ignoreFinalization || evidence.canonicalJson(existingFinalization) ===
+      evidence.canonicalJson(nextFinalization));
+}
+
+function assertExistingCleanupProgress(previous, next, transition) {
+  const rank = { PUBLISHED: 0, CLEANUP_ARMED: 1, REMOVED: 2 };
+  const left = previous.items.flatMap(item => [
+    item.controlCleanupState,
+    item.applyCleanupState,
+  ]).concat([previous.finalization.cleanupState]);
+  const right = next.items.flatMap(item => [
+    item.controlCleanupState,
+    item.applyCleanupState,
+  ]).concat([next.finalization.cleanupState]);
+  if (left.length !== right.length) fail('EXISTING cleanup authority set was resized');
+  for (let index = 0; index < left.length; index += 1) {
+    if (transition === 'ARM') {
+      if (left[index] !== 'PUBLISHED' || right[index] !== 'CLEANUP_ARMED') {
+        fail('EXISTING cleanup authority must arm every exact record once');
+      }
+    } else if (!(
+      (left[index] === 'CLEANUP_ARMED' &&
+        ['CLEANUP_ARMED', 'REMOVED'].includes(right[index])) ||
+      (left[index] === 'REMOVED' && right[index] === 'REMOVED')
+    ) || rank[right[index]] < rank[left[index]]) {
+      fail('EXISTING cleanup removal progress is invalid');
+    }
+  }
+}
+
+function immutableExistingFinalizationEqual(previous, next) {
+  if (previous === null || next === null) return previous === next;
+  return evidence.canonicalJson({
+    ...previous,
+    cleanupState: null,
+    finalizationDigest: null,
+  }) === evidence.canonicalJson({
+    ...next,
+    cleanupState: null,
+    finalizationDigest: null,
+  });
 }
 
 function assertExistingTerminalPublicationTransition(rawPrevious, rawNext) {
@@ -1677,6 +1953,7 @@ function assertExistingTerminalPublicationTransition(rawPrevious, rawNext) {
   if (!immutableExistingTerminalPublicationEqual(previous, next, {
     ignoreState: true,
     ignoreFinalization: true,
+    ignoreCleanupState: true,
   })) {
     fail('EXISTING terminal publication immutable authority changed');
   }
@@ -1686,11 +1963,19 @@ function assertExistingTerminalPublicationTransition(rawPrevious, rawNext) {
     }
     return next;
   }
-  if (previous.state === 'FINALIZED' && next.state === 'ACK_COMMITTED') {
-    if (evidence.canonicalJson(previous.finalization) !==
-        evidence.canonicalJson(next.finalization)) {
-      fail('EXISTING terminal ACK changed finalization authority');
+  if (previous.state === 'FINALIZED' && next.state === 'ACK_PREPARED') {
+    if (!immutableExistingFinalizationEqual(previous.finalization, next.finalization)) {
+      fail('EXISTING cleanup changed finalization authority');
     }
+    assertExistingCleanupProgress(previous, next, 'ARM');
+    return next;
+  }
+  if (previous.state === 'ACK_PREPARED' &&
+      ['ACK_PREPARED', 'ACK_COMMITTED'].includes(next.state)) {
+    if (!immutableExistingFinalizationEqual(previous.finalization, next.finalization)) {
+      fail('EXISTING cleanup changed finalization authority');
+    }
+    assertExistingCleanupProgress(previous, next, 'REMOVE');
     return next;
   }
   fail('EXISTING terminal publication transition is invalid');
@@ -1709,6 +1994,7 @@ function assertTransition(rawPrevious, rawNext) {
     if (next.state !== 'ACTIVE' || previous.generation !== '0' &&
         previous.terminalCleanupDigest !== null || next.nativePublication !== null ||
         next.existingTerminalPublication !== null ||
+        next.rollbackCreatePublication !== null ||
         next.terminalCleanup !== null || next.terminalCleanupDigest !== null) {
       fail('IDLE may only begin one clean ACTIVE operation');
     }
@@ -1718,6 +2004,8 @@ function assertTransition(rawPrevious, rawNext) {
     if (previous.terminalCleanup === null || previous.terminalCleanupDigest === null ||
         (previous.nativePublication !== null &&
          previous.nativePublication.state !== 'ACK_COMMITTED') ||
+        (previous.rollbackCreatePublication !== null &&
+         previous.rollbackCreatePublication.state !== 'ACK_COMMITTED') ||
         (previous.existingTerminalPublication !== null &&
          previous.existingTerminalPublication.state !== 'ACK_COMMITTED')) {
       fail('ACTIVE may return to IDLE only after exact terminal cleanup');
@@ -1732,10 +2020,72 @@ function assertTransition(rawPrevious, rawNext) {
     if (next.nativePublication !== null && next.nativePublication.state !== 'PREPARED') {
       fail('native authority must begin at PREPARED');
     }
+    if (previous.rollbackCreatePublication !== null && next.nativePublication !== null) {
+      fail('rollback-create authority cannot resurrect the CREATE publication');
+    }
   } else if (next.nativePublication === null) {
-    fail('a surviving ACTIVE value cannot drop native publication authority');
+    // The CREATE publication is the only authority for the created MISSING
+    // leaves, so it may be dropped only at the single CAS where the durable
+    // rollback publication takes that authority over: the attempt latch must
+    // already exist, the quarantine result must be published, and the phase must
+    // have advanced to CREATE_ROLLBACK_QUARANTINED.
+    if (next.rollbackCreatePublication === null ||
+        next.rollbackCreatePublication.schema !== SCHEMAS.ROLLBACK_CREATE_PUBLICATION ||
+        next.rollbackCreatePublication.state !== 'QUARANTINED' ||
+        previous.rollbackCreatePublication?.schema !==
+          SCHEMAS.ROLLBACK_CREATE_ATTEMPT_PUBLICATION ||
+        next.rollbackCreatePublication.operationId !== previous.activeOperationId) {
+      fail('a surviving ACTIVE value cannot drop native publication authority');
+    }
   } else {
     assertPublicationTransition(previous.nativePublication, next.nativePublication);
+  }
+  if (previous.rollbackCreatePublication === null) {
+    if (next.rollbackCreatePublication !== null) {
+      if (previous.activeKind !== 'snapshot_restore' ||
+          next.rollbackCreatePublication.schema !==
+            SCHEMAS.ROLLBACK_CREATE_ATTEMPT_PUBLICATION ||
+          next.rollbackCreatePublication.state !== 'PREPARED' ||
+          next.rollbackCreatePublication.predecessorValueDigest !== previous.valueDigest ||
+          next.rollbackCreatePublication.installedGeneration !== next.generation ||
+          next.rollbackCreatePublication.operationId !== previous.activeOperationId ||
+          next.nativePublication === null ||
+          previous.activeMarker?.publicMarkdownPhase?.phase !== 'CREATED_RECEIPT' ||
+          next.activeMarker?.publicMarkdownPhase?.phase !== 'CREATED_RECEIPT') {
+        fail('rollback-create attempt install CAS is invalid');
+      }
+    }
+  } else if (next.rollbackCreatePublication === null) {
+    fail('a surviving ACTIVE value cannot drop rollback-create publication authority');
+  } else if (previous.rollbackCreatePublication.schema ===
+      SCHEMAS.ROLLBACK_CREATE_ATTEMPT_PUBLICATION) {
+    if (next.rollbackCreatePublication.schema === SCHEMAS.ROLLBACK_CREATE_ATTEMPT_PUBLICATION) {
+      if (evidence.canonicalJson(previous.rollbackCreatePublication) !==
+          evidence.canonicalJson(next.rollbackCreatePublication)) {
+        fail('rollback-create attempt publication cannot change');
+      }
+    } else if (next.rollbackCreatePublication.schema ===
+        SCHEMAS.ROLLBACK_CREATE_PUBLICATION) {
+      if (next.rollbackCreatePublication.state !== 'QUARANTINED' ||
+          next.rollbackCreatePublication.operationId !==
+            previous.rollbackCreatePublication.operationId ||
+          next.rollbackCreatePublication.requestDigest !==
+            previous.rollbackCreatePublication.requestDigest ||
+          next.nativePublication !== null ||
+          previous.activeMarker?.publicMarkdownPhase?.phase !== 'CREATED_RECEIPT' ||
+          next.activeMarker?.publicMarkdownPhase?.phase !== 'CREATE_ROLLBACK_QUARANTINED') {
+        fail('rollback-create attempt settlement CAS is invalid');
+      }
+    } else {
+      fail('rollback-create attempt settlement CAS is invalid');
+    }
+  } else if (next.rollbackCreatePublication.schema !== SCHEMAS.ROLLBACK_CREATE_PUBLICATION) {
+    fail('rollback-create publication cannot return to an attempt latch');
+  } else {
+    assertRollbackCreatePublicationTransition(
+      previous.rollbackCreatePublication,
+      next.rollbackCreatePublication
+    );
   }
   if (previous.existingTerminalPublication === null) {
     if (next.existingTerminalPublication !== null) {
@@ -1927,6 +2277,11 @@ module.exports = Object.freeze({
   publicationSetDigest,
   existingFinalizationDigest,
   existingTerminalPublicationDigest,
+  rollbackCreatePublicationDigest,
+  assertRollbackCreatePublication,
+  assertRollbackCreatePublicationTransition,
+  rollbackCreateAttemptPublicationDigest,
+  assertRollbackCreateAttemptPublication,
   assertRecord,
   assertMutation,
   assertCreatePrivateRecord,

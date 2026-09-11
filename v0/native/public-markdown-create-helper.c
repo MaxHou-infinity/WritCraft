@@ -325,13 +325,34 @@ typedef struct {
   Request create_request;
   char request_digest[DIGEST_BYTES + 1U];
   char marker_digest[DIGEST_BYTES + 1U];
-  uint64_t marker_length;
-  char marker_identity[DIGEST_BYTES + 1U];
-  /* WRCCHRJ2 single-authority journal: whole-content sha of the held journal
-   * file (changes-history-transaction.json), verified by rollback_held_authority
-   * against HELD_MARKER_FD. Distinct from marker_digest, which is the EXISTING
+  /* WRCCHRJ2 single-authority journal carried on the rollback wire as the
+   * structured frame descriptor. The field names mirror ExistingExecuteRequest
+   * so rollback_held_authority can hand the binding to the shared
+   * existing_journal_marker_valid validator instead of re-hashing the raw held
+   * journal byte image. Distinct from marker_digest, which is the EXISTING
    * sub-request's active-marker domain digest embedded in EXISTING records. */
-  char journal_digest[DIGEST_BYTES + 1U];
+  char binding_digest[DIGEST_BYTES + 1U];
+  char slot;
+  char journal_id[64];
+  uint64_t generation;
+  bool previous_is_null;
+  char previous_digest[DIGEST_BYTES + 1U];
+  char value_digest[DIGEST_BYTES + 1U];
+  uint64_t frame_byte_length;
+  char frame_sha256[DIGEST_BYTES + 1U];
+  uint64_t payload_offset;
+  uint64_t payload_byte_length;
+  char payload_sha256[DIGEST_BYTES + 1U];
+  uint64_t active_marker_offset;
+  uint64_t active_marker_byte_length;
+  char active_marker_digest[DIGEST_BYTES + 1U];
+  char active_marker_canonical_sha256[DIGEST_BYTES + 1U];
+  char root_identity[DIGEST_BYTES + 1U];
+  char recovery_identity[DIGEST_BYTES + 1U];
+  /* Canonical JSON of the stored EXISTING journal binding; the exact preimage
+   * member of the ROLLBACK_CREATE request digest, so the digest no longer moves
+   * with the live journal byte image. */
+  char existing_journal_binding[8193];
   char root_digest[DIGEST_BYTES + 1U];
   char recovery_digest[DIGEST_BYTES + 1U];
   char created_phase[DIGEST_BYTES + 1U];
@@ -4337,10 +4358,10 @@ static bool rollback_existing_terminal_valid(RollbackRequest *request) {
    * rollback_existing_records derives each control/rollback basename from
    * request->existing_request (recordKey) and verifies the record files at
    * those names with exact content identities. The E/R path never recomputes
-   * the request digest either; the legacy rollback rebuild predates the
-   * WRCCHRJ2 journal binding, which is not carried on the rollback wire, so
-   * the on-disk record anchor plus the held-journal whole-content sha
-   * (journal_digest) are the single-authority bindings here. */
+   * the request digest either; the rollback rebuild anchors EXISTING through
+   * that on-disk record lookup and the WRCCHRJ2 journal frame binding carried
+   * on the rollback wire (validated against the held journal descriptor), so no
+   * raw held-journal byte image is needed here. */
   char (*controls)[MAX_RECORD_BYTES + 1U] = calloc(request->existing_count, sizeof(*controls));
   char (*applies)[MAX_RECORD_BYTES + 1U] = calloc(request->existing_count, sizeof(*applies));
   char (*rollbacks)[MAX_RECORD_BYTES + 1U] = calloc(request->existing_count, sizeof(*rollbacks));
@@ -4399,6 +4420,7 @@ static bool rollback_request_digest_valid(const RollbackRequest *request) {
     ",\"baseHistoryContentDigest\":%s%s%s,\"baseHistoryDigest\":\"%s\""
     ",\"baseHistoryExists\":%s,\"baseHistoryIdentityDigest\":%s%s%s"
     ",\"createPrecreatePhaseDigest\":\"%s\",\"createdReceiptPhaseDigest\":\"%s\""
+    ",\"existingJournalMarkerBinding\":%s"
     ",\"existingReceiptSetDigest\":\"%s\",\"existingRequestDigest\":\"%s\""
     ",\"existingTerminalReceiptDigest\":\"%s\",\"historyParentIdentityDigest\":\"%s\""
     ",\"items\":[", request->create_request.artifact_length,
@@ -4409,7 +4431,8 @@ static bool rollback_request_digest_valid(const RollbackRequest *request) {
     request->base_history_exists ? "true" : "false", request->base_history_exists ? "\"" : "",
     request->base_history_exists ? request->base_history_identity : "null",
     request->base_history_exists ? "\"" : "", request->create_request.phase,
-    request->created_phase, request->existing_receipt_set, request->existing_request,
+    request->created_phase, request->existing_journal_binding,
+    request->existing_receipt_set, request->existing_request,
     request->existing_terminal, request->history_parent);
   for (size_t i = 0U; ok && i < request->count; i += 1U) {
     const RollbackItem *item = &request->items[i];
@@ -4435,16 +4458,14 @@ static bool rollback_request_digest_valid(const RollbackRequest *request) {
         item->create.created_digest, escaped, item->create.selected);
   }
   ok = ok && rollback_append(canonical, MAX_INPUT_BYTES + 1U, &used,
-    "],\"journalMarkerDigest\":\"%s\",\"markerByteLength\":%" PRIu64
-    ",\"markerDigest\":\"%s\""
-    ",\"markerIdentityDigest\":\"%s\",\"operationId\":\"%s\""
+    "],\"markerDigest\":\"%s\",\"operationId\":\"%s\""
     ",\"originalCreatedReceiptUpdatedAt\":\"%s\",\"originalPrecreateUpdatedAt\":\"%s\""
     ",\"preparedHistoryDigest\":\"%s\",\"recoveryIdentityDigest\":\"%s\""
     ",\"rootIdentityDigest\":\"%s\",\"schema\":\"" ROLLBACK_REQUEST_SCHEMA
-    "\",\"selectionDigest\":\"%s\"}", request->journal_digest, request->marker_length,
-    request->marker_digest, request->marker_identity, request->create_request.operation,
-    request->original_updated_at, request->precreate_updated_at, request->prepared_history,
-    request->recovery_digest, request->root_digest, request->create_request.selection);
+    "\",\"selectionDigest\":\"%s\"}", request->marker_digest,
+    request->create_request.operation, request->original_updated_at,
+    request->precreate_updated_at, request->prepared_history, request->recovery_digest,
+    request->root_digest, request->create_request.selection);
   char digest[72];
   ok = ok && digest_domain(ROLLBACK_REQUEST_SCHEMA, canonical, digest) &&
     strcmp(digest, request->request_digest) == 0;
@@ -4735,6 +4756,9 @@ static bool rollback_quarantine_one(
 }
 
 static bool rollback_held_authority(RootBinding *root, RollbackRequest *request);
+static bool rollback_journal_authority_valid(
+  RootBinding *root, const RollbackRequest *request
+);
 
 static bool rollback_existing_public_exact(
   RootBinding *root, const RollbackExistingItem *item
@@ -5108,7 +5132,6 @@ static bool rollback_reconcile(RootBinding *root, RollbackRequest *request) {
     memcpy(request->items[i].quarantine.control_name, control_name, strlen(control_name) + 1U);
     memcpy(request->items[i].quarantine.receipt_name, receipt_name, strlen(receipt_name) + 1U);
   }
-  if (!rollback_namespace_clean(root->recovery_fd, request, NULL, NULL)) goto unknown;
   bool all_absent = true;
   bool all_committed = true;
   for (size_t i = 0U; i < request->count; i += 1U) {
@@ -5131,8 +5154,17 @@ static bool rollback_reconcile(RootBinding *root, RollbackRequest *request) {
         undo_quarantine_state(root, &item->quarantine, &(Identity){0}) != NAME_EXACT ||
         !rollback_missing_public_state(root, item, NAME_ABSENT)) all_committed = false;
   }
-  if (all_committed && rollback_commit_exact(root, request, controls, receipts) &&
-      rollback_namespace_clean(root->recovery_fd, request, controls, receipts)) {
+  /* The expected quarantine files are owned by the Q records this pass just
+   * loaded; the namespace check must run with those records bound, otherwise a
+   * committed quarantine reads as foreign residue and R could never confirm
+   * the truth of a preceding Q. */
+  if (!rollback_namespace_clean(root->recovery_fd, request,
+        all_committed ? controls : NULL, all_committed ? receipts : NULL)) goto unknown;
+  bool commit_exact = all_committed &&
+    rollback_commit_exact(root, request, controls, receipts);
+  bool namespace_exact = commit_exact &&
+    rollback_namespace_clean(root->recovery_fd, request, controls, receipts);
+  if (namespace_exact) {
     bool result = rollback_output(request, "COMMITTED", "-");
     free(controls); free(receipts); return result;
   }
@@ -5158,81 +5190,116 @@ static bool rollback_nullable_identity_fields(char **fields, size_t start, Recor
 }
 
 static bool rollback_header(char *line, RollbackRequest *request) {
-  char *fields[44];
+  char *fields[61];
   size_t field_count = 0U;
   uint64_t existing_count;
   uint64_t missing_count;
   uint64_t history_exists;
+  uint64_t generation = 0U;
   bool qr = (line[0] == 'Q' || line[0] == 'R');
   bool d = line[0] == 'D';
   bool a = line[0] == 'A';
-  size_t expected = qr ? 30U : (d ? 31U : (a ? 44U : 0U));
-  if (expected == 0U || !split_fields(line, fields, 44U, &field_count) ||
+  size_t expected = qr ? 47U : (d ? 48U : (a ? 61U : 0U));
+  if (expected == 0U || !split_fields(line, fields, 61U, &field_count) ||
       field_count != expected || strcmp(fields[1], "CREATE_ROLLBACK") != 0 ||
       !valid_operation(fields[2]) || !valid_digest(fields[3]) || !valid_digest(fields[4]) ||
-      !parse_uint(fields[5], 2ULL * 96ULL * 1024ULL * 1024ULL, &request->marker_length) ||
-      request->marker_length == 0U || !valid_digest(fields[6]) || !valid_digest(fields[7]) ||
-      !valid_digest(fields[8]) || !parse_uint(fields[9], MAX_ARTIFACT_BYTES,
+      !valid_digest(fields[5]) || !valid_digest(fields[6]) ||
+      !parse_uint(fields[7], MAX_ARTIFACT_BYTES,
         &request->create_request.artifact_length) || request->create_request.artifact_length == 0U ||
-      !valid_digest(fields[10]) || !valid_digest(fields[11]) || !valid_digest(fields[12]) ||
-      !valid_digest(fields[13]) || !valid_digest(fields[14]) || !valid_digest(fields[15]) ||
-      !decode_hex(fields[16], request->precreate_updated_at,
+      !valid_digest(fields[8]) || !valid_digest(fields[9]) || !valid_digest(fields[10]) ||
+      !valid_digest(fields[11]) || !valid_digest(fields[12]) || !valid_digest(fields[13]) ||
+      !decode_hex(fields[14], request->precreate_updated_at,
         sizeof(request->precreate_updated_at)) ||
       !strict_utf8((const unsigned char *)request->precreate_updated_at,
         strlen(request->precreate_updated_at)) ||
-      !decode_hex(fields[17], request->original_updated_at, sizeof(request->original_updated_at)) ||
+      !decode_hex(fields[15], request->original_updated_at, sizeof(request->original_updated_at)) ||
       !strict_utf8((const unsigned char *)request->original_updated_at,
-        strlen(request->original_updated_at)) || !valid_digest(fields[18]) ||
-      !valid_digest(fields[19]) || !valid_digest(fields[20]) || !valid_digest(fields[21]) ||
-      !parse_uint(fields[22], 192ULL * 1024ULL * 1024ULL, &request->base_history_length) ||
-      !parse_uint(fields[23], 1U, &history_exists) ||
-      (history_exists == 1U ? (!valid_digest(fields[24]) || !valid_digest(fields[25])) :
-        (strcmp(fields[24], "-") != 0 || strcmp(fields[25], "-") != 0)) ||
-      !valid_digest(fields[26]) || !parse_uint(fields[27], MAX_ITEMS, &existing_count) ||
-      !parse_uint(fields[28], MAX_ITEMS, &missing_count) || existing_count == 0U ||
-      missing_count == 0U || existing_count + missing_count > MAX_ITEMS ||
-      !valid_digest(fields[29])) return false;
+        strlen(request->original_updated_at)) || !valid_digest(fields[16]) ||
+      !decode_hex(fields[17], request->existing_journal_binding,
+        sizeof(request->existing_journal_binding)) ||
+      !strict_utf8((const unsigned char *)request->existing_journal_binding,
+        strlen(request->existing_journal_binding)) ||
+      request->existing_journal_binding[0] != '{' ||
+      request->existing_journal_binding[strlen(request->existing_journal_binding) - 1U] != '}' ||
+      !valid_digest(fields[18]) || !valid_digest(fields[19]) || !valid_digest(fields[20]) ||
+      !parse_uint(fields[21], 192ULL * 1024ULL * 1024ULL, &request->base_history_length) ||
+      !parse_uint(fields[22], 1U, &history_exists) ||
+      (history_exists == 1U ? (!valid_digest(fields[23]) || !valid_digest(fields[24])) :
+        (strcmp(fields[23], "-") != 0 || strcmp(fields[24], "-") != 0)) ||
+      !valid_digest(fields[25]) || !valid_digest(fields[26]) ||
+      strcmp(fields[27], JOURNAL_BASENAME) != 0 || strcmp(fields[28], JOURNAL_MAGIC) != 0 ||
+      !(strcmp(fields[29], "A") == 0 || strcmp(fields[29], "B") == 0) ||
+      !valid_journal_id(fields[30]) || strlen(fields[30]) >= sizeof(request->journal_id) ||
+      !parse_uint(fields[31], UINT64_MAX, &generation) ||
+      !(strcmp(fields[32], "-") == 0 || valid_digest(fields[32])) ||
+      !valid_digest(fields[33]) ||
+      !parse_uint(fields[34], JOURNAL_SLOT_CAPACITY, &request->frame_byte_length) ||
+      request->frame_byte_length == 0U || !valid_digest(fields[35]) ||
+      !parse_uint(fields[36], JOURNAL_MAX_HEADER_BYTES + 1U,
+        &request->payload_offset) || request->payload_offset == 0U ||
+      !parse_uint(fields[37], JOURNAL_MAX_VALUE_BYTES, &request->payload_byte_length) ||
+      request->payload_byte_length == 0U || !valid_digest(fields[38]) ||
+      !parse_uint(fields[39], JOURNAL_SLOT_CAPACITY, &request->active_marker_offset) ||
+      !parse_uint(fields[40], JOURNAL_MAX_VALUE_BYTES, &request->active_marker_byte_length) ||
+      request->active_marker_byte_length == 0U || !valid_digest(fields[41]) ||
+      !valid_digest(fields[42]) || !valid_digest(fields[43]) || !valid_digest(fields[44]) ||
+      !parse_uint(fields[45], MAX_ITEMS, &existing_count) ||
+      !parse_uint(fields[46], MAX_ITEMS, &missing_count) || existing_count == 0U ||
+      missing_count == 0U || existing_count + missing_count > MAX_ITEMS) return false;
   request->command = line[0];
   memcpy(request->create_request.operation, fields[2], strlen(fields[2]) + 1U);
   memcpy(request->request_digest, fields[3], DIGEST_BYTES + 1U);
   memcpy(request->marker_digest, fields[4], DIGEST_BYTES + 1U);
-  memcpy(request->marker_identity, fields[6], DIGEST_BYTES + 1U);
-  memcpy(request->create_request.artifact, fields[7], DIGEST_BYTES + 1U);
-  memcpy(request->create_request.artifact_identity, fields[8], DIGEST_BYTES + 1U);
-  memcpy(request->root_digest, fields[10], DIGEST_BYTES + 1U);
-  memcpy(request->recovery_digest, fields[11], DIGEST_BYTES + 1U);
-  memcpy(request->create_request.phase, fields[12], DIGEST_BYTES + 1U);
-  memcpy(request->created_phase, fields[13], DIGEST_BYTES + 1U);
-  memcpy(request->create_request.selection, fields[14], DIGEST_BYTES + 1U);
-  memcpy(request->prepared_history, fields[15], DIGEST_BYTES + 1U);
-  memcpy(request->existing_request, fields[18], DIGEST_BYTES + 1U);
-  memcpy(request->existing_terminal, fields[19], DIGEST_BYTES + 1U);
-  memcpy(request->existing_receipt_set, fields[20], DIGEST_BYTES + 1U);
-  memcpy(request->base_history, fields[21], DIGEST_BYTES + 1U);
+  memcpy(request->create_request.artifact, fields[5], DIGEST_BYTES + 1U);
+  memcpy(request->create_request.artifact_identity, fields[6], DIGEST_BYTES + 1U);
+  memcpy(request->root_digest, fields[8], DIGEST_BYTES + 1U);
+  memcpy(request->recovery_digest, fields[9], DIGEST_BYTES + 1U);
+  memcpy(request->create_request.phase, fields[10], DIGEST_BYTES + 1U);
+  memcpy(request->created_phase, fields[11], DIGEST_BYTES + 1U);
+  memcpy(request->create_request.selection, fields[12], DIGEST_BYTES + 1U);
+  memcpy(request->prepared_history, fields[13], DIGEST_BYTES + 1U);
+  memcpy(request->existing_request, fields[16], DIGEST_BYTES + 1U);
+  memcpy(request->existing_terminal, fields[18], DIGEST_BYTES + 1U);
+  memcpy(request->existing_receipt_set, fields[19], DIGEST_BYTES + 1U);
+  memcpy(request->base_history, fields[20], DIGEST_BYTES + 1U);
   request->base_history_exists = history_exists == 1U;
   if (request->base_history_exists) {
-    memcpy(request->base_history_content, fields[24], DIGEST_BYTES + 1U);
-    memcpy(request->base_history_identity, fields[25], DIGEST_BYTES + 1U);
+    memcpy(request->base_history_content, fields[23], DIGEST_BYTES + 1U);
+    memcpy(request->base_history_identity, fields[24], DIGEST_BYTES + 1U);
   }
-  memcpy(request->history_parent, fields[26], DIGEST_BYTES + 1U);
-  memcpy(request->journal_digest, fields[29], DIGEST_BYTES + 1U);
+  memcpy(request->history_parent, fields[25], DIGEST_BYTES + 1U);
+  memcpy(request->binding_digest, fields[26], DIGEST_BYTES + 1U);
+  request->slot = fields[29][0];
+  memcpy(request->journal_id, fields[30], strlen(fields[30]) + 1U);
+  request->generation = generation;
+  request->previous_is_null = strcmp(fields[32], "-") == 0;
+  if (!request->previous_is_null) {
+    memcpy(request->previous_digest, fields[32], DIGEST_BYTES + 1U);
+  }
+  memcpy(request->value_digest, fields[33], DIGEST_BYTES + 1U);
+  memcpy(request->frame_sha256, fields[35], DIGEST_BYTES + 1U);
+  memcpy(request->payload_sha256, fields[38], DIGEST_BYTES + 1U);
+  memcpy(request->active_marker_digest, fields[41], DIGEST_BYTES + 1U);
+  memcpy(request->active_marker_canonical_sha256, fields[42], DIGEST_BYTES + 1U);
+  memcpy(request->root_identity, fields[43], DIGEST_BYTES + 1U);
+  memcpy(request->recovery_identity, fields[44], DIGEST_BYTES + 1U);
   request->existing_count = (size_t)existing_count;
   request->count = (size_t)missing_count;
   request->create_request.count = request->count;
   if (d) {
     uint64_t token_count;
-    if (!parse_uint(fields[30], MAX_ITEMS, &token_count) || token_count != missing_count) return false;
+    if (!parse_uint(fields[47], MAX_ITEMS, &token_count) || token_count != missing_count) return false;
   } else if (a) {
     uint64_t token_count;
-    if (!has_prefix(fields[30], ".changes-history-native-rollback-create-final.") ||
-        strlen(fields[30]) >= sizeof(request->final_name) || !valid_digest(fields[31]) ||
-        !valid_digest(fields[32]) || !decode_hex(fields[33], request->rolled_updated_at,
-          sizeof(request->rolled_updated_at)) || !parse_identity_fields(fields, 34U,
-          &request->final_record) || !parse_uint(fields[43], MAX_ITEMS, &token_count) ||
+    if (!has_prefix(fields[47], ".changes-history-native-rollback-create-final.") ||
+        strlen(fields[47]) >= sizeof(request->final_name) || !valid_digest(fields[48]) ||
+        !valid_digest(fields[49]) || !decode_hex(fields[50], request->rolled_updated_at,
+          sizeof(request->rolled_updated_at)) || !parse_identity_fields(fields, 51U,
+          &request->final_record) || !parse_uint(fields[60], MAX_ITEMS, &token_count) ||
         token_count != missing_count) return false;
-    memcpy(request->final_name, fields[30], strlen(fields[30]) + 1U);
-    memcpy(request->final_digest, fields[31], DIGEST_BYTES + 1U);
-    memcpy(request->rolled_phase, fields[32], DIGEST_BYTES + 1U);
+    memcpy(request->final_name, fields[47], strlen(fields[47]) + 1U);
+    memcpy(request->final_digest, fields[48], DIGEST_BYTES + 1U);
+    memcpy(request->rolled_phase, fields[49], DIGEST_BYTES + 1U);
   }
   return true;
 }
@@ -5568,12 +5635,57 @@ unknown:
   return rollback_ack_output(request, "UNKNOWN", "UNKNOWN");
 }
 
+/* Idempotent D replay. D's delete loop unlinks every exact quarantined leaf and
+ * only then seals the final record, so a re-issued D (lost response, or the
+ * ROLLED_BACK CAS lost after D committed) observes leaf-ABSENT + final-EXACT
+ * instead of the pre-delete quarantined state and would otherwise fail the
+ * delete precondition and report UNKNOWN forever. Recognise the committed
+ * result exactly instead: held/private authority, every expected control and
+ * receipt identity still exact, every quarantined leaf ABSENT, the public
+ * MISSING leaf still ABSENT, the rebuilt final record present with its exact
+ * identity, and a clean rollback namespace. Absence alone is never sufficient.
+ * Any drift returns false and falls through to the strict delete path, which
+ * fails closed to UNKNOWN. */
+static bool rollback_delete_sealed(RootBinding *root, RollbackRequest *request) {
+  char (*controls)[MAX_RECORD_BYTES + 1U] = calloc(request->count, sizeof(*controls));
+  char (*receipts)[MAX_RECORD_BYTES + 1U] = calloc(request->count, sizeof(*receipts));
+  char final_record[MAX_RECORD_BYTES + 1U];
+  bool sealed = controls != NULL && receipts != NULL;
+  for (size_t i = 0U; sealed && i < request->count; i += 1U) {
+    RollbackItem *item = &request->items[i];
+    sealed = rollback_build_control(request, item, controls[i]) &&
+      record_identity_exact(root->recovery_fd, item->quarantine.control_name,
+        controls[i], &item->quarantine.control_record) &&
+      rollback_build_receipt(request, item, receipts[i]) &&
+      record_identity_exact(root->recovery_fd, item->quarantine.receipt_name,
+        receipts[i], &item->quarantine.receipt_record) &&
+      undo_quarantine_state(root, &item->quarantine, &(Identity){0}) == NAME_ABSENT &&
+      rollback_missing_public_state(root, item, NAME_ABSENT);
+  }
+  sealed = sealed && rollback_build_final_record(request, final_record) &&
+    record_state(root->recovery_fd, request->final_name, final_record) == NAME_EXACT &&
+    capture_record_identity(root->recovery_fd, request->final_name, final_record,
+      &request->final_record) &&
+    rollback_namespace_clean(root->recovery_fd, request, controls, receipts) &&
+    open_recovery(root, false);
+  free(controls);
+  free(receipts);
+  return sealed;
+}
+
 static bool rollback_delete(RootBinding *root, RollbackRequest *request) {
   char (*controls)[MAX_RECORD_BYTES + 1U] = calloc(request->count, sizeof(*controls));
   char (*receipts)[MAX_RECORD_BYTES + 1U] = calloc(request->count, sizeof(*receipts));
   if (controls == NULL || receipts == NULL ||
       !rollback_held_authority(root, request) ||
       !rollback_private_authority_exact(root, request)) goto unknown;
+  /* Already-sealed replay: return the committed FINALIZED result before the
+   * pre-delete quarantine precondition, which requires the quarantined leaves
+   * to still be present. */
+  if (rollback_delete_sealed(root, request)) {
+    bool result = rollback_delete_output(request, "FINALIZED", "-");
+    free(controls); free(receipts); return result;
+  }
   for (size_t i = 0U; i < request->count; i += 1U) {
     RollbackItem *item = &request->items[i];
     if (!rollback_build_control(request, item, controls[i]) ||
@@ -5720,18 +5832,7 @@ static bool rollback_held_authority(RootBinding *root, RollbackRequest *request)
     "changes-history-%s.bin", request->create_request.operation);
   if (artifact_length <= 0 || (size_t)artifact_length >= sizeof(artifact_name) ||
       !record_path_matches_fd(root->recovery_fd, artifact_name, HELD_ARTIFACT_FD)) return false;
-  Identity marker;
-  char marker_content[72];
-  char marker_identity[72];
-  if (!rollback_fd_readonly(HELD_MARKER_FD) ||
-      !hash_fd(HELD_MARKER_FD, &marker, marker_content, 2ULL * 96ULL * 1024ULL * 1024ULL) ||
-      marker.uid != (uintmax_t)geteuid() || permission_mode(marker.mode) != 0600U ||
-      marker.nlink != 1U || marker.size != request->marker_length ||
-      strcmp(marker_content, request->journal_digest) != 0 ||
-      !object_identity_digest(&marker, marker_content, marker_identity) ||
-      strcmp(marker_identity, request->marker_identity) != 0 ||
-      !record_path_matches_fd(root->recovery_fd, "changes-history-transaction.json",
-        HELD_MARKER_FD)) return false;
+  if (!rollback_journal_authority_valid(root, request)) return false;
   struct stat history_parent_stat;
   Identity history_parent;
   char history_parent_digest[72];
@@ -5779,16 +5880,24 @@ static bool rollback_parse_and_run(RootBinding *root, char *line) {
   RollbackRequest *request = calloc(1U, sizeof(*request));
   if (request == NULL) return false;
   bool result = false;
-  if (!rollback_header(line, request)) goto done;
+  if (!rollback_header(line, request)) {
+    DEBUG_STAGE("rollback-header"); goto done;
+  }
   for (size_t i = 0U; i < request->existing_count; i += 1U) {
-    if (!read_protocol_line(line) || !rollback_existing_line(line, request, i)) goto done;
+    if (!read_protocol_line(line) || !rollback_existing_line(line, request, i)) {
+      DEBUG_STAGE("rollback-existing-line"); goto done;
+    }
   }
   for (size_t i = 0U; i < request->count; i += 1U) {
-    if (!read_protocol_line(line) || !rollback_missing_line(line, request, i)) goto done;
+    if (!read_protocol_line(line) || !rollback_missing_line(line, request, i)) {
+      DEBUG_STAGE("rollback-missing-line"); goto done;
+    }
   }
   if (request->command == 'D' || request->command == 'A') {
     for (size_t i = 0U; i < request->count; i += 1U) {
-      if (!read_protocol_line(line) || !rollback_token_line(line, request, i)) goto done;
+      if (!read_protocol_line(line) || !rollback_token_line(line, request, i)) {
+        DEBUG_STAGE("rollback-token-line"); goto done;
+      }
     }
   }
   bool valid = protocol_eof();
@@ -5966,8 +6075,13 @@ static bool existing_execute_item_line(
     if (!existing_identity_fields(fields, 13U, &item->control_stored) ||
         !existing_identity_fields(fields, 23U, &item->apply_stored) ||
         !valid_digest(fields[33])) return false;
-    memcpy(request->publication_marker_digest, fields[33],
-      sizeof(request->publication_marker_digest));
+    if (index > 0U && strcmp(request->publication_marker_digest, fields[33]) != 0) {
+      return false;
+    }
+    if (index == 0U) {
+      memcpy(request->publication_marker_digest, fields[33],
+        sizeof(request->publication_marker_digest));
+    }
     item->stored_bound = true;
   }
   for (size_t i = 0U; i < index; i += 1U) {
@@ -5985,7 +6099,8 @@ static bool existing_execute_header(char *line, ExistingExecuteRequest *request)
   uint64_t item_count = 0U;
   uint64_t generation = 0U;
   if (!split_fields(line, fields, 34U, &count) || count != 33U ||
-      (strcmp(fields[0], "E") != 0 && strcmp(fields[0], "R") != 0) ||
+      (strcmp(fields[0], "E") != 0 && strcmp(fields[0], "R") != 0 &&
+       strcmp(fields[0], "V") != 0) ||
       !valid_operation(fields[1]) ||
       !valid_digest(fields[2]) || !valid_digest(fields[3]) ||
       strcmp(fields[4], JOURNAL_BASENAME) != 0 || strcmp(fields[5], JOURNAL_MAGIC) != 0 ||
@@ -6044,7 +6159,7 @@ static bool existing_execute_header(char *line, ExistingExecuteRequest *request)
   request->base_history_exists = strcmp(fields[29], "1") == 0;
   memcpy(request->base_history_content, fields[30], sizeof(request->base_history_content));
   memcpy(request->history_parent, fields[31], sizeof(request->history_parent));
-  request->reconcile = strcmp(fields[0], "R") == 0;
+  request->reconcile = strcmp(fields[0], "R") == 0 || strcmp(fields[0], "V") == 0;
   request->count = (size_t)item_count;
   return true;
 }
@@ -6269,6 +6384,39 @@ static bool existing_journal_marker_valid(RootBinding *root, const ExistingExecu
   if (valid) valid = existing_journal_identities_valid(root, request);
   free(frame);
   return valid;
+}
+
+/* WRCCHRJ2 rollback bridge: the rollback wire carries the same structured
+ * journal frame descriptor as E/R, so the held journal is revalidated through
+ * the shared existing_journal_marker_valid validator (frame bytes at the slot
+ * offset, frame/header/payload digests, active-marker slice, root/recovery
+ * identity digests and the HELD_MARKER_FD basename) instead of a raw
+ * whole-content hash of the held journal byte image. */
+static bool rollback_journal_authority_valid(
+  RootBinding *root, const RollbackRequest *request
+) {
+  ExistingExecuteRequest current;
+  memset(&current, 0, sizeof(current));
+  memcpy(current.binding_digest, request->binding_digest, DIGEST_BYTES + 1U);
+  current.slot = request->slot;
+  memcpy(current.journal_id, request->journal_id, sizeof(current.journal_id));
+  current.generation = request->generation;
+  current.previous_is_null = request->previous_is_null;
+  memcpy(current.previous_digest, request->previous_digest, DIGEST_BYTES + 1U);
+  memcpy(current.value_digest, request->value_digest, DIGEST_BYTES + 1U);
+  current.frame_byte_length = request->frame_byte_length;
+  memcpy(current.frame_sha256, request->frame_sha256, DIGEST_BYTES + 1U);
+  current.payload_offset = request->payload_offset;
+  current.payload_byte_length = request->payload_byte_length;
+  memcpy(current.payload_sha256, request->payload_sha256, DIGEST_BYTES + 1U);
+  current.active_marker_offset = request->active_marker_offset;
+  current.active_marker_byte_length = request->active_marker_byte_length;
+  memcpy(current.active_marker_digest, request->active_marker_digest, DIGEST_BYTES + 1U);
+  memcpy(current.active_marker_canonical_sha256, request->active_marker_canonical_sha256,
+    DIGEST_BYTES + 1U);
+  memcpy(current.root_identity, request->root_identity, DIGEST_BYTES + 1U);
+  memcpy(current.recovery_identity, request->recovery_identity, DIGEST_BYTES + 1U);
+  return existing_journal_marker_valid(root, &current);
 }
 
 static bool existing_execute_nonpublic_authority_valid(
@@ -6507,7 +6655,8 @@ static bool __attribute__((unused)) existing_swap_and_rollback(
   char ancestor[72];
   if (!open_parent(root, item->path, ancestors, &depth, &parent, leaf, ancestor) ||
       strcmp(ancestor, item->ancestor) != 0 || !revalidate_parent(root, ancestors, depth) ||
-      !existing_execute_authority_valid(root, request)) {
+      !existing_execute_nonpublic_authority_valid(root, request) ||
+      !existing_execute_leaf_before_exact(root, item)) {
     close_parent(ancestors, depth, parent);
     return false;
   }
@@ -7292,6 +7441,368 @@ static bool __attribute__((unused)) existing_output_uncommitted(
   return write_line(line);
 }
 
+static bool existing_output_batch(
+  char command,
+  const ExistingExecuteRequest *request,
+  const ExistingCommitOutput *commits,
+  bool committed
+) {
+  char (*tokens)[MAX_RECORD_BYTES + 1U] = NULL;
+  char *set = NULL;
+  char *terminal = NULL;
+  bool result = false;
+  if (request == NULL || commits == NULL || request->count < 1U) return false;
+  tokens = calloc(request->count, sizeof(*tokens));
+  set = calloc(MAX_INPUT_BYTES + 1U, 1U);
+  terminal = calloc(MAX_INPUT_BYTES + 1U, 1U);
+  if (tokens == NULL || set == NULL || terminal == NULL) goto done;
+  for (size_t index = 0U; index < request->count; index += 1U) {
+    const ExistingCommitOutput *commit = &commits[index];
+    const ExistingExecuteItem *item = &request->items[index];
+    size_t used = 0U;
+    if (commit->uncommitted == committed) goto done;
+    if (committed) {
+      if (!rollback_append(tokens[index], MAX_RECORD_BYTES + 1U, &used,
+          "{\"afterLeafIdentityDigest\":\"%s\",\"applyReceiptDigest\":\"%s\","
+          "\"controlBasename\":\"%s\",\"controlDigest\":\"%s\","
+          "\"controlRecordIdentity\":", commit->after_leaf, commit->apply_digest,
+          commit->control_name, commit->control_digest) ||
+          !rollback_identity_json(tokens[index], MAX_RECORD_BYTES + 1U, &used,
+            &commit->control_record) ||
+          !rollback_append(tokens[index], MAX_RECORD_BYTES + 1U, &used,
+            ",\"receiptBasename\":\"%s\",\"receiptRecordIdentity\":",
+            commit->apply_name) ||
+          !rollback_identity_json(tokens[index], MAX_RECORD_BYTES + 1U, &used,
+            &commit->apply_record_identity) ||
+          !rollback_append(tokens[index], MAX_RECORD_BYTES + 1U, &used,
+            ",\"schema\":\"" EXISTING_APPLY_TOKEN_SCHEMA
+            "\",\"selectedId\":\"%s\"}", item->selected)) goto done;
+    } else {
+      if (!rollback_append(tokens[index], MAX_RECORD_BYTES + 1U, &used,
+          "{\"afterLeafIdentityDigest\":null,\"applyReceiptDigest\":null,"
+          "\"applyReceiptRecordIdentity\":null,\"controlBasename\":\"%s\","
+          "\"controlDigest\":\"%s\",\"controlRecordIdentity\":",
+          commit->control_name, commit->control_digest) ||
+          !rollback_identity_json(tokens[index], MAX_RECORD_BYTES + 1U, &used,
+            &commit->control_record) ||
+          !rollback_append(tokens[index], MAX_RECORD_BYTES + 1U, &used,
+            ",\"receiptBasename\":\"%s\",\"restoredLeafIdentityDigest\":\"%s\","
+            "\"rollbackReceiptDigest\":\"%s\",\"rollbackReceiptRecordIdentity\":",
+            commit->apply_name, commit->after_leaf, commit->apply_digest) ||
+          !rollback_identity_json(tokens[index], MAX_RECORD_BYTES + 1U, &used,
+            &commit->apply_record_identity) ||
+          !rollback_append(tokens[index], MAX_RECORD_BYTES + 1U, &used,
+            ",\"schema\":\"" EXISTING_ROLLBACK_TOKEN_SCHEMA
+            "\",\"selectedId\":\"%s\"}", item->selected)) goto done;
+    }
+  }
+  size_t used = 0U;
+  if (!rollback_append(set, MAX_INPUT_BYTES + 1U, &used, "{\"items\":[")) goto done;
+  for (size_t index = 0U; index < request->count; index += 1U) {
+    const ExistingExecuteItem *item = &request->items[index];
+    const ExistingCommitOutput *commit = &commits[index];
+    if ((index > 0U && !rollback_append(set, MAX_INPUT_BYTES + 1U, &used, ",")) ||
+        !rollback_append(set, MAX_INPUT_BYTES + 1U, &used,
+          committed
+            ? "{\"applyToken\":%s,\"finalContentDigest\":\"%s\","
+              "\"finalLeafIdentityDigest\":\"%s\",\"rollbackToken\":null,"
+              "\"selectedId\":\"%s\"}"
+            : "{\"applyToken\":null,\"finalContentDigest\":\"%s\","
+              "\"finalLeafIdentityDigest\":\"%s\",\"rollbackToken\":%s,"
+              "\"selectedId\":\"%s\"}",
+          committed ? tokens[index] : item->before_content,
+          committed ? item->after_content : commit->after_leaf,
+          committed ? commit->after_leaf : tokens[index], item->selected)) goto done;
+  }
+  const char *state = committed ? "COMMITTED" : "UNCOMMITTED";
+  if (!rollback_append(set, MAX_INPUT_BYTES + 1U, &used,
+      "],\"operationId\":\"%s\",\"requestDigest\":\"%s\",\"schema\":\""
+      EXISTING_TERMINAL_SCHEMA "\",\"state\":\"%s\"}", request->operation,
+      request->request_digest, state)) goto done;
+  char receipt_set_digest[72];
+  if (!digest_domain(EXISTING_TERMINAL_SCHEMA, set, receipt_set_digest)) goto done;
+  used = 0U;
+  if (!rollback_append(terminal, MAX_INPUT_BYTES + 1U, &used,
+      "{\"artifactDigest\":\"%s\",\"baseHistoryDigest\":\"%s\","
+      "\"createdReceiptPhaseDigest\":\"%s\",\"items\":[", request->artifact,
+      request->base_history, request->created_phase)) goto done;
+  for (size_t index = 0U; index < request->count; index += 1U) {
+    const ExistingExecuteItem *item = &request->items[index];
+    const ExistingCommitOutput *commit = &commits[index];
+    if ((index > 0U && !rollback_append(terminal, MAX_INPUT_BYTES + 1U, &used, ",")) ||
+        !rollback_append(terminal, MAX_INPUT_BYTES + 1U, &used,
+          committed
+            ? "{\"applyToken\":%s,\"finalContentDigest\":\"%s\","
+              "\"finalLeafIdentityDigest\":\"%s\",\"rollbackToken\":null,"
+              "\"selectedId\":\"%s\"}"
+            : "{\"applyToken\":null,\"finalContentDigest\":\"%s\","
+              "\"finalLeafIdentityDigest\":\"%s\",\"rollbackToken\":%s,"
+              "\"selectedId\":\"%s\"}",
+          committed ? tokens[index] : item->before_content,
+          committed ? item->after_content : commit->after_leaf,
+          committed ? commit->after_leaf : tokens[index], item->selected)) goto done;
+  }
+  const char *marker = request->reconcile
+    ? request->publication_marker_digest : request->active_marker_digest;
+  if (!rollback_append(terminal, MAX_INPUT_BYTES + 1U, &used,
+      "],\"markerDigest\":\"%s\",\"operationId\":\"%s\","
+      "\"receiptSetDigest\":\"%s\",\"recoveryFsyncComplete\":true,"
+      "\"schema\":\"" EXISTING_TERMINAL_SCHEMA "\",\"selectionDigest\":\"%s\","
+      "\"state\":\"%s\"}", marker, request->operation, receipt_set_digest,
+      request->selection, state)) goto done;
+  char terminal_digest[72];
+  if (!digest_domain(EXISTING_TERMINAL_SCHEMA, terminal, terminal_digest)) goto done;
+  char line[MAX_LINE_BYTES + 1U];
+  int length = snprintf(line, sizeof(line),
+    "%c\tRESULT\t%s\t%s\t%s\t%s\t%s\t%s\t%s\t%s\t%s\t%s\t%zu\t-\n",
+    command, state, request->operation, request->request_digest, marker,
+    request->artifact, request->created_phase, request->selection, request->base_history,
+    receipt_set_digest, terminal_digest, request->count);
+  if (length <= 0 || (size_t)length >= sizeof(line) || !write_line(line)) goto done;
+  for (size_t index = 0U; index < request->count; index += 1U) {
+    const ExistingExecuteItem *item = &request->items[index];
+    const ExistingCommitOutput *commit = &commits[index];
+    length = snprintf(line, sizeof(line), "T\t%s\t%s\t%s\t%s\t%s\t%s\t%s\t%s\t%s",
+      item->selected, committed ? item->after_content : item->before_content,
+      commit->after_leaf, commit->control_name, commit->apply_name,
+      commit->control_digest, commit->apply_digest, commit->after_leaf, OBJECT_SCHEMA);
+    if (length <= 0 || (size_t)length >= sizeof(line)) goto done;
+    used = (size_t)length;
+    if (!append_identity(line, sizeof(line), &used, &commit->control_record) ||
+        !rollback_append(line, sizeof(line), &used, "\t%s", OBJECT_SCHEMA) ||
+        !append_identity(line, sizeof(line), &used, &commit->apply_record_identity) ||
+        !rollback_append(line, sizeof(line), &used, "\n") || !write_line(line)) goto done;
+  }
+  result = true;
+done:
+  free(tokens);
+  free(set);
+  free(terminal);
+  return result;
+}
+
+typedef struct {
+  char control_name[128];
+  char apply_name[128];
+  char rollback_name[128];
+  char before_name[128];
+  char stage_name[128];
+  char control_digest[72];
+  char control_record[MAX_RECORD_BYTES + 1U];
+  Identity control_identity;
+  ExistingStageAttempt stage_attempt;
+  Identity stage_identity;
+  ExistingCommitOutput commit;
+} ExistingBatchItem;
+
+static bool existing_batch_publish_rollback(
+  RootBinding *root,
+  const ExistingExecuteRequest *request,
+  size_t index,
+  ExistingBatchItem *batch
+) {
+  ExistingExecuteItem *item = &request->items[index];
+  Identity restored_identity;
+  Identity rollback_identity;
+  char restored_leaf[72];
+  char rollback_digest[72];
+  char rollback_record[MAX_RECORD_BYTES + 1U];
+  if (!existing_execute_nonpublic_authority_valid(root, request) ||
+      !existing_execute_leaf_restored_exact(root, item, &restored_identity) ||
+      !existing_leaf_identity_digest_observed(item, &restored_identity,
+        item->before_content, item->before_revision, restored_leaf) ||
+      !record_identity_matches(root->recovery_fd, batch->control_name,
+        batch->control_record, &batch->control_identity) ||
+      record_state(root->recovery_fd, batch->apply_name, "") != NAME_ABSENT ||
+      record_state(root->recovery_fd, batch->rollback_name, "") != NAME_ABSENT ||
+      record_state(root->recovery_fd, batch->before_name, "") != NAME_ABSENT ||
+      record_state(root->recovery_fd, batch->stage_name, "") != NAME_ABSENT ||
+      !existing_rollback_receipt_build(request, item, restored_leaf,
+        rollback_digest, rollback_record) ||
+      !write_record(root->recovery_fd, batch->rollback_name, rollback_record,
+        &rollback_identity, NULL) ||
+      !record_identity_matches(root->recovery_fd, batch->rollback_name,
+        rollback_record, &rollback_identity)) return false;
+  ExistingCommitOutput *commit = &batch->commit;
+  memset(commit, 0, sizeof(*commit));
+  memcpy(commit->control_name, batch->control_name, sizeof(commit->control_name));
+  memcpy(commit->control_digest, batch->control_digest, sizeof(commit->control_digest));
+  memcpy(commit->apply_name, batch->rollback_name, sizeof(commit->apply_name));
+  memcpy(commit->apply_digest, rollback_digest, sizeof(commit->apply_digest));
+  memcpy(commit->apply_record, rollback_record, sizeof(commit->apply_record));
+  memcpy(commit->after_leaf, restored_leaf, sizeof(commit->after_leaf));
+  commit->control_identity = batch->control_identity;
+  commit->apply_identity = rollback_identity;
+  commit->control_record.identity = batch->control_identity;
+  sha256_prefixed((const unsigned char *)batch->control_record,
+    strlen(batch->control_record), commit->control_record.content);
+  commit->apply_record_identity.identity = rollback_identity;
+  sha256_prefixed((const unsigned char *)rollback_record,
+    strlen(rollback_record), commit->apply_record_identity.content);
+  commit->uncommitted = true;
+  return true;
+}
+
+static bool existing_batch_restore_committed(
+  RootBinding *root,
+  const ExistingExecuteRequest *request,
+  size_t index,
+  ExistingBatchItem *batch
+) {
+  ExistingExecuteItem *item = &request->items[index];
+  ExistingCommitOutput committed = batch->commit;
+  ExistingStageAttempt before_attempt;
+  Identity before_stage_identity;
+  memset(&before_attempt, 0, sizeof(before_attempt));
+  before_attempt.fd = -1;
+  if (committed.uncommitted ||
+      !existing_execute_nonpublic_authority_valid(root, request) ||
+      !existing_execute_leaf_after_exact(root, item, committed.after_leaf) ||
+      !record_identity_matches(root->recovery_fd, batch->apply_name,
+        committed.apply_record, &committed.apply_identity) ||
+      !existing_stage_write(root->recovery_fd, batch->before_name,
+        item->before_offset, item->before_length, item->before_content,
+        &before_attempt, &before_stage_identity)) return false;
+  Ancestor ancestors[MAX_ROOT_COMPONENTS];
+  memset(ancestors, 0, sizeof(ancestors));
+  for (size_t i = 0U; i < MAX_ROOT_COMPONENTS; i += 1U) ancestors[i].fd = -1;
+  size_t depth = 0U;
+  int parent = -1;
+  char leaf[MAX_PATH_BYTES + 1U];
+  char ancestor[72];
+  if (!open_parent(root, item->path, ancestors, &depth, &parent, leaf, ancestor) ||
+      strcmp(ancestor, item->ancestor) != 0 || !revalidate_parent(root, ancestors, depth)) {
+    close_parent(ancestors, depth, parent);
+    return false;
+  }
+  int after_fd = openat(parent, leaf, O_RDONLY | O_NOFOLLOW | O_CLOEXEC);
+  int before_fd = openat(root->recovery_fd, batch->before_name,
+    O_RDONLY | O_NOFOLLOW | O_CLOEXEC);
+  Identity after_identity;
+  bool ok = after_fd >= 0 && before_fd >= 0 &&
+    existing_held_path_exact(parent, leaf, after_fd, NULL,
+      item->after_content, item->after_length, &after_identity) &&
+    existing_held_path_exact(root->recovery_fd, batch->before_name, before_fd,
+      &before_stage_identity, item->before_content, item->before_length, NULL) &&
+    revalidate_parent(root, ancestors, depth) &&
+    renameatx_np(parent, leaf, root->recovery_fd, batch->before_name, RENAME_SWAP) == 0 &&
+    fsync(parent) == 0 && fsync(root->recovery_fd) == 0 &&
+    record_path_matches_fd(parent, leaf, before_fd) &&
+    record_path_matches_fd(root->recovery_fd, batch->before_name, after_fd) &&
+    revalidate_parent(root, ancestors, depth) &&
+    existing_stage_remove_exact(root->recovery_fd, batch->before_name,
+      &after_identity, item->after_content, item->after_length) &&
+    unlink_exact_record_owned(root->recovery_fd, batch->apply_name,
+      committed.apply_record, &committed.apply_identity, -1);
+  if (after_fd >= 0) (void)close(after_fd);
+  if (before_fd >= 0) (void)close(before_fd);
+  close_parent(ancestors, depth, parent);
+  return ok && existing_batch_publish_rollback(root, request, index, batch);
+}
+
+static bool __attribute__((unused)) existing_execute_batch(
+  RootBinding *root,
+  ExistingExecuteRequest *request
+) {
+  ExistingBatchItem *items = calloc(request->count, sizeof(*items));
+  ExistingCommitOutput *commits = calloc(request->count, sizeof(*commits));
+  bool result = false;
+  if (items == NULL || commits == NULL) goto done;
+  for (size_t index = 0U; index < request->count; index += 1U) {
+    ExistingBatchItem *batch = &items[index];
+    ExistingExecuteItem *item = &request->items[index];
+    batch->stage_attempt.fd = -1;
+    if (!existing_control_record_build(request, item, batch->control_name,
+          batch->control_digest, batch->control_record) ||
+        !existing_record_names(request, item, batch->control_name, batch->apply_name,
+          batch->rollback_name, batch->before_name, batch->stage_name) ||
+        record_state(root->recovery_fd, batch->control_name, "") != NAME_ABSENT ||
+        record_state(root->recovery_fd, batch->apply_name, "") != NAME_ABSENT ||
+        record_state(root->recovery_fd, batch->rollback_name, "") != NAME_ABSENT ||
+        record_state(root->recovery_fd, batch->before_name, "") != NAME_ABSENT ||
+        record_state(root->recovery_fd, batch->stage_name, "") != NAME_ABSENT) goto done;
+  }
+  for (size_t index = 0U; index < request->count; index += 1U) {
+    ExistingBatchItem *batch = &items[index];
+    if (!write_record(root->recovery_fd, batch->control_name, batch->control_record,
+        &batch->control_identity, NULL)) goto done;
+  }
+  for (size_t index = 0U; index < request->count; index += 1U) {
+    ExistingBatchItem *batch = &items[index];
+    ExistingExecuteItem *item = &request->items[index];
+    if (!existing_stage_write(root->recovery_fd, batch->stage_name,
+        item->after_offset, item->after_length, item->after_content,
+        &batch->stage_attempt, &batch->stage_identity)) goto done;
+  }
+  size_t completed = 0U;
+  bool formal_uncommitted = false;
+  bool uncertain = false;
+  for (size_t index = 0U; index < request->count; index += 1U) {
+#ifdef WRITCRAFT_TEST_EXISTING_FAIL_ITEM_INDEX
+    if (index == (size_t)WRITCRAFT_TEST_EXISTING_FAIL_ITEM_INDEX) {
+      formal_uncommitted = true;
+      break;
+    }
+#endif
+    ExistingBatchItem *batch = &items[index];
+    ExistingExecuteItem *item = &request->items[index];
+    if (!existing_swap_and_rollback(root, request, item, batch->stage_name,
+        &batch->stage_identity, batch->before_name, batch->apply_name,
+        batch->rollback_name, batch->control_name, batch->control_digest,
+        batch->control_record, &batch->control_identity, &batch->commit)) {
+      uncertain = true;
+      break;
+    }
+    if (batch->commit.uncommitted) {
+      formal_uncommitted = true;
+      completed = index;
+      break;
+    }
+    completed = index + 1U;
+  }
+  if (formal_uncommitted || uncertain) {
+    for (size_t cursor = completed; cursor > 0U; cursor -= 1U) {
+      if (!existing_batch_restore_committed(root, request, cursor - 1U,
+          &items[cursor - 1U])) goto done;
+    }
+    if (uncertain) goto done;
+    for (size_t index = completed; index < request->count; index += 1U) {
+      ExistingBatchItem *batch = &items[index];
+      if (batch->commit.uncommitted) continue;
+      if (!existing_stage_remove_exact(root->recovery_fd, batch->stage_name,
+          &batch->stage_identity, request->items[index].after_content,
+          request->items[index].after_length) ||
+          !existing_batch_publish_rollback(root, request, index, batch)) goto done;
+    }
+    for (size_t index = 0U; index < request->count; index += 1U) {
+      commits[index] = items[index].commit;
+    }
+    result = existing_output_batch('E', request, commits, false);
+    goto done;
+  }
+  if (completed != request->count ||
+      !existing_execute_nonpublic_authority_valid(root, request)) goto done;
+  for (size_t index = 0U; index < request->count; index += 1U) {
+    ExistingBatchItem *batch = &items[index];
+    if (batch->commit.uncommitted ||
+        !existing_execute_leaf_after_exact(root, &request->items[index],
+          batch->commit.after_leaf) ||
+        !record_identity_matches(root->recovery_fd, batch->control_name,
+          batch->control_record, &batch->control_identity) ||
+        !record_identity_matches(root->recovery_fd, batch->apply_name,
+          batch->commit.apply_record, &batch->commit.apply_identity) ||
+        record_state(root->recovery_fd, batch->rollback_name, "") != NAME_ABSENT ||
+        record_state(root->recovery_fd, batch->before_name, "") != NAME_ABSENT ||
+        record_state(root->recovery_fd, batch->stage_name, "") != NAME_ABSENT) goto done;
+    commits[index] = batch->commit;
+  }
+  result = existing_output_batch('E', request, commits, true);
+done:
+  free(items);
+  free(commits);
+  return result;
+}
+
 static bool existing_output_unknown(char command, const ExistingExecuteRequest *request) {
   char response[256];
   int length = snprintf(response, sizeof(response),
@@ -7302,79 +7813,128 @@ static bool existing_output_unknown(char command, const ExistingExecuteRequest *
 
 static bool existing_reconcile_readonly(RootBinding *root, char *line) {
   ExistingExecuteRequest request;
-  ExistingCommitOutput commit;
+  const char output_command = line[0];
   memset(&request, 0, sizeof(request));
-  memset(&commit, 0, sizeof(commit));
   if (!existing_execute_header(line, &request)) return false;
   for (size_t index = 0U; index < request.count; index += 1U) {
     if (!read_protocol_line(line) || !existing_execute_item_line(line, &request, index)) return false;
   }
   if (!protocol_eof()) return false;
-  bool valid = request.count == 1U && existing_execute_nonpublic_authority_valid(root, &request);
-  char control_name[128];
-  char apply_name[128];
-  char rollback_name[128];
-  char before_name[128];
-  char stage_name[128];
-  char control_digest[72];
-  char control_record[MAX_RECORD_BYTES + 1U];
-  char after_leaf[72];
-  char apply_digest[72];
-  char apply_record[MAX_RECORD_BYTES + 1U];
-  ExistingExecuteItem *item = &request.items[0];
-  if (valid && (!item->stored_bound ||
-      !existing_control_record_build(&request, item, control_name, control_digest,
-      control_record))) {
-    valid = false;
+  if (request.count > 0U) {
+    ExistingCommitOutput *commits = calloc(request.count, sizeof(*commits));
+    ExistingCommitOutput *rollbacks = calloc(request.count, sizeof(*rollbacks));
+    bool valid_committed = commits != NULL && rollbacks != NULL &&
+      existing_execute_nonpublic_authority_valid(root, &request);
+    bool valid_uncommitted = valid_committed;
+    for (size_t index = 0U; index < request.count &&
+        (valid_committed || valid_uncommitted); index += 1U) {
+      ExistingExecuteItem *item = &request.items[index];
+      ExistingCommitOutput *batch_commit = &commits[index];
+      ExistingCommitOutput *batch_rollback = &rollbacks[index];
+      char control_name[128];
+      char apply_name[128];
+      char rollback_name[128];
+      char before_name[128];
+      char stage_name[128];
+      char control_digest[72];
+      char control_record[MAX_RECORD_BYTES + 1U];
+      char after_leaf[72];
+      char apply_digest[72];
+      char apply_record[MAX_RECORD_BYTES + 1U];
+      RecordIdentity control_identity;
+      if (!item->stored_bound ||
+          !existing_control_record_build(&request, item, control_name,
+            control_digest, control_record) ||
+          !existing_record_names(&request, item, control_name, apply_name,
+            rollback_name, before_name, stage_name) ||
+          record_state(root->recovery_fd, before_name, "") != NAME_ABSENT ||
+          record_state(root->recovery_fd, stage_name, "") != NAME_ABSENT ||
+          !capture_record_identity(root->recovery_fd, control_name, control_record,
+            &control_identity) ||
+          !same_file(&control_identity.identity, &item->control_stored) ||
+          !record_identity_matches(root->recovery_fd, control_name, control_record,
+            &control_identity.identity)) {
+        valid_committed = false;
+        valid_uncommitted = false;
+        break;
+      }
+      if (valid_committed) {
+        if (record_state(root->recovery_fd, rollback_name, "") != NAME_ABSENT ||
+            !existing_execute_leaf_identity_after(root, item, after_leaf) ||
+            !existing_apply_record_build(&request, item, after_leaf,
+              apply_digest, apply_record) ||
+            !capture_record_identity(root->recovery_fd, apply_name, apply_record,
+              &batch_commit->apply_record_identity) ||
+            !same_file(&batch_commit->apply_record_identity.identity, &item->apply_stored) ||
+            !record_identity_matches(root->recovery_fd, apply_name, apply_record,
+              &batch_commit->apply_record_identity.identity)) {
+          valid_committed = false;
+        } else {
+          memcpy(batch_commit->control_name, control_name,
+            sizeof(batch_commit->control_name));
+          memcpy(batch_commit->control_digest, control_digest,
+            sizeof(batch_commit->control_digest));
+          memcpy(batch_commit->apply_name, apply_name, sizeof(batch_commit->apply_name));
+          memcpy(batch_commit->apply_digest, apply_digest,
+            sizeof(batch_commit->apply_digest));
+          memcpy(batch_commit->apply_record, apply_record,
+            sizeof(batch_commit->apply_record));
+          memcpy(batch_commit->after_leaf, after_leaf, sizeof(batch_commit->after_leaf));
+          batch_commit->control_record = control_identity;
+          batch_commit->control_identity = control_identity.identity;
+          batch_commit->apply_identity = batch_commit->apply_record_identity.identity;
+        }
+      }
+      if (valid_uncommitted) {
+        Identity restored_identity;
+        char restored_leaf[72];
+        char rollback_digest[72];
+        char rollback_record[MAX_RECORD_BYTES + 1U];
+        if (record_state(root->recovery_fd, apply_name, "") != NAME_ABSENT ||
+            !existing_execute_leaf_restored_exact(root, item, &restored_identity) ||
+            !existing_leaf_identity_digest_observed(item, &restored_identity,
+              item->before_content, item->before_revision, restored_leaf) ||
+            !existing_rollback_receipt_build(&request, item, restored_leaf,
+              rollback_digest, rollback_record) ||
+            !capture_record_identity(root->recovery_fd, rollback_name, rollback_record,
+              &batch_rollback->apply_record_identity) ||
+            !same_file(&batch_rollback->apply_record_identity.identity,
+              &item->apply_stored) ||
+            !record_identity_matches(root->recovery_fd, rollback_name, rollback_record,
+              &batch_rollback->apply_record_identity.identity)) {
+          valid_uncommitted = false;
+        } else {
+          memcpy(batch_rollback->control_name, control_name,
+            sizeof(batch_rollback->control_name));
+          memcpy(batch_rollback->control_digest, control_digest,
+            sizeof(batch_rollback->control_digest));
+          memcpy(batch_rollback->apply_name, rollback_name,
+            sizeof(batch_rollback->apply_name));
+          memcpy(batch_rollback->apply_digest, rollback_digest,
+            sizeof(batch_rollback->apply_digest));
+          memcpy(batch_rollback->apply_record, rollback_record,
+            sizeof(batch_rollback->apply_record));
+          memcpy(batch_rollback->after_leaf, restored_leaf,
+            sizeof(batch_rollback->after_leaf));
+          batch_rollback->control_record = control_identity;
+          batch_rollback->control_identity = control_identity.identity;
+          batch_rollback->apply_identity = batch_rollback->apply_record_identity.identity;
+          batch_rollback->uncommitted = true;
+        }
+      }
+    }
+    bool output = valid_committed != valid_uncommitted
+      ? existing_output_batch(
+          output_command, &request, valid_committed ? commits : rollbacks, valid_committed
+        )
+      : existing_output_unknown(output_command, &request);
+    free(commits);
+    free(rollbacks);
+    free(request.items);
+    return output;
   }
-  if (valid && !existing_record_names(&request, item, control_name, apply_name,
-      rollback_name, before_name, stage_name)) {
-    valid = false;
-  }
-  if (valid && (record_state(root->recovery_fd, rollback_name, "") != NAME_ABSENT ||
-      record_state(root->recovery_fd, before_name, "") != NAME_ABSENT ||
-      record_state(root->recovery_fd, stage_name, "") != NAME_ABSENT)) {
-    valid = false;
-  }
-  if (valid && !existing_execute_leaf_identity_after(root, item, after_leaf)) {
-    valid = false;
-  }
-  if (valid && !existing_apply_record_build(&request, item, after_leaf, apply_digest, apply_record)) {
-    valid = false;
-  }
-  if (valid && !capture_record_identity(root->recovery_fd, control_name, control_record,
-      &commit.control_record)) {
-    valid = false;
-  }
-  if (valid && !capture_record_identity(root->recovery_fd, apply_name, apply_record,
-      &commit.apply_record_identity)) {
-    valid = false;
-  }
-  if (valid && !same_file(&commit.control_record.identity, &item->control_stored)) {
-    valid = false;
-  }
-  if (valid && !same_file(&commit.apply_record_identity.identity, &item->apply_stored)) {
-    valid = false;
-  }
-  if (valid) {
-    commit.control_identity = commit.control_record.identity;
-    commit.apply_identity = commit.apply_record_identity.identity;
-    if (!record_identity_matches(root->recovery_fd, control_name, control_record,
-          &commit.control_identity) ||
-        !record_identity_matches(root->recovery_fd, apply_name, apply_record,
-          &commit.apply_identity)) valid = false;
-  }
-  if (valid) {
-    memcpy(commit.control_name, control_name, sizeof(commit.control_name));
-    memcpy(commit.control_digest, control_digest, sizeof(commit.control_digest));
-    memcpy(commit.apply_name, apply_name, sizeof(commit.apply_name));
-    memcpy(commit.apply_digest, apply_digest, sizeof(commit.apply_digest));
-    memcpy(commit.apply_record, apply_record, sizeof(commit.apply_record));
-    memcpy(commit.after_leaf, after_leaf, sizeof(commit.after_leaf));
-    if (!existing_output_committed('R', &request, &commit)) valid = false;
-  }
-  if (!valid) return existing_output_unknown('R', &request);
-  return true;
+  free(request.items);
+  return existing_output_unknown(output_command, &request);
 }
 
 static bool existing_reconcile_header_shape(const char *line) {
@@ -7385,7 +7945,7 @@ static bool existing_reconcile_header_shape(const char *line) {
   if (length >= sizeof(copy)) return false;
   memcpy(copy, line, length + 1U);
   return split_fields(copy, fields, 34U, &count) && count == 33U &&
-    strcmp(fields[0], "R") == 0;
+    (strcmp(fields[0], "R") == 0 || strcmp(fields[0], "V") == 0);
 }
 
 #define EXISTING_FINAL_RECORD_SCHEMA \
@@ -7484,52 +8044,192 @@ static bool existing_finalize(RootBinding *root, char *line) {
   return wrote > 0 && (size_t)wrote < sizeof(line_out) && write_line(line_out);
 }
 
-/* EXISTING terminal ACK (A): verifies the final record is still the exact
- * owner-private file Main sealed, then acknowledges it so cleanup may proceed. */
-static bool existing_ack(RootBinding *root, char *line) {
-  char *fields[16];
+#define EXISTING_CLEANUP_KEY_SCHEMA \
+  "writcraft.changes-history-native-existing-cleanup-key/v1"
+
+typedef struct {
+  char selected[160];
+  char control_name[128];
+  char control_digest[72];
+  RecordIdentity control_record;
+  char apply_name[128];
+  char apply_digest[72];
+  RecordIdentity apply_record;
+} ExistingAckItem;
+
+static bool existing_ack_item_line(
+  char *line, ExistingAckItem *item, ExistingAckItem *previous, size_t previous_count
+) {
+  char *fields[26];
   size_t count = 0U;
-  uint64_t dev, ino, uid, mode, nlink, size, mtime, ctime;
-  if (!split_fields(line, fields, 16U, &count) || count != 16U ||
+  if (!split_fields(line, fields, 26U, &count) || count != 26U ||
+      strcmp(fields[0], "I") != 0 || !valid_selected(fields[1]) ||
+      !valid_digest_basename(fields[2], ".changes-history-native-existing-control.") ||
+      !valid_digest(fields[3]) || strcmp(fields[4], OBJECT_SCHEMA) != 0 ||
+      !parse_identity_fields(fields, 5U, &item->control_record) ||
+      !valid_digest_basename(fields[14], ".changes-history-native-existing-apply.") ||
+      !valid_digest(fields[15]) || strcmp(fields[16], OBJECT_SCHEMA) != 0 ||
+      !parse_identity_fields(fields, 17U, &item->apply_record)) return false;
+  memcpy(item->selected, fields[1], strlen(fields[1]) + 1U);
+  memcpy(item->control_name, fields[2], strlen(fields[2]) + 1U);
+  memcpy(item->control_digest, fields[3], DIGEST_BYTES + 1U);
+  memcpy(item->apply_name, fields[14], strlen(fields[14]) + 1U);
+  memcpy(item->apply_digest, fields[15], DIGEST_BYTES + 1U);
+  if (strcmp(item->control_name, item->apply_name) == 0) return false;
+  for (size_t index = 0U; index < previous_count; index += 1U) {
+    if (strcmp(previous[index].selected, item->selected) == 0 ||
+        strcmp(previous[index].control_name, item->control_name) == 0 ||
+        strcmp(previous[index].apply_name, item->apply_name) == 0 ||
+        strcmp(previous[index].control_name, item->apply_name) == 0 ||
+        strcmp(previous[index].apply_name, item->control_name) == 0) return false;
+  }
+  return true;
+}
+
+static bool existing_ack_cleanup_name(
+  const char *operation, const char *request_digest, const char *selected,
+  const char *role, size_t ordinal, const char *source, char out[128]
+) {
+  char canonical[1024];
+  char key_digest[72];
+  int length = snprintf(canonical, sizeof(canonical),
+    "{\"operationId\":\"%s\",\"ordinal\":%zu,\"requestDigest\":\"%s\","
+    "\"role\":\"%s\",\"schema\":\"" EXISTING_CLEANUP_KEY_SCHEMA "\","
+    "\"selectedId\":\"%s\",\"sourceBasename\":\"%s\"}",
+    operation, ordinal, request_digest, role, selected, source);
+  if (length <= 0 || (size_t)length >= sizeof(canonical) ||
+      !digest_domain(EXISTING_CLEANUP_KEY_SCHEMA, canonical, key_digest)) return false;
+  length = snprintf(out, 128U,
+    ".changes-history-native-existing-cleanup.%s", key_digest + 7U);
+  return length > 0 && length < 128;
+}
+
+static NameState existing_ack_record_state(
+  int directory, const char *name, const RecordIdentity *expected, bool moved
+) {
+  int fd = openat(directory, name, O_RDONLY | O_NOFOLLOW | O_CLOEXEC);
+  if (fd < 0) return errno == ENOENT ? NAME_ABSENT : NAME_ERROR;
+  Identity identity;
+  char content[72];
+  bool exact = hash_fd(fd, &identity, content, MAX_RECORD_BYTES) &&
+    strcmp(content, expected->content) == 0 &&
+    (moved ? same_bound_record(&identity, &expected->identity)
+      : same_file(&identity, &expected->identity)) &&
+    record_path_matches_fd(directory, name, fd);
+  (void)close(fd);
+  return exact ? NAME_EXACT : NAME_FOREIGN;
+}
+
+static bool existing_ack_remove_record(
+  RootBinding *root, const char *source, const char *cleanup,
+  const RecordIdentity *expected
+) {
+  NameState source_state = existing_ack_record_state(
+    root->recovery_fd, source, expected, false
+  );
+  NameState cleanup_state = existing_ack_record_state(
+    root->recovery_fd, cleanup, expected, true
+  );
+  if (source_state == NAME_FOREIGN || source_state == NAME_ERROR ||
+      cleanup_state == NAME_FOREIGN || cleanup_state == NAME_ERROR ||
+      (source_state == NAME_EXACT && cleanup_state != NAME_ABSENT)) return false;
+  if (source_state == NAME_ABSENT && cleanup_state == NAME_ABSENT) return true;
+  if (source_state == NAME_EXACT) {
+    int held = openat(root->recovery_fd, source, O_RDONLY | O_NOFOLLOW | O_CLOEXEC);
+    Identity identity;
+    char content[72];
+    struct stat ignored;
+    bool moved = held >= 0 && hash_fd(held, &identity, content, MAX_RECORD_BYTES) &&
+      same_file(&identity, &expected->identity) && strcmp(content, expected->content) == 0 &&
+      record_path_matches_fd(root->recovery_fd, source, held) &&
+      fstatat(root->recovery_fd, cleanup, &ignored, AT_SYMLINK_NOFOLLOW) != 0 &&
+      errno == ENOENT && renameatx_np(root->recovery_fd, source,
+        root->recovery_fd, cleanup, RENAME_EXCL) == 0 &&
+      fsync(root->recovery_fd) == 0;
+    if (held >= 0) (void)close(held);
+    if (!moved || existing_ack_record_state(
+      root->recovery_fd, cleanup, expected, true
+    ) != NAME_EXACT) return false;
+  }
+  int held = openat(root->recovery_fd, cleanup, O_RDONLY | O_NOFOLLOW | O_CLOEXEC);
+  Identity identity;
+  char content[72];
+  struct stat ignored;
+  bool removed = held >= 0 && hash_fd(held, &identity, content, MAX_RECORD_BYTES) &&
+    same_bound_record(&identity, &expected->identity) &&
+    strcmp(content, expected->content) == 0 &&
+    record_path_matches_fd(root->recovery_fd, cleanup, held) &&
+    unlinkat(root->recovery_fd, cleanup, 0) == 0 &&
+    fstatat(root->recovery_fd, cleanup, &ignored, AT_SYMLINK_NOFOLLOW) != 0 &&
+    errno == ENOENT && fsync(root->recovery_fd) == 0;
+  if (held >= 0) (void)close(held);
+  return removed && existing_ack_record_state(
+    root->recovery_fd, source, expected, false
+  ) == NAME_ABSENT;
+}
+
+/* EXISTING terminal ACK (A): consumes durable ACK_PREPARED authority and
+ * exact-removes every ordered apply/control record plus the final record.
+ * Deterministic cleanup names make response-loss restart A-only and preserve
+ * any same-byte replacement whose publication identity does not match. */
+static bool existing_ack(RootBinding *root, char *line) {
+  char *fields[17];
+  size_t count = 0U;
+  uint64_t item_count = 0U;
+  RecordIdentity final_record;
+  if (!split_fields(line, fields, 17U, &count) || count != 17U ||
       strcmp(fields[0], "F") != 0 || strcmp(fields[1], "ACK") != 0 ||
       !valid_operation(fields[2]) || !valid_digest(fields[3]) ||
       !valid_digest_basename(fields[4], ".changes-history-native-existing-final.") ||
       !valid_digest(fields[5]) || !valid_digest(fields[6]) ||
-      !parse_uint(fields[7], UINT64_MAX, &dev) ||
-      !parse_uint(fields[8], UINT64_MAX, &ino) ||
-      !parse_uint(fields[9], UINT64_MAX, &uid) ||
-      !parse_uint(fields[10], UINT64_MAX, &mode) ||
-      !parse_uint(fields[11], UINT64_MAX, &nlink) ||
-      !parse_uint(fields[12], UINT64_MAX, &size) ||
-      !parse_uint(fields[13], INTMAX_MAX, &mtime) ||
-      !parse_uint(fields[14], INTMAX_MAX, &ctime) ||
-      !valid_digest(fields[15]) || uid != (uint64_t)geteuid() ||
-      mode != 0600U || nlink != 1U || !open_recovery(root, false)) {
-    return false;
+      !parse_identity_fields(fields, 7U, &final_record) ||
+      !parse_uint(fields[16], MAX_ITEMS, &item_count) || item_count == 0U ||
+      !open_recovery(root, false)) return false;
+  char operation[64];
+  char request_digest[72];
+  char final_name[128];
+  char final_digest[72];
+  memcpy(operation, fields[2], strlen(fields[2]) + 1U);
+  memcpy(request_digest, fields[3], DIGEST_BYTES + 1U);
+  memcpy(final_name, fields[4], strlen(fields[4]) + 1U);
+  memcpy(final_digest, fields[5], DIGEST_BYTES + 1U);
+  ExistingAckItem *items = calloc((size_t)item_count, sizeof(*items));
+  if (items == NULL) return false;
+  bool valid = true;
+  for (size_t index = 0U; index < (size_t)item_count; index += 1U) {
+    if (!read_protocol_line(line) || !existing_ack_item_line(
+      line, &items[index], items, index
+    )) {
+      valid = false;
+      break;
+    }
   }
-  Identity expected;
-  expected.dev = (uintmax_t)dev;
-  expected.ino = (uintmax_t)ino;
-  expected.uid = (uintmax_t)uid;
-  expected.mode = (uintmax_t)(S_IFREG | mode);
-  expected.nlink = (uintmax_t)nlink;
-  expected.size = (uintmax_t)size;
-  expected.mtime_ns = (intmax_t)mtime;
-  expected.ctime_ns = (intmax_t)ctime;
-  int fd = openat(root->recovery_fd, fields[4],
-    O_RDONLY | O_NOFOLLOW | O_CLOEXEC);
-  Identity identity;
-  char content[72];
-  bool valid = fd >= 0 && hash_fd(fd, &identity, content,
-    MAX_RECORD_BYTES) && same_file(&expected, &identity) &&
-    strcmp(content, fields[15]) == 0 &&
-    record_path_matches_fd(root->recovery_fd, fields[4], fd) &&
-    open_recovery(root, false);
-  if (fd >= 0) (void)close(fd);
+  if (valid) valid = protocol_eof();
+  for (size_t index = 0U; valid && index < (size_t)item_count; index += 1U) {
+    char cleanup[128];
+    valid = existing_ack_cleanup_name(operation, request_digest, items[index].selected,
+      "APPLY", index * 2U, items[index].apply_name, cleanup) &&
+      existing_ack_remove_record(root, items[index].apply_name, cleanup,
+        &items[index].apply_record);
+    if (valid) {
+      valid = existing_ack_cleanup_name(operation, request_digest, items[index].selected,
+        "CONTROL", (index * 2U) + 1U, items[index].control_name, cleanup) &&
+        existing_ack_remove_record(root, items[index].control_name, cleanup,
+          &items[index].control_record);
+    }
+  }
+  if (valid) {
+    char cleanup[128];
+    valid = existing_ack_cleanup_name(operation, request_digest, "terminal", "FINAL",
+      (size_t)item_count * 2U, final_name, cleanup) &&
+      existing_ack_remove_record(root, final_name, cleanup, &final_record) &&
+      open_recovery(root, false);
+  }
+  free(items);
   if (!valid) return false;
   char line_out[512];
   int wrote = snprintf(line_out, sizeof(line_out),
-    "F\tRESULT\tACKED\t%s\t%s\t%s\n", fields[2], fields[3], fields[5]);
+    "F\tRESULT\tACKED\t%s\t%s\t%s\n", operation, request_digest, final_digest);
   return wrote > 0 && (size_t)wrote < sizeof(line_out) && write_line(line_out);
 }
 
@@ -7565,6 +8265,10 @@ static bool existing_execute_unknown(RootBinding *root, char *line) {
       !existing_execute_authority_valid(root, &request)) goto done;
 #endif
 #ifndef WRITCRAFT_TEST_EXISTING_CANONICAL
+  if (request.count > 1U) {
+    result = existing_execute_batch(root, &request);
+    goto done;
+  }
   if (request.count == 1U) {
     char control_name[128];
     char apply_name[128];
@@ -8423,7 +9127,8 @@ int main(void) {
   } else if (line[0] == 'E' && strncmp(line + 1U, "\t", 1U) == 0) {
     output_limit = MAX_EXISTING_OUTPUT_BYTES;
     result = existing_execute_unknown(&root, line);
-  } else if (line[0] == 'R' && strncmp(line + 1U, "\t", 1U) == 0 &&
+  } else if ((line[0] == 'R' || line[0] == 'V') &&
+      strncmp(line + 1U, "\t", 1U) == 0 &&
       existing_reconcile_header_shape(line)) {
     output_limit = MAX_EXISTING_OUTPUT_BYTES;
     result = existing_reconcile_readonly(&root, line);

@@ -380,6 +380,7 @@ function existingProductionFixture(
     activeMarkerDigest: journal.activeMarkerDigest(marker),
     nativePublication: null,
     existingTerminalPublication: null,
+    rollbackCreatePublication: null,
     terminalCleanup: null,
     terminalCleanupDigest: null,
     valueDigest: null,
@@ -698,10 +699,15 @@ function runExistingReconcileProduction(helperPath, item, reconcileIdentities, p
 
 function reconcileIdentitiesFromReceipt(receipt) {
   assert.ok(receipt && Array.isArray(receipt.items));
-  return receipt.items.map(item => ({
-    controlRecordIdentity: item.applyToken.controlRecordIdentity,
-    applyRecordIdentity: item.applyToken.receiptRecordIdentity,
-  }));
+  return receipt.items.map(item => {
+    const terminalToken = item.applyToken || item.rollbackToken;
+    return {
+      controlRecordIdentity: terminalToken.controlRecordIdentity,
+      applyRecordIdentity: item.applyToken
+        ? terminalToken.receiptRecordIdentity
+        : terminalToken.rollbackReceiptRecordIdentity,
+    };
+  });
 }
 
 function assertCommittedExistingProduction(item, result, authoritySnapshot = null) {
@@ -986,6 +992,10 @@ const existingStageFaultHelpers = [
   label,
   helper: compile(`public-markdown-helper-existing-stage-${label}`, [definition]),
 }));
+const existingMultiSecondFaultHelper = compile(
+  'public-markdown-helper-existing-multi-second-fault',
+  ['WRITCRAFT_TEST_EXISTING_FAIL_ITEM_INDEX=1']
+);
 
 if (process.env.WRC_A1B_CANONICAL_ONLY !== '1') {
   if (process.env.WRC_A1B_E2A_BASELINE === '1') {
@@ -1189,21 +1199,80 @@ if (process.env.WRC_A1B_CANONICAL_ONLY !== '1') {
       });
     }
 
-    test('A1b E-2b multi-item production E remains UNKNOWN without records', () => {
+    test('A1b E-2b multi-item production E commits one ordered aggregate terminal', () => {
       const item = existingProductionFixture(helper, 2, false);
-      const beforeChapters = item.chapterPaths.map(chapterPath => fs.readFileSync(chapterPath));
       const beforeArtifact = fs.readFileSync(item.artifactPath);
       const beforeHistory = fs.readFileSync(item.historyPath);
       try {
-        const result = runExistingProduction(helper, item);
-        assert.strictEqual(result.status, 0, result.stderr || result.stdout);
-        assert.match(result.stdout, /^P\tOK\nE\tRESULT\tUNKNOWN\t/);
+        const result = item.scoped.existingRestore.execute(item.bound, item.descriptors);
+        assert.strictEqual(result.state, 'COMMITTED');
+        assert.deepStrictEqual(
+          result.terminalReceipt.items.map(terminalItem => terminalItem.selectedId),
+          ['existing:0', 'existing:1']
+        );
         item.chapterPaths.forEach((chapterPath, index) =>
-          assert.deepStrictEqual(fs.readFileSync(chapterPath), beforeChapters[index]));
+          assert.deepStrictEqual(fs.readFileSync(chapterPath), item.afterBytes[index]));
         assert.deepStrictEqual(fs.readFileSync(item.artifactPath), beforeArtifact);
         assert.deepStrictEqual(fs.readFileSync(item.historyPath), beforeHistory);
-        assert.strictEqual(fs.readdirSync(path.join(item.rootPath, '.writcraft', 'recovery'))
-          .some(name => name.startsWith('.changes-history-native-existing-')), false);
+        assert.strictEqual(result.terminalReceipt.items.length, 2);
+        const reconciled = item.scoped.existingRestore.reconcile(
+          item.bound,
+          item.descriptors,
+          reconcileIdentitiesFromReceipt(result.terminalReceipt),
+          result.terminalReceipt.markerDigest,
+          result.requestDigest
+        );
+        assert.strictEqual(reconciled.state, 'COMMITTED');
+        assert.deepStrictEqual(reconciled.terminalReceipt, result.terminalReceipt);
+      } finally { item.close(); }
+    });
+
+    test('A1b E-3 multi-item R rejects one replaced record without partial success', () => {
+      const item = existingProductionFixture(helper, 2, false);
+      try {
+        const committed = item.scoped.existingRestore.execute(item.bound, item.descriptors);
+        assert.strictEqual(committed.state, 'COMMITTED');
+        const secondReceipt = committed.terminalReceipt.items[1].applyToken;
+        const applyPath = path.join(
+          item.rootPath, '.writcraft', 'recovery', secondReceipt.receiptBasename
+        );
+        const movedPath = `${applyPath}.moved`;
+        const exactBytes = fs.readFileSync(applyPath);
+        fs.renameSync(applyPath, movedPath);
+        fs.writeFileSync(applyPath, exactBytes, { flag: 'wx', mode: 0o600 });
+        const reconciled = item.scoped.existingRestore.reconcile(
+          item.bound,
+          item.descriptors,
+          reconcileIdentitiesFromReceipt(committed.terminalReceipt),
+          committed.terminalReceipt.markerDigest,
+          committed.requestDigest
+        );
+        assert.strictEqual(reconciled.state, 'UNKNOWN');
+        assert.deepStrictEqual(fs.readFileSync(applyPath), exactBytes);
+        assert.deepStrictEqual(fs.readFileSync(movedPath), exactBytes);
+      } finally { item.close(); }
+    });
+
+    test('A1b E-2b item two failure restores the complete multi-item set', () => {
+      const item = existingProductionFixture(existingMultiSecondFaultHelper, 2, false);
+      try {
+        const result = item.scoped.existingRestore.execute(item.bound, item.descriptors);
+        assert.strictEqual(result.state, 'UNCOMMITTED');
+        assert.deepStrictEqual(
+          result.terminalReceipt.items.map(terminalItem => terminalItem.selectedId),
+          ['existing:0', 'existing:1']
+        );
+        item.chapterPaths.forEach((chapterPath, index) =>
+          assert.deepStrictEqual(fs.readFileSync(chapterPath), item.beforeBytes[index]));
+        const reconciled = item.scoped.existingRestore.reconcile(
+          item.bound,
+          item.descriptors,
+          reconcileIdentitiesFromReceipt(result.terminalReceipt),
+          result.terminalReceipt.markerDigest,
+          result.requestDigest
+        );
+        assert.strictEqual(reconciled.state, 'UNCOMMITTED');
+        assert.deepStrictEqual(reconciled.terminalReceipt, result.terminalReceipt);
       } finally { item.close(); }
     });
 
@@ -1800,7 +1869,7 @@ if (process.env.WRC_A1B_E3_R === '1') {
 }
 
 if (process.env.WRC_A1B_E4_FA === '1') {
-  test('A1b E-4 finalize seals the committed terminal and ACK acknowledges the final record', () => {
+  test('A1b E-4 finalize seals the committed terminal and refuses the retired item-less ACK wire', () => {
     const item = existingProductionFixture(helper);
     try {
       const executed = item.scoped.existingRestore.execute(item.bound, item.descriptors);
@@ -1835,19 +1904,43 @@ if (process.env.WRC_A1B_E4_FA === '1') {
         item.bound,
         executed.terminalReceipt
       );
-      const acked = item.scoped.existingRestore.ack(
-        item.bound,
-        finalizeRequest,
-        finalized.finalRecordIdentity,
+      // P1-5: the native A command must refuse the retired item-less ACK wire.
+      // Without per-item control/apply identities it cannot prove the exact
+      // removals that ACK_COMMITTED depends on, so it has to fail closed and
+      // delete nothing. The accepted publication ACK is covered by the mixed
+      // production journey, which proves every sealed basename is removed and
+      // the journal reaches IDLE.
+      const bind = schema.encodeRootBind({
+        schema: schema.SCHEMAS.ROOT_BIND,
+        canonicalRoot: item.rootPath,
+        expectedRootIdentityDigest: directoryIdentityDigest(item.rootPath),
+        expectedRecoveryIdentityDigest: directoryIdentityDigest(
+          path.join(item.rootPath, '.writcraft', 'recovery')
+        ),
+      });
+      const identity = finalized.finalRecordIdentity;
+      const legacyAckWire = [
+        'F', 'ACK', item.bound.request.operationId,
+        existingSchema.requestDigest(item.bound),
+        finalBasename,
+        existingSchema.buildFinalRecord(finalizeRequest, item.bound).finalRecordDigest,
         `sha256:${'d'.repeat(64)}`,
-        item.descriptors
-      );
-      assert.strictEqual(acked.command, existingSchema.COMMANDS.FINALIZE);
-      assert.strictEqual(acked.state, 'ACKED');
-      assert.strictEqual(
-        acked.finalRecordDigest,
-        existingSchema.buildFinalRecord(finalizeRequest, item.bound).finalRecordDigest
-      );
+        identity.dev, identity.ino, String(identity.uid), String(identity.mode),
+        String(identity.nlink), identity.size, identity.mtimeNs, identity.ctimeNs,
+        identity.contentSha256,
+      ].join('\t');
+      const refused = childProcess.spawnSync(helper, [], {
+        input: `${bind}${legacyAckWire}\n`,
+        encoding: 'utf8',
+        stdio: [
+          'pipe', 'pipe', 'pipe', fs.openSync('/', fs.constants.O_RDONLY),
+          item.descriptors.artifactFd, item.descriptors.markerFd,
+          item.descriptors.historyParentFd, item.descriptors.historyFd,
+        ],
+      });
+      assert.notStrictEqual(refused.status, 0);
+      assert.strictEqual(fs.existsSync(finalPath), true);
+      assert.strictEqual(fs.readFileSync(finalPath, 'utf8'), finalWire);
     } finally { item.close(); }
   });
 

@@ -1,7 +1,7 @@
 {
   "schemaVersion": "writcraft.test-gates/v1",
   "targetVersion": "0.4.0",
-  "expectedTestCount": 52,
+  "expectedTestCount": 53,
   "legacyBaseline": "tests/0.4.0-legacy-test-baseline.json",
   "tests": [
     {
@@ -144,6 +144,15 @@
       "stage": "A",
       "lane": "public-markdown-native",
       "evidenceKind": "native-lifecycle",
+      "requiredInCurrentGate": true,
+      "completionEligible": false,
+      "requiresGui": false
+    },
+    {
+      "test": "tests/verify-v0-public-markdown-native-rollback-create-publication.js",
+      "stage": "A",
+      "lane": "public-markdown-native",
+      "evidenceKind": "native-schema",
       "requiredInCurrentGate": true,
       "completionEligible": false,
       "requiresGui": false

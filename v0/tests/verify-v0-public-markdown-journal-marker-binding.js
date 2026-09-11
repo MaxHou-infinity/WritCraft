@@ -50,6 +50,7 @@ function activeValue() {
     activeMarkerDigest: journal.activeMarkerDigest(activeMarker),
     nativePublication: null,
     existingTerminalPublication: null,
+    rollbackCreatePublication: null,
     terminalCleanup: null,
     terminalCleanupDigest: null,
   });
@@ -110,16 +111,16 @@ test('ACTIVE canonical payload slice and binding have an independent hard golden
       schema: 'writcraft.changes-history-marker-journal-head/v1',
       journalId,
       generation: '1',
-      valueDigest: 'sha256:da45490bcf253e0ad705ae28717b7ae32222567047284dd9c0fd427c1d459733',
+      valueDigest: 'sha256:8cb44f335725f88a1b3f987f266b0a3c7fd251a050d330e2e3e162e064a80c74',
     },
-    frameByteLength: 1851,
-    frameSha256: 'sha256:20a325044045e27ed7f2b6c9cfee284c96c3c1c3067dfecffd8c4e20425c7ed2',
-    payloadByteLength: 1563,
-    payloadSha256: 'sha256:9f83943f8266c4d231cda668444dcd3acc7b79d53c1ef3f1580e8d677eae4ff6',
+    frameByteLength: 1884,
+    frameSha256: 'sha256:c87943298f428d57adfedbca1d2626aa168041cfcaccf044b8bffe05d1af6790',
+    payloadByteLength: 1596,
+    payloadSha256: 'sha256:4b7291c2166e536c2fe902dac7eea6979cf79a5fc096b7cb50d78951b82abd77',
     activeMarkerOffset: 48,
     activeMarkerByteLength: 839,
     activeMarkerDigest: 'sha256:df1019e3ba6acef480f2da94fbd3fbb327ddee6ede1ca6c2b447d175fefa62ef',
-    bindingSha256: 'e73e0908bb144c41750c61b1babc1d26ea1f3b55ed928d23a58864bb80742d1c',
+    bindingSha256: '733fc7e71f3ca51b26422ab10129dd5aac552d77765a0d13c49cda771be84b6f',
   });
 });
 

@@ -277,9 +277,10 @@ function fixture(missingCount = 1, baseHistoryExists = true, pathFactory = null)
     nativeCreateRequest,
     baseHistoryExists
   );
+  // The held binding carries the STRUCTURED journal binding now, so the request
+  // digest stays fixed while the journal frame advances.
   const held = schema.buildRollbackCreateHeldBinding(
-    4096,
-    heldIdentity(4096, digest('d'), 1),
+    journalBinding(),
     digest('f'),
     baseHistoryExists,
     baseHistoryExists ? digest('e') : null,
@@ -370,15 +371,90 @@ function decodeHexUtf8(value) {
   return Buffer.from(value, 'hex').toString('utf8');
 }
 
+// Positional Q/R/D/A header layout:
+//   [0] command letter, [1] 'CREATE_ROLLBACK', then the fields emitted by
+//   rollbackCreateAuthorityHeaderFields() in source order.
+// This table mirrors that returned array order one-for-one, so AUTHORITY[name]
+// is the wire index of `name` and a future schema change only edits this table.
+const AUTHORITY_HEADER_PREFIX = 2; // [0] letter, [1] magic
+const ROLLBACK_AUTHORITY_FIELDS = Object.freeze([
+  'operationId',                          // [2]
+  'requestDigest',                        // [3]
+  'markerDigest',                         // [4]
+  'artifactDigest',                       // [5]
+  'artifactIdentityDigest',               // [6]
+  'artifactByteLength',                   // [7]
+  'rootIdentityDigest',                   // [8]
+  'recoveryIdentityDigest',               // [9]
+  'createPrecreatePhaseDigest',           // [10]
+  'createdReceiptPhaseDigest',            // [11]
+  'selectionDigest',                      // [12]
+  'preparedHistoryDigest',                // [13]
+  'originalPrecreateUpdatedAt',           // [14]
+  'originalCreatedReceiptUpdatedAt',      // [15]
+  'existingRequestDigest',                // [16]
+  'existingJournalMarkerBinding',         // [17]
+  'existingTerminalReceiptDigest',        // [18]
+  'existingReceiptSetDigest',             // [19]
+  'baseHistoryDigest',                    // [20]
+  'baseHistoryByteLength',                // [21]
+  'baseHistoryExists',                    // [22]
+  'baseHistoryContentDigest',             // [23]
+  'baseHistoryIdentityDigest',            // [24]
+  'historyParentIdentityDigest',          // [25]
+  'journalBindingDigest',                 // [26]
+  'journalBasename',                      // [27]
+  'journalMagic',                         // [28]
+  'journalActiveSlot',                    // [29]
+  'journalHeadId',                        // [30]
+  'journalHeadGeneration',                // [31]
+  'journalPreviousValueDigest',           // [32]
+  'journalHeadValueDigest',               // [33]
+  'journalFrameByteLength',               // [34]
+  'journalFrameSha256',                   // [35]
+  'journalPayloadOffset',                 // [36]
+  'journalPayloadByteLength',             // [37]
+  'journalPayloadSha256',                 // [38]
+  'journalActiveMarkerOffset',            // [39]
+  'journalActiveMarkerByteLength',        // [40]
+  'journalActiveMarkerDigest',            // [41]
+  'journalActiveMarkerCanonicalSha256',   // [42]
+  'journalBindingRootIdentityDigest',     // [43]
+  'journalBindingRecoveryIdentityDigest', // [44]
+  'existingItemCount',                    // [45]
+  'missingItemCount',                     // [46]
+]);
+const AUTHORITY = Object.freeze(Object.fromEntries(
+  ROLLBACK_AUTHORITY_FIELDS.map((name, index) => [name, index + AUTHORITY_HEADER_PREFIX])
+));
+const AUTHORITY_HEADER_LENGTH = AUTHORITY_HEADER_PREFIX + ROLLBACK_AUTHORITY_FIELDS.length;
+
+// The ACK header appends these after the shared authority fields; the D (settle)
+// header appends only the trailing token count, and Q/R append nothing.
+const ROLLBACK_ACK_TAIL_FIELDS = Object.freeze([
+  'finalBasename',                 // ACK only
+  'finalRecordDigest',             // ACK only
+  'rolledBackPhaseDigest',         // ACK only
+  'rolledBackPhaseUpdatedAt',      // ACK only
+  ...['dev', 'ino', 'uid', 'mode', 'nlink', 'size', 'mtimeNs', 'ctimeNs',
+    'contentSha256'].map(name => `finalRecordIdentity.${name}`),
+  'settleTokenCount',              // ACK only (D carries it too)
+]);
+const ROLLBACK_ACK = Object.freeze(Object.fromEntries(
+  ROLLBACK_ACK_TAIL_FIELDS.map((name, index) => [name, AUTHORITY_HEADER_LENGTH + index])
+));
+const ROLLBACK_ACK_HEADER_LENGTH = AUTHORITY_HEADER_LENGTH + ROLLBACK_ACK_TAIL_FIELDS.length;
+
 function independentlyRebuildRollbackWireAuthority(qWire, aWire) {
   const qLines = qWire.trimEnd().split('\n').map(line => line.split('\t'));
   const aLines = aWire.trimEnd().split('\n').map(line => line.split('\t'));
   const header = qLines[0];
   const existing = qLines.filter(fields => fields[0] === 'E');
   const missing = qLines.filter(fields => fields[0] === 'I');
-  assert.strictEqual(header.length, 30);
-  assert.strictEqual(existing.length, Number(header[27]));
-  assert.strictEqual(missing.length, Number(header[28]));
+  assert.strictEqual(AUTHORITY_HEADER_LENGTH, 47);
+  assert.strictEqual(header.length, AUTHORITY_HEADER_LENGTH);
+  assert.strictEqual(existing.length, Number(header[AUTHORITY.existingItemCount]));
+  assert.strictEqual(missing.length, Number(header[AUTHORITY.missingItemCount]));
   assert.strictEqual(qLines.length, 1 + existing.length + missing.length);
   const indexed = [...existing, ...missing].map(fields => ({
     fields,
@@ -416,15 +492,15 @@ function independentlyRebuildRollbackWireAuthority(qWire, aWire) {
           ancestorIdentityDigest: fields[7],
         }),
   });
-  assert.strictEqual(phaseSchema.digestSelection(selection), header[14]);
+  assert.strictEqual(phaseSchema.digestSelection(selection), header[AUTHORITY.selectionDigest]);
   const create = schema.assertCreateRequest({
     schema: schema.SCHEMAS.CREATE_REQUEST,
-    operationId: header[2],
-    artifactDigest: header[7],
-    artifactIdentityDigest: header[8],
-    artifactByteLength: Number(header[9]),
-    precreatePhaseDigest: header[12],
-    selectionDigest: header[14],
+    operationId: header[AUTHORITY.operationId],
+    artifactDigest: header[AUTHORITY.artifactDigest],
+    artifactIdentityDigest: header[AUTHORITY.artifactIdentityDigest],
+    artifactByteLength: Number(header[AUTHORITY.artifactByteLength]),
+    precreatePhaseDigest: header[AUTHORITY.createPrecreatePhaseDigest],
+    selectionDigest: header[AUTHORITY.selectionDigest],
     items: missing.map(fields => ({
       selectedId: fields[2],
       path: decodeHexUtf8(fields[3]),
@@ -436,10 +512,10 @@ function independentlyRebuildRollbackWireAuthority(qWire, aWire) {
   });
   const precreate = {
     schema: phaseSchema.SCHEMA,
-    operationId: header[2],
+    operationId: header[AUTHORITY.operationId],
     kind: 'snapshot_restore',
     phase: 'PRECREATE',
-    artifactDigest: header[7],
+    artifactDigest: header[AUTHORITY.artifactDigest],
     selectionDigest: phaseSchema.digestSelection(selection),
     items: missing.map(fields => ({
       selectedId: fields[2],
@@ -454,10 +530,13 @@ function independentlyRebuildRollbackWireAuthority(qWire, aWire) {
     finalReceiptDigest: null,
     existingReceiptSetDigest: null,
     rollbackReceiptDigest: null,
-    updatedAt: decodeHexUtf8(header[16]),
+    updatedAt: decodeHexUtf8(header[AUTHORITY.originalPrecreateUpdatedAt]),
   };
   phaseSchema.assertPhaseRecord(precreate, selection);
-  assert.strictEqual(evidence.digestObject(phaseSchema.SCHEMA, precreate), header[12]);
+  assert.strictEqual(
+    evidence.digestObject(phaseSchema.SCHEMA, precreate),
+    header[AUTHORITY.createPrecreatePhaseDigest]
+  );
   missing.forEach((fields, index) => {
     assert.strictEqual(fields.length, 31);
     const control = schema.buildControl(create, index);
@@ -475,11 +554,11 @@ function independentlyRebuildRollbackWireAuthority(qWire, aWire) {
   });
   const created = {
     schema: phaseSchema.SCHEMA,
-    operationId: header[2],
+    operationId: header[AUTHORITY.operationId],
     kind: 'snapshot_restore',
     phase: 'CREATED_RECEIPT',
-    artifactDigest: header[7],
-    selectionDigest: header[14],
+    artifactDigest: header[AUTHORITY.artifactDigest],
+    selectionDigest: header[AUTHORITY.selectionDigest],
     items: missing.map(fields => ({
       selectedId: fields[2],
       path: decodeHexUtf8(fields[3]),
@@ -489,24 +568,34 @@ function independentlyRebuildRollbackWireAuthority(qWire, aWire) {
       creationReceiptDigest: fields[12],
       quarantineReceiptDigest: null,
     })),
-    preparedHistoryDigest: header[15],
+    preparedHistoryDigest: header[AUTHORITY.preparedHistoryDigest],
     finalReceiptDigest: null,
     existingReceiptSetDigest: null,
     rollbackReceiptDigest: null,
-    updatedAt: decodeHexUtf8(header[17]),
+    updatedAt: decodeHexUtf8(header[AUTHORITY.originalCreatedReceiptUpdatedAt]),
   };
   phaseSchema.assertPhaseRecord(created, selection);
-  assert.strictEqual(evidence.digestObject(phaseSchema.SCHEMA, created), header[13]);
+  assert.strictEqual(
+    evidence.digestObject(phaseSchema.SCHEMA, created),
+    header[AUTHORITY.createdReceiptPhaseDigest]
+  );
   const aHeader = aLines[0];
   const tokens = aLines.filter(fields => fields[0] === 'T');
-  assert.strictEqual(aHeader.length, 44);
-  assert.deepStrictEqual(aHeader.slice(2, 30), header.slice(2));
+  assert.strictEqual(ROLLBACK_ACK_HEADER_LENGTH, 61);
+  assert.strictEqual(aHeader.length, ROLLBACK_ACK_HEADER_LENGTH);
+  assert.deepStrictEqual(
+    aHeader.slice(AUTHORITY_HEADER_PREFIX, AUTHORITY_HEADER_LENGTH),
+    header.slice(AUTHORITY_HEADER_PREFIX)
+  );
   assert.deepStrictEqual(
     aLines.filter(fields => ['E', 'I'].includes(fields[0])),
     qLines.filter(fields => ['E', 'I'].includes(fields[0]))
   );
-  assert.strictEqual(tokens.length, Number(aHeader[43]));
-  assert.ok(Date.parse(decodeHexUtf8(aHeader[33])) >= Date.parse(created.updatedAt));
+  assert.strictEqual(tokens.length, Number(aHeader[ROLLBACK_ACK.settleTokenCount]));
+  assert.ok(
+    Date.parse(decodeHexUtf8(aHeader[ROLLBACK_ACK.rolledBackPhaseUpdatedAt])) >=
+      Date.parse(created.updatedAt)
+  );
   const rolledBack = {
     ...created,
     phase: 'ROLLED_BACK',
@@ -514,12 +603,15 @@ function independentlyRebuildRollbackWireAuthority(qWire, aWire) {
       ...item,
       quarantineReceiptDigest: tokens[index][9],
     })),
-    existingReceiptSetDigest: aHeader[20],
-    rollbackReceiptDigest: aHeader[31],
-    updatedAt: decodeHexUtf8(aHeader[33]),
+    existingReceiptSetDigest: aHeader[AUTHORITY.existingReceiptSetDigest],
+    rollbackReceiptDigest: aHeader[ROLLBACK_ACK.finalRecordDigest],
+    updatedAt: decodeHexUtf8(aHeader[ROLLBACK_ACK.rolledBackPhaseUpdatedAt]),
   };
   phaseSchema.assertPhaseRecord(rolledBack, selection);
-  assert.strictEqual(evidence.digestObject(phaseSchema.SCHEMA, rolledBack), aHeader[32]);
+  assert.strictEqual(
+    evidence.digestObject(phaseSchema.SCHEMA, rolledBack),
+    aHeader[ROLLBACK_ACK.rolledBackPhaseDigest]
+  );
   return { selection, precreate, create, created, rolledBack };
 }
 
@@ -553,32 +645,43 @@ function test(name, fn) {
 
 console.log('\nPrivate public-Markdown ROLLBACK_CREATE schema verification');
 
-test('held marker and raw History descriptors are explicit rollback-create authority', () => {
+test('held journal binding and raw History descriptors are explicit rollback-create authority', () => {
   const value = fixture();
   assert.deepStrictEqual(
     schema.assertRollbackCreateHeldBinding(value.held, value.existing.bound),
     value.held
   );
-  assert.strictEqual(value.request.markerIdentityDigest,
-    evidence.digestObjectIdentity(value.held.markerIdentity));
+  // The request binds the STORED EXISTING-era journal binding. That is what
+  // keeps the request digest — and therefore Q's record basenames — fixed while
+  // the live journal frame advances, which is the precondition for the staged
+  // rollback CAS. The live held journal binding travels separately in the
+  // heldBinding.
+  assert.strictEqual(
+    evidence.canonicalJson(value.request.existingJournalMarkerBinding),
+    evidence.canonicalJson(value.existing.bound.request.journalMarkerBinding)
+  );
+  assert.notStrictEqual(value.held.journalMarkerBinding, undefined);
   assert.strictEqual(value.request.baseHistoryIdentityDigest,
     evidence.digestObjectIdentity(value.held.baseHistoryIdentity));
   let getters = 0;
   const hostile = { ...value.held };
-  Object.defineProperty(hostile, 'markerIdentity', {
+  Object.defineProperty(hostile, 'journalMarkerBinding', {
     enumerable: true,
-    get() { getters += 1; return value.held.markerIdentity; },
+    get() { getters += 1; return value.held.journalMarkerBinding; },
   });
   invalid(() => schema.assertRollbackCreateHeldBinding(hostile, value.existing.bound));
-  for (const markerIdentity of [
-    { ...value.held.markerIdentity, mode: 0o644 },
-    { ...value.held.markerIdentity, nlink: 2 },
-  ]) {
-    invalid(() => schema.assertRollbackCreateHeldBinding({
-      ...value.held,
-      markerIdentity,
-    }, value.existing.bound));
-  }
+  // A tampered held journal binding must fail closed. It is rejected by the
+  // journal-binding schema itself, so accept either protocol code here.
+  assert.throws(() => schema.assertRollbackCreateHeldBinding({
+    ...value.held,
+    journalMarkerBinding: {
+      ...value.held.journalMarkerBinding,
+      frameSha256: digest('9'),
+    },
+  }, value.existing.bound), error => [
+    'PUBLIC_MARKDOWN_NATIVE_PROTOCOL',
+    'SNAPSHOT_EXISTING_JOURNAL_BINDING_PROTOCOL',
+  ].includes(error?.code));
   for (const baseHistoryIdentity of [
     { ...value.held.baseHistoryIdentity, mode: 0o644 },
     { ...value.held.baseHistoryIdentity, nlink: 2 },
@@ -852,31 +955,31 @@ test('deterministic names/digests are frozen in the CREATE_ROLLBACK domain', () 
   const value = fixture();
   assert.strictEqual(
     schema.rollbackCreateRequestDigest(value.bound),
-    'sha256:d58c74d16de1e02a28b8499eca404e598bcd23193967568993a74f5696f4a039'
+    'sha256:efe6311f22a4aa85856e49f05ecb9b6c5b247e2949b5fa5d093f30f52c837345'
   );
   assert.strictEqual(
     schema.rollbackCreateRecordNames(value.bound, 0).controlBasename,
-    '.changes-history-native-rollback-create-control.e1a899ea57f9321fbe03789ab10e3dc6fb8f4f873af69147225dfa49e6794047'
+    '.changes-history-native-rollback-create-control.10043d3ab103d2357942320a9cd2a0370a497fc88ce87a25f63323f094c8ec45'
   );
   assert.strictEqual(
     value.qControls[0].controlDigest,
-    'sha256:dfae4e6f1f006793896b07b8dcad7b6643c0cd43fefeb8f54c094004e443548b'
+    'sha256:1d6f6ff01e8d7a24e7db2b7913296e4b81342ea7680cccff771c422e80851262'
   );
   assert.strictEqual(
     value.qReceipts[0].receiptDigest,
-    'sha256:bc315254d4a1737cefa52702422bd65a71cab04a1a9005e65fd735ae1a935aa3'
+    'sha256:af5353d7b47f71e66cdfac6ac5f85ac38360b77c864ecbbe8720857dd0ec524a'
   );
   assert.strictEqual(
     schema.rollbackCreateReceiptSetDigest(value.settle, value.bound),
-    'sha256:e14115693e50789700f3ac9ccc2d96830d019cee11fb4891cc7b9b9191717114'
+    'sha256:f04f7d985cb9eaae2e102c299ec21595f874ffe707c957ac649f59e85161caf4'
   );
   assert.strictEqual(
     schema.rollbackCreateFinalRecordName(value.settle, value.bound),
-    '.changes-history-native-rollback-create-final.ff2987144537178fff958d59c31ee1c4a11ab8cf847ea74561e498fad8f36954'
+    '.changes-history-native-rollback-create-final.4a0cfd409669184137609e1b8263b85693262807a71c81357530ab2a555bf482'
   );
   assert.strictEqual(
     value.finalRecord.finalRecordDigest,
-    'sha256:6ae7055a905ebf8d990be05f31e1f43229f6a8414a1b19e71253a523aacb9381'
+    'sha256:7084b095c2d97c6a2c867d22c442f3cb671a4a66809b9be8bc18917be1615f5a'
   );
 });
 
@@ -909,7 +1012,9 @@ test('Q/R/D/A wire is bounded, domain-tagged and path/body redacted', () => {
       .rollbackToken.rollbackReceiptDigest));
     assert.ok(wire.includes(value.existing.terminal.items[0]
       .rollbackToken.rollbackReceiptRecordIdentity.ino));
-    assert.ok(wire.includes(value.request.markerIdentityDigest));
+    assert.ok(wire.includes(Buffer.from(
+      evidence.canonicalJson(value.request.existingJournalMarkerBinding), 'utf8'
+    ).toString('hex')));
     assert.ok(wire.includes(value.request.baseHistoryIdentityDigest));
     assert.ok(!wire.includes('new-0.md'));
     assert.ok(!wire.includes('/private/tmp'));
@@ -972,8 +1077,14 @@ test('wire parent indexes and original timestamps reject omission, reorder and f
     mutate(lines => { lines[2][1] = lines[1][1]; }),
     mutate(lines => { lines[2][1] = '3'; }),
     mutate(lines => { [lines[2], lines[3]] = [lines[3], lines[2]]; }),
-    mutate(lines => { lines[0][16] = Buffer.from('2026-08-08T23:59:59.000Z').toString('hex'); }),
-    mutate(lines => { lines[0][17] = Buffer.from('2026-08-09T00:00:01.000Z').toString('hex'); }),
+    mutate(lines => {
+      lines[0][AUTHORITY.originalPrecreateUpdatedAt] =
+        Buffer.from('2026-08-08T23:59:59.000Z').toString('hex');
+    }),
+    mutate(lines => {
+      lines[0][AUTHORITY.originalCreatedReceiptUpdatedAt] =
+        Buffer.from('2026-08-09T00:00:01.000Z').toString('hex');
+    }),
   ];
   for (const hostile of cases) {
     assert.throws(() => independentlyRebuildRollbackWireAuthority(hostile, aWire));
@@ -1081,11 +1192,11 @@ test('maximum COMMITTED Q/R response has an independent frozen 512 KiB envelope'
   })), [
     {
       bytes: 274527,
-      sha256: 'fd9420c1b1e340ab0760df9bb1d6d6469039d3ab770c985f7f247d3bee2309ca',
+      sha256: 'cfbe0a53d89652e1ce925d1eb9fe8824315d193494f8d483c6da98d0f618e674',
     },
     {
       bytes: 274527,
-      sha256: '4ca26df61122802da60aa1b69704207de437a55187295247b607cc14d1bb5b41',
+      sha256: '4511e82a16eb1e961729755f57ee696a0bed9479ad29b864b7b26692ba9679c4',
     },
   ]);
   const overflow = Buffer.alloc(schema.LIMITS.maxRollbackCreateResponseBytes + 1, 0x61);
@@ -1152,24 +1263,24 @@ test('maximum Unicode 1E+299I authority freezes every Q/R/D/A wire budget', () =
     sha256: crypto.createHash('sha256').update(Buffer.from(wire, 'utf8')).digest('hex'),
   })), [
     {
-      bytes: 2703309,
+      bytes: 2706847,
       maxLine: 9452,
-      sha256: '9e109d1c535b64564fd79cb542d84dda7e83e9d0941f67cf060d20721aa7a25e',
+      sha256: '8ae544ebc52cf955376d64b33ab0fa5eca1c94605940ebf98f784bca8af5659b',
     },
     {
-      bytes: 2703309,
+      bytes: 2706847,
       maxLine: 9452,
-      sha256: '698b39388681f15706ff5ee1e86f90a3502c69a08b9d269333f2fc16efebea84',
+      sha256: 'fd96c640dfcf4c49cdb1ad677e97ee3c0556d746f9c7c5078ef35572334668e4',
     },
     {
-      bytes: 2977984,
+      bytes: 2981522,
       maxLine: 9452,
-      sha256: '3772400ea432ee3942b0df0a472ad524244620bfa19221004b9486ce960132c4',
+      sha256: '1f4d8445a8d68f7ed324b26bb221853a1bf6ad86a9a3d0f677b17e0c35d459ed',
     },
     {
-      bytes: 2978405,
+      bytes: 2981943,
       maxLine: 9452,
-      sha256: '859702567f140fd066caec96eb20cc8de41526fc97a3ecc3c34c9e9dd430f924',
+      sha256: '09f387fabb219dce4048f55df45f88326335659397dcd68633bbc1d3954732a5',
     },
   ]);
   assert.throws(

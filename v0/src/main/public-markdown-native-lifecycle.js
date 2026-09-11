@@ -986,10 +986,6 @@ function createPublicMarkdownNativeTransport(options = {}) {
       );
     }
 
-    function unknownExistingAckResult(authority, finalizeRequest) {
-      return existingRestoreSchema.buildAckResult(authority, finalizeRequest, 'UNKNOWN');
-    }
-
     function invokeExisting(commandWire, descriptors) {
       return invoke(
         commandWire,
@@ -1041,17 +1037,34 @@ function createPublicMarkdownNativeTransport(options = {}) {
       }
     }
 
-    function verifyExisting(rawAuthority, rawTerminalReceipt, rawDescriptors) {
+    function verifyExisting(
+      rawAuthority,
+      rawTerminalReceipt,
+      rawDescriptors,
+      rawStoredRequestDigest = null
+    ) {
       const value = existingRestoreAuthority(rawAuthority, rawDescriptors);
       const { authority, descriptors } = value;
-      const request = existingRestoreSchema.buildVerifyRequest(authority, rawTerminalReceipt);
+      const request = existingRestoreSchema.buildVerifyRequest(
+        authority,
+        rawTerminalReceipt,
+        rawStoredRequestDigest
+      );
       try {
         const result = assertProcessSuccess(
-          invokeExisting(existingRestoreSchema.encodeVerifyCommand(authority, rawTerminalReceipt), descriptors),
+          invokeExisting(existingRestoreSchema.encodeVerifyCommand(
+            authority,
+            rawTerminalReceipt,
+            rawStoredRequestDigest
+          ), descriptors),
           'UNKNOWN'
         );
-        existingRestoreSchema.assertResponseEnvelope(result.stdout, result.stderr);
-        return unknownExistingVerifyResult(authority);
+        return existingRestoreSchema.parseVerifyResponse(
+          result.stdout,
+          authority,
+          rawTerminalReceipt,
+          rawStoredRequestDigest
+        );
       } catch (_) {
         return unknownExistingVerifyResult(authority);
       }
@@ -1147,42 +1160,6 @@ function createPublicMarkdownNativeTransport(options = {}) {
           finalRecordDigest: publication.finalization.finalRecordDigest,
           errorCode: 'UNKNOWN',
         });
-      }
-    }
-
-    function ackExisting(
-      rawAuthority,
-      rawFinalizeRequest,
-      rawFinalRecordIdentity,
-      markerPhaseDigest,
-      rawDescriptors
-    ) {
-      const value = existingRestoreAuthority(rawAuthority, rawDescriptors);
-      const { authority, descriptors } = value;
-      const request = existingRestoreSchema.buildAckRequest(
-        authority,
-        rawFinalizeRequest,
-        rawFinalRecordIdentity,
-        markerPhaseDigest
-      );
-      try {
-        const result = assertProcessSuccess(
-          invokeExisting(
-            existingRestoreSchema.encodeAckCommand(
-              request,
-              authority,
-              rawFinalizeRequest,
-              markerPhaseDigest
-            ),
-            descriptors
-          ),
-          'UNKNOWN'
-        );
-        return existingRestoreSchema.parseAckResponse(
-          result.stdout, authority, rawFinalizeRequest
-        );
-      } catch (_) {
-        return unknownExistingAckResult(authority, rawFinalizeRequest);
       }
     }
 
@@ -1343,7 +1320,6 @@ function createPublicMarkdownNativeTransport(options = {}) {
       reconcileFinalizeExisting,
       finalizePublication,
       ackPublication,
-      ackExisting,
     });
   }
 
@@ -1606,7 +1582,6 @@ function createPublicMarkdownNativeLifecycle(options = {}) {
         finalizePublication: descriptorMethod(rawScoped, 'finalizePublication'),
         ackPublication: descriptorMethod(rawScoped, 'ackPublication'),
         reconcileFinalize: descriptorMethod(rawScoped, 'reconcileFinalizeExisting'),
-        ack: descriptorMethod(rawScoped, 'ackExisting'),
       });
       if (Object.values(scoped).some(value => value === null)) {
         fail('PUBLIC_MARKDOWN_HELPER_UNAVAILABLE', 'native public Markdown transport is unavailable');
@@ -1694,16 +1669,23 @@ function createPublicMarkdownNativeLifecycle(options = {}) {
               rawStoredRequestDigest
             );
           },
-          verify(rawAuthority, rawTerminalReceipt, rawDescriptors) {
+          verify(rawAuthority, rawTerminalReceipt, rawDescriptors, rawStoredRequestDigest = null) {
             const authority = existingRestoreSchema.assertAuthority(rawAuthority);
             const terminal = existingRestoreSchema.assertTerminalReceipt(
               rawTerminalReceipt,
-              authority
+              authority,
+              rawStoredRequestDigest
             );
             return existingRestoreSchema.assertVerifyResult(
-              existingRestore.verify(authority, terminal, rawDescriptors),
+              existingRestore.verify(
+                authority,
+                terminal,
+                rawDescriptors,
+                rawStoredRequestDigest
+              ),
               authority,
-              terminal
+              terminal,
+              rawStoredRequestDigest
             );
           },
           finalize(rawAuthority, rawTerminalReceipt, rawDescriptors) {
@@ -1748,7 +1730,6 @@ function createPublicMarkdownNativeLifecycle(options = {}) {
               rawDescriptors
             );
           },
-          ack: existingRestore.ack,
         }),
         create,
         createMissingJournal(rawAuthority, rawRequest, rawValue, heldArtifactFd) {

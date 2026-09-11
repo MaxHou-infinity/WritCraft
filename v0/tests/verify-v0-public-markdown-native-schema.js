@@ -117,6 +117,7 @@ function journalAuthorityFixture(request = createRequest()) {
     activeMarkerDigest: journal.activeMarkerDigest(activeMarker),
     nativePublication: prepared,
     existingTerminalPublication: null,
+    rollbackCreatePublication: null,
     terminalCleanup: null,
     terminalCleanupDigest: null,
     valueDigest: null,
@@ -555,8 +556,8 @@ test('CREATE_MISSING current-head authority and wire bind exact ACTIVE PREPARED 
     commandDigest: token.commandDigest,
   }, {
     wireBytes: 1656,
-    wireSha256: 'bbbacfb453c8538a74497a8525061ed883c30ff07fcfacb72b322216dd9cdd1d',
-    commandDigest: 'sha256:44e14be5a732ac69d6490dc3dfcbd072a1c3620b7a4fc0e724295e2d4a76f948',
+    wireSha256: '90cee2153ba1f21313778261f3e45e8ae436804fd36010699bc1ad91b6c661c2',
+    commandDigest: 'sha256:678092bd84fab4654fe82e261bd60f124da50719fff043fbdf063427c5b2cf76',
   });
   const mutateHeader = (source, transform) => {
     const lines = source.trimEnd().split('\n');
@@ -819,8 +820,8 @@ test('maximum 300-item publication result and capture retain frame and response 
   }, {
     captureBytes: 4697033,
     captureSha256: '1b035dbff6e0448074e259514a2bea2ad5e1c70af659d9db5c0a332f15654c90',
-    frameBytes: 4699664,
-    frameSha256: 'c9360828b9069e40a2a6d9c83ef01a971267637443f60a8cd8a9832a453cdd3f',
+    frameBytes: 4699697,
+    frameSha256: '81d157cc6d0848126d0e22fb065a18b8ac72461a9c8b46c4bb190200c219d92d',
     responseBytes: 395434,
   });
   assert(frame.length < journal.MAX_FRAME_BYTES);

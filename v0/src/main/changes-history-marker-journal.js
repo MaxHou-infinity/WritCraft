@@ -234,6 +234,7 @@ function initialValue(projectId, journalId) {
     activeMarkerDigest: null,
     nativePublication: null,
     existingTerminalPublication: null,
+    rollbackCreatePublication: null,
     terminalCleanup: null,
     terminalCleanupDigest: null,
     valueDigest: null,
