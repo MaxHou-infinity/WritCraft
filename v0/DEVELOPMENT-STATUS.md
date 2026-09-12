@@ -3,13 +3,14 @@
 > 最后更新：2026-09-11
 > 当前公开/代码版本：`writ-craft@0.3.1`（npm `preview`）
 > 下一目标：`0.4.0` 证据与交付闭环（`WRC-0.4.0-R1`）
-> 当前 checkpoint：**Stage A / A2a 独立复审 NO-GO**（绑定本地 commit `2b81494`，
-> 结论 **P0=0、P1=1、P2=5**）；A1b 已于 `1f43b7f` 代码级签核（GO、P0=0、P1=0、P2=2）
-> 当前结论：**A2a 实现完成且移植保真、Renderer 权威、零写入、Stage B 隔离均经独立确认成立；
-> 阻断项是证据完整性——A2a 自己命名的 App 边界 E2E 门禁不稳定，复审首次执行即真实红过一次
-> （1/8）。修复该竞争并回收 2 处测试质量回退后，由同一 reviewer 定点确认才可签收。
-> A1c 后移；Stage B 重签与 Stage C/D/E 继续冻结。A1b/A2a 均非 App、Stage、candidate 或 release 签收。**
-> 当前完整 finding batch：[`docs/0.4.0-A2A-INDEPENDENT-REVIEW.md`](../docs/0.4.0-A2A-INDEPENDENT-REVIEW.md)
+> 当前 checkpoint：**Stage A / A2a 已代码级签核**（修复批次 `b16ffc7`，同一 reviewer 定点确认
+> **GO、P0=0、P1=0、P2=3**）；A1b 已于 `1f43b7f` 签核（GO、P0=0、P1=0、P2=2）
+> 当前结论：**A1b 与 A2a 均已签收**；按所有者 2026-09-11 顺序授权，下一 checkpoint 为
+> **A1c（Safe Undo）**。Stage B 重签与 Stage C/D/E 继续冻结。两者均只覆盖代码/集成层，
+> **不是** App、Stage、candidate 或 release 签收。
+> A2a 残留 P2：(c) GUI e2e 对 CI 不可见（既有项目级缺口，非本变更引入）；
+> (d) create 的 `confirmation` 是 preload 常量而非 Main 手势校验；(e) 少量源码文本 grep 断言。
+> 完整 finding batch 与定点确认：[`docs/0.4.0-A2A-INDEPENDENT-REVIEW.md`](../docs/0.4.0-A2A-INDEPENDENT-REVIEW.md)
 > 本批次实施记录：[`docs/archive/engineering/A1B-P1-FIX-PLAN-2026-09-11.md`](../docs/archive/engineering/A1B-P1-FIX-PLAN-2026-09-11.md)（预检分类、端口计划、缺陷与决策；不拥有派工权）
 > **顺序授权（2026-09-11，所有者）**：A1b 独立签收后**先做 A2a**（快照 create/list 的 App 接线，让用户第一次真正摸到快照），**A1c 后移**。见 `docs/0.4.0-EXECUTION-PROTOCOL.md` 同日修订；该授权只改顺序，不改门禁与产品范围。
 
