@@ -339,22 +339,41 @@ Stage B/GUI 不得 `requiredInCurrentGate`、4 个门禁脚本的精确字符串
 | 追加 `RELEASE-NOTES-v0.3.1.md` | 补齐唯一缺失的版本发布说明 | 新增文件（与"清理"直觉相反） | 可选；已改为在 npm 合同记录发布事实。**若无异议我倾向不新增** |
 | 为 0.3.1 补做 `verify:npm-preview:installed` | 补齐公开版本的装包验证证据 | 需联网、需真实耗时 | 建议排入 0.4.0 恢复后的独立批次，不混入清理 |
 
-### 8.3 建议作为**下一批次**的测试可信度工程（本批次不做，避免一次改太多）
+### 8.3 测试可信度工程 R1–R7（R1+R4 已落地，其余待办）
 
-审计 C 给出的可执行反复发规则（R1–R7）。优先级：
+审计 C 给出的可执行反复发规则（R1–R7）。**状态（2026-09-12 晚）**：
 
-1. **R1 报告诚实性** —— 禁止 `${passed}/${passed}` 与硬编码 `N/N`；要求
-   `assert.strictEqual(passed, EXPECTED_TOTAL)` 后才打印。约 181 处一行级改动，**不改任何测试体**。
-2. **R4 禁止静默跳过** —— 跳过必须计数并使文件非零退出（除非显式 `WRITCRAFT_ALLOW_SKIP=1`）。
-   先处理 §5.3 的 4 个已知违规。
-3. **R2 真实可达性** —— 删除 `requiresGui` 豁免；把"package.json 里出现过路径"换成执行闭包；
-   并解析 `verify.yml` 断言 CI 未静默丢门禁。
-4. **R5 超时** —— 门禁 runner 加 `timeout` + `killSignal`，失败标 `TIMEOUT` 而非读成 hang。
-5. **R3 声明=实际** —— 把 `source-text` 提升为一等 `evidenceKind`，让 24 个纯静态脚本必须如实声明。
-6. **R6 二进制新鲜度** —— 加一步"重建全部 helper 到临时目录并比对 sha256"（实测约 40 秒）。
-7. **R7 分支治理工件化** —— PDCA Plan gate 必须落盘 `docs/plan/<task>.md`，含每个受影响符号的
-   `git log --all -S` 命中表与分类；未分类命中即拒绝开工。
-8. **脚手架合并** —— `v0/tests/` 增共享 helper，回收 2,000–2,700 行。**建议最后做**（触碰面最大）。
+1. **R1 报告诚实性 —— 已落地为棘轮门禁。** 新增
+   `v0/tests/check-v0-test-report-honesty.js`（`--check` / `--report`）与
+   `v0/tests/0.4.0-report-honesty-allowlist.json`，注册为 `npm run verify:test-report-honesty`
+   并链入 `pretest`/`preverify`。**冻结债务 190 个文件**：133 个同标识符分母（`${x}/${x}`）、
+   14 个硬编码 `N/N`、172 个打印计数却从不断言计数、9 个静默跳过。门禁**阻止新增**
+   （已实证：新增一个违规文件即 exit 1），并会把"已修好但仍留在 allowlist"的条目报为 stale。
+   债务只增不减即视为回归。
+2. **R4 禁止静默跳过 —— 已落地检测 + 已修 2 个真实缺陷。**
+   - `verify-v0-research-apply-transaction.js`（在 `npm test` 链上）：harness 捕获失败后置
+     `process.exitCode=1` 继续跑，而结尾汇总行无保护地打印 `${passed}/${passed} passed`。
+     已加 `EXPECTED_TOTAL=12` + `assert.strictEqual` + `if (!process.exitCode)` 保护；
+     **实证**：注入一个断言失败后，日志不再出现任何 "passed" 行（此前会打印 "12/12 passed"）。
+   - `verify-v0-delivery-image-decode-service.js`（Stage B，CI 门禁）：4 个 native 检查在
+     非 macOS 环境下 `console.log('skipped'); return;`，但 harness 仍 `passed += 1`，摘要硬编码
+     `/8` → **永远 8/8**。已加 `SKIP` 哨兵 + `skipped` 计数 + 真实总数断言；**跳过即非零退出**，
+     除非显式 `WRITCRAFT_ALLOW_SKIP=1`。
+   - 其余 9 个静默跳过均为 Electron 门禁；其中 `verify-v0-snapshot-create-list-electron.js` 与
+     `verify-v0-electron-e2e.js` **在签收复审点名清单内**，必须重新复审后才能改（红线 a）。
+3. **R2/R3/R5/R6/R7 —— 未开始。** 其中 R7（Plan gate 落盘符号级 `git log --all -S` 分类）
+   是对"重复实现平行分支"这一本项目已付过代价的失效模式的直接对策，建议优先。
+4. 其余待办细则（未开始）：
+   - **R2 真实可达性** —— 删除 `requiresGui` 豁免；把"package.json 里出现过路径"换成执行闭包；
+     并解析 `verify.yml` 断言 CI 未静默丢门禁。
+   - **R3 声明=实际** —— 把 `source-text` 提升为一等 `evidenceKind`，让 24 个纯静态脚本必须如实声明。
+   - **R5 超时** —— 门禁 runner 加 `timeout` + `killSignal`，失败标 `TIMEOUT` 而非读成 hang。
+     （本次清理中已亲历该缺陷：一次组件门禁运行长时间无输出、无超时、无法区分 hang 与慢。）
+   - **R6 二进制新鲜度** —— 加一步"重建全部 helper 到临时目录并比对 sha256"（实测约 40 秒）。
+   - **R7 分支治理工件化** —— PDCA Plan gate 必须落盘 `docs/plan/<task>.md`，含每个受影响符号的
+     `git log --all -S` 命中表与分类；未分类命中即拒绝开工。
+   - **脚手架合并** —— `v0/tests/` 增共享 helper，回收 2,000–2,700 行。**建议最后做**（触碰面最大，
+     且会触及需重新复审的文件）。
 
 ---
 
@@ -429,6 +448,9 @@ journal 实现的唯一可执行规范"**；其格式权威仍在 `changes-histo
 
 ### 11.3 本批次之后仍需做的事
 
-1. **R1+R4 测试可信度修复**（所有者已选为下一优先项）：R1 报告诚实性、R4 禁止静默跳过。
+1. **R1+R4 测试可信度修复 —— 已于 2026-09-12 落地**：新增 `check-v0-test-report-honesty.js`
+   棘轮门禁（进 `pretest`/`preverify`），冻结 190 个文件的债务并阻止新增；修复
+   `verify-v0-research-apply-transaction.js` 与 `verify-v0-delivery-image-decode-service.js`
+   两个已实证的假绿。详见 §8.3。
 2. 随后考虑 R2/R3/R5/R6/R7（见 §8.3）。
 3. 清理批次自身已通过独立对抗性复审（本节），可作为本批次的 close 证据。

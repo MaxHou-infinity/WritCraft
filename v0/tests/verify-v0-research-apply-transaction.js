@@ -568,4 +568,16 @@ test('applyDecision history failure rolls disk back and terminalizes Research as
   } finally { item.cleanup(); }
 });
 
-console.log(`\n${passed}/${passed} Research committed apply transaction checks passed.\n`);
+// R1 (2026-09-12): the summary must not claim "N/N passed" after a failure.
+// `test()` records failures in process.exitCode and keeps going, so without
+// these two guards a red run still printed "<n>/<n> ... passed" and only the
+// exit code disagreed with the log.
+const EXPECTED_TOTAL = 12;
+if (!process.exitCode) {
+  assert.strictEqual(
+    passed,
+    EXPECTED_TOTAL,
+    `expected ${EXPECTED_TOTAL} checks but ran ${passed}`
+  );
+  console.log(`\n${passed}/${EXPECTED_TOTAL} Research committed apply transaction checks passed.\n`);
+}

@@ -177,19 +177,27 @@ verify-v0-npm-preview.js:51  →  FAIL
 
 ---
 
-## 10. 我想让这份文档下一步变成什么
+## 10. 修复进展（R1–R7）
 
-已识别的修复项（R1–R7，来自 2026-09-12 审计，见
-[`archive/engineering/CLEANUP-AUDIT-2026-09-12.md`](archive/engineering/CLEANUP-AUDIT-2026-09-12.md) §8.3）：
-
-| 规则 | 内容 | 效果 |
+| 规则 | 内容 | 状态 |
 |---|---|---|
-| R1 | 禁止 `${passed}/${passed}` 与硬编码 `N/N`；必须 `assert.strictEqual(passed, EXPECTED_TOTAL)` 后才打印 | 让"N/N"重新有意义（约 181 处一行级改动，不动测试体） |
-| R2 | 删除 `requiresGui` 豁免；用**执行闭包**替代"路径出现在 package.json 里"；解析 `verify.yml` 校验 CI 未丢门禁 | 让"注册"等于"会跑" |
-| R3 | 把 `source-text` 提升为一等 `evidenceKind`，24 个纯静态脚本必须如实声明 | 消除"名字很硬、实际只 grep" |
-| R4 | 跳过必须计数并非零退出（除非显式 `WRITCRAFT_ALLOW_SKIP=1`） | 杀死静默跳过计入通过 |
-| R5 | 门禁 runner 加 `timeout` + `killSignal`，失败标 `TIMEOUT` | hang 不再挂住全部 |
-| R6 | 加一步"重建全部 helper 并比对 sha256" | 杀死"旧二进制证明新代码" |
-| R7 | PDCA Plan gate 必须落盘符号级 `git log --all -S` 命中分类 | 把"重复实现分支"变成可检测的缺失工件 |
+| **R1** | 报告诚实性：禁止未断言的 `${x}/${x}` 与硬编码 `N/N`；打印计数前必须 `assert.strictEqual(counter, EXPECTED_TOTAL)` | **已落地为棘轮门禁**（2026-09-12）：`npm run verify:test-report-honesty`，已进 `pretest`/`preverify`。**当前冻结债务：133 个同标识符分母 + 14 个硬编码总数 + 172 个未断言计数 + 9 个静默跳过 = 190 个文件**（明细见 `v0/tests/0.4.0-report-honesty-allowlist.json`）。门禁**阻止新增**，债务需逐批偿还 |
+| **R4** | 跳过必须计数并使文件非零退出（除非显式 `WRITCRAFT_ALLOW_SKIP=1`） | **已落地同一门禁**（静态检测）+ **已修复 2 个真实缺陷**：`verify-v0-research-apply-transaction.js`（曾在断言失败后仍打印 "12/12 passed"）与 `verify-v0-delivery-image-decode-service.js`（曾在跳过一半 native 检查时仍打印 "8/8"）。其余 9 个为 Electron 门禁，其中 2 个在签收复审点名清单内，需重新复审后方可改 |
+| R2 | 删除 `requiresGui` 豁免；用**执行闭包**替代"路径出现在 package.json 里"；解析 `verify.yml` 校验 CI 未丢门禁 | 未开始 |
+| R3 | 把 `source-text` 提升为一等 `evidenceKind`，24 个纯静态脚本必须如实声明 | 未开始 |
+| R5 | 门禁 runner 加 `timeout` + `killSignal`，失败标 `TIMEOUT` | 未开始 |
+| R6 | 加一步"重建全部 helper 并比对 sha256" | 未开始（手工跑过，约 40 秒） |
+| R7 | PDCA Plan gate 必须落盘符号级 `git log --all -S` 命中分类 | 未开始 |
 
-在这七条落地之前，**请按 §4 的方式读结果，按 §5 的方式估计证据强度。**
+**如何读这个棘轮**：
+
+```bash
+cd v0
+npm run verify:test-report-honesty            # 门禁：任何新增违规即红
+node tests/check-v0-test-report-honesty.js --report   # 打印逐文件债务清单
+```
+
+一条债务被修好后，必须**同时**从 allowlist 删除该条目——否则门禁会打印
+"stale allowlist entries"，因为留着一条已修好的豁免会静默重新允许该缺陷回来。
+
+在这七条全部落地之前，**请按 §4 的方式读结果，按 §5 的方式估计证据强度。**

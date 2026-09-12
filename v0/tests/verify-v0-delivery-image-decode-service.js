@@ -14,7 +14,16 @@ const fixture = require('./fixtures/electron-ai-provider');
 const bytes = Buffer.from('png-bytes');
 const digest = 'sha256:' + 'a'.repeat(64);
 let passed = 0;
-function test(name, fn) { fn(); passed += 1; console.log(`  ✓ ${name}`); }
+let skipped = 0;
+const SKIP = Symbol('skip');
+function test(name, fn) {
+  if (fn() === SKIP) {
+    skipped += 1;
+    return;
+  }
+  passed += 1;
+  console.log(`  ✓ ${name}`);
+}
 function expectCode(code, fn) { assert.throws(fn, error => error && error.code === code); }
 
 test('accepts only the bounded ImageIO helper protocol', () => {
@@ -84,7 +93,7 @@ test('native entry mode reads the exact bound image from a held bundle fd', () =
   const helperPath = path.join(__dirname, '..', 'src', 'main', 'native', 'delivery-image-decode-helper');
   if (process.platform !== 'darwin' || !fs.existsSync(helperPath)) {
     console.log('    (native entry binding fixture skipped outside macOS build environment)');
-    return;
+    return SKIP;
   }
   const image = Buffer.from('iVBORw0KGgoAAAANSUhEUgAAAAEAAAABCAQAAAC1HAwCAAAAC0lEQVR42mNk+A8AAQUBAScY42YAAAAASUVORK5CYII=', 'base64');
   const fileId = 'file_image_entry';
@@ -158,7 +167,7 @@ test('native helper rejects a CRC-valid but damaged PNG IDAT stream', () => {
   const helperPath = path.join(__dirname, '..', 'src', 'main', 'native', 'delivery-image-decode-helper');
   if (process.platform !== 'darwin' || !fs.existsSync(helperPath)) {
     console.log('    (native damaged-IDAT fixture skipped outside macOS build environment)');
-    return;
+    return SKIP;
   }
   const valid = Buffer.from(fixture.PNG_BASE64, 'base64');
   const damaged = Buffer.from(valid);
@@ -185,7 +194,7 @@ test('native helper rejects a structurally valid JPEG with a damaged entropy str
   const helperPath = path.join(__dirname, '..', 'src', 'main', 'native', 'delivery-image-decode-helper');
   if (process.platform !== 'darwin' || !fs.existsSync(helperPath)) {
     console.log('    (native damaged-JPEG entropy fixture skipped outside macOS build environment)');
-    return;
+    return SKIP;
   }
   const valid = Buffer.from('/9j/4AAQSkZJRgABAQEASABIAAD/2wBDAAIBAQEBAQIBAQECAgICAgQDAgICAgUDBAMEBgUGBgYFBQUGBwkIBgcIBwUFCAsICAkJCgoKBgcLDAsKDAkKCgr/2wBDAQICAgICAgUDAwUKBgUGCgoKCgoKCgoKCgoKCgoKCgoKCgoKCgoKCgoKCgoKCgoKCgoKCgoKCgoKCgoKCgoKCgr/wAARCAABAAEDASIAAhEBAxEB/8QAFQABAQAAAAAAAAAAAAAAAAAAAAf/xAAUEAEAAAAAAAAAAAAAAAAAAAAA/8QAFQEBAQAAAAAAAAAAAAAAAAAACAn/xAAUEQEAAAAAAAAAAAAAAAAAAAAA/9oADAMBAAIRAxEAPwCFgA+uA//Z', 'base64');
   const damaged = Buffer.from(valid);
@@ -233,7 +242,7 @@ test('real macOS helper stays within the 40-image and 40Mpx worker envelope', ()
   const helperPath = path.join(__dirname, '..', 'src', 'main', 'native', 'delivery-image-decode-helper');
   if (process.platform !== 'darwin' || !fs.existsSync(helperPath)) {
     console.log('    (native ImageIO pressure fixture skipped outside macOS build environment)');
-    return;
+    return SKIP;
   }
   const decoder = decode.createDeliveryImageDecoder({ helperPath });
   const onePixel = Buffer.from(fixture.PNG_BASE64, 'base64');
@@ -249,4 +258,22 @@ test('real macOS helper stays within the 40-image and 40Mpx worker envelope', ()
   assert.strictEqual(result.contentSha256, `sha256:${crypto.createHash('sha256').update(maximum).digest('hex')}`);
 });
 
-console.log(`Stage B delivery ImageIO decoder boundary: ${passed}/8 passed`);
+// R1+R4 (2026-09-12): previously a skip still ran `passed += 1` and the total was
+// hardcoded, so this CI gate printed "8/8 passed" even when half its native
+// checks never executed. A skip is not a pass: it is reported and fails the gate
+// unless the operator explicitly accepts it.
+const EXPECTED_TOTAL = 8;
+const run = passed + skipped;
+assert.strictEqual(run, EXPECTED_TOTAL, `expected ${EXPECTED_TOTAL} checks but ran ${run}`);
+if (skipped > 0 && !process.env.WRITCRAFT_ALLOW_SKIP) {
+  console.error(
+    `Stage B delivery ImageIO decoder boundary: ${passed}/${EXPECTED_TOTAL} passed, `
+      + `${skipped} SKIPPED -- a skip is not a pass. Set WRITCRAFT_ALLOW_SKIP=1 to accept.`
+  );
+  process.exitCode = 1;
+} else {
+  console.log(
+    `Stage B delivery ImageIO decoder boundary: ${passed}/${EXPECTED_TOTAL} passed`
+      + `${skipped > 0 ? `, ${skipped} skipped (WRITCRAFT_ALLOW_SKIP=1)` : ''}`
+  );
+}
