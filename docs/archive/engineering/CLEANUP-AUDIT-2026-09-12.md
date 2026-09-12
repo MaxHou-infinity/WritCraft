@@ -368,7 +368,8 @@ Stage B/GUI 不得 `requiredInCurrentGate`、4 个门禁脚本的精确字符串
      并解析 `verify.yml` 断言 CI 未静默丢门禁。
    - **R3 声明=实际** —— 把 `source-text` 提升为一等 `evidenceKind`，让 24 个纯静态脚本必须如实声明。
    - **R5 超时** —— 门禁 runner 加 `timeout` + `killSignal`，失败标 `TIMEOUT` 而非读成 hang。
-     （本次清理中已亲历该缺陷：一次组件门禁运行长时间无输出、无超时、无法区分 hang 与慢。）
+     （本次清理中已亲历该缺陷两次：一次组件门禁长时间无输出、无法区分 hang 与慢；
+     以及 §10.7 记录的 8 个从 2026-08-04 挂到 2026-09-12 的僵死测试进程。）
    - **R6 二进制新鲜度** —— 加一步"重建全部 helper 到临时目录并比对 sha256"（实测约 40 秒）。
    - **R7 分支治理工件化** —— PDCA Plan gate 必须落盘 `docs/plan/<task>.md`，含每个受影响符号的
      `git log --all -S` 命中表与分类；未分类命中即拒绝开工。
@@ -403,6 +404,14 @@ Stage B/GUI 不得 `requiredInCurrentGate`、4 个门禁脚本的精确字符串
 5. `EVIDENCE-DELIVERY-V1-CONTRACT.md` 与 `CHANGES-HISTORY-RECOVERY-V1-CONTRACT.md` 的 Snapshot 权威
    是否重叠：审计 A 判断为互补（schema vs recovery），**未读全 165 KB 的后者**，仍待确认。
 6. `docs/0.4.0-A1B-E*-REVIEW.md` 三份记录的 §4 表格未内联绑定日期（§3.3 的可读性残余）。
+7. **（2026-09-12 实测到的环境实例）8 个僵死测试进程**：`verify-v0-sources-race.js` 及其父
+   shell 共 8 个进程，启动于 **2026-08-04 14:54–15:16**，直到 2026-09-12 仍在运行，
+   **每个已累计约 54 分钟 CPU**（合计约 7 CPU 小时），其中一个是 `node tests/verify-v0-sources-race.js
+   && npm test` 链。这是 §5.5"无超时"风险的**活体实例**：该测试挂死后没有任何机制回收它。
+   本批次已将其全部 `kill`（进程级清理，不影响仓库文件）。**注意**：这些僵死进程在被清理前
+   一直在与本批次的测量争抢 CPU，因此本批次早前任何一次"墙钟偏慢"的观察都可能是它造成的；
+   `verify-v0-daily-workspace-data-runner.js:30` 的 `Date.now() - started < 500` 这类断言
+   在这种环境下**必然可能假红**。建议把"检查并清理僵死测试进程"纳入 R5。
 
 ---
 
