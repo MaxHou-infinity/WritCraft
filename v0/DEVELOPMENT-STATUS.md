@@ -3,8 +3,11 @@
 > 最后更新：2026-09-11
 > 当前公开/代码版本：`writ-craft@0.3.1`（npm `preview`）
 > 下一目标：`0.4.0` 证据与交付闭环（`WRC-0.4.0-R1`）
-> 当前 checkpoint：**Stage A / A1b 独立复审 NO-GO（`e24bd51`，P0=0、P1=5、P2=1）；5 个 P1 的修复批次已实施**
-> 当前结论：**5 个 P1 均已修复并有可复现证据；A1b 仍待同一独立 reviewer 定点确认 P0=0/P1=0 后才可签收；A1c、A2、Stage B 重签与 Stage C/D/E 继续冻结**
+> 当前 checkpoint：**Stage A / A1b 已由独立对抗性复审代码级签核**（绑定本地 commit `1f43b7f`，
+> 结论 **GO、P0=0、P1=0、P2=2**）；当前主 checkpoint 转入 **A2a**（快照 create/list App 接线）
+> 当前结论：**A1b 的 5 个 P1 全部闭合；按所有者 2026-09-11 顺序授权，A2a 先行、A1c 后移；
+> Stage B 重签与 Stage C/D/E 继续冻结。A1b 签核仅覆盖代码/集成层，不是 App、Stage、candidate 或 release 签收。**
+> P2 残留：P2-1 文档失真已修（`73c3bc6`）；P2-2（rollback phase→publication 单向条件，生产不可达）保留为可选加固。
 > 本批次实施记录：[`docs/archive/engineering/A1B-P1-FIX-PLAN-2026-09-11.md`](../docs/archive/engineering/A1B-P1-FIX-PLAN-2026-09-11.md)（预检分类、端口计划、缺陷与决策；不拥有派工权）
 > **顺序授权（2026-09-11，所有者）**：A1b 独立签收后**先做 A2a**（快照 create/list 的 App 接线，让用户第一次真正摸到快照），**A1c 后移**。见 `docs/0.4.0-EXECUTION-PROTOCOL.md` 同日修订；该授权只改顺序，不改门禁与产品范围。
 
