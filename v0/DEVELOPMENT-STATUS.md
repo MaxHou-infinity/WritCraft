@@ -112,3 +112,7 @@ A2b–A2d、A3、A→B、Stage B 重签与 Stage C/D/E，以及 candidate、push
 
 CI（`.github/workflows/verify.yml`）按 registration → syntax → current-components → test →
 `npm audit --omit=dev` 编排；完整数字只在当前 checkpoint 出口重跑后更新。
+
+**读结果之前先读 [`docs/TESTING.md`](../docs/TESTING.md)**：它说明五个入口各证明什么、
+为什么 `npm test` 在本机 npm 12 上必然红（环境性，不得放宽门禁）、以及为什么不能按字面
+解读脚本打印的 `N/N`。注意 `npm test`/`verify`/`verify:full` **都不跑** 0.4.0 组件门禁。

@@ -6,7 +6,7 @@
 
 1. **当前事实**：只读 [`../v0/DEVELOPMENT-STATUS.md`](../v0/DEVELOPMENT-STATUS.md) 顶部当前控制块，确认唯一 checkpoint、开放风险和下一动作。
 2. **当前验收**：只读该 checkpoint 唯一直接相关的合同或矩阵。A1b 使用 [`0.4.0-A1B-EXISTING-STATE-MATRIX.md`](0.4.0-A1B-EXISTING-STATE-MATRIX.md) 与实际触及的 Changes/History 合同；不要把内部 E/R/V/F 或 schema/wire slice 当成独立签收点。A1b 与 A2a 的签收结论分别见下方“已签收 checkpoint 的独立复审记录”。
-3. **工程事实**：只读受影响源码、测试和 `v0/package.json`。源码与可复现测试优先于文字快照。
+3. **工程事实**：只读受影响源码、测试和 `v0/package.json`。源码与可复现测试优先于文字快照。**读测试结果之前先读 [`TESTING.md`](TESTING.md)** —— 它说明五个"绿"各证明什么、当前哪个入口是环境性红灯、以及为什么不能按字面解读 `N/N` 报告。
 4. **执行控制**：只在打开、暂停或签收 checkpoint 时读取 [`0.4.0-EXECUTION-PROTOCOL.md`](0.4.0-EXECUTION-PROTOCOL.md)。它控制 WIP/review/Stage 顺序，不改变产品范围。
 
 只有需要判断版本、阶段或产品范围时，才读取 [`ROADMAP.md`](ROADMAP.md) 与 [`ROADMAP-0.4.0.md`](ROADMAP-0.4.0.md)；只有实际触及长期产品或稳定架构决策时，才读取 [`WRITCRAFT-PRD-V3.md`](WRITCRAFT-PRD-V3.md) 与 [`ARCHITECTURE.md`](ARCHITECTURE.md)。阶段 0 review、旧 checkpoint review、PRD、架构和冻结兼容合同都不是每次开发的必读材料。
@@ -60,6 +60,7 @@
 | 当前执行控制 | `0.4.0-EXECUTION-PROTOCOL.md` | 是；只决定当前 checkpoint、WIP、停止条件、证据阶梯与测试注册，不得改变产品范围 |
 | 当前事实账本 | `v0/DEVELOPMENT-STATUS.md` | 是；只从其中尚未关闭的当前阶段和开放项续作 |
 | 长期产品/稳定架构 | `WRITCRAFT-PRD-V3.md`、`ARCHITECTURE.md` | 只约束边界，不能自行新增当前版本任务 |
+| 测试方法与证据强度 | `TESTING.md` | 是；只描述"某条绿证明了什么"，不新增门禁、不改变任何测试 |
 | A1b micro review | `0.4.0-A1B-E*-REVIEW.md` | 否；仅为 historical component evidence，不是 checkpoint、状态或派工门禁 |
 | 已签收 checkpoint 记录 | `0.4.0-A1B-INDEPENDENT-REVIEW.md`、`0.4.0-A2A-INDEPENDENT-REVIEW.md` | 否；是 A1b/A2a 的签收依据与残留 P2 载体，只读、受保护，删除或改写即失效 |
 | 冻结兼容合同 | 0.1.x–0.3.0 路线图、`*-V1-CONTRACT.md`、阶段复审记录 | 否；只有 0.4.0 实际触及对应生产边界时才作为兼容与回归约束 |

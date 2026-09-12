@@ -29,10 +29,12 @@
    - **81/223 个测试脚本不在 `npm test` / `verify` / `verify:full` 的任何一条链上**（42/223 连 CI 都跑不到），
      其中包含 0.4.0 Stage A/B 的 **50 个**组件证据；
    - **一个 A1b 门禁脚本（`verify-v0-changes-history-production-wiring.js`）在把 `main.js` 的关键调用
-     包进 `if (false) {}` 之后仍然打印 "1/1 passed" 并 exit 0** —— 它证明的只是"源码里存在这些子串"；
+     包进 `if (false) {}` 之后仍然打印 "1/1 passed" 并 exit 0** —— 它证明的只是"源码里存在这些子串"
+     （父 agent 已独立复核该脚本：93 行、26 条 `assert.match`/`doesNotMatch`、无任何文件写入或子进程，
+     结论成立）；
    - **24 个脚本（3,098 行）的断言 100% 是源码文本 grep**，其中 14 个**零动态断言**，且全部位于
      `npm test` 或 CI 路径上；
-   - **125/223 打印 `${passed}/${passed}`**，即"N/N"在结构上无法表达失败；
+   - **136/223 打印同一标识符的 `${x}/${x}`**（另有 14 个打印硬编码 `N/N`），即"N/N"在结构上无法表达失败；
    - 至少 4 处**静默跳过**把未执行的检查计入通过（含一个硬编码 `8/8`）。
 
    换句话说：**"绿灯"当前不能按字面理解。** 这是所有者说"不清楚测试方法、怕继续埋坑"的
@@ -117,6 +119,12 @@ native C 源码正确性未审；A2a Electron 门禁只跑 1 次（n=1，未做�
 
    保留的**真实**残余：这三份记录的 §4 表格没有在表格内重复标注绑定日期，读者需回到文件头
    才能判断"漂移是预期的"。这是一个可选的**可读性**改进，不是证据缺陷；本批次不改（改了就漂移）。
+
+3. **审计 C 的两处计数经父 agent 重测后更正**（结论方向不变，数字必须改）：
+   - "113 处 `spawnSync`/`execFileSync`，0 带 `timeout`" → **实测：133 处子进程调用，其中 16 处
+     带 `timeout`（9 个文件），117 处不带（27 个文件）**。"无超时保护"仍然成立且严重，但不是"一个都没有"。
+   - "125/223 打印 `${passed}/${passed}`" → **实测：136/223 打印同一标识符的 `${x}/${x}`；
+     另有 14 个文件打印硬编码 `N/N` 字面量**（审计 C 报 15，方法不同）。结论方向一致。
 
 ---
 
@@ -219,7 +227,7 @@ writing-structure-main-wiring、delivery-preflight-ipc-boundary、image-trash-in
   即使 `WRITCRAFT_E2E_FORCE=1`，只要没设 `WRITCRAFT_E2E_AUTHOR_PROJECT` 就 **SKIP + exit 0**。
 - `verify-v0-context-catalog-electron.js:41-44`：**完全无视 FORCE** 直接跳过。
 
-**报告不可信**：125/223 打印 `${passed}/${passed}`；15 个文件打印硬编码总数；
+**报告不可信**：**136/223** 打印同一标识符的 `${x}/${x}`；**14 个文件**打印硬编码 `N/N` 字面量；
 `verify-v0-changes-history-marker-journal-native-lifecycle.js` 在同一文件里既打印 "1/1" 又打印 "10/10"。
 
 ### 5.4 门禁注册器真正保证了什么
@@ -238,8 +246,9 @@ Stage B/GUI 不得 `requiredInCurrentGate`、4 个门禁脚本的精确字符串
 
 ### 5.5 可靠性
 
-- **零超时**：113 处 `spawnSync`/`execFileSync` 无一带 `timeout`；门禁 runner 也没有；
-  `npm test` 是一条 `&&` 链。**一个 hang 会挂住全部。**
+- **超时保护只覆盖一部分**（父 agent 精确重测）：`v0/tests/` 下 133 处子进程调用中 **117 处没有
+  `timeout`**（16 处有，分布在 9 个文件），未保护的调用分布在 27 个测试文件里；门禁 runner 自身
+  也没有超时；`npm test` 是一条 `&&` 链。**一处 hang 仍可能挂住整条链。**
 - `verify-v0-daily-workspace-data-runner.js:30` 的 `assert(Date.now() - started < 500)` 在 `npm test` 内，
   **按构造就是负载相关的**。
 - A2a 那次 flake 是真实的，已在 `b16ffc7` 修复；审计 C 今日 n=1 未复现；该复审自身已声明 42/42 是弱证据。
@@ -257,7 +266,8 @@ Stage B/GUI 不得 `requiredInCurrentGate`、4 个门禁脚本的精确字符串
 
 **没有。** 逐条核对：
 
-- `verify-v0-changes-history-production-wiring.js`（那 23 条正则的脚本）**不是** A1b 签收所依赖的证据。
+- `verify-v0-changes-history-production-wiring.js`（93 行、26 条正则、末尾硬编码 `1/1` 的那个脚本）
+  **不是** A1b 签收所依赖的证据。
   A1b 的 P1 闭合裁定是 reviewer 自己读码给出的 `file:line` 级证据
   （如 `public-markdown-create-helper.c:8267-8271`、`reconciliation-service.js:5398-5413`），
   不是任何 grep 测试的绿。
