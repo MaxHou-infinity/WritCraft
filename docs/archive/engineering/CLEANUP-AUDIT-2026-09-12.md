@@ -34,7 +34,7 @@
      结论成立）；
    - **24 个脚本（3,098 行）的断言 100% 是源码文本 grep**，其中 14 个**零动态断言**，且全部位于
      `npm test` 或 CI 路径上；
-   - **136/223 打印同一标识符的 `${x}/${x}`**（另有 14 个打印硬编码 `N/N`），即"N/N"在结构上无法表达失败；
+   - **125 个文件**打印字面 `${passed}/${passed}`（同一标识符的宽口径为 136 个），即"N/N"在结构上无法表达失败；
    - 至少 4 处**静默跳过**把未执行的检查计入通过（含一个硬编码 `8/8`）。
 
    换句话说：**"绿灯"当前不能按字面理解。** 这是所有者说"不清楚测试方法、怕继续埋坑"的
@@ -120,11 +120,19 @@ native C 源码正确性未审；A2a Electron 门禁只跑 1 次（n=1，未做�
    保留的**真实**残余：这三份记录的 §4 表格没有在表格内重复标注绑定日期，读者需回到文件头
    才能判断"漂移是预期的"。这是一个可选的**可读性**改进，不是证据缺陷；本批次不改（改了就漂移）。
 
-3. **审计 C 的两处计数经父 agent 重测后更正**（结论方向不变，数字必须改）：
-   - "113 处 `spawnSync`/`execFileSync`，0 带 `timeout`" → **实测：133 处子进程调用，其中 16 处
-     带 `timeout`（9 个文件），117 处不带（27 个文件）**。"无超时保护"仍然成立且严重，但不是"一个都没有"。
-   - "125/223 打印 `${passed}/${passed}`" → **实测：136/223 打印同一标识符的 `${x}/${x}`；
-     另有 14 个文件打印硬编码 `N/N` 字面量**（审计 C 报 15，方法不同）。结论方向一致。
+3. **审计 C 的一处计数正确、一处计数错误、一处口径更窄**（父 agent 用可复现方法逐项重测）：
+
+   | 审计 C 的说法 | 复核结论 | 实测（`verify-v0-*.js`，9e3e06e） |
+   |---|---|---|
+   | `spawnSync`/`execFileSync` **113 处** | **正确** | 113 处（同口径重测） |
+   | 其中 **0 处带 `timeout`** | **错误** | **16 处带 `timeout`（9 个文件），97 处不带** |
+   | 125/223 打印 `${passed}/${passed}` | **正确且更严谨** | 125 个文件匹配字面 `${passed}/${passed}`；`136/223` 是**更宽**的"同标识符 `${x}/${x}`"口径 |
+
+   - 若把所有子进程形式（`spawnSync`/`execFileSync`/`execSync`/`spawn`/`execFile`）都算上，
+     则是 **132 处调用、16 处带 `timeout`、116 处不带（26 个文件）**。
+   - **"超时保护基本缺失"这一结论成立且严重**，但"一处都没有"不成立；本审计最初的
+     "133 处、0 带超时"叙述同样不准确，此处一并更正。
+   - 硬编码 `N/N` 字面量：实测 **14 个文件**（审计 C 报 15，扫描口径不同）。
 
 ---
 
@@ -217,8 +225,17 @@ writing-structure-main-wiring、delivery-preflight-ipc-boundary、image-trash-in
 
 **实验**：把 `main.js` 中三个 create 调用包进 `if (false) {}`，并让被引用的 transaction 文件不定义任何东西。
 `verify-v0-changes-history-production-wiring.js` 仍然打印 **"1/1 … passed" 并 exit 0**。
-该脚本 `evidenceKind: 'production-wiring'`、`requiredInCurrentGate: true`，全部内容是
-**23 条针对 `main.js` 源码的正则**。
+该脚本 `evidenceKind: 'production-wiring'`、`requiredInCurrentGate: true`，全文 93 行、
+**26 条针对 `main.js`/`changes-history-transaction.js` 源码的正则**，不加载它声称验证的任何生产模块、
+无文件写入、无子进程（父 agent 读全文核实；**该脚本不在任一签收复审的点名清单内**）。
+同类的纯文本大文件还有 `verify-v0-project-intelligence.js`（94/94 断言是 `.includes`，横幅却自称
+"项目智能**集成**检查"）与 `verify-v0-workspace.js`（104/108 是 `.includes`）。
+
+**已捕获失败却仍打印"全过"（最危险的一条）**：
+`verify-v0-research-apply-transaction.js:571` 在 `npm test`（pretest）与 `verify` 链上运行。
+其 harness 捕获失败并置 `process.exitCode=1` 后**继续执行**，而 :571 的摘要行**没有**
+`if (!process.exitCode)` 保护，且分母=分子。**实证：注入一个断言失败后，stdout 仍打印
+`11/11 … passed`，而退出码为 1。** 这说明"人看日志"与"CI 看退出码"会得出相反结论。
 
 **静默跳过计入通过**：
 - `verify-v0-delivery-image-decode-service.js`：二进制/平台缺失时跳过 8 项中的 4 项，
@@ -227,7 +244,16 @@ writing-structure-main-wiring、delivery-preflight-ipc-boundary、image-trash-in
   即使 `WRITCRAFT_E2E_FORCE=1`，只要没设 `WRITCRAFT_E2E_AUTHOR_PROJECT` 就 **SKIP + exit 0**。
 - `verify-v0-context-catalog-electron.js:41-44`：**完全无视 FORCE** 直接跳过。
 
-**报告不可信**：**136/223** 打印同一标识符的 `${x}/${x}`；**14 个文件**打印硬编码 `N/N` 字面量；
+**汇总行缺少退出码保护**：多数打印 `passed` 的汇总行没有 `if (!process.exitCode)` 保护
+（父 agent 实测：按宽松口径有 206 行汇总行未提及 `exitCode`，仅 42 行提及；审计 C 报 99 行，
+口径不同，但"大量未保护"成立）。这是 R1 要一并收口的第三个缺陷面。
+
+**注意（审计 C 的反向结论，同样重要）**：套件里**不存在**"空洞断言"这一类问题 ——
+0 个 `assert(true)`/自比较/空测试体，45 个"捕获后继续"的 harness **全部**置 `process.exitCode=1`，
+退出码本身是诚实的。**问题不是断言写得假，而是测量对象选错了（测文本而非测行为）与报表机制坏了。**
+
+**报告不可信**：**125 个文件**匹配字面 `${passed}/${passed}`（更宽的"同标识符 `${x}/${x}`"
+口径为 **136 个**）；**14 个文件**打印硬编码 `N/N` 字面量；
 `verify-v0-changes-history-marker-journal-native-lifecycle.js` 在同一文件里既打印 "1/1" 又打印 "10/10"。
 
 ### 5.4 门禁注册器真正保证了什么
@@ -246,9 +272,10 @@ Stage B/GUI 不得 `requiredInCurrentGate`、4 个门禁脚本的精确字符串
 
 ### 5.5 可靠性
 
-- **超时保护只覆盖一部分**（父 agent 精确重测）：`v0/tests/` 下 133 处子进程调用中 **117 处没有
-  `timeout`**（16 处有，分布在 9 个文件），未保护的调用分布在 27 个测试文件里；门禁 runner 自身
-  也没有超时；`npm test` 是一条 `&&` 链。**一处 hang 仍可能挂住整条链。**
+- **超时保护基本缺失**：`verify-v0-*.js` 中 113 处 `spawnSync`/`execFileSync` 里只有 **16 处**
+  带 `timeout`（9 个文件），**97 处不带**；含全部子进程形式则为 132 处中 116 处不带（26 个文件）。
+  门禁 runner（`check-v0-0-4-test-registration.js:187-191`）自身也没有超时；`npm test` 是一条
+  `&&` 链。**一处 hang 仍可能挂住整条链。**
 - `verify-v0-daily-workspace-data-runner.js:30` 的 `assert(Date.now() - started < 500)` 在 `npm test` 内，
   **按构造就是负载相关的**。
 - A2a 那次 flake 是真实的，已在 `b16ffc7` 修复；审计 C 今日 n=1 未复现；该复审自身已声明 42/42 是弱证据。
@@ -284,7 +311,10 @@ Stage B/GUI 不得 `requiredInCurrentGate`、4 个门禁脚本的精确字符串
 | `ee92900` + `d6b9a79` | **F1**：把 A1b 定点确认写入复审文件，并修正文件头使其不再与签收矛盾 |
 | `7479983` | **F2–F7、F10**：清除状态账本/协议/路线图/验收合同中的签收前描述；0.3.1 全面校正；归档协议不再自称现行；补全 archive 索引；修正 `raw/_back` |
 
-**未执行**：本批次到目前为止**没有删除任何文件**。删除需要所有者逐项点头（§8）。
+**已执行（截至本文件写入时）**：§8.1 的零风险删除（4 个 `.DS_Store` 与 `.omc/stage-a-quarantine-20260810/`）
+已执行；§8.2 中所有者已点头的两项（`v0/release/`、1,488 行死代码）见 §11 执行记录。
+**本批次未删除任何 git 已跟踪的文件**（除 §11 记录的 4 个死模块/死测试文件，它们由所有者逐项批准）。
+删除需要所有者逐项点头（§8）。
 
 ---
 
@@ -354,3 +384,51 @@ Stage B/GUI 不得 `requiredInCurrentGate`、4 个门禁脚本的精确字符串
 5. `EVIDENCE-DELIVERY-V1-CONTRACT.md` 与 `CHANGES-HISTORY-RECOVERY-V1-CONTRACT.md` 的 Snapshot 权威
    是否重叠：审计 A 判断为互补（schema vs recovery），**未读全 165 KB 的后者**，仍待确认。
 6. `docs/0.4.0-A1B-E*-REVIEW.md` 三份记录的 §4 表格未内联绑定日期（§3.3 的可读性残余）。
+
+---
+
+## 11. 执行记录：所有者已点头的删除，以及独立复审对本批次的更正
+
+### 11.1 所有者批准后执行的删除（2026-09-12）
+
+| 项 | 删除内容 | 可恢复性 |
+|---|---|---|
+| `v0/release/`（425 MB） | 打包好的 0.3.1 app + zip；未跟踪、已 gitignore | **不可由 git 恢复**；可由 0.3.1 源码重建 |
+| 死代码对 1：`v0/src/main/changes-history-marker-journal.js`（520）+ `v0/tests/verify-v0-changes-history-marker-journal.js`（376） | 任何 ref 的任何提交都从未 require 过该模块 | git 历史保留 |
+| 死代码对 2：`v0/src/main/project-onboarding-service.js`（335）+ `v0/tests/verify-v0-project-onboarding.js`（257） | 自仓库第一次提交起就从未进入生产路径 | git 历史保留 |
+| 注册清册同步 | `0.4.0-test-gates.json` 54→53、`0.4.0-legacy-test-baseline.json` 169→168、`package.json` 移除 2 处引用 | 同一 change set（红线 b） |
+
+合计删除 **1,488 行**（855 生产 + 633 测试）。同步后注册门禁实测：
+`221 verify-v0 scripts classified (53 current, 168 legacy), 40 Stage A, 9 Stage B, 2 GUI-only`，exit 0。
+
+**如实记录的代价**：审计 C 指出 marker-journal 的那 376 行测试含有 12 条 native 测试**未覆盖**的
+断言（symlink 逃逸、注入式描述符链验证器、0755/0700 模式、nofollow 重开、陈旧 head 等）。
+按 C 的判定"要么模块+测试一起删，要么都不删"，本批次选择了前者。**失去的是"一个死掉的 JS
+journal 实现的唯一可执行规范"**；其格式权威仍在 `changes-history-marker-journal-schema.js`
+（保留）与 `CHANGES-HISTORY-RECOVERY-V1-CONTRACT.md` §4.2.1，且该实现全文可从 git 取回。
+**保留的守卫**：`tests/verify-v0-project-onboarding-integration.js` 未删，它断言 `main.js`
+不得 require v1。
+
+### 11.2 独立对抗性复审（`bcff6186`）对本批次提出的更正 —— 全部已采纳
+
+复审对 `b66975e..7dc424e` 做只读对抗，提出 2 个 P1 + 4 个 P2。**6 条全部成立，已逐条修正**：
+
+| # | 发现 | 处置 |
+|---|---|---|
+| **P1-1** | A1b 定点确认段绑定的 `1f43b7fc…` **不存在**（第 8 位应为 `3`），且它是 commit 却被写成 "tree" | 已改为完整 `1f43b7f3407f…` 并更正标签；两个复审文件中**全部** hash 现已逐个 `git cat-file` 验证有效 |
+| **P1-2** | 该确认段**日期不可能**：写 2026-09-11，却绑定 `57daa08`（2026-09-12 19:48）并引用 `73c3bc6`（09-12 20:00）；且 P2-1 括注"8 删/8 增、100% 注释"与 `73c3bc6` 实际（2 文件 +12/−11，含非注释正文）不符 | 确认段与状态账本日期更正为 **2026-09-12**；括注改为实测值。**并发现同类错误波及 A2a**：A2a 复审 `Review date` 与定点确认同样写 09-11，实际绑定 09-12 的 `2b81494`/`b16ffc7`，已一并更正 |
+| P2-3 | 本文 §7 说"没有删除任何文件"，§8.1 却说"已删除" —— 同一提交自相矛盾 | 已改写 §7 并新增本节 §11 |
+| P2-4 | §5.5"113 处无一带 timeout"的绝对表述 | 见 §3.3 更正表：113 这个**计数是对的**，"0 带 timeout"错（16 处带） |
+| P2-5 | 新增的 INDEX 规则说签收记录"删除或改写即失效"，而本批次自己改写了 A1b 复审文件 | 已把规则**限定**为"改写其结论/finding"；错别字与日期更正不属失效范围 |
+| P2-6 | 状态账本 `最后更新` 仍为 09-11；§3 已改标题为"全部闭合"但条目 2 仍写"遗留待 reviewer 裁定" | 均已修正；V≡R 明确标注为**已裁定，不再是待办** |
+
+**复审已验证为干净的部分**（摘要）：npm 0.3.1 全部事实与 registry 一致（含 shasum/integrity/time/fileCount
+与 `74bc497`）；无 v0.3.1 GitHub tag；全部新相对链接可达；**当前派工控制文件有且只有一个**；
+`src/main` 116/75,859 等规模数字复现；死模块结论复现；测试链数字（131/138/141/50/181）精确复现；
+`safety`：`git diff --diff-filter=D/R b66975e..7dc424e` 为空，无红线被违反。
+
+### 11.3 本批次之后仍需做的事
+
+1. **R1+R4 测试可信度修复**（所有者已选为下一优先项）：R1 报告诚实性、R4 禁止静默跳过。
+2. 随后考虑 R2/R3/R5/R6/R7（见 §8.3）。
+3. 清理批次自身已通过独立对抗性复审（本节），可作为本批次的 close 证据。

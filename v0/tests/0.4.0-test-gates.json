@@ -1,7 +1,7 @@
 {
   "schemaVersion": "writcraft.test-gates/v1",
   "targetVersion": "0.4.0",
-  "expectedTestCount": 54,
+  "expectedTestCount": 53,
   "legacyBaseline": "tests/0.4.0-legacy-test-baseline.json",
   "tests": [
     {
@@ -54,15 +54,6 @@
       "stage": "A",
       "lane": "changes-history",
       "evidenceKind": "schema",
-      "requiredInCurrentGate": true,
-      "completionEligible": false,
-      "requiresGui": false
-    },
-    {
-      "test": "tests/verify-v0-changes-history-marker-journal.js",
-      "stage": "A",
-      "lane": "changes-history",
-      "evidenceKind": "service-integration",
       "requiredInCurrentGate": true,
       "completionEligible": false,
       "requiresGui": false

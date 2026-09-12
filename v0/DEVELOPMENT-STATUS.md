@@ -1,6 +1,6 @@
 # 笔触 · WritCraft 当前开发状态
 
-> 最后更新：2026-09-11
+> 最后更新：2026-09-12
 > 当前公开/代码版本：`writ-craft@0.3.1`（npm `preview`）
 > 下一目标：`0.4.0` 证据与交付闭环（`WRC-0.4.0-R1`）
 > 当前 checkpoint：**Stage A / A2a 已代码级签核**（修复批次 `b16ffc7`，同一 reviewer 定点确认
@@ -33,24 +33,24 @@
   `PRECREATE → CREATED_RECEIPT → EXISTING_COMMITTED → HISTORY_COMMITTED → FINALIZED → ACK_COMMITTED → IDLE`。
 - fresh R stored-publication identity 与单项 `Q → fresh R → D → A → ROLLED_BACK`
   是已通过的 component/integration evidence。原独立复审（`e24bd51`）曾判定它们没有闭合
-  完整 checkpoint；该 finding batch 已在 2026-09-11 修复并**定点确认 GO**，见下 §3。
+  完整 checkpoint；该 finding batch 已于 2026-09-11 修复（`1f43b7f`）并**于 2026-09-12 定点确认 GO**，见下 §3。
 - `e24bd51` 补入 D 精确删除、A forged-phase、A exact-ACK replacement-preserve
   三类 native 对抗测试；测试全绿，未改变下面 §3 记录的 5 个生产 P1（该批 P1 此后已全部闭合）。
 
 ## 3. A1b 的 5 个 P1 —— 全部闭合并已定点确认
 
-**最终结论：GO；P0=0、P1=0、P2=2** —— 修复批次绑定 `1f43b7f`，由同一独立 reviewer 于
-2026-09-11 定点确认，确认记录见
+**最终结论：GO；P0=0、P1=0、P2=2** —— 修复批次绑定 `1f43b7f`（2026-09-11 落库），由同一独立
+reviewer 于 **2026-09-12** 定点确认（GO 由 `2ab928d` 落库，确认段由 `ee92900` 写入复审文件），确认记录见
 [`docs/0.4.0-A1B-INDEPENDENT-REVIEW.md`](../docs/0.4.0-A1B-INDEPENDENT-REVIEW.md) 文末。
 （原 finding batch 绑定 `e24bd51`，当日结论 P0=0、P1=5、P2=1；下列为逐项闭合记录。）
 
 1. **已闭合**：native E/R 现支持多 EXISTING 批量（`existing_execute_batch` / `existing_output_batch`
    / `existing_batch_publish_rollback`），证据 `WRC_A1B_E2B_*` 91/91。
-2. **已闭合**：native `V` 已是真实只读复验并被 Main 消费（`E/R 后 fresh V`）；证据
-   `WRC_A1B_E3_R=1` 78/78。**遗留待 reviewer 裁定**：V 与 R 在当前 native 实现中共用同一
-   只读复验体，仅命令字不同；按 `0.4.0-A1B-EXISTING-STATE-MATRIX.md`「只有存储的
-   publication 才能授权 fresh R/V」的冻结顺序，V 在 CAS 之后运行是有意设计，不另造第二套
-   复验实现。
+2. **已闭合（含 V≡R 裁定）**：native `V` 已是真实只读复验并被 Main 消费（`E/R 后 fresh V`）；证据
+   `WRC_A1B_E3_R=1` 78/78。**V 与 R 共用同一只读复验体**（仅命令字不同）：所有者已裁定该实现
+   符合冻结契约（契约以证明义务与顺序定义 V，而非要求第二套实现），裁定与明示残留
+   （V 继承 R 的任何盲点）见 `0.4.0-A1B-EXISTING-STATE-MATRIX.md` §Owner ruling 与 A1b 复审
+   文末「三项特别裁定 (a)」。**该问题已裁定，不再是待办。**
 3. **已闭合**：Q/D/A 均已实现分阶段 WRCCHRJ2 publication 并具备重放/响应丢失恢复。
    本批次新增 `ROLLBACK_CREATE_PUBLICATION`（`QUARANTINED → ROLLED_BACK → ACK_COMMITTED`）
    与 `ROLLBACK_CREATE_ATTEMPT_PUBLICATION`（Q 之前的 `PREPARED` 写前 latch），

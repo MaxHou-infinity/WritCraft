@@ -25,7 +25,7 @@
 
 ## 已签收 checkpoint 的独立复审记录（签收证据）
 
-这两份记录是 A1b / A2a 的**签收依据**，不是可派工文档；它们同时承载接受与残留 P2，删除或改写它们等于使签核失效：
+这两份记录是 A1b / A2a 的**签收依据**，不是可派工文档；它们同时承载接受与残留 P2。**删除它们，或改写其签收结论/finding/P2 残留，等于使签核失效**（错别字与日期的更正不属此列）：
 
 - [`0.4.0-A1B-INDEPENDENT-REVIEW.md`](0.4.0-A1B-INDEPENDENT-REVIEW.md)：A1b 完整 finding batch（`e24bd51`，NO-GO）与其**定点确认 GO**（`1f43b7f`，P0=0/P1=0/P2=2）。
 - [`0.4.0-A2A-INDEPENDENT-REVIEW.md`](0.4.0-A2A-INDEPENDENT-REVIEW.md)：A2a 完整 review 与其**定点确认 GO**（`b16ffc7`，P0=0/P1=0/P2=3）。
@@ -62,7 +62,7 @@
 | 长期产品/稳定架构 | `WRITCRAFT-PRD-V3.md`、`ARCHITECTURE.md` | 只约束边界，不能自行新增当前版本任务 |
 | 测试方法与证据强度 | `TESTING.md` | 是；只描述"某条绿证明了什么"，不新增门禁、不改变任何测试 |
 | A1b micro review | `0.4.0-A1B-E*-REVIEW.md` | 否；仅为 historical component evidence，不是 checkpoint、状态或派工门禁 |
-| 已签收 checkpoint 记录 | `0.4.0-A1B-INDEPENDENT-REVIEW.md`、`0.4.0-A2A-INDEPENDENT-REVIEW.md` | 否；是 A1b/A2a 的签收依据与残留 P2 载体，只读、受保护，删除或改写即失效 |
+| 已签收 checkpoint 记录 | `0.4.0-A1B-INDEPENDENT-REVIEW.md`、`0.4.0-A2A-INDEPENDENT-REVIEW.md` | 否；是 A1b/A2a 的签收依据与残留 P2 载体，只读、受保护；删除或改写其结论/finding 即失效 |
 | 冻结兼容合同 | 0.1.x–0.3.0 路线图、`*-V1-CONTRACT.md`、阶段复审记录 | 否；只有 0.4.0 实际触及对应生产边界时才作为兼容与回归约束 |
 | 历史材料 | `docs/archive/`、`raw/`、`deliverables/` | 否；仅追溯证据，不得恢复旧 TODO、里程碑或目标模式文本 |
 

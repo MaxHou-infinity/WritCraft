@@ -1,7 +1,7 @@
 {
   "schemaVersion": "writcraft.test-legacy-baseline/v1",
   "frozenAt": "2026-08-11",
-  "expectedTestCount": 169,
+  "expectedTestCount": 168,
   "tests": [
     "tests/verify-v0-ai-metrics-integration.js",
     "tests/verify-v0-ai-metrics-renderer.js",
@@ -124,7 +124,6 @@
     "tests/verify-v0-project-onboarding-integration.js",
     "tests/verify-v0-project-onboarding-ui.js",
     "tests/verify-v0-project-onboarding-v2.js",
-    "tests/verify-v0-project-onboarding.js",
     "tests/verify-v0-project-search.js",
     "tests/verify-v0-project-service.js",
     "tests/verify-v0-project-watcher-health.js",
