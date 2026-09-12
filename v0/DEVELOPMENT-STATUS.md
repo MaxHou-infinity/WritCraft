@@ -6,7 +6,7 @@
 > 当前 checkpoint：**Stage A / A2a 已代码级签核**（修复批次 `b16ffc7`，同一 reviewer 定点确认
 > **GO、P0=0、P1=0、P2=3**）；A1b 已于 `1f43b7f` 签核（GO、P0=0、P1=0、P2=2）
 > 当前结论：**A1b 与 A2a 均已签收**；按所有者 2026-09-11 顺序授权，下一 checkpoint 为
-> **A1c（Safe Undo）**。Stage B 重签与 Stage C/D/E 继续冻结。两者均只覆盖代码/集成层，
+> **A1c（Safe Undo）**；但**所有者已授权先执行 P0 清理审计批次**（零行为变更、不解除 A1c/A2b 冻结、自身须独立复审）。Stage B 重签与 Stage C/D/E 继续冻结。两者均只覆盖代码/集成层，
 > **不是** App、Stage、candidate 或 release 签收。
 > A2a 残留 P2：(c) GUI e2e 对 CI 不可见（既有项目级缺口，非本变更引入）；
 > (d) create 的 `confirmation` 是 preload 常量而非 Main 手势校验；(e) 少量源码文本 grep 断言。
