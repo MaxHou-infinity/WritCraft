@@ -4,6 +4,8 @@
 > 适用版本：`writ-craft@0.4.0`
 > 冻结日期：2026-08-06
 > 状态：**阶段 0 已冻结并经独立复审签收（P0=0、P1=0、P2=4）；阶段 A 进行中。A-R1.1 首红 P0=0/P1=7/P2=1，A-R1.2 为 P0=0/P1=4/P2=1，A-R1.3 为 P0=0/P1=2/P2=0，A-R1.4 已由同一独立复审员以 P0=0/P1=0/P2=0 签收；native/storage 实现门禁已解锁，但阶段 A、App 与真实作者验收均未完成**
+>
+> 进度指针（2026-09-12）：上述 A-R1.x 数字是组件层历史证据。**当前 checkpoint 进度以 [`../v0/DEVELOPMENT-STATUS.md`](../v0/DEVELOPMENT-STATUS.md) 顶部控制块为唯一权威** —— A0、A1a、A1b（`1f43b7f`）、A2a（`b16ffc7`）已代码级签收，下一 checkpoint 为 A1c；本合同的验收语义未变，仍是 0.4.0 的当前验收依据。
 > 上位合同：`docs/ROADMAP-0.4.0.md`（`WRC-0.4.0-R1`）
 
 本合同冻结 0.4.0 的 Snapshot、选择性恢复、交付预检、引用健康度、DOCX、Graph 多视图和真实渲染边界。它不授权发布，也不把现有 History、Diagnostic Export、SourceIndex、Citation、Graph v2、Image Trash 或 0.3.0 AI task 包装成新能力。

@@ -32,13 +32,17 @@
   `ROLLBACK_CREATE` Q/R/D/A、Main post-E terminal CAS，以及 mixed applied 主线：
   `PRECREATE → CREATED_RECEIPT → EXISTING_COMMITTED → HISTORY_COMMITTED → FINALIZED → ACK_COMMITTED → IDLE`。
 - fresh R stored-publication identity 与单项 `Q → fresh R → D → A → ROLLED_BACK`
-  是已通过的 component/integration evidence，但独立复审证明它们没有闭合完整 checkpoint。
+  是已通过的 component/integration evidence。原独立复审（`e24bd51`）曾判定它们没有闭合
+  完整 checkpoint；该 finding batch 已在 2026-09-11 修复并**定点确认 GO**，见下 §3。
 - `e24bd51` 补入 D 精确删除、A forged-phase、A exact-ACK replacement-preserve
-  三类 native 对抗测试；测试全绿，未改变下面的 5 个生产 P1。
+  三类 native 对抗测试；测试全绿，未改变下面 §3 记录的 5 个生产 P1（该批 P1 此后已全部闭合）。
 
-## 3. 当前 P1
+## 3. A1b 的 5 个 P1 —— 全部闭合并已定点确认
 
-完整独立复审绑定 `e24bd51`，结论 P0=0、P1=5、P2=1。2026-09-11 修复批次的逐项状态：
+**最终结论：GO；P0=0、P1=0、P2=2** —— 修复批次绑定 `1f43b7f`，由同一独立 reviewer 于
+2026-09-11 定点确认，确认记录见
+[`docs/0.4.0-A1B-INDEPENDENT-REVIEW.md`](../docs/0.4.0-A1B-INDEPENDENT-REVIEW.md) 文末。
+（原 finding batch 绑定 `e24bd51`，当日结论 P0=0、P1=5、P2=1；下列为逐项闭合记录。）
 
 1. **已闭合**：native E/R 现支持多 EXISTING 批量（`existing_execute_batch` / `existing_output_batch`
    / `existing_batch_publish_rollback`），证据 `WRC_A1B_E2B_*` 91/91。
@@ -68,7 +72,7 @@ P2：`37e67e7` 含当前 main 缺失的 durable rollback publication 设计参�
 
 ## 4. 当前可复现证据
 
-- `node tests/check-v0-0-4-test-registration.js --check`：222 scripts，53 current，41 Stage A，exit 0。
+- `node tests/check-v0-0-4-test-registration.js --check`：223 scripts，54 current，41 Stage A，exit 0。
 - `node tests/verify-v0-snapshot-restore-mixed-journey.js`：18/18，exit 0（含 formal rollback
   journey、`ROLLED_BACK`→IDLE 收敛与幂等重清，以及 6 个重启/响应丢失边界）。
   **全部为正向断言**：其中「D 已执行但 `ROLLED_BACK` CAS 丢失」与「native D 响应丢失」
@@ -85,13 +89,19 @@ P2：`37e67e7` 含当前 main 缺失的 durable rollback publication 设计参�
 - `npm run verify:0.4:current-components`：41/41 Stage A + 9/9 Stage B preflight，exit 0。
 - `npm test`：受限沙箱首红为 Electron `code=null`；真实 Electron 权限重跑 exit 0。
 
-以上绿灯没有覆盖或推翻独立复审的 5 个合同/生产边界 P1。
+以上绿灯是 component/integration 层证据。它们**不**构成 App、Stage、candidate 或 release 签收；
+A1b 的签收依据是上 §3 的逐项 reviewer 裁定，不是这些绿灯的总和。
 
 ## 5. 唯一下一动作
 
-**按 authority 依赖顺序修复 5 个 P1，运行 focused production gates，并由同一独立 reviewer 对原 finding batch 定点确认。**
+**当前进行中：P0 清理审计批次（2026-09-12 所有者授权）** —— 零行为变更、自身须独立复审、
+不解除 A1c/A2b 冻结；范围与红线见
+[`docs/archive/engineering/CLEANUP-BASELINE-2026-09-12.md`](../docs/archive/engineering/CLEANUP-BASELINE-2026-09-12.md)
+与 [`docs/0.4.0-EXECUTION-PROTOCOL.md`](../docs/0.4.0-EXECUTION-PROTOCOL.md) 文末「2026-09-12 所有者授权」。
 
-A1b 签收前，A1c、A2a–A2d、A3、A→B、Stage C/D/E、candidate、push/tag/release/publish/distribution 均冻结。
+该批次关闭后，按所有者 2026-09-11 顺序授权，下一 checkpoint 为 **A1c（Safe Undo）**；
+A2b–A2d、A3、A→B、Stage B 重签与 Stage C/D/E，以及 candidate、push/tag/release/publish/distribution
+继续冻结，等待前序 checkpoint。
 
 ## 6. 门禁执行清单（无 CI 时的显式步骤）
 

@@ -72,7 +72,7 @@ npx writ-craft@preview --check
 └── references/         # 资料与引用
 ```
 
-第一次使用时，先打开 `edit.md`，把“为什么写、写给谁、要讲清什么”告诉笔触。你可以直接进入章节，通过项目对话、段落改写和一致性图谱推进作品。当前公开的 `0.3.0` Preview 已包含统一任务进度、受限 `@` 上下文、处理建议 → 正文内 Diff → 接受或撤销的透明协作任务流。
+第一次使用时，先打开 `edit.md`，把“为什么写、写给谁、要讲清什么”告诉笔触。你可以直接进入章节，通过项目对话、段落改写和一致性图谱推进作品。当前公开的 `0.3.1` Preview 已包含统一任务进度、受限 `@` 上下文、处理建议 → 正文内 Diff → 接受或撤销的透明协作任务流。
 
 左侧书脊式活动栏在项目文件、搜索、来源与图谱之间保持唯一清晰的工作区状态；新建或打开其他项目时，从项目标题右侧的 `•••` 菜单进入。
 
@@ -102,13 +102,13 @@ MiniMax API Key 只应在应用设置中配置。不要把 Key 写进项目文�
 
 `0.2.0` 的工作区能力已纳入当前预览；其 GitHub/App 候选记录仍保留在状态账本中，npm registry 的中间版本不作为当前安装入口。
 
-公开的 `0.3.0` 透明 AI 协作 Preview，已验证统一任务进度、受限 `@` 引用、Context Catalog 过期保护、五入口统一 Context Manifest v2、正文内 Diff、Safe Undo、同 profile Key 重启恢复，以及真实作者隔离副本的 Chat → Navigation → Diff → 冲突阻止 → 接受 → Safe Undo。Chapter、Research、普通 Changes、Graph、图片、五入口 edit.md revision 漂移旧结果丢弃、来源不足“添加来源”恢复、取消/60 秒超时和跨项目迟到结果零写入均已有获批 GUI 证据；阶段 E 独立复审已签收 P0=0、P1=0、P2=3。该版本已发布到 npm `preview` 和 GitHub prerelease，但仍是 Developer Preview。
+公开的 `0.3.1` 透明 AI 协作 Preview，已验证统一任务进度、受限 `@` 引用、Context Catalog 过期保护、五入口统一 Context Manifest v2、正文内 Diff、Safe Undo、同 profile Key 重启恢复，以及真实作者隔离副本的 Chat → Navigation → Diff → 冲突阻止 → 接受 → Safe Undo。Chapter、Research、普通 Changes、Graph、图片、五入口 edit.md revision 漂移旧结果丢弃、来源不足“添加来源”恢复、取消/60 秒超时和跨项目迟到结果零写入均已有获批 GUI 证据；阶段 E 独立复审已签收 P0=0、P1=0、P2=3。`0.3.0` 已发布到 npm `preview` 和 GitHub prerelease；`0.3.1` 是其后的评估修复批次，于 2026-08-16 发布到 npm `preview`（无独立 release note、无 GitHub tag）。当前公开版本为 `0.3.1`，仍是 Developer Preview。
 
 ## Preview 边界
 
 - 目前仅支持 macOS arm64 / x64，通过终端启动。
 - 尚未提供 Apple Developer ID 签名与公证的 `.app` 安装包。
-- 当前公开 Preview 为 `writ-craft@0.3.0`；安装时请始终显式使用 `@preview`。`latest` 保留为上一稳定指针 `0.1.0`，不代表本次 prerelease。
+- 当前公开 Preview 为 `writ-craft@0.3.1`；安装时请始终显式使用 `@preview`。`latest` 保留为上一稳定指针 `0.1.0`，不代表本次 prerelease。
 - 重要文稿请保留独立备份；正式生产使用尚未开放。
 - 源码公开可见，**不等于开源授权**。评估、复制和使用边界以 [专有评估许可证](LICENSE) 为准。
 
@@ -120,7 +120,7 @@ MiniMax API Key 只应在应用设置中配置。不要把 Key 写进项目文�
 
 查看 [公开路线图](docs/ROADMAP.md)，了解当前阶段、未来付费方向和不会越过的产品边界。
 
-下一目标版本 0.4.0“证据与交付闭环”的 `WRC-0.4.0-R1` 已完成阶段 0 合同/基线冻结，独立复审为 P0=0、P1=0、P2=4；当前进入阶段 A，建立 Main 项目快照、比较、Markdown 选择性恢复和安全删除权威。阶段 0 未修改产品代码，公开版本仍是 0.3.0 Preview。
+下一目标版本 0.4.0“证据与交付闭环”的 `WRC-0.4.0-R1` 已完成阶段 0 合同/基线冻结，独立复审为 P0=0、P1=0、P2=4；当前处于阶段 A，A1b 与 A2a 已代码级签收（详见 [`v0/DEVELOPMENT-STATUS.md`](v0/DEVELOPMENT-STATUS.md)），继续建立 Main 项目快照、比较、Markdown 选择性恢复和安全删除权威。阶段 0 未修改产品代码，公开版本仍是 `0.3.1` Preview。
 
 ## 参与笔触
 

@@ -5,7 +5,7 @@
 ## 开始开发前只读四类入口
 
 1. **当前事实**：只读 [`../v0/DEVELOPMENT-STATUS.md`](../v0/DEVELOPMENT-STATUS.md) 顶部当前控制块，确认唯一 checkpoint、开放风险和下一动作。
-2. **当前验收**：只读该 checkpoint 唯一直接相关的合同或矩阵。A1b 当前使用 [`0.4.0-A1B-EXISTING-STATE-MATRIX.md`](0.4.0-A1B-EXISTING-STATE-MATRIX.md) 与实际触及的 Changes/History 合同；不要把内部 E/R/V/F 或 schema/wire slice 当成独立签收点。
+2. **当前验收**：只读该 checkpoint 唯一直接相关的合同或矩阵。A1b 使用 [`0.4.0-A1B-EXISTING-STATE-MATRIX.md`](0.4.0-A1B-EXISTING-STATE-MATRIX.md) 与实际触及的 Changes/History 合同；不要把内部 E/R/V/F 或 schema/wire slice 当成独立签收点。A1b 与 A2a 的签收结论分别见下方“已签收 checkpoint 的独立复审记录”。
 3. **工程事实**：只读受影响源码、测试和 `v0/package.json`。源码与可复现测试优先于文字快照。
 4. **执行控制**：只在打开、暂停或签收 checkpoint 时读取 [`0.4.0-EXECUTION-PROTOCOL.md`](0.4.0-EXECUTION-PROTOCOL.md)。它控制 WIP/review/Stage 顺序，不改变产品范围。
 
@@ -19,9 +19,18 @@
 
 `ROADMAP-0.2.0.md` 已于 2026-08-03 获得所有者批准并生效。原审阅稿已直接转为该版本合同，不保留第二份活动路线图。
 
-`ROADMAP-0.3.0.md` 已于 2026-08-04 获批并完成阶段 0 → E，0.3.0 已发布为 npm/GitHub Developer Preview。
+`ROADMAP-0.3.0.md` 已于 2026-08-04 获批并完成阶段 0 → E，0.3.0 已发布为 npm/GitHub Developer Preview；其后 0.3.1 修复批次已于 2026-08-16 发布到 npm `preview`，是**当前公开版本**，发布事实见 [`NPM-DEVELOPER-PREVIEW-V1-CONTRACT.md`](NPM-DEVELOPER-PREVIEW-V1-CONTRACT.md)。
 
 `ROADMAP-0.4.0.md` 已于 2026-08-06 获批为 `WRC-0.4.0-R1`；所有者随后提交了其中 §11 的完整目标模式文本。阶段 0 已完成并由独立复审以 P0=0、P1=0、P2=4 签收。2026-08-11 完成封版距离审计后，执行方式切换为 `WRC-0.4.0-EXEC-R1` 受约束里程碑恢复；当前只允许 Stage A，Stage B 冻结等待 A→B 重签，C/D/E 禁止开工。
+
+## 已签收 checkpoint 的独立复审记录（签收证据）
+
+这两份记录是 A1b / A2a 的**签收依据**，不是可派工文档；它们同时承载接受与残留 P2，删除或改写它们等于使签核失效：
+
+- [`0.4.0-A1B-INDEPENDENT-REVIEW.md`](0.4.0-A1B-INDEPENDENT-REVIEW.md)：A1b 完整 finding batch（`e24bd51`，NO-GO）与其**定点确认 GO**（`1f43b7f`，P0=0/P1=0/P2=2）。
+- [`0.4.0-A2A-INDEPENDENT-REVIEW.md`](0.4.0-A2A-INDEPENDENT-REVIEW.md)：A2a 完整 review 与其**定点确认 GO**（`b16ffc7`，P0=0/P1=0/P2=3）。
+
+两者都只覆盖**代码/集成层**，不等于 App、Stage、candidate 或 release 签收。
 
 ## A1b 历史 component evidence（不可派工）
 
@@ -52,6 +61,7 @@
 | 当前事实账本 | `v0/DEVELOPMENT-STATUS.md` | 是；只从其中尚未关闭的当前阶段和开放项续作 |
 | 长期产品/稳定架构 | `WRITCRAFT-PRD-V3.md`、`ARCHITECTURE.md` | 只约束边界，不能自行新增当前版本任务 |
 | A1b micro review | `0.4.0-A1B-E*-REVIEW.md` | 否；仅为 historical component evidence，不是 checkpoint、状态或派工门禁 |
+| 已签收 checkpoint 记录 | `0.4.0-A1B-INDEPENDENT-REVIEW.md`、`0.4.0-A2A-INDEPENDENT-REVIEW.md` | 否；是 A1b/A2a 的签收依据与残留 P2 载体，只读、受保护，删除或改写即失效 |
 | 冻结兼容合同 | 0.1.x–0.3.0 路线图、`*-V1-CONTRACT.md`、阶段复审记录 | 否；只有 0.4.0 实际触及对应生产边界时才作为兼容与回归约束 |
 | 历史材料 | `docs/archive/`、`raw/`、`deliverables/` | 否；仅追溯证据，不得恢复旧 TODO、里程碑或目标模式文本 |
 
@@ -64,7 +74,7 @@
 - [`NPM-DEVELOPER-PREVIEW-V1-CONTRACT.md`](NPM-DEVELOPER-PREVIEW-V1-CONTRACT.md)：npm Preview 分发合同。
 - [`RELEASE-NOTES-v0.1.2.md`](RELEASE-NOTES-v0.1.2.md)：历史 0.1.2 Preview 说明。
 - [`RELEASE-NOTES-v0.2.0.md`](RELEASE-NOTES-v0.2.0.md)：历史 0.2.0 Preview 说明。
-- [`RELEASE-NOTES-v0.3.0.md`](RELEASE-NOTES-v0.3.0.md)：当前公开 0.3.0 透明 AI 协作 Preview 说明。
+- [`RELEASE-NOTES-v0.3.0.md`](RELEASE-NOTES-v0.3.0.md)：历史 0.3.0 透明 AI 协作 Preview 说明（已被 0.3.1 取代；0.3.1 未另写 release note，发布事实以 npm 合同为准）。
 - [`../SECURITY.md`](../SECURITY.md)、[`../CONTRIBUTING.md`](../CONTRIBUTING.md)：安全与贡献。
 
 ## 冻结兼容合同（按受影响模块读取）

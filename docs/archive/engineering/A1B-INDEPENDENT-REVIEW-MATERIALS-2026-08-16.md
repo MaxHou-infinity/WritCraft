@@ -1,7 +1,10 @@
 # A1b 独立复审材料（2026-08-16）
 
 > 目的：为 A1b mixed EXISTING + `ROLLBACK_CREATE` 的独立 reviewer 提供变更清单、证据链与当前开放项。
-> 状态：A1b 仍未签收（NO-GO）。本材料不构成签收，仅整理当前可核验事实。
+> 状态（2026-08-16 当时）：A1b 仍未签收（NO-GO）。本材料不构成签收，仅整理当时可核验事实。
+> **后续更新（2026-09-12 补注）**：A1b 已于 `1f43b7f` 由同一 reviewer 定点确认 **GO（P0=0、P1=0、P2=2）**，
+> 见 [`docs/0.4.0-A1B-INDEPENDENT-REVIEW.md`](../../0.4.0-A1B-INDEPENDENT-REVIEW.md) 文末与 `v0/DEVELOPMENT-STATUS.md`。
+> 本文件保持归档原貌，不再代表当前状态。
 > 关联：`docs/0.4.0-EXECUTION-PROTOCOL.md`、`v0/DEVELOPMENT-STATUS.md`、`docs/0.4.0-A1B-EXISTING-STATE-MATRIX.md`。
 
 ## 1. 本轮变更清单（commit → 内容 → 验证）

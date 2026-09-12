@@ -1,8 +1,12 @@
 # WritCraft V0 · npm Developer Preview v1
 
-> Status: `writ-craft@0.3.0` was published to npm `preview` on 2026-08-05 after real-author acceptance. Registry tags remain intentionally split: `preview: 0.3.0`, `latest: 0.1.0`; this is still a macOS Developer Preview, not a stable release. The prior `0.1.2` publication remains historical: registry shasum `553bec35246b118ae5a47b2d4dd327c16c171029`, tag `v0.1.2`, release commit `395b863`.
+> Status (2026-09-12 refresh): the current public preview is **`writ-craft@0.3.1`**, published to npm `preview` on **2026-08-16** (release commit `74bc497`, an evaluation fix batch). Registry tags remain intentionally split: `preview: 0.3.1`, `latest: 0.1.0`. `0.3.1` was published **without a separate `RELEASE-NOTES-v0.3.1.md`**; its publication facts are recorded below. This is still a macOS Developer Preview, not a stable release, and no App/ZIP was distributed.
+>
+> Historical: `writ-craft@0.3.0` was published to npm `preview` on 2026-08-05 after real-author acceptance. The prior `0.1.2` publication remains historical: registry shasum `553bec35246b118ae5a47b2d4dd327c16c171029`, tag `v0.1.2`, release commit `395b863`.
 
-Published package evidence: version `0.3.0`, shasum `c3294a3f106119096751f8c2b67afa55e91bd702`, integrity `sha512-mVU4thULwrwHMmdZ5ZXF4VYMh3HzWR91G5mvuxQeCIl4WU34NhLNvw0gU1vaWiWa3ha4oVeQ41f0N6WLGu/6Gw==`, tarball [`writ-craft-0.3.0.tgz`](https://registry.npmjs.org/writ-craft/-/writ-craft-0.3.0.tgz). GitHub prerelease: [`v0.3.0`](https://github.com/MaxHou-infinity/WritCraft/releases/tag/v0.3.0), tag and release commit `a747683`. Approved isolated public-registry install verification passed **2/2**; no App/ZIP was distributed.
+Published package evidence (**0.3.1**, current): shasum `43ff6081e6c6229818a8219e10bcbaa714cff7e5`, integrity `sha512-q4SwbH+iyByC/3uO8A4NM2u0PkglU6XRPDRzRXkzVYnfbwui0NdW5P2ndLOJMnF9+c4IkfHPQS0k14/9Hfvitw==`, tarball [`writ-craft-0.3.1.tgz`](https://registry.npmjs.org/writ-craft/-/writ-craft-0.3.1.tgz), registry `time["0.3.1"]` = `2026-08-16T07:47:18.410Z`, 185 files. A GitHub tag/prerelease for `v0.3.1` was **not** created locally and has **not been verified** in this repository; treat `0.3.1` as an npm-only preview publication until confirmed by the owner.
+
+Published package evidence (**0.3.0**, historical): version `0.3.0`, shasum `c3294a3f106119096751f8c2b67afa55e91bd702`, integrity `sha512-mVU4thULwrwHMmdZ5ZXF4VYMh3HzWR91G5mvuxQeCIl4WU34NhLNvw0gU1vaWiWa3ha4oVeQ41f0N6WLGu/6Gw==`, tarball [`writ-craft-0.3.0.tgz`](https://registry.npmjs.org/writ-craft/-/writ-craft-0.3.0.tgz). GitHub prerelease: [`v0.3.0`](https://github.com/MaxHou-infinity/WritCraft/releases/tag/v0.3.0), tag and release commit `a747683`. Approved isolated public-registry install verification passed **2/2**; no App/ZIP was distributed.
 
 ## Distribution boundary
 
@@ -61,7 +65,7 @@ reason. Do not use unpublish as the normal rollback mechanism.
 
 Before a preview tag is published:
 
-1. run `npm test`, Electron-enabled `npm run verify`, forced real-Electron E2E, persistent Main/IPC, and `npm run verify:npm-preview`;
+1. run `npm test`, `npm run verify`, **`npm run verify:full`** (the command that adds forced real-Electron E2E), persistent Main/IPC, and `npm run verify:npm-preview`;
 2. run `npm audit --omit=dev` against the candidate dependency graph and require zero known production vulnerabilities; repeat this audit for every candidate and immediately before publication;
 3. run `npm run verify:npm-preview:installed` against the generated tarball, proving the public CLI receives Main's exact IPC after `did-finish-load`, uses only the isolated profile, forwards termination, and leaves no child process; this proves page load, not every workspace/bootstrap behavior;
 4. complete the fresh-tarball install, `--check`, Main-observed page-load IPC, signal/exit, and cleanup matrix on npm 10/arm64 and npm 11/x64; an unavailable or failing combination blocks public preview publication;
@@ -80,3 +84,9 @@ tarball, matched the published shasum, observed Main IPC after page load,
 confirmed profile isolation and signal forwarding, and passed **2/2**. This
 does not claim a stable release, Apple signing/notarization, or App/ZIP
 distribution.
+
+On 2026-09-12, `npm view writ-craft dist-tags --json` returned
+`preview: 0.3.1` and `latest: 0.1.0`. Whether an equivalent isolated
+`verify:npm-preview:installed` run was performed for `0.3.1` is **not recorded**
+in this repository; that gap is tracked as an open item in
+`v0/DEVELOPMENT-STATUS.md` rather than silently assumed green.
