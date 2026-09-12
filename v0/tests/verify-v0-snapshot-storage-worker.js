@@ -104,9 +104,9 @@ function boundScript(onProductionCommand) {
       child.reply(`P\tOK\t1\t2\t${process.getuid()}\t493\n`);
       return;
     }
-    if (line === 'D') {
+    if (line === 'D' || line === 'I') {
       child.reply(
-        `D\tOK\tcontrol\t3\t4\t${process.getuid()}\t448` +
+        `${line}\tOK\tcontrol\t3\t4\t${process.getuid()}\t448` +
         `\tbundles\t5\t6\t${process.getuid()}\t448` +
         `\tquarantine\t7\t8\t${process.getuid()}\t448\n`
       );
@@ -414,6 +414,26 @@ async function run() {
     await worker.close();
   });
 
+  await check('expected project identity rejects a replacement before native storage initialization', async () => {
+    const commands = [];
+    const worker = createSnapshotStorageWorkerForRoot('/private/tmp', {
+      initializeStorage: true,
+      expectedRootIdentity: { dev: 999, ino: 1000 },
+      spawn: scriptedSpawn((line, child) => {
+        commands.push(line.split('\t')[0]);
+        if (line.startsWith('P\t')) {
+          child.reply(`P\tOK\t1\t2\t${process.getuid()}\t493\n`);
+        }
+      }),
+    });
+    try {
+      await assert.rejects(worker.ready(), error => error?.code === 'SNAPSHOT_ROOT_CHANGED');
+      assert.deepStrictEqual(commands, ['P']);
+    } finally {
+      await close(worker);
+    }
+  });
+
   await check('production create streams sealed Markdown through shared marked and returns formal COMMITTED truth', async () => {
     const scratch = fs.mkdtempSync(path.join(os.tmpdir(), 'writcraft-snapshot-worker-'));
     const data = setup(scratch);
@@ -437,6 +457,36 @@ async function run() {
       schema.assertDigest(result.snapshotManifestDigest, 'snapshotManifestDigest');
       schema.assertDigest(result.publishedIdentityDigest, 'publishedIdentityDigest');
       schema.assertDigest(result.receiptDigest, 'receiptDigest');
+    } finally {
+      await close(worker);
+      fs.rmSync(scratch, { recursive: true, force: true });
+    }
+  });
+
+  await check('production worker returns formal UNCOMMITTED when native private byte capacity is full', async () => {
+    const scratch = fs.mkdtempSync(path.join(os.tmpdir(), 'writcraft-snapshot-worker-'));
+    const data = setup(scratch);
+    fs.writeFileSync(path.join(data.project, 'capacity.md'), '# capacity\n', { mode: 0o600 });
+    const worker = createSnapshotStorageWorkerForRoot(data.project, {
+      helperPath: compile(scratch, ['WRITCRAFT_TEST_MAX_COMMITTED_PRIVATE_BYTES=1024']),
+    });
+    try {
+      const request = productionRequest();
+      const result = await worker.createProductionSnapshot(request);
+      assert.deepStrictEqual(result, {
+        transactionId: request.transactionId,
+        snapshotId: request.snapshotId,
+        stageBasename: request.stageBasename,
+        finalBasename: request.finalBasename,
+        state: 'UNCOMMITTED',
+        snapshotManifestDigest: result.snapshotManifestDigest,
+        reason: 'SNAPSHOT_CAPACITY_EXCEEDED',
+      });
+      schema.assertDigest(result.snapshotManifestDigest, 'snapshotManifestDigest');
+      assert.deepStrictEqual(fs.readdirSync(path.join(data.root, 'bundles')), []);
+      assert.strictEqual(fs.readdirSync(path.join(data.root, 'control')).some(name =>
+        name.startsWith('stage-') || name.startsWith('recovery-')
+      ), false);
     } finally {
       await close(worker);
       fs.rmSync(scratch, { recursive: true, force: true });

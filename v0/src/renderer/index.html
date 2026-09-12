@@ -858,11 +858,20 @@
     .project-home-hero h1 { margin: 0; font: 600 clamp(34px, 4vw, 58px)/1.05 Georgia, "Songti SC", serif; }
     .project-home-hero p { max-width: 620px; margin: 14px 0 0; color: #756e65; font-size: 16px; line-height: 1.7; }
     .project-home-actions { display: flex; gap: 10px; flex: 0 0 auto; }
-    .project-home-actions button, .project-home-card button { border: 1px solid #cdbfaf; border-radius: 10px; background: #fffdf9; color: #3b342d; padding: 9px 14px; font: 650 13px/1.2 ui-sans-serif, system-ui; cursor: pointer; }
-    .project-home-actions .is-primary, .project-home-card button.is-primary { border-color: #547b71; background: #547b71; color: #fff; }
+    .project-home-actions button, .project-home-card button, .project-home-snapshot-card button { border: 1px solid #cdbfaf; border-radius: 10px; background: #fffdf9; color: #3b342d; padding: 9px 14px; font: 650 13px/1.2 ui-sans-serif, system-ui; cursor: pointer; }
+    .project-home-actions .is-primary, .project-home-card button.is-primary, .project-home-snapshot-card button.is-primary { border-color: #547b71; background: #547b71; color: #fff; }
+    .project-home-actions button:disabled, .project-home-card button:disabled, .project-home-snapshot-card button:disabled { cursor: default; opacity: .55; }
     .project-home-status { min-height: 24px; margin: 18px 0 0; color: #756e65; font-size: 13px; }
     .project-home-status.is-error { color: #a33f35; }
     .project-home-summary { display: grid; grid-template-columns: repeat(3, minmax(0,1fr)); gap: 12px; margin: 26px 0; }
+    .project-home-snapshot-card { margin: 0 0 18px; padding: 22px; border: 1px solid #c9d5d0; border-radius: 16px; background: #edf3f0; box-shadow: 0 8px 24px rgba(65,50,37,.045); }
+    .project-home-snapshot-head { display: flex; align-items: flex-start; justify-content: space-between; gap: 20px; }
+    .project-home-snapshot-head h2 { margin: 0; font: 600 22px/1.25 Georgia, "Songti SC", serif; }
+    .project-home-snapshot-head p { margin: 5px 0 0; color: #64756f; font-size: 13px; line-height: 1.55; }
+    .project-home-snapshot-status { min-height: 20px; margin: 14px 0 4px; color: #506760; font-size: 13px; }
+    .project-home-snapshot-status.is-error { color: #a33f35; }
+    .project-home-snapshot-list { display: grid; gap: 0; }
+    .project-home-snapshot-summary { padding: 12px 0 7px; color: #64756f; font-size: 12px; }
     .project-home-stat { padding: 18px 20px; border: 1px solid #ddd2c5; border-radius: 14px; background: rgba(255,255,255,.58); }
     .project-home-stat strong { display: block; font: 600 30px/1 Georgia, serif; }
     .project-home-stat span { display: block; margin-top: 8px; color: #7d746a; font-size: 12px; }
@@ -1151,6 +1160,11 @@
           </header>
           <div id="project-home-status" class="project-home-status" role="status" aria-live="polite">打开项目后显示今日工作入口。</div>
           <div id="project-home-summary" class="project-home-summary"></div>
+          <section class="project-home-snapshot-card" aria-label="本地快照">
+            <div class="project-home-snapshot-head"><div><h2>本地快照</h2><p>保存当前项目的本地恢复点；不会修改正文，也不是云端备份。</p></div><button id="project-home-snapshot-create" class="is-primary" type="button">创建本地快照</button></div>
+            <div id="project-home-snapshot-status" class="project-home-snapshot-status" role="status" aria-live="polite">正在读取本地快照…</div>
+            <div id="project-home-snapshot-list" class="project-home-snapshot-list"><div class="project-home-empty">打开项目后显示已提交的本地恢复点。</div></div>
+          </section>
           <div id="project-home-grid" class="project-home-grid"></div>
         </div>
       </section>

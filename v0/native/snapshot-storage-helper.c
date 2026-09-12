@@ -23,6 +23,7 @@
 // Strict LF-terminated private protocol (path is lowercase hex UTF-8 bytes):
 //   P<TAB>absolute-project-path-hex
 //   D
+//   I
 //   S<TAB>transaction-id<TAB>snapshot-id<TAB>stage-basename<TAB>exact-bytes
 //   W<TAB>transaction-id<TAB>chunk-hex
 //   F<TAB>transaction-id<TAB>snapshot-manifest-digest
@@ -58,6 +59,7 @@
 #include <stdlib.h>
 #include <string.h>
 #include <sys/stat.h>
+#include <sys/file.h>
 #include <sys/types.h>
 #include <unistd.h>
 
@@ -79,6 +81,11 @@
 #define MAX_CONTENT_BYTES (512ULL * 1024ULL * 1024ULL)
 #define MAX_ENTRIES 500U
 #define MAX_COMMITTED_SNAPSHOTS 20U
+#ifndef WRITCRAFT_TEST_MAX_COMMITTED_PRIVATE_BYTES
+#define MAX_COMMITTED_PRIVATE_BYTES (2ULL * 1024ULL * 1024ULL * 1024ULL)
+#else
+#define MAX_COMMITTED_PRIVATE_BYTES WRITCRAFT_TEST_MAX_COMMITTED_PRIVATE_BYTES
+#endif
 #define MAX_UNAVAILABLE_DETAILS 256U
 #define MAX_RECORD_BYTES (1024U * 1024U)
 #define DIGEST_TEXT_BYTES 71U
@@ -862,6 +869,58 @@ static bool open_private_tree(const RootBinding *root, StorageBinding *storage) 
   return true;
 }
 
+static bool ensure_private_directory(
+  int parent,
+  const char *name,
+  int *fd_out,
+  Identity *identity_out
+) {
+  bool created = false;
+  if (mkdirat(parent, name, 0700) == 0) {
+    created = true;
+  } else if (errno != EEXIST) {
+    return false;
+  }
+  if (!open_private_directory(parent, name, fd_out, identity_out)) return false;
+  if (created && fsync(parent) != 0) {
+    (void)close(*fd_out);
+    *fd_out = -1;
+    return false;
+  }
+  return true;
+}
+
+static bool initialize_private_tree(RootBinding *root, StorageBinding *storage) {
+  int meta = -1;
+  int snapshots = -1;
+  int version = -1;
+  Identity ignored;
+  bool valid = revalidate_root(root) &&
+    ensure_private_directory(root->project_fd, ".writcraft", &meta, &ignored) &&
+    ensure_private_directory(meta, "snapshots", &snapshots, &ignored) &&
+    ensure_private_directory(snapshots, "v1", &version, &ignored) &&
+    ensure_private_directory(
+      version, "control", &storage->control_fd, &storage->control_identity
+    ) &&
+    ensure_private_directory(
+      version, "bundles", &storage->bundles_fd, &storage->bundles_identity
+    ) &&
+    ensure_private_directory(
+      version, "quarantine", &storage->quarantine_fd, &storage->quarantine_identity
+    ) &&
+    fsync(version) == 0 &&
+    revalidate_root(root);
+  if (meta >= 0) (void)close(meta);
+  if (snapshots >= 0) (void)close(snapshots);
+  if (version >= 0) (void)close(version);
+  if (!valid) {
+    close_storage(storage);
+    return false;
+  }
+  storage->ready = true;
+  return true;
+}
+
 static bool revalidate_storage(const RootBinding *root, const StorageBinding *expected) {
   StorageBinding actual;
   memset(&actual, 0, sizeof(actual));
@@ -876,9 +935,11 @@ static bool revalidate_storage(const RootBinding *root, const StorageBinding *ex
   return valid;
 }
 
-static bool bind_storage(RootBinding *root, StorageBinding *storage) {
-  if (!revalidate_root(root) || !open_private_tree(root, storage)) {
-    return write_error('D', "PRIVATE_PARENT") && false;
+static bool bind_storage(RootBinding *root, StorageBinding *storage, bool initialize) {
+  const char command = initialize ? 'I' : 'D';
+  if (!revalidate_root(root) ||
+      !(initialize ? initialize_private_tree(root, storage) : open_private_tree(root, storage))) {
+    return write_error(command, "PRIVATE_PARENT") && false;
   }
   if (!compute_parent_identity_digest(
         "control", root->root_identity_digest, &storage->control_identity,
@@ -892,15 +953,19 @@ static bool bind_storage(RootBinding *root, StorageBinding *storage) {
         "quarantine", root->root_identity_digest, &storage->quarantine_identity,
         storage->quarantine_identity_digest
       )) {
-    return write_error('D', "IDENTITY") && false;
+    return write_error(command, "IDENTITY") && false;
+  }
+  if (!revalidate_root(root) || !revalidate_storage(root, storage)) {
+    return write_error(command, "PRIVATE_PARENT") && false;
   }
   char response[512];
   int length = snprintf(
     response,
     sizeof(response),
-    "D\tOK\tcontrol\t%" PRIuMAX "\t%" PRIuMAX "\t%" PRIuMAX "\t%" PRIuMAX
+    "%c\tOK\tcontrol\t%" PRIuMAX "\t%" PRIuMAX "\t%" PRIuMAX "\t%" PRIuMAX
     "\tbundles\t%" PRIuMAX "\t%" PRIuMAX "\t%" PRIuMAX "\t%" PRIuMAX
     "\tquarantine\t%" PRIuMAX "\t%" PRIuMAX "\t%" PRIuMAX "\t%" PRIuMAX "\n",
+    command,
     storage->control_identity.dev,
     storage->control_identity.ino,
     storage->control_identity.uid,
@@ -5179,6 +5244,116 @@ static bool settle_production_uncommitted(
   return rewritten;
 }
 
+typedef enum {
+  PRODUCTION_CAPACITY_OK = 0,
+  PRODUCTION_CAPACITY_EXCEEDED = 1,
+  PRODUCTION_CAPACITY_BUSY = 2,
+  PRODUCTION_CAPACITY_UNAVAILABLE = 3,
+  PRODUCTION_CAPACITY_FINAL_EXISTS = 4,
+} ProductionCapacityTruth;
+
+static ProductionCapacityTruth production_capacity_guard(
+  RootBinding *root,
+  StorageBinding *storage,
+  const char *final_name,
+  uintmax_t prospective_size,
+  int *lock_fd_out
+) {
+  *lock_fd_out = -1;
+  int lock_fd = openat(
+    storage->bundles_fd, ".", O_RDONLY | O_DIRECTORY | O_NOFOLLOW | O_CLOEXEC
+  );
+  if (lock_fd < 0) return PRODUCTION_CAPACITY_UNAVAILABLE;
+  if (flock(lock_fd, LOCK_EX | LOCK_NB) != 0) {
+    (void)close(lock_fd);
+    return errno == EWOULDBLOCK || errno == EAGAIN
+      ? PRODUCTION_CAPACITY_BUSY
+      : PRODUCTION_CAPACITY_UNAVAILABLE;
+  }
+  struct stat lock_stat;
+  Identity lock_identity;
+  if (fstat(lock_fd, &lock_stat) != 0 || !identity_from_stat(&lock_stat, &lock_identity) ||
+      !same_directory(&storage->bundles_identity, &lock_identity)) {
+    (void)close(lock_fd);
+    return PRODUCTION_CAPACITY_UNAVAILABLE;
+  }
+
+  int scan_fd = openat(
+    storage->bundles_fd, ".", O_RDONLY | O_DIRECTORY | O_NOFOLLOW | O_CLOEXEC
+  );
+  if (scan_fd < 0) {
+    (void)close(lock_fd);
+    return PRODUCTION_CAPACITY_UNAVAILABLE;
+  }
+  DIR *directory = fdopendir(scan_fd);
+  if (directory == NULL) {
+    (void)close(scan_fd);
+    (void)close(lock_fd);
+    return PRODUCTION_CAPACITY_UNAVAILABLE;
+  }
+
+  size_t scanned = 0U;
+  size_t committed_count = 0U;
+  uintmax_t committed_bytes = 0U;
+  ProductionCapacityTruth truth = PRODUCTION_CAPACITY_OK;
+  struct dirent *entry = NULL;
+  while ((entry = readdir(directory)) != NULL) {
+    if (strcmp(entry->d_name, ".") == 0 || strcmp(entry->d_name, "..") == 0) continue;
+    scanned += 1U;
+    if (scanned > MAX_SCAN_ENTRIES || !valid_final_name(entry->d_name)) {
+      truth = PRODUCTION_CAPACITY_UNAVAILABLE;
+      break;
+    }
+    int fd = openat(
+      storage->bundles_fd, entry->d_name,
+      O_RDONLY | O_NOFOLLOW | O_NONBLOCK | O_CLOEXEC
+    );
+    struct stat held;
+    struct stat at_path;
+    Identity held_identity;
+    Identity path_identity;
+    bool exact = fd >= 0 && fstat(fd, &held) == 0 &&
+      fstatat(storage->bundles_fd, entry->d_name, &at_path, AT_SYMLINK_NOFOLLOW) == 0 &&
+      identity_from_stat(&held, &held_identity) && identity_from_stat(&at_path, &path_identity) &&
+      same_regular_identity(&held_identity, &path_identity) && S_ISREG(held.st_mode) &&
+      held.st_uid == geteuid() && (held.st_mode & 0777) == 0600 && held.st_nlink == 1 &&
+      held_identity.size <= MAX_BUNDLE_BYTES;
+    if (fd >= 0) (void)close(fd);
+    if (!exact) {
+      truth = PRODUCTION_CAPACITY_UNAVAILABLE;
+      break;
+    }
+    if (strcmp(entry->d_name, final_name) == 0) {
+      truth = PRODUCTION_CAPACITY_FINAL_EXISTS;
+      break;
+    }
+    if (held_identity.size > MAX_COMMITTED_PRIVATE_BYTES ||
+        committed_bytes > MAX_COMMITTED_PRIVATE_BYTES - held_identity.size) {
+      truth = PRODUCTION_CAPACITY_EXCEEDED;
+      break;
+    }
+    committed_bytes += held_identity.size;
+    committed_count += 1U;
+  }
+  (void)closedir(directory);
+  if (truth == PRODUCTION_CAPACITY_OK &&
+      (!revalidate_root(root) || !revalidate_storage(root, storage))) {
+    truth = PRODUCTION_CAPACITY_UNAVAILABLE;
+  }
+  if (truth == PRODUCTION_CAPACITY_OK &&
+      (committed_count >= MAX_COMMITTED_SNAPSHOTS ||
+       prospective_size > MAX_COMMITTED_PRIVATE_BYTES ||
+       prospective_size > MAX_COMMITTED_PRIVATE_BYTES - committed_bytes)) {
+    truth = PRODUCTION_CAPACITY_EXCEEDED;
+  }
+  if (truth == PRODUCTION_CAPACITY_OK) {
+    *lock_fd_out = lock_fd;
+    return truth;
+  }
+  (void)close(lock_fd);
+  return truth;
+}
+
 static bool finish_production_capture(
   char *line,
   RootBinding *root,
@@ -5338,6 +5513,33 @@ static bool finish_production_capture(
   _exit(89);
 #endif
 
+  int capacity_lock_fd = -1;
+  ProductionCapacityTruth capacity = production_capacity_guard(
+    root, storage, final_name, staged_identity.size, &capacity_lock_fd
+  );
+  if (capacity != PRODUCTION_CAPACITY_OK) {
+    const char *code = capacity == PRODUCTION_CAPACITY_EXCEEDED
+      ? "SNAPSHOT_CAPACITY_EXCEEDED"
+      : capacity == PRODUCTION_CAPACITY_BUSY
+        ? "SNAPSHOT_CAPACITY_BUSY"
+        : capacity == PRODUCTION_CAPACITY_FINAL_EXISTS
+          ? "FINAL_EXISTS"
+          : "SNAPSHOT_CAPACITY_UNAVAILABLE";
+    bool known = settle_production_uncommitted(
+      storage, stage, capture, transaction_name, transaction_fd,
+      stage_digest, manifest_digest, recovery_name, marker_fd, code
+    );
+    (void)close(marker_fd);
+    (void)close(transaction_fd);
+    if (!known) return write_error('B', "UNKNOWN") && false;
+    char response[512];
+    int length = snprintf(
+      response, sizeof(response), "B\tOK\t%s\tUNCOMMITTED\t%s\t%s\n",
+      capture->transaction_id, manifest_digest, code
+    );
+    return length > 0 && (size_t)length < sizeof(response) && write_line(response);
+  }
+
   // This exact full source rewalk/re-read is deliberately the final operation
   // before atomic no-clobber publish. No time window is used as authority.
   if (!recheck_capture_sources(root, storage, capture)) {
@@ -5345,6 +5547,7 @@ static bool finish_production_capture(
       storage, stage, capture, transaction_name, transaction_fd,
       stage_digest, manifest_digest, recovery_name, marker_fd, "SOURCE_STALE"
     );
+    (void)close(capacity_lock_fd);
     (void)close(marker_fd);
     (void)close(transaction_fd);
     if (!known) return write_error('B', "UNKNOWN") && false;
@@ -5357,6 +5560,7 @@ static bool finish_production_capture(
   }
 #ifdef WRITCRAFT_TEST_PAUSE_PRODUCTION_BEFORE_RENAME
   if (!test_sync_point("production-before-rename")) {
+    (void)close(capacity_lock_fd);
     (void)close(marker_fd);
     (void)close(transaction_fd);
     return write_error('B', "UNKNOWN") && false;
@@ -5370,6 +5574,7 @@ static bool finish_production_capture(
       storage, stage, capture, transaction_name, transaction_fd,
       stage_digest, manifest_digest, recovery_name, marker_fd, code
     );
+    (void)close(capacity_lock_fd);
     (void)close(marker_fd);
     (void)close(transaction_fd);
     if (!known) return write_error('B', "UNKNOWN") && false;
@@ -5406,6 +5611,7 @@ static bool finish_production_capture(
     fsync(storage->control_fd) == 0;
   (void)close(marker_fd);
   (void)close(transaction_fd);
+  (void)close(capacity_lock_fd);
   if (!committed) return write_error('B', "UNKNOWN") && false;
   (void)close(stage->fd);
   stage->fd = -1;
@@ -7057,7 +7263,14 @@ int main(void) {
       break;
     }
     if (strcmp(line, "D") == 0) {
-      if (storage.ready || !bind_storage(&root, &storage)) {
+      if (storage.ready || !bind_storage(&root, &storage, false)) {
+        success = false;
+        break;
+      }
+      continue;
+    }
+    if (strcmp(line, "I") == 0) {
+      if (storage.ready || !bind_storage(&root, &storage, true)) {
         success = false;
         break;
       }

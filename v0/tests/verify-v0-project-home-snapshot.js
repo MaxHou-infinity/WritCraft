@@ -2,6 +2,8 @@
 
 const assert = require('assert');
 const crypto = require('crypto');
+const fs = require('fs');
+const path = require('path');
 const { createProjectHomeSnapshotService, LIMITS } = require('../src/main/project-home-snapshot-service');
 
 function revision(content) { return crypto.createHash('sha256').update(content).digest('hex'); }
@@ -15,6 +17,19 @@ const service = createProjectHomeSnapshotService({ clock: () => now });
 const projectInstanceId = `instance_${'a'.repeat(24)}`;
 const captureAuthority = () => ({ projectInstanceId, projectMutationGeneration: 4 });
 async function main() {
+const htmlSource = fs.readFileSync(path.join(__dirname, '..', 'src', 'renderer', 'index.html'), 'utf8');
+const homeSource = fs.readFileSync(path.join(__dirname, '..', 'src', 'renderer', 'project-home-view.js'), 'utf8');
+const preloadSource = fs.readFileSync(path.join(__dirname, '..', 'src', 'main', 'preload.js'), 'utf8');
+assert.match(htmlSource, /id="project-home-snapshot-create"[^>]*>创建本地快照</u);
+assert.match(htmlSource, /不会修改正文，也不是云端备份/u);
+assert.match(homeSource, /snapshotBridge\.create\(projectInstanceId\)/u);
+assert.match(homeSource, /本地快照已创建。/u);
+assert.match(homeSource, /task\.kind !== 'SNAPSHOT_CREATE'/u);
+assert.match(homeSource, /clearSnapshots\('正在切换项目/u);
+assert.match(homeSource, /refresh\(\{ quietSnapshots: true \}\)/u);
+assert.match(homeSource, /snapshotSuccessProjectInstanceId !== projectInstanceId/u);
+assert.match(preloadSource, /confirmation: 'CREATE_SNAPSHOT'/u);
+assert.doesNotMatch(homeSource, /rootPath|snapshotManifestDigest/u);
 const inventoryRunner = async request => require('../src/main/workspace-inventory-service').buildWorkspaceInventory({
   projectService, rootPath: request.rootPath, captureAuthority: request.captureAuthority,
 });

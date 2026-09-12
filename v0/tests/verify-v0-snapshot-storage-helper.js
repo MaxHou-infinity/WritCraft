@@ -210,6 +210,39 @@ function runHelper(helper, project, input) {
   }
 }
 
+function runAfterRootReplacement(helper, project) {
+  const driver = String.raw`
+    const childProcess = require('child_process');
+    const fs = require('fs');
+    const [helper, project] = process.argv.slice(1);
+    const rootFd = fs.openSync('/', fs.constants.O_RDONLY);
+    const child = childProcess.spawn(helper, [], { stdio: ['pipe', 'pipe', 'pipe', rootFd] });
+    fs.closeSync(rootFd);
+    let stdout = '';
+    let stderr = '';
+    let replaced = false;
+    child.stdout.on('data', chunk => {
+      stdout += chunk.toString('utf8');
+      if (!replaced && stdout.includes('P\tOK\t')) {
+        replaced = true;
+        fs.renameSync(project, project + '-original');
+        fs.mkdirSync(project, { mode: 0o700 });
+        child.stdin.end('I\nX\n');
+      }
+    });
+    child.stderr.on('data', chunk => { stderr += chunk.toString('utf8'); });
+    child.on('close', (status, signal) => {
+      process.stdout.write(JSON.stringify({ status, signal, stdout, stderr, replaced }));
+    });
+    child.stdin.write('P\t' + Buffer.from(project, 'utf8').toString('hex') + '\n');
+  `;
+  const result = childProcess.spawnSync(process.execPath, ['-e', driver, helper, project], {
+    encoding: 'utf8', timeout: 20000,
+  });
+  assert.strictEqual(result.status, 0, result.stderr || result.stdout);
+  return JSON.parse(result.stdout);
+}
+
 function runLateTerminalMutation(helper, project, input, syncName, mutation) {
   const driver = String.raw`
     const childProcess = require('child_process');
@@ -361,24 +394,26 @@ function reconcileProtocol(project, extra = []) {
   ].join('\n');
 }
 
-function productionCaptureProtocol(project, extraFields = []) {
-  return [...productionCaptureCommands(project, extraFields), 'X', ''].join('\n');
+function productionCaptureProtocol(project, extraFields = [], identities = {}) {
+  return [...productionCaptureCommands(project, extraFields, identities), 'X', ''].join('\n');
 }
 
-function productionCaptureCommands(project, extraFields = []) {
+function productionCaptureCommands(project, extraFields = [], identities = {}) {
+  const transactionId = identities.transactionId || TRANSACTION_ID;
+  const snapshotId = identities.snapshotId || SNAPSHOT_ID;
   return [
     `P\t${encodeHex(project)}`,
     'D',
     [
-      'G', TRANSACTION_ID, PROJECT_INSTANCE_ID, SNAPSHOT_ID, '17', '23', COMMITTED_AT,
+      'G', transactionId, PROJECT_INSTANCE_ID, snapshotId, '17', '23', COMMITTED_AT,
       ...extraFields,
     ].join('\t'),
   ];
 }
 
-function sealedCandidates(stdout) {
+function sealedCandidates(stdout, transactionId = TRANSACTION_ID) {
   const lines = stdout.trim().split('\n');
-  const terminal = lines.find(line => line.startsWith(`G\tOK\t${TRANSACTION_ID}\t`));
+  const terminal = lines.find(line => line.startsWith(`G\tOK\t${transactionId}\t`));
   assert(terminal, stdout);
   const terminalFields = terminal.split('\t');
   const captureDigest = terminalFields[4];
@@ -403,11 +438,12 @@ function tokenPassCommands(pass, overrides = {}) {
     sha256Bytes: bytes => `sha256:${crypto.createHash('sha256').update(bytes).digest('hex')}`,
   });
   const value = { ...pass, ...overrides };
+  const transactionId = value.transactionId;
   const canonical = Buffer.from(api.canonicalJson(value), 'utf8');
   return [
-    `T\t${TRANSACTION_ID}\t${canonical.length}`,
-    ...writeCommands(TRANSACTION_ID, canonical).map(command => `U${command.slice(1)}`),
-    `K\t${TRANSACTION_ID}`,
+    `T\t${transactionId}\t${canonical.length}`,
+    ...writeCommands(transactionId, canonical).map(command => `U${command.slice(1)}`),
+    `K\t${transactionId}`,
   ];
 }
 
@@ -437,6 +473,45 @@ test('refuses a native build whose exact package version was not injected', () =
       return true;
     });
     assert.strictEqual(fs.existsSync(output), false);
+  })
+);
+
+test('descriptor-bound initialization creates the fixed private tree and is idempotent', () =>
+  withScratch(scratch => {
+    const helper = compileHelper(scratch);
+    const project = path.join(scratch, 'project');
+    fs.mkdirSync(project, { mode: 0o700 });
+    const protocol = `P\t${encodeHex(project)}\nI\nX\n`;
+    const first = runHelper(helper, project, protocol);
+    assert.strictEqual(first.status, 0, first.stderr || first.stdout);
+    const firstBinding = first.stdout.trim().split('\n')[1];
+    assert.match(firstBinding, /^I\tOK\tcontrol\t/u);
+    for (const relative of [
+      '.writcraft', '.writcraft/snapshots', '.writcraft/snapshots/v1',
+      '.writcraft/snapshots/v1/control', '.writcraft/snapshots/v1/bundles',
+      '.writcraft/snapshots/v1/quarantine',
+    ]) {
+      const stat = fs.lstatSync(path.join(project, relative));
+      assert(stat.isDirectory());
+      assert.strictEqual(stat.mode & 0o777, 0o700);
+    }
+    const second = runHelper(helper, project, protocol);
+    assert.strictEqual(second.status, 0, second.stderr || second.stdout);
+    assert.strictEqual(second.stdout.trim().split('\n')[1], firstBinding);
+  })
+);
+
+test('root replacement after P is rejected before descriptor-bound initialization writes', () =>
+  withScratch(scratch => {
+    const helper = compileHelper(scratch);
+    const project = path.join(scratch, 'project');
+    fs.mkdirSync(project, { mode: 0o700 });
+    const result = runAfterRootReplacement(helper, project);
+    assert.strictEqual(result.replaced, true);
+    assert.match(result.stdout, /P\tOK\t/u);
+    assert.match(result.stdout, /I\tERR\tPRIVATE_PARENT/u);
+    assert.strictEqual(fs.existsSync(path.join(project, '.writcraft')), false);
+    assert.strictEqual(fs.existsSync(path.join(`${project}-original`, '.writcraft')), false);
   })
 );
 
@@ -799,6 +874,187 @@ test('production B builds, validates, no-clobber publishes, and persists formal 
     )));
     assert.strictEqual(transaction.state, 'COMMITTED');
     assert.strictEqual(transaction.snapshotManifestDigest, parsed.manifest.snapshotManifestDigest);
+  })
+);
+
+test('production B refuses the twenty-first private bundle before publish without deleting existing leaves', () =>
+  withScratch(scratch => {
+    const helper = compileHelper(scratch);
+    const project = path.join(scratch, 'project');
+    fs.mkdirSync(project);
+    const privateRoot = createPrivateTree(project);
+    fs.writeFileSync(path.join(project, 'chapter.md'), '# capacity count\n', { mode: 0o600 });
+    const bundles = path.join(privateRoot, 'bundles');
+    const existing = [];
+    for (let index = 0; index < 20; index += 1) {
+      const name = digestBasename('bundle-', `capacity-${index}`, '.wcsb');
+      fs.writeFileSync(path.join(bundles, name), Buffer.from([index]), { mode: 0o600, flag: 'wx' });
+      existing.push([name, fs.readFileSync(path.join(bundles, name))]);
+    }
+    const scanned = runHelper(helper, project, productionCaptureProtocol(project));
+    const api = snapshotImageTokenizer.createAdapter({
+      marked,
+      sha256Bytes: bytes => `sha256:${crypto.createHash('sha256').update(bytes).digest('hex')}`,
+    });
+    const pass = api.createTokenPass({
+      transactionId: TRANSACTION_ID,
+      candidates: sealedCandidates(scanned.stdout),
+    });
+    const result = runHelper(helper, project, [
+      ...productionCaptureCommands(project),
+      ...tokenPassCommands(pass),
+      `B\t${TRANSACTION_ID}`,
+      'X',
+      '',
+    ].join('\n'));
+    assert.strictEqual(result.status, 0, result.stderr || result.stdout);
+    assert.match(result.stdout.trim().split('\n').find(line => line.startsWith('B\tOK\t')), new RegExp(
+      `^B\\tOK\\t${TRANSACTION_ID}\\tUNCOMMITTED\\tsha256:[a-f0-9]{64}` +
+      `\\tSNAPSHOT_CAPACITY_EXCEEDED$`
+    ));
+    assert.deepStrictEqual(
+      fs.readdirSync(bundles).sort(), existing.map(([name]) => name).sort()
+    );
+    for (const [name, bytes] of existing) {
+      assert.deepStrictEqual(fs.readFileSync(path.join(bundles, name)), bytes);
+    }
+    assert.strictEqual(fs.readdirSync(path.join(privateRoot, 'control')).some(name =>
+      name.startsWith('stage-') || name.startsWith('recovery-')
+    ), false);
+  })
+);
+
+test('production B enforces the private byte cap before publish', () =>
+  withScratch(scratch => {
+    const helper = compileHelper(scratch, ['WRITCRAFT_TEST_MAX_COMMITTED_PRIVATE_BYTES=1024']);
+    const project = path.join(scratch, 'project');
+    fs.mkdirSync(project);
+    const privateRoot = createPrivateTree(project);
+    fs.writeFileSync(path.join(project, 'chapter.md'), '# capacity bytes\n', { mode: 0o600 });
+    const scanned = runHelper(helper, project, productionCaptureProtocol(project));
+    const api = snapshotImageTokenizer.createAdapter({
+      marked,
+      sha256Bytes: bytes => `sha256:${crypto.createHash('sha256').update(bytes).digest('hex')}`,
+    });
+    const pass = api.createTokenPass({
+      transactionId: TRANSACTION_ID,
+      candidates: sealedCandidates(scanned.stdout),
+    });
+    const result = runHelper(helper, project, [
+      ...productionCaptureCommands(project),
+      ...tokenPassCommands(pass),
+      `B\t${TRANSACTION_ID}`,
+      'X',
+      '',
+    ].join('\n'));
+    assert.strictEqual(result.status, 0, result.stderr || result.stdout);
+    assert.match(result.stdout.trim().split('\n').find(line => line.startsWith('B\tOK\t')), new RegExp(
+      `^B\\tOK\\t${TRANSACTION_ID}\\tUNCOMMITTED\\tsha256:[a-f0-9]{64}` +
+      `\\tSNAPSHOT_CAPACITY_EXCEEDED$`
+    ));
+    assert.deepStrictEqual(fs.readdirSync(path.join(privateRoot, 'bundles')), []);
+    assert.strictEqual(fs.readdirSync(path.join(privateRoot, 'control')).some(name =>
+      name.startsWith('stage-') || name.startsWith('recovery-')
+    ), false);
+  })
+);
+
+test('production capacity lock allows only one concurrent helper to cross the publish boundary', () =>
+  withScratch(scratch => {
+    const producer = compileHelper(scratch, ['WRITCRAFT_TEST_PAUSE_PRODUCTION_BEFORE_RENAME']);
+    const contender = compileHelper(scratch);
+    const project = path.join(scratch, 'project');
+    const sync = path.join(scratch, 'sync');
+    fs.mkdirSync(project);
+    fs.mkdirSync(sync, { mode: 0o700 });
+    const privateRoot = createPrivateTree(project);
+    fs.writeFileSync(path.join(project, 'chapter.md'), '# capacity lock\n', { mode: 0o600 });
+    const second = {
+      transactionId: `txn_${'5'.repeat(48)}`,
+      snapshotId: `snapshot_${'6'.repeat(48)}`,
+    };
+    const api = snapshotImageTokenizer.createAdapter({
+      marked,
+      sha256Bytes: bytes => `sha256:${crypto.createHash('sha256').update(bytes).digest('hex')}`,
+    });
+    const firstScan = runHelper(contender, project, productionCaptureProtocol(project));
+    const firstPass = api.createTokenPass({
+      transactionId: TRANSACTION_ID,
+      candidates: sealedCandidates(firstScan.stdout),
+    });
+    const secondScan = runHelper(
+      contender, project, productionCaptureProtocol(project, [], second)
+    );
+    const secondPass = api.createTokenPass({
+      transactionId: second.transactionId,
+      candidates: sealedCandidates(secondScan.stdout, second.transactionId),
+    });
+    const firstInput = [
+      ...productionCaptureCommands(project),
+      ...tokenPassCommands(firstPass),
+      `B\t${TRANSACTION_ID}`,
+      'X',
+      '',
+    ].join('\n');
+    const secondInput = [
+      ...productionCaptureCommands(project, [], second),
+      ...tokenPassCommands(secondPass),
+      `B\t${second.transactionId}`,
+      'X',
+      '',
+    ].join('\n');
+    const driver = String.raw`
+      const childProcess = require('child_process');
+      const fs = require('fs');
+      const path = require('path');
+      const [producer, contender, project, sync, first64, second64] = process.argv.slice(1);
+      const rootFd = fs.openSync('/', fs.constants.O_RDONLY);
+      const child = childProcess.spawn(producer, [], {
+        stdio: ['pipe', 'pipe', 'pipe', rootFd],
+        env: { ...process.env, WRITCRAFT_TEST_SYNC_DIR: sync },
+      });
+      fs.closeSync(rootFd);
+      let firstOut = '';
+      let firstErr = '';
+      child.stdout.on('data', chunk => { firstOut += chunk.toString('utf8'); });
+      child.stderr.on('data', chunk => { firstErr += chunk.toString('utf8'); });
+      child.stdin.end(Buffer.from(first64, 'base64'));
+      const closed = new Promise(resolve => child.on('close', (status, signal) =>
+        resolve({ status, signal, stdout: firstOut, stderr: firstErr })));
+      (async () => {
+        const ready = path.join(sync, 'production-before-rename.ready');
+        const deadline = Date.now() + 10000;
+        while (!fs.existsSync(ready)) {
+          if (Date.now() >= deadline) throw new Error('capacity lock pause timeout');
+          await new Promise(resolve => setTimeout(resolve, 5));
+        }
+        const contenderRootFd = fs.openSync('/', fs.constants.O_RDONLY);
+        const second = childProcess.spawnSync(contender, [], {
+          input: Buffer.from(second64, 'base64'), encoding: 'utf8',
+          stdio: ['pipe', 'pipe', 'pipe', contenderRootFd],
+        });
+        fs.closeSync(contenderRootFd);
+        fs.writeFileSync(path.join(sync, 'production-before-rename.release'), '', { flag: 'wx' });
+        const first = await closed;
+        process.stdout.write(JSON.stringify({ first, second: {
+          status: second.status, signal: second.signal, stdout: second.stdout, stderr: second.stderr,
+        } }));
+      })().catch(error => { console.error(error.stack || error); child.kill(); process.exitCode = 1; });
+    `;
+    const raced = childProcess.spawnSync(process.execPath, [
+      '-e', driver, producer, contender, project, sync,
+      Buffer.from(firstInput).toString('base64'), Buffer.from(secondInput).toString('base64'),
+    ], { encoding: 'utf8', timeout: 30000 });
+    assert.strictEqual(raced.status, 0, raced.stderr || raced.stdout);
+    const result = JSON.parse(raced.stdout);
+    assert.strictEqual(result.first.status, 0, result.first.stderr || result.first.stdout);
+    assert.match(result.first.stdout, new RegExp(`B\\tOK\\t${TRANSACTION_ID}\\tCOMMITTED`));
+    assert.strictEqual(result.second.status, 0, result.second.stderr || result.second.stdout);
+    assert.match(result.second.stdout, new RegExp(
+      `B\\tOK\\t${second.transactionId}\\tUNCOMMITTED\\tsha256:[a-f0-9]{64}` +
+      `\\tSNAPSHOT_CAPACITY_BUSY`
+    ));
+    assert.strictEqual(fs.readdirSync(path.join(privateRoot, 'bundles')).length, 1);
   })
 );
 

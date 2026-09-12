@@ -19,6 +19,9 @@ const watcherInvalidationPolicy = require('./watcher-invalidation-policy');
 const projectWatcherHealthService = require('./project-watcher-health');
 const projectWatcherFlushHandlerService = require('./project-watcher-flush-handler');
 const snapshotWatcherBarrierService = require('./snapshot-watcher-barrier');
+const localOperationService = require('./local-operation-service');
+const snapshotService = require('./snapshot-service');
+const snapshotHandlerService = require('./snapshot-handler');
 const projectSearchService = require('./project-search-service');
 const changeSetService = require('./changeset-service');
 const changeSetReviewService = require('./changeset-review-service');
@@ -150,6 +153,16 @@ const aiTaskState = aiTaskStateService.createAiTaskStateService({
       mainWindow.webContents.send('writcraft:writing-task-progress', snapshot);
     } catch (_) {
       // Author-visible progress is advisory; Main task authority is independent.
+    }
+  },
+});
+const snapshotLocalOperations = localOperationService.createLocalOperationService({
+  onUpdate(snapshot) {
+    try {
+      if (!mainWindow || mainWindow.isDestroyed() || mainWindow.webContents.isDestroyed()) return;
+      mainWindow.webContents.send('writcraft:snapshot-task-progress', snapshot);
+    } catch (_) {
+      // Progress is advisory. Durable snapshot truth remains Main-owned.
     }
   },
 });
@@ -1234,6 +1247,41 @@ const snapshotWatcherBarrierAdapter =
     drainDeferredWatcherPayloads: drainSnapshotDeferredWatcherPayloads,
   });
 
+function assertSnapshotOwnerCurrent(binding) {
+  if (!binding || binding.ownerGeneration !== deliveryOwnerGeneration) {
+    throw new projectService.ProjectServiceError('PROJECT_CHANGED', '本地快照 owner 已失效');
+  }
+  return snapshotWatcherBarrierAdapter.assertOwnerCurrent(binding);
+}
+
+const snapshotCreateService = snapshotService.createSnapshotService({
+  localOperations: snapshotLocalOperations,
+  acquireLease(owner) {
+    if (owner.ownerGeneration !== deliveryOwnerGeneration) {
+      throw new projectService.ProjectServiceError('PROJECT_CHANGED', '本地快照 owner 已失效');
+    }
+    return snapshotWatcherBarrierAdapter.acquireLease(owner);
+  },
+  releaseLease: (lease, binding) => snapshotWatcherBarrierAdapter.releaseLease(lease, binding),
+  settleWatcherBarrier: binding => snapshotWatcherBarrierAdapter.settleWatcherBarrier(binding),
+  assertOwnerCurrent: assertSnapshotOwnerCurrent,
+  async createProductionWorker(binding) {
+    const project = assertSnapshotOwnerCurrent(binding);
+    const worker = snapshotStorageWorkerService.createSnapshotStorageWorkerForRoot(project.rootPath, {
+      expectedRootIdentity: project.rootIdentity,
+      initializeStorage: binding.purpose === 'create',
+    });
+    try {
+      await worker.ready();
+      assertSnapshotOwnerCurrent(binding);
+      return worker;
+    } catch (error) {
+      await worker.close().catch(() => {});
+      throw error;
+    }
+  },
+});
+
 async function runAiRequest(projectInstanceId, task, externalSignal = null, metadata = {}) {
   if (currentProject && projectInstanceId === currentProject.instanceId) {
     assertProjectWatcherAvailable(currentProject);
@@ -1415,6 +1463,7 @@ function restartProjectWatcher(project) {
 }
 
 function setCurrentProject(project) {
+  const previousProjectInstanceId = currentProject?.instanceId || null;
   const changedProject = !currentProject || currentProject.rootPath !== project.rootPath ||
     currentProject.instanceId !== project.instanceId;
   const recoverSameProjectWatcher = !changedProject &&
@@ -1461,6 +1510,14 @@ function setCurrentProject(project) {
   if (changedProject) {
     projectMutationGeneration += 1;
     deliveryOwnerGeneration += 1;
+    if (previousProjectInstanceId) {
+      try {
+        snapshotLocalOperations.invalidateProject(
+          previousProjectInstanceId,
+          deliveryOwnerGeneration
+        );
+      } catch (_) {}
+    }
     workspaceSaveGeneration = 0;
     dailyWorkspaceGraphGeneration += 1;
     dailyWorkspaceGraphCache = null;
@@ -2081,6 +2138,35 @@ function sameDeliveryBinding(left, right) {
     left.navigationEpoch === right.navigationEpoch;
 }
 
+function captureSnapshotAppBinding(event) {
+  return {
+    webContentsId: event?.sender?.id,
+    projectInstanceId: currentProject?.instanceId || null,
+    ownerGeneration: deliveryOwnerGeneration,
+  };
+}
+
+function sameSnapshotAppBinding(left, right) {
+  return left && right && left.webContentsId === right.webContentsId &&
+    left.projectInstanceId === right.projectInstanceId &&
+    left.ownerGeneration === right.ownerGeneration;
+}
+
+const snapshotAppHandler = snapshotHandlerService.createSnapshotHandler({
+  assertTrustedSender,
+  getCurrentProject: () => currentProject,
+  captureBinding: captureSnapshotAppBinding,
+  sameBinding: sameSnapshotAppBinding,
+  snapshotService: snapshotCreateService,
+  localOperations: snapshotLocalOperations,
+  storageAvailable: project => projectService.snapshotStorageAvailable(
+    project.rootPath, project.rootIdentity
+  ),
+  createWorker: project => snapshotStorageWorkerService.createSnapshotStorageWorkerForRoot(
+    project.rootPath, { expectedRootIdentity: project.rootIdentity }
+  ),
+});
+
 const DELIVERY_IPC_ERROR_MESSAGES = Object.freeze({
   SNAPSHOT_BUSY: 'snapshot 当前不可用',
   SNAPSHOT_BARRIER_FAILED: 'snapshot barrier 未完成',
@@ -2099,6 +2185,32 @@ const DELIVERY_IPC_ERROR_MESSAGES = Object.freeze({
   EXPORT_OUTCOME_UNKNOWN: '导出结果未知',
   LOCAL_OPERATION_TIMEOUT: '本地操作超时',
 });
+
+const SNAPSHOT_IPC_ERROR_MESSAGES = Object.freeze({
+  SNAPSHOT_STALE: '项目状态已变化，请重新打开本地快照',
+  SNAPSHOT_REQUEST_INVALID: '本地快照请求无效',
+  SNAPSHOT_CONFIRMATION_REQUIRED: '请明确确认本地快照操作',
+  SNAPSHOT_CAPACITY_EXCEEDED: '本地快照容量已满；不会自动删除旧快照',
+  SNAPSHOT_CAPACITY_BUSY: '另一个本地快照操作正在确认容量，请稍后重试',
+  SNAPSHOT_CAPACITY_UNAVAILABLE: '无法安全核对本地快照容量；没有创建新快照',
+  SNAPSHOT_PRIVATE_STORAGE_UNSAFE: '本地快照私有目录无法安全使用',
+  SNAPSHOT_LIST_UNAVAILABLE: '本地快照暂时无法安全读取',
+  SNAPSHOT_SOURCE_CHANGED: '项目文件在创建期间发生变化，请重试',
+  SNAPSHOT_CREATE_UNCOMMITTED: '本地快照未创建，公开项目文件没有改变',
+  SNAPSHOT_CREATE_UNKNOWN: '本地快照结果需要重新核对，请重新打开项目',
+  PROJECT_WATCHER_UNAVAILABLE: '项目文件监听暂不可用，未创建本地快照',
+  PROJECT_CHANGED: '项目已切换，本地快照结果不会进入当前项目',
+  LOCAL_TASK_BUSY: '该项目已有本地操作正在运行',
+  LOCAL_TASK_NOT_CANCELABLE: '本地快照尚不可取消',
+  LOCAL_TASK_NOT_FOUND: '本地快照任务不存在或已结束',
+  REQUEST_ABORTED: '已取消创建本地快照',
+});
+
+function snapshotIpcFailure(error, fallback = 'SNAPSHOT_CREATE_UNCOMMITTED') {
+  const raw = typeof error?.code === 'string' ? error.code : fallback;
+  const code = Object.hasOwn(SNAPSHOT_IPC_ERROR_MESSAGES, raw) ? raw : fallback;
+  return { ok: false, error: code, message: SNAPSHOT_IPC_ERROR_MESSAGES[code] };
+}
 
 function deliveryIpcFailure(error, fallbackCode = 'DELIVERY_BLOCKED') {
   const stableCode = typeof error?.code === 'string' &&
@@ -2402,6 +2514,34 @@ ipcMain.handle('writcraft:project:list-delivery-snapshots', async (event, projec
     }
   } catch (error) {
     return deliveryIpcFailure(error);
+  }
+});
+
+ipcMain.handle('writcraft:project:create-snapshot', async (event, request) => {
+  try {
+    const task = await snapshotAppHandler.create(event, request);
+    if (task.terminalTruth !== 'COMMITTED') {
+      return snapshotIpcFailure({ code: task.errorCode || 'SNAPSHOT_CREATE_UNCOMMITTED' });
+    }
+    return { ok: true, task };
+  } catch (error) {
+    return snapshotIpcFailure(error);
+  }
+});
+
+ipcMain.handle('writcraft:project:list-snapshots', async (event, request) => {
+  try {
+    return { ok: true, result: await snapshotAppHandler.list(event, request) };
+  } catch (error) {
+    return snapshotIpcFailure(error, 'SNAPSHOT_LIST_UNAVAILABLE');
+  }
+});
+
+ipcMain.handle('writcraft:project:cancel-snapshot-task', async (event, request) => {
+  try {
+    return { ok: true, task: snapshotAppHandler.cancel(event, request) };
+  } catch (error) {
+    return snapshotIpcFailure(error);
   }
 });
 

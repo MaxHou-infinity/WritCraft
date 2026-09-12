@@ -11,10 +11,19 @@
   const grid = document.getElementById('project-home-grid');
   const refreshButton = document.getElementById('project-home-refresh');
   const backButton = document.getElementById('project-home-back');
+  const snapshotBridge = window.writCraft?.project?.snapshots;
+  const snapshotCreateButton = document.getElementById('project-home-snapshot-create');
+  const snapshotStatus = document.getElementById('project-home-snapshot-status');
+  const snapshotList = document.getElementById('project-home-snapshot-list');
   if (!bridge || !view || !status || !summary || !grid) return;
 
   let requestSequence = 0;
   let navigationSequence = 0;
+  let snapshotRequestSequence = 0;
+  let snapshotCreating = false;
+  let snapshotTaskId = null;
+  let snapshotCancelAvailable = false;
+  let snapshotSuccessProjectInstanceId = null;
   let origin = null;
 
   function project() { return window.__workspace?.readState()?.project || null; }
@@ -33,6 +42,40 @@
   function setStatus(message, error = false) {
     status.textContent = message;
     status.classList.toggle('is-error', error);
+  }
+  function setSnapshotStatus(message, error = false) {
+    if (!snapshotStatus) return;
+    snapshotStatus.textContent = message;
+    snapshotStatus.classList.toggle('is-error', error);
+  }
+  function formatBytes(value) {
+    if (!Number.isFinite(value) || value <= 0) return '0 B';
+    const units = ['B', 'KB', 'MB', 'GB'];
+    const index = Math.min(units.length - 1, Math.floor(Math.log(value) / Math.log(1024)));
+    const scaled = value / (1024 ** index);
+    return `${scaled >= 10 || index === 0 ? Math.round(scaled) : scaled.toFixed(1)} ${units[index]}`;
+  }
+  function updateSnapshotButton() {
+    if (!snapshotCreateButton) return;
+    if (!snapshotCreating) {
+      snapshotCreateButton.disabled = false;
+      snapshotCreateButton.textContent = '创建本地快照';
+      return;
+    }
+    snapshotCreateButton.disabled = !snapshotCancelAvailable;
+    snapshotCreateButton.textContent = snapshotCancelAvailable ? '取消创建' : '正在创建…';
+  }
+  function resetSnapshotOperation() {
+    snapshotCreating = false;
+    snapshotTaskId = null;
+    snapshotCancelAvailable = false;
+    updateSnapshotButton();
+  }
+  function clearSnapshots(message = '') {
+    snapshotRequestSequence += 1;
+    snapshotSuccessProjectInstanceId = null;
+    snapshotList?.replaceChildren();
+    setSnapshotStatus(message);
   }
   function captureOrigin() {
     const path = window.__workspace?.getCurrentPath?.() || '';
@@ -74,6 +117,108 @@
     empty.className = 'project-home-empty';
     empty.textContent = text;
     list.appendChild(empty);
+  }
+
+  function renderSnapshots(result) {
+    if (!snapshotList) return;
+    snapshotList.replaceChildren();
+    const capacity = result?.capacity || {};
+    const snapshotSummary = document.createElement('div');
+    snapshotSummary.className = 'project-home-snapshot-summary';
+    snapshotSummary.textContent = `${capacity.usedSnapshots || 0} 个本地快照 · 上限 ${capacity.maxSnapshots || 20} 个 · ${formatBytes(capacity.usedPrivateBytes)} / ${formatBytes(capacity.maxPrivateBytes)}`;
+    snapshotList.appendChild(snapshotSummary);
+    if (!result?.items?.length) {
+      appendEmpty(snapshotList, '还没有本地快照。创建后可在后续恢复流程中使用。');
+    } else {
+      result.items.forEach(item => {
+        const row = document.createElement('div');
+        row.className = 'project-home-item';
+        row.dataset.snapshotId = item.snapshotId;
+        const copy = document.createElement('div');
+        const strong = document.createElement('strong');
+        strong.textContent = `本地恢复点 · ${new Date(item.createdAt).toLocaleString('zh-CN')}`;
+        const detail = document.createElement('small');
+        detail.textContent = `${item.markdownCount} 篇 Markdown · ${item.imageCount} 张图片 · ${formatBytes(item.totalBytes)}`;
+        copy.append(strong, detail);
+        row.appendChild(copy);
+        snapshotList.appendChild(row);
+      });
+    }
+    if (result?.unavailableCount > 0) {
+      setSnapshotStatus(`${result.unavailableCount} 个恢复点暂时无法安全读取；未对其进行修改。`, true);
+    }
+  }
+
+  async function loadSnapshots(projectInstanceId, options = {}) {
+    if (!snapshotBridge || !snapshotList) return false;
+    const owner = ++snapshotRequestSequence;
+    if (!options.quiet && snapshotSuccessProjectInstanceId !== projectInstanceId) {
+      setSnapshotStatus('正在读取已提交的本地快照…');
+    }
+    try {
+      const response = await snapshotBridge.list(projectInstanceId);
+      if (owner !== snapshotRequestSequence || project()?.instanceId !== projectInstanceId) return false;
+      if (!response?.ok || !response.result) {
+        throw new Error(response?.message || '本地快照暂时无法读取');
+      }
+      renderSnapshots(response.result);
+      if (!options.quiet && response.result.unavailableCount === 0 &&
+          snapshotSuccessProjectInstanceId !== projectInstanceId) {
+        setSnapshotStatus(response.result.items.length ? '已读取本地恢复点。' : '可以创建第一个本地快照。');
+      }
+      return true;
+    } catch (error) {
+      if (owner !== snapshotRequestSequence || project()?.instanceId !== projectInstanceId) return false;
+      if (!options.quiet || snapshotSuccessProjectInstanceId !== projectInstanceId) {
+        setSnapshotStatus(`${error.message || '本地快照暂时无法读取'}。请确认项目仍可写后重试。`, true);
+      }
+      return false;
+    }
+  }
+
+  async function createSnapshot() {
+    const active = project();
+    if (!active || !snapshotBridge) {
+      setSnapshotStatus('请先创建或打开项目。', true);
+      return;
+    }
+    if (snapshotCreating) {
+      if (!snapshotCancelAvailable || !snapshotTaskId) return;
+      snapshotCancelAvailable = false;
+      updateSnapshotButton();
+      const response = await snapshotBridge.cancel(active.instanceId, snapshotTaskId);
+      if (!response?.ok) {
+        setSnapshotStatus(response?.message || '当前阶段无法取消；创建结果仍会按磁盘事实确认。', true);
+      } else {
+        setSnapshotStatus('正在确认取消结果；不会把未知状态显示为成功。');
+      }
+      return;
+    }
+    const projectInstanceId = active.instanceId;
+    snapshotSuccessProjectInstanceId = null;
+    snapshotCreating = true;
+    snapshotTaskId = null;
+    snapshotCancelAvailable = false;
+    updateSnapshotButton();
+    setSnapshotStatus('正在核对项目并创建本地恢复点；不会修改 Markdown。');
+    try {
+      const response = await snapshotBridge.create(projectInstanceId);
+      if (project()?.instanceId !== projectInstanceId) return;
+      if (!response?.ok || response.task?.terminalTruth !== 'COMMITTED') {
+        throw new Error(response?.message || '未能确认本地快照已提交');
+      }
+      await loadSnapshots(projectInstanceId, { quiet: true });
+      if (project()?.instanceId === projectInstanceId) {
+        snapshotSuccessProjectInstanceId = projectInstanceId;
+        setSnapshotStatus('本地快照已创建。');
+      }
+    } catch (error) {
+      if (project()?.instanceId === projectInstanceId) {
+        setSnapshotStatus(`${error.message || '本地快照创建失败'}；未确认提交时不会显示为成功。`, true);
+      }
+    } finally {
+      if (project()?.instanceId === projectInstanceId) resetSnapshotOperation();
+    }
   }
 
   function appendAction(list, label, detail, action, primary = false) {
@@ -226,7 +371,7 @@
     grid.appendChild(chapterCard.card);
   }
 
-  async function refresh() {
+  async function refresh(options = {}) {
     const active = project();
     const owner = ++requestSequence;
     summary.replaceChildren();
@@ -240,6 +385,8 @@
       if (owner !== requestSequence || project()?.instanceId !== active.instanceId) return;
       if (!response?.ok || !response.snapshot) throw new Error(response?.message || '项目首页暂时不可用');
       render(response.snapshot);
+      await loadSnapshots(active.instanceId, { quiet: options.quietSnapshots === true });
+      if (owner !== requestSequence || project()?.instanceId !== active.instanceId) return;
       setStatus(response.snapshot.status === 'partial'
         ? '部分本地索引暂不可用；已验证的入口仍可使用。'
         : '已根据当前项目事实更新。');
@@ -263,7 +410,30 @@
     if (opened !== false) window.__workspace?.revealRange?.(target.caretOffset, 0);
   }
   backButton.addEventListener('click', returnToOrigin);
-  refreshButton.addEventListener('click', refresh);
+  refreshButton.addEventListener('click', () => {
+    snapshotSuccessProjectInstanceId = null;
+    void refresh();
+  });
+  snapshotCreateButton?.addEventListener('click', () => { void createSnapshot(); });
+  snapshotBridge?.onProgress?.(task => {
+    const active = project();
+    if (!active || task?.projectInstanceId !== active.instanceId || task.kind !== 'SNAPSHOT_CREATE') return;
+    snapshotTaskId = task.taskId;
+    snapshotCreating = task.status === 'queued' || task.status === 'running' || task.status === 'cancelling';
+    snapshotCancelAvailable = task.cancelAvailable === true;
+    updateSnapshotButton();
+    if (task.status === 'running' && task.elapsedMs >= 2000) {
+      const stage = ({
+        preparing: '准备本地快照',
+        settling_watcher: '确认最新正文状态',
+        scanning_sources: '读取项目文件',
+        writing_private_bundle: '写入私有快照',
+        publishing_bundle: '提交本地恢复点',
+        reconciling: '确认磁盘提交结果',
+      })[task.stage] || '创建本地快照';
+      setSnapshotStatus(`${stage}…已用时 ${Math.max(2, Math.floor(task.elapsedMs / 1000))} 秒。`);
+    }
+  });
   document.addEventListener('writcraft:workspace-view-changed', event => {
     if (event.detail?.view !== 'home') return;
     if (event.detail?.previous !== 'home') captureOrigin();
@@ -272,16 +442,24 @@
   document.addEventListener('writcraft:project-entering', () => {
     requestSequence += 1;
     navigationSequence += 1;
+    snapshotRequestSequence += 1;
+    resetSnapshotOperation();
+    clearSnapshots('正在切换项目…');
     origin = null;
   });
   document.addEventListener('writcraft:project-entered', () => {
     requestSequence += 1;
     navigationSequence += 1;
+    snapshotRequestSequence += 1;
+    resetSnapshotOperation();
+    clearSnapshots();
     if (document.querySelector('.app-shell')?.dataset.workspaceView === 'home') void refresh();
   });
   ['writcraft:tree-changed', 'writcraft:current-file-authority-changed'].forEach(eventName => {
     document.addEventListener(eventName, () => {
-      if (document.querySelector('.app-shell')?.dataset.workspaceView === 'home') void refresh();
+      if (document.querySelector('.app-shell')?.dataset.workspaceView === 'home') {
+        void refresh({ quietSnapshots: true });
+      }
     });
   });
   window.__projectHomeView = Object.freeze({ refresh });

@@ -201,6 +201,30 @@ contextBridge.exposeInMainWorld('writCraft', {
       discardPendingReview: (projectInstanceId, reviewLocationId) =>
         ipcRenderer.invoke('writcraft:project:discard-pending-review', projectInstanceId, reviewLocationId),
     }),
+    snapshots: Object.freeze({
+      list: projectInstanceId => ipcRenderer.invoke('writcraft:project:list-snapshots', {
+        schema: 'writcraft.snapshot-list-request/v1',
+        projectInstanceId,
+      }),
+      create: projectInstanceId => ipcRenderer.invoke('writcraft:project:create-snapshot', {
+        schema: 'writcraft.snapshot-create-request/v1',
+        projectInstanceId,
+        confirmation: 'CREATE_SNAPSHOT',
+      }),
+      cancel: (projectInstanceId, taskId) =>
+        ipcRenderer.invoke('writcraft:project:cancel-snapshot-task', {
+          schema: 'writcraft.local-task-cancel-request/v1',
+          projectInstanceId,
+          taskId,
+          confirmation: 'CANCEL_LOCAL_OPERATION',
+        }),
+      onProgress: handler => {
+        if (typeof handler !== 'function') return () => {};
+        const listener = (_event, payload) => handler(payload);
+        ipcRenderer.on('writcraft:snapshot-task-progress', listener);
+        return () => ipcRenderer.removeListener('writcraft:snapshot-task-progress', listener);
+      },
+    }),
     proposeChanges: (projectInstanceId, request) => ipcRenderer.invoke('writcraft:project:propose-changes', projectInstanceId, request),
     proposeChapter: (projectInstanceId, request) => ipcRenderer.invoke('writcraft:project:propose-chapter', projectInstanceId, request),
     proposeOnboarding: (projectInstanceId, request) => ipcRenderer.invoke('writcraft:project:propose-onboarding', projectInstanceId, request),

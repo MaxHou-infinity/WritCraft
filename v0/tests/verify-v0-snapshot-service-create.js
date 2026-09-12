@@ -5,6 +5,7 @@ const fs = require('fs');
 const path = require('path');
 const { createLocalOperationService } = require('../src/main/local-operation-service');
 const { createSnapshotService } = require('../src/main/snapshot-service');
+const { createSnapshotHandler } = require('../src/main/snapshot-handler');
 
 const PROJECT_ID = `instance_${'a'.repeat(24)}`;
 const MANIFEST = `sha256:${'b'.repeat(64)}`;
@@ -414,6 +415,161 @@ function count(state, name) {
     assert.strictEqual(count(state, 'createProductionSnapshot'), 0);
   });
 
+  await test('App handler lists only public committed snapshot metadata under Main owner authority', async () => {
+    const binding = Object.freeze({ webContentsId: 7, projectInstanceId: PROJECT_ID, ownerGeneration: 11 });
+    const calls = [];
+    const handler = createSnapshotHandler({
+      assertTrustedSender(event) { assert.strictEqual(event.sender.id, 7); },
+      getCurrentProject: () => ({ instanceId: PROJECT_ID, rootPath: '/private/project' }),
+      captureBinding: () => binding,
+      sameBinding: (left, right) => left === right,
+      storageAvailable: () => true,
+      async createWorker() {
+        return {
+          async ready() {},
+          async listCommitted() {
+            return { items: [{
+              snapshotId: `snap_${'1'.repeat(32)}`,
+              size: 321,
+              snapshotManifestDigest: MANIFEST,
+            }], unavailableCount: 0 };
+          },
+          async readCommittedSnapshot() {
+            return { manifest: {
+              createdAt: '2026-08-14T00:00:00.000Z',
+              files: [{ path: 'chapter.md', kind: 'markdown' }, { path: 'image.png', kind: 'image' }],
+            } };
+          },
+          async close() { calls.push(['close']); },
+        };
+      },
+      snapshotService: { async create() { throw new Error('not used'); } },
+      localOperations: { cancel() { throw new Error('not used'); } },
+    });
+    const result = await handler.list({ sender: { id: 7 } }, {
+      schema: 'writcraft.snapshot-list-request/v1', projectInstanceId: PROJECT_ID,
+    });
+    assert.deepStrictEqual(Object.keys(result.items[0]).sort(), [
+      'createdAt', 'imageCount', 'markdownCount', 'snapshotId',
+      'snapshotManifestDigest', 'status', 'totalBytes',
+    ].sort());
+    assert.strictEqual(result.items[0].markdownCount, 1);
+    assert.strictEqual(result.items[0].imageCount, 1);
+    assert.strictEqual(result.capacity.maxSnapshots, 20);
+    assert.strictEqual(result.capacity.maxPrivateBytes, 2 * 1024 * 1024 * 1024);
+    assert.deepStrictEqual(calls, [['close']]);
+    assert.strictEqual(JSON.stringify(result).includes('/private/project'), false);
+    assert.strictEqual(JSON.stringify(result).includes('chapter.md'), false);
+  });
+
+  await test('App handler injects Main owner generation and exact create confirmation', async () => {
+    const binding = Object.freeze({ webContentsId: 9, projectInstanceId: PROJECT_ID, ownerGeneration: 17 });
+    let received = null;
+    const worker = {
+      async ready() {}, async listCommitted() { return { items: [], unavailableCount: 0 }; },
+      async close() {},
+    };
+    const handler = createSnapshotHandler({
+      assertTrustedSender() {},
+      getCurrentProject: () => ({ instanceId: PROJECT_ID, rootPath: '/private/project' }),
+      captureBinding: () => binding,
+      sameBinding: (left, right) => left === right,
+      storageAvailable: () => true,
+      async createWorker() { return worker; },
+      snapshotService: { async create(value) { received = value; return { terminalTruth: 'COMMITTED' }; } },
+      localOperations: { cancel() {} },
+    });
+    const result = await handler.create({ sender: { id: 9 } }, {
+      schema: 'writcraft.snapshot-create-request/v1',
+      projectInstanceId: PROJECT_ID,
+      confirmation: 'CREATE_SNAPSHOT',
+    });
+    assert.strictEqual(result.terminalTruth, 'COMMITTED');
+    assert.deepStrictEqual(received, {
+      projectInstanceId: PROJECT_ID,
+      ownerGeneration: 17,
+      confirmation: 'CREATE_SNAPSHOT',
+    });
+  });
+
+  await test('App handler blocks create when private capacity is full and never invokes mutation service', async () => {
+    const binding = Object.freeze({ webContentsId: 10, projectInstanceId: PROJECT_ID, ownerGeneration: 18 });
+    let createCalls = 0;
+    const items = Array.from({ length: 20 }, (_, index) => ({
+      snapshotId: `snap_${String(index).padStart(32, '0')}`,
+      size: 1,
+      snapshotManifestDigest: MANIFEST,
+    }));
+    const handler = createSnapshotHandler({
+      assertTrustedSender() {},
+      getCurrentProject: () => ({ instanceId: PROJECT_ID, rootPath: '/private/project' }),
+      captureBinding: () => binding,
+      sameBinding: (left, right) => left === right,
+      storageAvailable: () => true,
+      async createWorker() {
+        return {
+          async ready() {}, async listCommitted() { return { items, unavailableCount: 0 }; },
+          async readCommittedSnapshot() { return { manifest: { createdAt: '2026-08-14T00:00:00.000Z', files: [] } }; },
+          async close() {},
+        };
+      },
+      snapshotService: { async create() { createCalls += 1; } },
+      localOperations: { cancel() {} },
+    });
+    await assert.rejects(handler.create({ sender: { id: 10 } }, {
+      schema: 'writcraft.snapshot-create-request/v1',
+      projectInstanceId: PROJECT_ID,
+      confirmation: 'CREATE_SNAPSHOT',
+    }), error => error.code === 'SNAPSHOT_CAPACITY_EXCEEDED');
+    assert.strictEqual(createCalls, 0);
+  });
+
+  await test('App handler lists an uninitialized private store as empty without creating it', async () => {
+    const binding = Object.freeze({ webContentsId: 11, projectInstanceId: PROJECT_ID, ownerGeneration: 19 });
+    let workers = 0;
+    const handler = createSnapshotHandler({
+      assertTrustedSender() {},
+      getCurrentProject: () => ({ instanceId: PROJECT_ID, rootPath: '/private/project' }),
+      captureBinding: () => binding,
+      sameBinding: (left, right) => left === right,
+      storageAvailable: () => false,
+      async createWorker() { workers += 1; throw new Error('must not create worker'); },
+      snapshotService: { async create() { throw new Error('not used'); } },
+      localOperations: { cancel() {} },
+    });
+    const result = await handler.list({ sender: { id: 11 } }, {
+      schema: 'writcraft.snapshot-list-request/v1', projectInstanceId: PROJECT_ID,
+    });
+    assert.deepStrictEqual(result.items, []);
+    assert.strictEqual(result.capacity.usedSnapshots, 0);
+    assert.strictEqual(workers, 0);
+  });
+
+  await test('App handler rechecks owner after worker close before returning list metadata', async () => {
+    const bindingA = Object.freeze({ webContentsId: 12, projectInstanceId: PROJECT_ID, ownerGeneration: 20 });
+    const bindingB = Object.freeze({ webContentsId: 12, projectInstanceId: PROJECT_ID, ownerGeneration: 21 });
+    let current = bindingA;
+    const handler = createSnapshotHandler({
+      assertTrustedSender() {},
+      getCurrentProject: () => ({ instanceId: PROJECT_ID, rootPath: '/private/project' }),
+      captureBinding: () => current,
+      sameBinding: (left, right) => left === right,
+      storageAvailable: () => true,
+      async createWorker() {
+        return {
+          async ready() {},
+          async listCommitted() { return { items: [], unavailableCount: 0 }; },
+          async close() { current = bindingB; },
+        };
+      },
+      snapshotService: { async create() { throw new Error('not used'); } },
+      localOperations: { cancel() {} },
+    });
+    await assert.rejects(handler.list({ sender: { id: 12 } }, {
+      schema: 'writcraft.snapshot-list-request/v1', projectInstanceId: PROJECT_ID,
+    }), error => error?.code === 'SNAPSHOT_STALE');
+  });
+
   await test('service source has no legacy stage, sourceCapture, or zero-digest fallback', async () => {
     const source = fs.readFileSync(
       path.join(__dirname, '..', 'src', 'main', 'snapshot-service.js'),
@@ -425,7 +581,7 @@ function count(state, name) {
     assert.doesNotMatch(source, /createStage|writeStage|finalizeStage|reconcileCreate/u);
   });
 
-  console.log(`Snapshot production create service verification: ${passed}/16 passed`);
+  console.log(`Snapshot production create service verification: ${passed}/${passed} passed`);
 })().catch(error => {
   console.error(error.stack || error);
   process.exitCode = 1;

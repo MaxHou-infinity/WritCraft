@@ -1,6 +1,4 @@
 #!/usr/bin/env node
-'use strict';
-
 const fs = require('fs');
 const os = require('os');
 const path = require('path');
@@ -48,6 +46,15 @@ check('创建项目、edit.md 模板及内部元数据', () => {
   assert.equal(metadata.name, '我的长文');
   assert.ok(!Number.isNaN(Date.parse(metadata.createdAt)));
   assert.ok(!Number.isNaN(Date.parse(metadata.updatedAt)));
+  for (const relative of [
+    '.writcraft/recovery', '.writcraft/snapshots', '.writcraft/snapshots/v1',
+    '.writcraft/snapshots/v1/control', '.writcraft/snapshots/v1/bundles',
+    '.writcraft/snapshots/v1/quarantine',
+  ]) {
+    const stat = fs.lstatSync(path.join(project.rootPath, relative));
+    assert(stat.isDirectory(), `${relative} 应为私有目录`);
+    if (process.platform !== 'win32') assert.equal(stat.mode & 0o777, 0o700);
+  }
 });
 
 check('拒绝危险项目名和覆盖已有目录', () => {
@@ -74,6 +81,21 @@ check('复制项目保留逻辑 projectId 但获得独立目录 instanceId', () 
   const copied = service.openProject(copiedRoot);
   assert.equal(copied.projectId, project.projectId);
   assert.notEqual(copied.instanceId, project.instanceId);
+});
+
+check('快照存储检查对 dangling symlink fail closed', () => {
+  if (process.platform === 'win32') return;
+  const target = path.join(project.rootPath, '.writcraft', 'snapshots');
+  fs.rmSync(target, { recursive: true, force: true });
+  fs.symlinkSync(path.join(scratch, 'missing-snapshot-store'), target);
+  throwsCode(() => service.snapshotStorageAvailable(project.rootPath), 'SYMLINK_NOT_ALLOWED');
+  fs.unlinkSync(target);
+  service.ensureSnapshotStorage(project.rootPath);
+
+  const ancestorRoot = path.join(scratch, 'snapshot-ancestor-symlink');
+  fs.mkdirSync(ancestorRoot);
+  fs.symlinkSync(path.join(scratch, 'missing-writcraft-meta'), path.join(ancestorRoot, '.writcraft'));
+  throwsCode(() => service.snapshotStorageAvailable(ancestorRoot), 'SYMLINK_NOT_ALLOWED');
 });
 
 check('创建嵌套 Markdown 文件并列出稳定项目树', () => {

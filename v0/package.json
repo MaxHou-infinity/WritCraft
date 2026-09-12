@@ -51,6 +51,7 @@
     "e2e:electron:author-affected": "WRITCRAFT_E2E_FORCE=1 node tests/verify-v0-author-affected-electron.js",
     "e2e:electron:context-catalog": "WRITCRAFT_E2E_FORCE=1 node tests/verify-v0-context-catalog-electron.js",
     "e2e:electron:delivery-preflight": "WRITCRAFT_E2E_FORCE=1 node tests/verify-v0-delivery-preflight-electron.js",
+    "e2e:electron:snapshot-create-list": "WRITCRAFT_E2E_FORCE=1 node tests/verify-v0-snapshot-create-list-electron.js",
     "e2e:daily-workspace": "WRITCRAFT_E2E_FORCE=1 WRITCRAFT_E2E_FOCUS_DAILY_WORKSPACE=1 node tests/verify-v0-electron-e2e.js",
     "e2e:daily-workspace:performance": "WRITCRAFT_E2E_FORCE=1 node tests/verify-v0-daily-workspace-performance.js",
     "e2e:watcher-main-ipc": "node tests/verify-v0-watcher-persistent-main-ipc.js",

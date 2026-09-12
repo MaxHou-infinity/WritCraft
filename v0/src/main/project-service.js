@@ -20,6 +20,14 @@ const WORKSPACE_FILE = path.join(META_DIR, 'workspace.json');
 const TRASH_DIR = path.join(META_DIR, 'trash');
 const TRASH_MANIFEST_FILE = path.join(TRASH_DIR, 'manifest.json');
 const RECOVERY_DIR = path.join(META_DIR, 'recovery');
+const SNAPSHOT_DIRECTORIES = Object.freeze([
+  META_DIR,
+  path.join(META_DIR, 'snapshots'),
+  path.join(META_DIR, 'snapshots', 'v1'),
+  path.join(META_DIR, 'snapshots', 'v1', 'control'),
+  path.join(META_DIR, 'snapshots', 'v1', 'bundles'),
+  path.join(META_DIR, 'snapshots', 'v1', 'quarantine'),
+]);
 const PROJECT_SCHEMA = 'writcraft.project/v1';
 const WORKSPACE_SCHEMA = workspaceStateService.SCHEMA_V2;
 const TRASH_SCHEMA = 'writcraft.trash/v1';
@@ -528,6 +536,8 @@ function createProjectAt(parentPath, name) {
   fs.mkdirSync(root, { mode: 0o700 });
   try {
     fs.mkdirSync(path.join(root, META_DIR), { mode: 0o700 });
+    fs.mkdirSync(path.join(root, RECOVERY_DIR), { mode: 0o700 });
+    ensureSnapshotStorage(root);
     atomicWriteAbsolute(path.join(root, EDIT_FILE), makeEditTemplate(cleanName));
     atomicWriteAbsolute(path.join(root, META_FILE), `${JSON.stringify({
       schema: PROJECT_SCHEMA,
@@ -544,6 +554,67 @@ function createProjectAt(parentPath, name) {
     throw error;
   }
   return projectDescriptor(root);
+}
+
+function assertPrivateDirectory(target) {
+  const stat = fs.lstatSync(target);
+  if (stat.isSymbolicLink()) fail('SYMLINK_NOT_ALLOWED', '项目私有目录不能是符号链接');
+  if (!stat.isDirectory()) fail('NOT_DIRECTORY', '项目私有路径不是目录');
+  if (typeof process.getuid === 'function' && stat.uid !== process.getuid()) {
+    fail('PRIVATE_OWNER_MISMATCH', '项目私有目录不属于当前用户');
+  }
+  if (process.platform !== 'win32' && (stat.mode & 0o777) !== 0o700) {
+    fail('PRIVATE_MODE_UNSAFE', '项目私有目录权限不安全');
+  }
+  return target;
+}
+
+function ensurePrivateDirectory(parent, name) {
+  const target = path.join(parent, name);
+  try { fs.mkdirSync(target, { mode: 0o700 }); }
+  catch (error) {
+    if (error?.code !== 'EEXIST') throw error;
+  }
+  return assertPrivateDirectory(target);
+}
+
+function ensureSnapshotStorage(rootPath) {
+  const root = assertDirectory(rootPath, '项目目录');
+  for (const relative of SNAPSHOT_DIRECTORIES) {
+    ensurePrivateDirectory(path.join(root, path.dirname(relative)), path.basename(relative));
+  }
+  const version = path.join(root, META_DIR, 'snapshots', 'v1');
+  syncDirectory(version);
+  return version;
+}
+
+function snapshotStorageAvailable(rootPath, expectedRootIdentity = null) {
+  const root = assertDirectory(rootPath, '项目目录');
+  if (expectedRootIdentity) {
+    const rootStat = fs.lstatSync(root, { bigint: true });
+    if (!rootStat.isDirectory() || rootStat.dev !== expectedRootIdentity.dev ||
+        rootStat.ino !== expectedRootIdentity.ino) {
+      fail('PROJECT_CHANGED', '项目根目录身份已经变化');
+    }
+  }
+  const metadata = path.join(root, META_DIR);
+  try { fs.lstatSync(metadata); }
+  catch (error) {
+    if (error?.code === 'ENOENT') return false;
+    throw error;
+  }
+  assertPrivateDirectory(metadata);
+  const snapshots = path.join(metadata, 'snapshots');
+  try { fs.lstatSync(snapshots); }
+  catch (error) {
+    if (error?.code === 'ENOENT') return false;
+    throw error;
+  }
+  assertPrivateDirectory(snapshots);
+  for (const relative of SNAPSHOT_DIRECTORIES) {
+    assertPrivateDirectory(path.join(root, relative));
+  }
+  return true;
 }
 
 function openProject(rootPath) {
@@ -1249,6 +1320,7 @@ module.exports = {
   TRASH_MANIFEST_FILE,
   TRASH_SCHEMA,
   RECOVERY_DIR,
+  SNAPSHOT_DIRECTORIES,
   RECOVERY_SCHEMA,
   RECENT_FILE,
   MAX_FILE_BYTES,
@@ -1257,6 +1329,8 @@ module.exports = {
   MAX_RECOVERY_TOTAL_BYTES,
   ProjectServiceError,
   createProjectAt,
+  ensureSnapshotStorage,
+  snapshotStorageAvailable,
   openProject,
   openProjectForRecovery,
   createEditPrompt,

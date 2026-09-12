@@ -197,6 +197,8 @@ function captureMetadataFramingBytes(fields) {
 class SnapshotStorageWorker {
   constructor(options = {}) {
     this.rootPath = validateRootPath(options.rootPath);
+    this.expectedRootIdentity = options.expectedRootIdentity || null;
+    this.initializeStorage = options.initializeStorage === true;
     this.timeoutMs = Number.isSafeInteger(options.timeoutMs) && options.timeoutMs > 0
       ? options.timeoutMs
       : DEFAULT_TIMEOUT_MS;
@@ -427,9 +429,15 @@ class SnapshotStorageWorker {
       schema.assertRootIdentity(value);
       return Object.freeze(value);
     }, true);
+    if (this.expectedRootIdentity &&
+        (String(this.expectedRootIdentity.dev) !== root.dev ||
+         String(this.expectedRootIdentity.ino) !== root.ino)) {
+      throw failure('SNAPSHOT_ROOT_CHANGED', 'Snapshot project root identity changed');
+    }
     this.rootIdentity = root;
-    const parents = await this.#send('D', 'D\n', fields => {
-      exactFields(fields, 17, 'D');
+    const storageCommand = this.initializeStorage ? 'I' : 'D';
+    const parents = await this.#send(storageCommand, `${storageCommand}\n`, fields => {
+      exactFields(fields, 17, storageCommand);
       const roles = ['control', 'bundles', 'quarantine'];
       const starts = [2, 7, 12];
       const result = {};
