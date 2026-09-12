@@ -64,15 +64,16 @@ P2：`37e67e7` 含当前 main 缺失的 durable rollback publication 设计参�
 
 - `node tests/check-v0-0-4-test-registration.js --check`：222 scripts，53 current，41 Stage A，exit 0。
 - `node tests/verify-v0-snapshot-restore-mixed-journey.js`：18/18，exit 0（含 formal rollback
-  journey、`ROLLED_BACK`→IDLE 收敛与幂等重清、以及 6 个重启/响应丢失边界；其中 2 个是
-  **`KNOWN DEFECT (P1)` 表征测试**，绿灯表示缺陷已被固定，**不表示 P1=0**）。
+  journey、`ROLLED_BACK`→IDLE 收敛与幂等重清，以及 6 个重启/响应丢失边界）。
+  **全部为正向断言**：其中「D 已执行但 `ROLLED_BACK` CAS 丢失」与「native D 响应丢失」
+  两个边界在实现期暴露了 native D 重放不幂等这一隐藏 P1，现已修复并由这两个测试正向固定。
 - `node tests/verify-v0-public-markdown-native-rollback-create-publication.js`：23/23，exit 0
   （新增；journal 级 ROLLBACK_CREATE publication 契约）。
 - `node tests/verify-v0-snapshot-restore-service.js`：42/42，exit 0。
 - `node tests/verify-v0-public-markdown-native-lifecycle.js`：67/67，exit 0。
 - `WRC_A1B_E3_R=1 node tests/verify-v0-public-markdown-native-lifecycle.js`：78/78，exit 0。
 - `WRC_A1B_E4_FA=1 node tests/verify-v0-public-markdown-native-lifecycle.js`：69/69，exit 0。
-- `WRC_A1B_E2B_CONTROL=1 WRC_A1B_E2B_STAGE=1 WRC_A1B_E2B_APPLY=1 node tests/verify-v0-public-markdown-native-lifecycle.js`：89/89，exit 0。
+- `WRC_A1B_E2B_CONTROL=1 WRC_A1B_E2B_STAGE=1 WRC_A1B_E2B_APPLY=1 node tests/verify-v0-public-markdown-native-lifecycle.js`：91/91，exit 0。
 - `node tests/verify-v0-public-markdown-native-rollback-create-lifecycle.js`：exit 0。
 - `node tests/verify-v0-public-markdown-native-rollback-create-schema.js`：16/16，exit 0。
 - `npm run verify:0.4:current-components`：41/41 Stage A + 9/9 Stage B preflight，exit 0。

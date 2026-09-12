@@ -1208,14 +1208,14 @@ try {
   //
   // The QUARANTINED CAS committed and D ran to completion (the quarantined leaf
   // was unlinked and the rollback final record was sealed), but the ROLLED_BACK
-  // CAS that would have sealed D's result was lost. Production has no D
-  // reconcile: settleRollbackCreate re-issues the raw D command, and native
-  // DELETE_CREATE_ROLLBACK requires the exact quarantined record identities
-  // (undo_quarantine_state == NAME_EXACT) that its own first pass deleted, so the
-  // replay returns UNKNOWN. The restart therefore fails closed as
-  // CHANGES_MANUAL_RECOVERY_REQUIRED with the deleted truth and the sealed final
-  // record already on disk. The required behaviour is deterministic convergence
-  // to ROLLED_BACK; this test pins the observed defect, it does not accept it.
+  // CAS that would have sealed D's result was lost. This boundary used to be
+  // unrecoverable: settleRollbackCreate re-issues the raw D command, and native
+  // DELETE_CREATE_ROLLBACK required the exact quarantined record identities
+  // (undo_quarantine_state == NAME_EXACT) that its own first pass had deleted, so
+  // the replay returned UNKNOWN and the restart failed closed with the deleted
+  // truth already on disk. Native D now recognises its own sealed result via
+  // rollback_delete_sealed, so the restart converges deterministically to
+  // ROLLED_BACK, then A, then the ACK_COMMITTED terminal.
   test('rollback restart after D ran before the ROLLED_BACK CAS settles the sealed truth to ACK_COMMITTED', () => {
     const faults = rollbackFaults();
     const rolledBackCas = appendFailureInjector(
