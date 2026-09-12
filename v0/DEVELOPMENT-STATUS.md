@@ -6,6 +6,7 @@
 > 当前 checkpoint：**Stage A / A1b 独立复审 NO-GO（`e24bd51`，P0=0、P1=5、P2=1）；5 个 P1 的修复批次已实施**
 > 当前结论：**5 个 P1 均已修复并有可复现证据；A1b 仍待同一独立 reviewer 定点确认 P0=0/P1=0 后才可签收；A1c、A2、Stage B 重签与 Stage C/D/E 继续冻结**
 > 本批次实施记录：[`docs/archive/engineering/A1B-P1-FIX-PLAN-2026-09-11.md`](../docs/archive/engineering/A1B-P1-FIX-PLAN-2026-09-11.md)（预检分类、端口计划、缺陷与决策；不拥有派工权）
+> **顺序授权（2026-09-11，所有者）**：A1b 独立签收后**先做 A2a**（快照 create/list 的 App 接线，让用户第一次真正摸到快照），**A1c 后移**。见 `docs/0.4.0-EXECUTION-PROTOCOL.md` 同日修订；该授权只改顺序，不改门禁与产品范围。
 
 ## 1. 当前权威
 
