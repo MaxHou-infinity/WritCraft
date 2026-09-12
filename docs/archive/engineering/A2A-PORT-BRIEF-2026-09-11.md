@@ -93,3 +93,62 @@ node scripts/check-syntax.js
 超出 `package.json` 声明的 `engines`（`npm >=10 <12`）而必然失败（npm 12 的
 `npm pack --dry-run --json` 输出对象而非数组）。**不要为此放宽该冻结门禁**；
 完整 `npm test` 应在合规工具链或 CI（node 22 → npm 10）上跑。
+
+## 6. 实测移植评估（2026-09-11 预检结果，已逐文件核对）
+
+方法：把 `8880709^`（分支父提交）与当前 `main` 逐受影响文件对比。**结论：这是一次近乎干净的
+移植，不是重写**——这正是「禁止重复实现」想要的结果。
+
+| 文件 | 相对 `8880709^` 的差异 | 移植代价 |
+|---|---|---|
+| `v0/native/snapshot-storage-helper.c` | **逐字节相同** | 近似纯应用 |
+| `v0/src/main/snapshot-service.js`（及其 create 相关） | **逐字节相同** | 直接消费，**不需改动** |
+| 存储 helper 测试、worker 测试 | **逐字节相同** | 近似纯应用 |
+| `v0/src/main/preload.js` | 仅 `'use strict'` / 注释级差异 | 极小 |
+| `v0/src/main/project-service.js` | 同上 | 极小 |
+| `v0/src/main/snapshot-storage-worker.js` | 同上 | 极小 |
+| `v0/src/main/main.js` | **差 76 行**（来自后续 A1b 提交 `e66c260`/`4fb80cd`） | 需定向适配 |
+| `v0/src/renderer/*` | 后续 `readState()` 重构 + 新增 dialog；视图已用 `project()` helper，适配面收敛 | 需定向适配 |
+
+## 7. 两项已裁定的适配决定（所有者方向，勿再自行决定）
+
+### 7.1 通道：**增量移植，不替换**
+
+分支 `8880709` 的做法是**替换** Stage B 的
+`writcraft:project:list-delivery-snapshots` 通道为新的 `list-snapshots`，并从 preload 移除
+`listDeliverySnapshots`、把 `sources-view.js` 改指向新桥。
+
+**本批次不这样做。** 理由：执行协议冻结 Stage B 已签收的纯层，而 A2a 的交付物是
+「在 App 里创建/列出真实 committed snapshot」，**不是**统一快照通道。通道合并属 A→B 重签
+时的设计决定，不属本 checkpoint。
+
+因此：
+- 保留现有 `list-delivery-snapshots` 通道、`preload.listDeliverySnapshots` 与
+  `sources-view.js` 现有消费者**原样不动**；
+- A2a 的新 create/list 通道以**新增**方式进入新的 `snapshots` 桥；
+- **不需要**移植 `8880709` 对 `verify-v0-delivery-preflight-ipc-boundary.js` 的改动，该测试
+  必须保持原样且常绿。
+
+**遗留（需在 A→B 重签时决定，不得静默处理）**：届时 App 内会同时存在两个「列出快照」的
+通道（Stage B 的 delivery-preflight 只读通道 与 A2a 的新通道），需要在重签时明确合并或
+划定各自职责。
+
+### 7.2 既有测试：**必须一并移植/适配**
+
+`8880709` 还改了 6 个既有测试（helper +274、service-create +158、worker +54、
+project-service +15、project-home-snapshot +13、ipc-boundary），它们是 native
+`I`/容量守卫增量与私有目录接线的覆盖。当前 main 仍是分支前的版本，因此**必须同批次移植**，
+否则 `verify:0.4:current-components` 会红。
+
+注意：其中 ipc-boundary 那一项属 §7.1 已裁定不移植的通道替换，**保持不动**；其余 5 项按当前
+API 适配（是修改，不是新增注册）。
+
+## 8. 施工优先级（若需分批交付）
+
+1. `snapshot-handler.js` + `snapshotService` 接线（A2a 核心）
+2. 新增 create/list 两个通道 + `snapshots` preload 窄桥
+3. Renderer：`project-home-view.js` + `index.html`（脚本顺序 load-bearing）
+4. native 增量 + `npm run build:native-helper`
+5. 新 Electron 测试 + 清册登记
+
+若第 4/5 项超出预期，交付 1–3 并**精确说明剩余**，优于拖延全部。
