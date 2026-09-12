@@ -19,5 +19,6 @@
 - `engineering/A2A-PORT-BRIEF-2026-09-11.md`：A2a 移植来源与保真度证明（sha256/行差）；A2a 复审依赖它。
 - `engineering/SIMPLIFICATION-PROPOSAL-2026-09-11.md`：架构师只读简化提案（A2a P2-1 的来源）；其行数统计已被 2026-09-12 审计更新，见 CLEANUP-AUDIT。
 - `engineering/CLEANUP-BASELINE-2026-09-12.md`：2026-09-12 P0 清理审计的 Phase-0 基线与删除红线。
+- `engineering/CLEANUP-AUDIT-2026-09-12.md`：2026-09-12 三路只读审计（文档/代码/测试）的完整结论、被纠正的审计误判与逐项处置决议。
 
 归档文档可以回答“当时为什么这样做”，不能回答“现在下一步做什么”。任何旧 TODO 必须在 `v0/DEVELOPMENT-STATUS.md` 重新确认后才可执行。
