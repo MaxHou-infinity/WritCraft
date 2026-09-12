@@ -123,6 +123,23 @@ async function run() {
     assert.deepStrictEqual(instance.networkRequests.filter(url => /^https?:/iu.test(url)), []);
     assert.deepStrictEqual([...markdownBytes(project.rootPath)], [...beforeMarkdown]);
 
+    // renderer/project-home-view.js:440 starts a non-quiet refresh() for this
+    // Home activation, so its loadSnapshots (:156) can still be in flight right
+    // here. If that read lands after the chmod below makes the private snapshot
+    // root unsafe, its failure branch (:172-173) rewrites the create status this
+    // probe asserts, while the probe's own quiet refresh preserves it by design
+    // (:172 guard). Wait until the view is idle and one quiet refresh has taken
+    // over both request sequences; then any earlier non-quiet read is either
+    // finished or superseded and can no longer write the status.
+    await waitForValue(instance.client, `(async () => {
+      const view = document.getElementById('project-home-view');
+      if (view?.getAttribute('aria-busy') !== 'false') return null;
+      await window.__projectHomeView.refresh({ quietSnapshots: true });
+      const status = document.getElementById('project-home-status')?.textContent || '';
+      return status === '已根据当前项目事实更新。' ||
+        status === '部分本地索引暂不可用；已验证的入口仍可使用。';
+    })()`, 'the Home snapshot read to settle before the private-permission probe');
+
     const snapshotPrivateRoot = path.join(project.rootPath, '.writcraft', 'snapshots');
     fs.chmodSync(snapshotPrivateRoot, 0o755);
     try {

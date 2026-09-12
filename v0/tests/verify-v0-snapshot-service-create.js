@@ -12,6 +12,10 @@ const MANIFEST = `sha256:${'b'.repeat(64)}`;
 const PUBLISHED = `sha256:${'c'.repeat(64)}`;
 const RECEIPT = `sha256:${'d'.repeat(64)}`;
 
+// Pinned denominator: a skipped test must show up as a red, not as a smaller
+// self-consistent fraction. Update this number only when tests are added or
+// removed.
+const EXPECTED_TEST_COUNT = 21;
 let passed = 0;
 async function test(name, fn) {
   try {
@@ -581,7 +585,9 @@ function count(state, name) {
     assert.doesNotMatch(source, /createStage|writeStage|finalizeStage|reconcileCreate/u);
   });
 
-  console.log(`Snapshot production create service verification: ${passed}/${passed} passed`);
+  assert.strictEqual(passed, EXPECTED_TEST_COUNT,
+    `expected ${EXPECTED_TEST_COUNT} snapshot create service tests, ran ${passed}`);
+  console.log(`Snapshot production create service verification: ${passed}/${EXPECTED_TEST_COUNT} passed`);
 })().catch(error => {
   console.error(error.stack || error);
   process.exitCode = 1;
