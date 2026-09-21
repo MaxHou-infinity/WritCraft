@@ -19,7 +19,7 @@
 
 `ROADMAP-0.2.0.md` 已于 2026-08-03 获得所有者批准并生效。原审阅稿已直接转为该版本合同，不保留第二份活动路线图。
 
-`ROADMAP-0.3.0.md` 已于 2026-08-04 获批并完成阶段 0 → E，0.3.0 已发布为 npm/GitHub Developer Preview；其后 0.3.1 修复批次已于 2026-08-16 发布到 npm `preview`，是**当前公开版本**，发布事实见 [`NPM-DEVELOPER-PREVIEW-V1-CONTRACT.md`](NPM-DEVELOPER-PREVIEW-V1-CONTRACT.md)。
+`ROADMAP-0.3.0.md` 已于 2026-08-04 获批并完成阶段 0 → E，0.3.0 已发布为 npm/GitHub Developer Preview；其后 0.3.1 修复批次已于 2026-08-16 发布到 npm `preview`，是**当前公开版本**，见 [`RELEASE-NOTES-v0.3.1.md`](RELEASE-NOTES-v0.3.1.md) 与 [`NPM-DEVELOPER-PREVIEW-V1-CONTRACT.md`](NPM-DEVELOPER-PREVIEW-V1-CONTRACT.md)。
 
 `ROADMAP-0.4.0.md` 已于 2026-08-06 获批为 `WRC-0.4.0-R1`；所有者随后提交了其中 §11 的完整目标模式文本。阶段 0 已完成并由独立复审以 P0=0、P1=0、P2=4 签收。2026-08-11 完成封版距离审计后，执行方式切换为 `WRC-0.4.0-EXEC-R1` 受约束里程碑恢复；当前只允许 Stage A，Stage B 冻结等待 A→B 重签，C/D/E 禁止开工。
 
@@ -75,7 +75,8 @@
 - [`NPM-DEVELOPER-PREVIEW-V1-CONTRACT.md`](NPM-DEVELOPER-PREVIEW-V1-CONTRACT.md)：npm Preview 分发合同。
 - [`RELEASE-NOTES-v0.1.2.md`](RELEASE-NOTES-v0.1.2.md)：历史 0.1.2 Preview 说明。
 - [`RELEASE-NOTES-v0.2.0.md`](RELEASE-NOTES-v0.2.0.md)：历史 0.2.0 Preview 说明。
-- [`RELEASE-NOTES-v0.3.0.md`](RELEASE-NOTES-v0.3.0.md)：历史 0.3.0 透明 AI 协作 Preview 说明（已被 0.3.1 取代；0.3.1 未另写 release note，发布事实以 npm 合同为准）。
+- [`RELEASE-NOTES-v0.3.0.md`](RELEASE-NOTES-v0.3.0.md)：历史 0.3.0 透明 AI 协作 Preview 说明（已被 0.3.1 取代）。
+- [`RELEASE-NOTES-v0.3.1.md`](RELEASE-NOTES-v0.3.1.md)：**当前公开版本** 0.3.1 评估修复批次说明（tag `v0.3.1` 为补打，见该文件「Notes on this record」）。
 - [`../SECURITY.md`](../SECURITY.md)、[`../CONTRIBUTING.md`](../CONTRIBUTING.md)：安全与贡献。
 
 ## 冻结兼容合同（按受影响模块读取）
