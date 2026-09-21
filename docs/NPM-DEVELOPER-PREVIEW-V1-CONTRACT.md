@@ -1,6 +1,6 @@
 # WritCraft V0 · npm Developer Preview v1
 
-> Status (2026-09-12 refresh): the current public preview is **`writ-craft@0.3.1`**, published to npm `preview` on **2026-08-16** (release commit `74bc497`, an evaluation fix batch). Registry tags remain intentionally split: `preview: 0.3.1`, `latest: 0.1.0`. Release note: [`RELEASE-NOTES-v0.3.1.md`](RELEASE-NOTES-v0.3.1.md); both that note and the `v0.3.1` git tag were added **retrospectively** on 2026-09-12 (the npm publication itself was not, at the time, accompanied by either). This is still a macOS Developer Preview, not a stable release, and no App/ZIP was distributed.
+> Status (2026-09-21 refresh): the current public preview is **`writ-craft@0.3.1`**, published to npm `preview` on **2026-08-16** (release commit `74bc497`, an evaluation fix batch). Registry tags remain intentionally split: `preview: 0.3.1`, `latest: 0.1.0`. Release note: [`RELEASE-NOTES-v0.3.1.md`](RELEASE-NOTES-v0.3.1.md); both that note and the `v0.3.1` git tag were added **retrospectively on 2026-09-21** (the npm publication itself was not, at the time, accompanied by either). This is still a macOS Developer Preview, not a stable release, and no App/ZIP was distributed.
 >
 > Historical: `writ-craft@0.3.0` was published to npm `preview` on 2026-08-05 after real-author acceptance. The prior `0.1.2` publication remains historical: registry shasum `553bec35246b118ae5a47b2d4dd327c16c171029`, tag `v0.1.2`, release commit `395b863`.
 
